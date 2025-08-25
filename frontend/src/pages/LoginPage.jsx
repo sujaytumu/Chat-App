@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, UserPlus } from "lucide-react";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -97,13 +97,20 @@ const LoginPage = () => {
             </button>
           </form>
 
-          <div className="text-center">
-            <p className="text-base-content/60">
-              Don&apos;t have an account?{" "}
-              <Link to="/signup" className="link link-primary">
-                Create account
-              </Link>
-            </p>
+          {/* Highlighted Create Account Box */}
+          <div className="mt-6">
+            <Link
+              to="/signup"
+              className="block border-2 border-primary rounded-xl p-4 text-center shadow-md hover:shadow-xl hover:bg-primary/10 transition-all duration-300"
+            >
+              <div className="flex items-center justify-center gap-2 text-primary font-semibold">
+                <UserPlus className="w-5 h-5" />
+                Create New Account
+              </div>
+              <p className="text-sm text-base-content/60 mt-1">
+                Join us today – it only takes a minute!
+              </p>
+            </Link>
           </div>
         </div>
       </div>
