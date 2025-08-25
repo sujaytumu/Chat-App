@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, User, LogIn } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import AuthImagePattern from "../components/AuthImagePattern";
@@ -131,19 +131,25 @@ const SignUpPage = () => {
             </button>
           </form>
 
-          <div className="text-center">
-            <p className="text-base-content/60">
-              Already have an account?{" "}
-              <Link to="/login" className="link link-primary">
-                Sign in
-              </Link>
-            </p>
+          {/* Highlighted Login Box */}
+          <div className="mt-6">
+            <Link
+              to="/login"
+              className="block border-2 border-primary rounded-xl p-4 text-center shadow-md hover:shadow-xl hover:bg-primary/10 transition-all duration-300"
+            >
+              <div className="flex items-center justify-center gap-2 text-primary font-semibold">
+                <LogIn className="w-5 h-5" />
+                Already have an account? Sign In
+              </div>
+              <p className="text-sm text-base-content/60 mt-1">
+                Access your messages and continue chatting instantly.
+              </p>
+            </Link>
           </div>
         </div>
       </div>
 
       {/* right side */}
-
       <AuthImagePattern
         title="Join our community"
         subtitle="Connect with friends, share moments, and stay in touch with your loved ones."
