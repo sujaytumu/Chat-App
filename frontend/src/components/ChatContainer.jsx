@@ -14,7 +14,7 @@ const ChatContainer = () => {
     selectedUser,
     subscribeToMessages,
     unsubscribeFromMessages,
-    socket, // Assuming socket is exposed here or accessible via the store
+    socket, // Assuming socket is exposed here or accessible via store
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
