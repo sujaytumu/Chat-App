@@ -8,7 +8,7 @@ const MessageInput = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
-  const { sendMessage, socket, selectedUser } = useChatStore(); // Assuming socket and selectedUser available here..
+  const { sendMessage, socket, selectedUser } = useChatStore(); // Assuming socket and selectedUser available here
 
   // For typing throttle
   const typingTimeoutRef = useRef(null);
