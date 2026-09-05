@@ -3,87 +3,32 @@ import { useEffect, useRef, useState } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
+import ImageLightbox from "./ImageLightbox";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 
 const ChatContainer = () => {
-  const {
-    messages,
-    getMessages,
-    isMessagesLoading,
-    selectedUser,
-    subscribeToMessages,
-    unsubscribeFromMessages,
-    socket, // Assuming socket is exposed here or accessible via the store
-  } = useChatStore();
+  const { messages, isMessagesLoading, selectedChat, typingUsers } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
-  const [typingUsers, setTypingUsers] = useState(new Set());
+  const [lightboxSrc, setLightboxSrc] = useState(null);
 
-  useEffect(() => {
-    getMessages(selectedUser._id);
-    subscribeToMessages();
-    return () => unsubscribeFromMessages();
-  }, [selectedUser._id, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+  const isGroup = selectedChat.type === "group";
+  const data = selectedChat.data;
+
+  const membersById = isGroup
+    ? Object.fromEntries(data.members.map((m) => [m._id, m]))
+    : {};
+
+  const isOtherTyping = isGroup
+    ? (typingUsers[`group:${data._id}`]?.size ?? 0) > 0
+    : (typingUsers[data._id]?.size ?? 0) > 0;
 
   useEffect(() => {
     if (messageEndRef.current && messages) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages]);
-
-  // Listen for typing events
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleTyping = ({ fromUserId }) => {
-      if (fromUserId === selectedUser._id) {
-        setTypingUsers((prev) => new Set(prev).add(fromUserId));
-      }
-    };
-
-    const handleStopTyping = ({ fromUserId }) => {
-      if (fromUserId === selectedUser._id) {
-        setTypingUsers((prev) => {
-          const copy = new Set(prev);
-          copy.delete(fromUserId);
-          return copy;
-        });
-      }
-    };
-
-    const handleMessageSeen = ({ messageId, seenBy }) => {
-      // Optionally update message state to mark message as seen
-      // This depends on your store update method - example:
-      // updateMessageSeen(messageId, seenBy);
-    };
-
-    socket.on("typing", handleTyping);
-    socket.on("stopTyping", handleStopTyping);
-    socket.on("messageSeen", handleMessageSeen);
-
-    return () => {
-      socket.off("typing", handleTyping);
-      socket.off("stopTyping", handleStopTyping);
-      socket.off("messageSeen", handleMessageSeen);
-    };
-  }, [socket, selectedUser._id]);
-
-  // Emit messageSeen when messages from selectedUser are displayed
-  useEffect(() => {
-    if (!socket || !messages.length) return;
-
-    // Collect messages sent by selectedUser that are not seen yet
-    const unseenMessages = messages.filter(
-      (msg) => msg.senderId === selectedUser._id && !msg.seen
-    );
-
-    unseenMessages.forEach((msg) => {
-      socket.emit("messageSeen", { messageId: msg._id, fromUserId: msg.senderId });
-      // Optionally update locally that this message has been seen to prevent duplicate emits
-      // markMessageSeenLocally(msg._id);
-    });
-  }, [messages, selectedUser._id, socket]);
+  }, [messages, isOtherTyping]);
 
   if (isMessagesLoading) {
     return (
@@ -98,59 +43,54 @@ const ChatContainer = () => {
   return (
     <div className="flex-1 flex flex-col overflow-auto bg-[#ECE5DD]">
       <ChatHeader />
-      {/* Typing indicator */}
-      {typingUsers.has(selectedUser._id) && (
-        <div className="px-4 text-sm italic text-gray-600">{selectedUser.name} is typing...</div>
-      )}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((message) => {
           const isMe = message.senderId === authUser._id;
+          const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
+
           return (
-            <div
-              key={message._id}
-              className={`flex items-end ${isMe ? "justify-end" : "justify-start"}`}
-              ref={messageEndRef}
-            >
+            <div key={message._id} className={`flex items-end ${isMe ? "justify-end" : "justify-start"}`}>
               {!isMe && (
-                <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden mr-2 shrink-0">
                   <img
-                    src={selectedUser.profilePic || "/avatar.png"}
+                    src={sender?.profilePic || "/avatar.png"}
                     alt="profile pic"
                     className="w-full h-full object-cover"
                   />
                 </div>
               )}
               <div
-                className={`max-w-[45%] px-3 py-1.5 rounded-lg break-words shadow-sm flex items-end pl-3 ${
-                  isMe
-                    ? "bg-[#25D366] text-white rounded-br-none"
-                    : "bg-white text-black rounded-bl-none"
+                className={`max-w-[65%] sm:max-w-[45%] px-3 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
+                  isMe ? "bg-[#25D366] text-white rounded-br-none" : "bg-white text-black rounded-bl-none"
                 }`}
-                style={{ whiteSpace: "pre-wrap" }}
               >
-                {message.text}
+                {isGroup && !isMe && (
+                  <span className="text-xs font-semibold text-primary mb-0.5">
+                    {sender?.fullName || "Unknown"}
+                  </span>
+                )}
                 {message.image && (
                   <img
                     src={message.image}
                     alt="Attachment"
-                    className="sm:max-w-[150px] rounded-md mt-1"
+                    onClick={() => setLightboxSrc(message.image)}
+                    className="max-w-[220px] rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
                   />
                 )}
+                {message.text && <span style={{ whiteSpace: "pre-wrap" }}>{message.text}</span>}
                 <span
-                  className={`ml-2 text-[10px] leading-none flex-shrink-0 self-end whitespace-nowrap ${
+                  className={`self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap ${
                     isMe ? "text-white/80" : "text-black/60"
                   }`}
-                  style={{ minWidth: "32px", textAlign: "right" }}
                 >
                   {formatMessageTime(message.createdAt)}
+                  {isMe && !isGroup && message.seen && <span>✓✓</span>}
+                  {isMe && isGroup && message.seenBy?.length > 1 && <span>✓✓</span>}
                 </span>
-                {/* Show Seen indicator */}
-                {isMe && message.seen && (
-                  <span className="ml-1 text-[9px] leading-none self-end text-white/70">✓✓ Seen</span>
-                )}
               </div>
               {isMe && (
-                <div className="w-8 h-8 rounded-full overflow-hidden ml-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden ml-2 shrink-0">
                   <img
                     src={authUser.profilePic || "/avatar.png"}
                     alt="profile pic"
@@ -161,8 +101,20 @@ const ChatContainer = () => {
             </div>
           );
         })}
+
+        {isOtherTyping && (
+          <div className="flex items-center gap-1 px-2">
+            <span className="size-2 rounded-full bg-zinc-400 animate-bounce [animation-delay:-0.3s]" />
+            <span className="size-2 rounded-full bg-zinc-400 animate-bounce [animation-delay:-0.15s]" />
+            <span className="size-2 rounded-full bg-zinc-400 animate-bounce" />
+          </div>
+        )}
+        <div ref={messageEndRef} />
       </div>
+
       <MessageInput />
+
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 };
