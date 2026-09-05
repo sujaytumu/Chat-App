@@ -1,16 +1,18 @@
 import { useRef, useState, useEffect } from "react";
 import { useChatStore } from "../store/useChatStore";
-import { Image, Send, X } from "lucide-react";
+import { Image, Send, X, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
+import { compressImage, MAX_IMAGE_SIZE_MB } from "../lib/imageUtils";
 
 const MessageInput = () => {
   const [text, setText] = useState("");
   const [imagePreview, setImagePreview] = useState(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
-  const { sendMessage, socket, selectedUser } = useChatStore(); // Assuming socket and selectedUser available here
+  const { sendMessage, emitTyping, emitStopTyping, selectedChat } = useChatStore();
 
-  // For typing throttle
   const typingTimeoutRef = useRef(null);
 
   const resizeTextarea = () => {
@@ -20,17 +22,27 @@ const MessageInput = () => {
     }
   };
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
+    if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file");
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+    if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+      toast.error(`Image must be under ${MAX_IMAGE_SIZE_MB}MB`);
+      return;
+    }
+
+    setIsCompressing(true);
+    try {
+      const compressed = await compressImage(file);
+      setImagePreview(compressed);
+    } catch {
+      toast.error("Could not process that image");
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const removeImage = () => {
@@ -38,40 +50,34 @@ const MessageInput = () => {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Emit typing event with throttle
   const handleTyping = () => {
-    if (!socket || !selectedUser?._id) return;
-
-    socket.emit("typing", { toUserId: selectedUser._id });
-
+    emitTyping();
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-
-    typingTimeoutRef.current = setTimeout(() => {
-      socket.emit("stopTyping", { toUserId: selectedUser._id });
-    }, 1500);
+    typingTimeoutRef.current = setTimeout(() => emitStopTyping(), 1500);
   };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!text.trim() && !imagePreview) return;
+    if ((!text.trim() && !imagePreview) || isSending) return;
 
-    if (socket && selectedUser?._id) {
-      socket.emit("stopTyping", { toUserId: selectedUser._id }); // Stop typing on send
-    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    emitStopTyping();
 
+    setIsSending(true);
     try {
       await sendMessage({
         text: text.trim(),
         image: imagePreview,
       });
 
-      // Clear form
       setText("");
       setImagePreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
-      if (textareaRef.current) textareaRef.current.style.height = "40px"; // Reset height after send
-    } catch (error) {
-      console.error("Failed to send message:", error);
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+    } catch {
+      // toast already shown by store
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -88,18 +94,15 @@ const MessageInput = () => {
         handleSendMessage(e);
       }
     }
-    // Shift + Enter adds newline
   };
 
-  // Cleanup typing timeout and emit stopTyping on unmount
   useEffect(() => {
     return () => {
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (socket && selectedUser?._id) {
-        socket.emit("stopTyping", { toUserId: selectedUser._id });
-      }
+      emitStopTyping();
     };
-  }, [socket, selectedUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat]);
 
   return (
     <div className="p-4 w-full">
@@ -146,16 +149,17 @@ const MessageInput = () => {
               imagePreview ? "text-emerald-500" : "text-zinc-400"
             } items-center justify-center`}
             onClick={() => fileInputRef.current?.click()}
+            disabled={isCompressing}
           >
-            <Image size={20} />
+            {isCompressing ? <Loader2 size={20} className="animate-spin" /> : <Image size={20} />}
           </button>
         </div>
         <button
           type="submit"
           className="btn btn-sm btn-circle"
-          disabled={!text.trim() && !imagePreview}
+          disabled={(!text.trim() && !imagePreview) || isSending}
         >
-          <Send size={22} />
+          {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={22} />}
         </button>
       </form>
     </div>
@@ -163,4 +167,3 @@ const MessageInput = () => {
 };
 
 export default MessageInput;
-

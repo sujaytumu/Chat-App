@@ -4,21 +4,15 @@ import NoChatSelected from "../components/NoChatSelected";
 import ChatContainer from "../components/ChatContainer";
 
 const HomePage = () => {
-  const { selectedUser } = useChatStore();
+  const { selectedChat } = useChatStore();
 
   return (
     <div className="h-screen bg-base-200">
-      {/* Removed flex and horizontal padding from this container */}
       <div className="pt-20">
-        {/* Removed max-w-6xl and px-4 to allow full width */}
         <div className="bg-base-100 rounded-lg shadow-cl w-full h-[calc(100vh-8rem)]">
-          {/* Flex container for sidebar and chat */}
           <div className="flex h-full rounded-lg overflow-hidden">
-            {/* Sidebar should have fixed width without margin/padding */}
             <Sidebar />
-
-            {/* Chat area will fill remaining space */}
-            {!selectedUser ? <NoChatSelected /> : <ChatContainer />}
+            {!selectedChat ? <NoChatSelected /> : <ChatContainer />}
           </div>
         </div>
       </div>
@@ -27,4 +21,3 @@ const HomePage = () => {
 };
 
 export default HomePage;
-
