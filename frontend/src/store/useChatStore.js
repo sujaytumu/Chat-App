@@ -2,6 +2,17 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import { playNotificationSound, showDesktopNotification } from "../lib/notificationSound";
+
+function notifyIncoming(senderName, message, isGroup = false) {
+  playNotificationSound();
+  const body = message.image ? "📷 Photo" : message.text || "New message";
+  showDesktopNotification(isGroup ? `${senderName}` : senderName, {
+    body: isGroup && message.text ? message.text : body,
+    icon: "/whatsapp-icon.jpg",
+    tag: isGroup ? `group-${message.groupId}` : `dm-${message.senderId}`,
+  });
+}
 
 export const useChatStore = create((set, get) => ({
   // Sidebar data
@@ -204,7 +215,9 @@ export const useChatStore = create((set, get) => ({
 
       if (isActiveChat) {
         set({ messages: [...messages, message] });
-        axiosInstance.put(`/messages/seen/${message.senderId}`).catch(() => {});
+        if (document.visibilityState === "visible") {
+          axiosInstance.put(`/messages/seen/${message.senderId}`).catch(() => {});
+        }
       } else {
         set((state) => ({
           users: state.users.map((u) =>
@@ -213,6 +226,11 @@ export const useChatStore = create((set, get) => ({
               : u
           ),
         }));
+      }
+
+      if (!isActiveChat || document.visibilityState !== "visible") {
+        const sender = get().users.find((u) => u._id === message.senderId);
+        notifyIncoming(sender?.fullName || "New message", message);
       }
 
       // Bump sender to top / refresh preview regardless of active chat
@@ -245,6 +263,11 @@ export const useChatStore = create((set, get) => ({
               : g
           ),
         }));
+      }
+
+      if ((!isActiveChat || document.visibilityState !== "visible") && message.senderId !== useAuthStore.getState().authUser?._id) {
+        const group = get().groups.find((g) => g._id === message.groupId);
+        notifyIncoming(group?.name || "New group message", message, true);
       }
 
       set((state) => {

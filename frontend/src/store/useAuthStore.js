@@ -3,6 +3,7 @@ import { axiosInstance } from "../lib/axios.js";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 import { useChatStore } from "./useChatStore";
+import { useCallStore } from "./useCallStore";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
 
@@ -102,9 +103,12 @@ export const useAuthStore = create((set, get) => ({
 
     // Wire up chat-related socket listeners (messages, typing, groups) once
     useChatStore.getState().subscribeToSocket();
+    useCallStore.getState().subscribeToCallSocket();
   },
   disconnectSocket: () => {
     useChatStore.getState().unsubscribeFromSocket();
+    useCallStore.getState().unsubscribeFromCallSocket();
+    useCallStore.getState().resetCall();
     if (get().socket?.connected) get().socket.disconnect();
     set({ socket: null });
   },
