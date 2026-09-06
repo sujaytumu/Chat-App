@@ -2,7 +2,6 @@ import { useRef, useState, useEffect } from "react";
 import { useChatStore } from "../store/useChatStore";
 import {
   Paperclip,
-  Send,
   X,
   Loader2,
   Image as ImageIcon,
@@ -12,6 +11,7 @@ import {
   Mic,
   Trash2,
 } from "lucide-react";
+import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import { compressImage } from "../lib/imageUtils";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
@@ -420,7 +420,10 @@ const MessageInput = () => {
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               placeholder="Type a message"
-              className="flex-1 resize-none rounded-lg bg-[#2A3942] px-4 py-2.5 text-[15px] max-h-32 min-h-[42px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              className="flex-1 resize-none rounded-lg bg-[#2A3942] px-4 py-2.5 text-[15px] leading-[20px] max-h-32 min-h-[42px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
               style={{ overflow: "hidden" }}
             />
           </>
@@ -432,7 +435,7 @@ const MessageInput = () => {
             className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
             disabled={isSending}
           >
-            {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={19} className="ml-0.5" />}
+            {isSending ? <Loader2 size={20} className="animate-spin" /> : <WhatsAppSendIcon size={18} className="ml-0.5" />}
           </button>
         ) : (
           <button
@@ -445,7 +448,7 @@ const MessageInput = () => {
             {isSending ? (
               <Loader2 size={20} className="animate-spin" />
             ) : isRecording ? (
-              <Send size={19} className="ml-0.5" />
+              <WhatsAppSendIcon size={18} className="ml-0.5" />
             ) : (
               <Mic size={20} />
             )}

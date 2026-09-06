@@ -146,7 +146,11 @@ const ChatContainer = () => {
                   />
                 )}
                 {message.file && <AttachmentContent file={message.file} />}
-                {message.text && <span style={{ whiteSpace: "pre-wrap" }}>{message.text}</span>}
+                {message.text && (
+                  <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
+                    {message.text}
+                  </span>
+                )}
                 <span
                   className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]"
                 >
