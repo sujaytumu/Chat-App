@@ -103,6 +103,34 @@ export const useChatStore = create((set, get) => ({
           : `/groups/${selectedChat.data._id}/messages`;
       const res = await axiosInstance.post(url, messageData);
       set({ messages: [...messages, res.data] });
+
+      // Bump this chat to the top of the sidebar and refresh its preview
+      // immediately — don't wait for a refetch.
+      if (selectedChat.type === "direct") {
+        set((state) => {
+          const updated = state.users.map((u) =>
+            u._id === selectedChat.data._id ? { ...u, lastMessage: res.data } : u
+          );
+          updated.sort((a, b) => {
+            const at = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
+            const bt = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
+            return bt - at;
+          });
+          return { users: updated };
+        });
+      } else {
+        set((state) => {
+          const updated = state.groups.map((g) =>
+            g._id === selectedChat.data._id ? { ...g, lastMessage: res.data } : g
+          );
+          updated.sort((a, b) => {
+            const at = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : new Date(a.createdAt).getTime();
+            const bt = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : new Date(b.createdAt).getTime();
+            return bt - at;
+          });
+          return { groups: updated };
+        });
+      }
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to send message");
       throw error;
