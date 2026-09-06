@@ -60,11 +60,12 @@ export function playRingtone() {
   }
 }
 
-export function requestNotificationPermission() {
-  if (typeof Notification === "undefined") return;
+export async function requestNotificationPermission() {
+  if (typeof Notification === "undefined") return "unsupported";
   if (Notification.permission === "default") {
-    Notification.requestPermission();
+    return await Notification.requestPermission();
   }
+  return Notification.permission;
 }
 
 function urlBase64ToUint8Array(base64String) {
