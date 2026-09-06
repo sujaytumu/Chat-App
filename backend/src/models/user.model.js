@@ -20,6 +20,17 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Web Push subscriptions (one per browser/device the user has granted
+    // notification permission on)
+    pushSubscriptions: [
+      {
+        endpoint: { type: String, required: true },
+        keys: {
+          p256dh: { type: String, required: true },
+          auth: { type: String, required: true },
+        },
+      },
+    ],
   },
   { timestamps: true }
 );

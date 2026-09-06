@@ -9,6 +9,8 @@ import {
   FileText,
   Music,
   Video as VideoIcon,
+  Mic,
+  Trash2,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { compressImage } from "../lib/imageUtils";
@@ -21,6 +23,14 @@ const MessageInput = () => {
   const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingStreamRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
+  const discardRecordingRef = useRef(false);
 
   const photoInputRef = useRef(null);
   const documentInputRef = useRef(null);
@@ -144,6 +154,84 @@ const MessageInput = () => {
     typingTimeoutRef.current = setTimeout(() => emitStopTyping(), 1500);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      audioChunksRef.current = [];
+      discardRecordingRef.current = false;
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        clearInterval(recordingIntervalRef.current);
+
+        if (discardRecordingRef.current || audioChunksRef.current.length === 0) {
+          setIsRecording(false);
+          setRecordingSeconds(0);
+          return;
+        }
+
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
+        setIsSending(true);
+        try {
+          const data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error("Failed to read recording"));
+            reader.readAsDataURL(blob);
+          });
+          await sendMessage({
+            text: "",
+            file: { data, name: `Voice message.webm`, mimeType: blob.type, size: blob.size },
+          });
+        } catch {
+          toast.error("Could not send voice message");
+        } finally {
+          setIsSending(false);
+          setIsRecording(false);
+          setRecordingSeconds(0);
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } catch {
+      toast.error("Microphone access is needed to record a voice message");
+    }
+  };
+
+  const stopRecording = (discard = false) => {
+    discardRecordingRef.current = discard;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearInterval(recordingIntervalRef.current);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const formatDuration = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if ((!text.trim() && !imagePreview && !filePreview) || isSending) return;
@@ -243,95 +331,126 @@ const MessageInput = () => {
       )}
 
       <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-        <div className="relative" ref={attachMenuRef}>
-          {showAttachMenu && (
-            <div className="absolute bottom-full left-0 mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
+        {isRecording ? (
+          <div className="flex-1 flex items-center gap-3 bg-[#2A3942] rounded-lg px-4 py-2.5 min-h-[42px]">
+            <button
+              type="button"
+              onClick={() => stopRecording(true)}
+              className="text-[#8696A0] hover:text-red-400 transition-colors shrink-0"
+              title="Cancel recording"
+            >
+              <Trash2 size={19} />
+            </button>
+            <span className="size-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="text-[#D1D7DB] text-sm tabular-nums">{formatDuration(recordingSeconds)}</span>
+            <span className="text-[#8696A0] text-xs ml-auto hidden sm:inline">Recording voice message…</span>
+          </div>
+        ) : (
+          <>
+            <div className="relative" ref={attachMenuRef}>
+              {showAttachMenu && (
+                <div className="absolute bottom-full left-0 mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                  >
+                    <span className="size-8 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
+                      <ImageIcon size={16} className="text-white" />
+                    </span>
+                    Photo &amp; Video
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => documentInputRef.current?.click()}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                  >
+                    <span className="size-8 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
+                      <FileText size={16} className="text-white" />
+                    </span>
+                    Document
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => audioInputRef.current?.click()}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                  >
+                    <span className="size-8 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
+                      <Music size={16} className="text-white" />
+                    </span>
+                    Audio
+                  </button>
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                ref={photoInputRef}
+                onChange={handlePhotoOrVideoChange}
+              />
+              <input type="file" className="hidden" ref={documentInputRef} onChange={handleDocumentChange} />
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                ref={audioInputRef}
+                onChange={handleAudioChange}
+              />
+
               <button
                 type="button"
-                onClick={() => photoInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                onClick={() => setShowAttachMenu((s) => !s)}
+                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
+                disabled={isProcessingAttachment}
               >
-                <span className="size-8 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
-                  <ImageIcon size={16} className="text-white" />
-                </span>
-                Photo &amp; Video
-              </button>
-              <button
-                type="button"
-                onClick={() => documentInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
-              >
-                <span className="size-8 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
-                  <FileText size={16} className="text-white" />
-                </span>
-                Document
-              </button>
-              <button
-                type="button"
-                onClick={() => audioInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
-              >
-                <span className="size-8 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
-                  <Music size={16} className="text-white" />
-                </span>
-                Audio
+                {isProcessingAttachment ? (
+                  <Loader2 size={21} className="animate-spin" />
+                ) : (
+                  <Paperclip size={22} className="rotate-45" />
+                )}
               </button>
             </div>
-          )}
 
-          <input
-            type="file"
-            accept="image/*,video/*"
-            className="hidden"
-            ref={photoInputRef}
-            onChange={handlePhotoOrVideoChange}
-          />
-          <input
-            type="file"
-            className="hidden"
-            ref={documentInputRef}
-            onChange={handleDocumentChange}
-          />
-          <input
-            type="file"
-            accept="audio/*"
-            className="hidden"
-            ref={audioInputRef}
-            onChange={handleAudioChange}
-          />
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message"
+              className="flex-1 resize-none rounded-lg bg-[#2A3942] px-4 py-2.5 text-[15px] max-h-32 min-h-[42px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
+              style={{ overflow: "hidden" }}
+            />
+          </>
+        )}
 
+        {!isRecording && (text.trim() || hasAttachment) ? (
+          <button
+            type="submit"
+            className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
+            disabled={isSending}
+          >
+            {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={19} className="ml-0.5" />}
+          </button>
+        ) : (
           <button
             type="button"
-            onClick={() => setShowAttachMenu((s) => !s)}
-            className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
-            disabled={isProcessingAttachment}
+            onClick={isRecording ? () => stopRecording(false) : startRecording}
+            className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
+            disabled={isSending}
+            title={isRecording ? "Send voice message" : "Record voice message"}
           >
-            {isProcessingAttachment ? (
-              <Loader2 size={21} className="animate-spin" />
+            {isSending ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : isRecording ? (
+              <Send size={19} className="ml-0.5" />
             ) : (
-              <Paperclip size={22} className="rotate-45" />
+              <Mic size={20} />
             )}
           </button>
-        </div>
-
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          value={text}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message"
-          className="flex-1 resize-none rounded-lg bg-[#2A3942] px-4 py-2.5 text-[15px] max-h-32 min-h-[42px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
-          style={{ overflow: "hidden" }}
-        />
-
-        <button
-          type="submit"
-          className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors disabled:bg-[#2A3942] disabled:text-[#5b6971]"
-          disabled={(!text.trim() && !hasAttachment) || isSending}
-        >
-          {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={19} className="ml-0.5" />}
-        </button>
+        )}
       </form>
     </div>
   );
