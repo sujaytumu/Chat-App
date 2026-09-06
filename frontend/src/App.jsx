@@ -5,7 +5,8 @@ import LoginPage from "./pages/LoginPage";//login
 import SettingsPage from "./pages/SettingsPage";//settings page
 import ProfilePage from "./pages/ProfilePage";
 import NotificationManager from "./components/NotificationManager";
-import CallManager from "./components/CallManager";
+import { lazy, Suspense } from "react";
+const CallManager = lazy(() => import("./components/CallManager"));
 
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
@@ -39,7 +40,11 @@ const App = () => {
       <Navbar />
 
       {authUser && <NotificationManager />}
-      {authUser && <CallManager />}
+      {authUser && (
+        <Suspense fallback={null}>
+          <CallManager />
+        </Suspense>
+      )}
 
       {/* Main routes */}
       <main className="flex-1">

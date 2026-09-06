@@ -48,7 +48,7 @@ const ChatContainer = () => {
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-auto bg-[#ECE5DD]">
+      <div className="flex-1 flex flex-col overflow-auto bg-[#0B141A]">
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -57,18 +57,18 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-auto bg-[#ECE5DD]">
+    <div className="flex-1 flex flex-col overflow-auto bg-[#0B141A]">
       <ChatHeader />
 
       {pinnedMessage && (
         <button
           onClick={scrollToPinned}
-          className="flex items-center gap-2 px-4 py-2 bg-[#f5f0d8] border-b border-black/5 text-left hover:bg-[#efe8c8] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#202C33] border-b border-black/30 text-left hover:bg-[#26333c] transition-colors"
         >
-          <Pin size={14} className="text-amber-700 shrink-0" />
+          <Pin size={14} className="text-[#00A884] shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-amber-800">Pinned message</p>
-            <p className="text-sm truncate text-zinc-700">
+            <p className="text-xs font-medium text-[#00A884]">Pinned message</p>
+            <p className="text-sm truncate text-[#D1D7DB]">
               {pinnedMessage.image ? "📷 Photo" : pinnedMessage.file ? `📎 ${pinnedMessage.file.name}` : pinnedMessage.text}
             </p>
           </div>
@@ -78,7 +78,7 @@ const ChatContainer = () => {
               e.stopPropagation();
               togglePinMessage(pinnedMessage._id);
             }}
-            className="btn btn-xs btn-circle btn-ghost shrink-0"
+            className="size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 shrink-0"
             title="Unpin"
           >
             <X size={13} />
@@ -112,7 +112,7 @@ const ChatContainer = () => {
               {isMe && (
                 <button
                   onClick={() => togglePinMessage(message._id)}
-                  className={`btn btn-xs btn-circle btn-ghost mr-1 mb-1 transition-opacity ${
+                  className={`size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 mr-1 mb-1 transition-opacity ${
                     hoveredId === message._id ? "opacity-100" : "opacity-0"
                   }`}
                   title={message.pinned ? "Unpin" : "Pin"}
@@ -122,17 +122,17 @@ const ChatContainer = () => {
               )}
 
               <div
-                className={`max-w-[65%] sm:max-w-[45%] px-3 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
-                  isMe ? "bg-[#25D366] text-white rounded-br-none" : "bg-white text-black rounded-bl-none"
+                className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
+                  isMe ? "bg-[#005C4B] text-[#E9EDEF] rounded-br-none" : "bg-[#202C33] text-[#E9EDEF] rounded-bl-none"
                 }`}
               >
                 {isGroup && !isMe && (
-                  <span className="text-xs font-semibold text-primary mb-0.5">
+                  <span className="text-xs font-semibold text-[#00A884] mb-0.5">
                     {sender?.fullName || "Unknown"}
                   </span>
                 )}
                 {message.pinned && (
-                  <span className="flex items-center gap-1 text-[10px] mb-0.5 opacity-70">
+                  <span className="flex items-center gap-1 text-[10px] mb-0.5 text-[#8696A0]">
                     <Pin size={10} /> Pinned
                   </span>
                 )}
@@ -140,27 +140,26 @@ const ChatContainer = () => {
                   <img
                     src={message.image}
                     alt="Attachment"
+                    loading="lazy"
                     onClick={() => setLightboxSrc(message.image)}
-                    className="max-w-[220px] rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                    className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
                   />
                 )}
                 {message.file && <AttachmentContent file={message.file} />}
                 {message.text && <span style={{ whiteSpace: "pre-wrap" }}>{message.text}</span>}
                 <span
-                  className={`self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap ${
-                    isMe ? "text-white/80" : "text-black/60"
-                  }`}
+                  className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]"
                 >
                   {formatMessageTime(message.createdAt)}
                   {isMe && !isGroup && <MessageTicks message={message} />}
-                  {isMe && isGroup && message.seenBy?.length > 1 && <span>✓✓</span>}
+                  {isMe && isGroup && message.seenBy?.length > 1 && <span className="text-[#53BDEB]">✓✓</span>}
                 </span>
               </div>
 
               {!isMe && (
                 <button
                   onClick={() => togglePinMessage(message._id)}
-                  className={`btn btn-xs btn-circle btn-ghost ml-1 mb-1 transition-opacity ${
+                  className={`size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 ml-1 mb-1 transition-opacity ${
                     hoveredId === message._id ? "opacity-100" : "opacity-0"
                   }`}
                   title={message.pinned ? "Unpin" : "Pin"}
