@@ -15,9 +15,9 @@ const NotificationManager = () => {
 
   useEffect(() => {
     const trySubscribe = async () => {
-      requestNotificationPermission();
-      if (Notification.permission === "granted") {
-        registerPushSubscription(axiosInstance);
+      const result = await requestNotificationPermission();
+      if (result === "granted") {
+        await registerPushSubscription(axiosInstance);
       }
     };
     trySubscribe();
