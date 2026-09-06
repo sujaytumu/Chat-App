@@ -62,6 +62,41 @@ export function requestNotificationPermission() {
   }
 }
 
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+// Registers the service worker and subscribes the browser to Web Push, so
+// this device keeps getting notified even when the site/tab is fully closed
+// (as long as the browser/OS is running). Safe to call repeatedly.
+export async function registerPushSubscription(axiosInstance) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  if (Notification.permission !== "granted") return;
+
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+
+    const { data } = await axiosInstance.get("/push/vapid-public-key");
+    if (!data.publicKey) return; // backend not configured with VAPID keys yet
+
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(data.publicKey),
+      });
+    }
+
+    await axiosInstance.post("/push/subscribe", subscription.toJSON());
+  } catch (err) {
+    console.log("Push subscription failed:", err.message);
+  }
+}
+
 export function showDesktopNotification(title, options) {
   if (typeof Notification === "undefined") return;
   if (Notification.permission !== "granted") return;

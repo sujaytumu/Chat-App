@@ -172,7 +172,11 @@ const Sidebar = () => {
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-medium truncate text-[#E9EDEF]">{item.name}</span>
                   {item.lastMessage && (
-                    <span className="text-[10px] text-[#8696A0] shrink-0">
+                    <span
+                      className={`text-[10px] shrink-0 ${
+                        item.unreadCount > 0 ? "text-[#00A884] font-semibold" : "text-[#8696A0]"
+                      }`}
+                    >
                       {new Date(item.lastMessage.createdAt).toLocaleTimeString("en-US", {
                         hour: "2-digit",
                         minute: "2-digit",
@@ -182,7 +186,7 @@ const Sidebar = () => {
                 </div>
                 <div
                   className={`text-sm truncate ${
-                    item.unreadCount > 0 ? "text-[#E9EDEF] font-medium" : "text-[#8696A0]"
+                    item.unreadCount > 0 ? "text-[#E9EDEF] font-semibold" : "text-[#8696A0]"
                   }`}
                 >
                   {lastMessagePreview(item.lastMessage, useAuthStore.getState().authUser?._id)}

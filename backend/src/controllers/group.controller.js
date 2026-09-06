@@ -3,6 +3,7 @@ import Message from "../models/message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
+import { sendPushToUser } from "../lib/webPush.js";
 
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
@@ -179,6 +180,19 @@ export const sendGroupMessage = async (req, res) => {
     });
 
     io.to(groupId.toString()).emit("newGroupMessage", newMessage);
+
+    // Push to every other member so they're notified even with the app closed
+    group.members
+      .filter((memberId) => !memberId.equals(senderId))
+      .forEach((memberId) => {
+        sendPushToUser(memberId, {
+          title: `${req.user.fullName} in ${group.name}`,
+          body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
+          icon: group.groupPic || "/whatsapp-icon.jpg",
+          tag: `group-${groupId}`,
+          data: { url: "/", chatType: "group", chatId: groupId.toString() },
+        });
+      });
 
     res.status(201).json(newMessage);
   } catch (error) {

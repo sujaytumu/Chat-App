@@ -5,6 +5,7 @@ import Group from "../models/group.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
+import { sendPushToUser } from "../lib/webPush.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -139,6 +140,16 @@ export const sendMessage = async (req, res) => {
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
     }
+
+    // Background push notification — reaches the recipient even if the app
+    // isn't open at all, as long as they've granted notification permission.
+    sendPushToUser(receiverId, {
+      title: req.user.fullName,
+      body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
+      icon: req.user.profilePic || "/whatsapp-icon.jpg",
+      tag: `dm-${senderId}`,
+      data: { url: "/", chatType: "direct", chatId: senderId.toString() },
+    });
 
     res.status(201).json(newMessage);
   } catch (error) {

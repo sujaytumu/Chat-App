@@ -10,9 +10,12 @@ import { connectDB } from "./lib/db.js";
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
 import groupRoutes from "./routes/group.route.js";
+import pushRoutes from "./routes/push.route.js";
 import { app, server } from "./lib/socket.js";
+import { configureWebPush } from "./lib/webPush.js";
 
 dotenv.config();
+configureWebPush();
 
 const PORT = process.env.PORT || 5001;
 const __dirname = path.resolve();
@@ -34,6 +37,7 @@ app.use(
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/push", pushRoutes);
 
 if (process.env.NODE_ENV === "production") {
   app.use(

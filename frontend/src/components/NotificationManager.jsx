@@ -1,22 +1,31 @@
 import { useEffect } from "react";
 import { useChatStore } from "../store/useChatStore";
-import { requestNotificationPermission } from "../lib/notificationSound";
+import { requestNotificationPermission, registerPushSubscription } from "../lib/notificationSound";
+import { axiosInstance } from "../lib/axios";
 
 const BASE_TITLE = "Talkies";
 
-// Invisible component: requests notification permission once, and keeps the
-// browser tab title showing the total unread count (e.g. "(3) Talkies"),
-// similar to WhatsApp Web.
+// Invisible component: requests notification permission, subscribes this
+// device to background Web Push (so notifications arrive even with the app
+// fully closed), and keeps the browser tab title showing the total unread
+// count (e.g. "(3) Talkies"), similar to WhatsApp Web.
 const NotificationManager = () => {
   const users = useChatStore((s) => s.users);
   const groups = useChatStore((s) => s.groups);
 
   useEffect(() => {
-    requestNotificationPermission();
+    const trySubscribe = async () => {
+      requestNotificationPermission();
+      if (Notification.permission === "granted") {
+        registerPushSubscription(axiosInstance);
+      }
+    };
+    trySubscribe();
+
     // Some browsers only honor a permission request that follows a genuine
     // user gesture — retry once on the user's first click/keypress just in case.
     const retry = () => {
-      requestNotificationPermission();
+      trySubscribe();
       window.removeEventListener("click", retry);
       window.removeEventListener("keydown", retry);
     };
@@ -34,6 +43,11 @@ const NotificationManager = () => {
       groups.reduce((sum, g) => sum + (g.unreadCount || 0), 0);
 
     document.title = totalUnread > 0 ? `(${totalUnread > 99 ? "99+" : totalUnread}) ${BASE_TITLE}` : BASE_TITLE;
+
+    if (navigator.setAppBadge) {
+      if (totalUnread > 0) navigator.setAppBadge(totalUnread).catch(() => {});
+      else navigator.clearAppBadge?.().catch(() => {});
+    }
 
     return () => {
       document.title = BASE_TITLE;
