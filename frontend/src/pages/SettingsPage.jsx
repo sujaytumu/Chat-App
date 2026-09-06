@@ -1,11 +1,79 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send } from "lucide-react";
+import { Send, Bell, BellOff, BellRing } from "lucide-react";
+import { useEffect, useState } from "react";
+import { registerPushSubscription } from "../lib/notificationSound";
+import { axiosInstance } from "../lib/axios";
+import toast from "react-hot-toast";
 
 const PREVIEW_MESSAGES = [
   { id: 1, content: "Hey! How's it going?", isSent: false },
   { id: 2, content: "I'm doing great! Just working on some new features.", isSent: true },
 ];
+
+const NotificationSettings = () => {
+  const [permission, setPermission] = useState(
+    typeof Notification !== "undefined" ? Notification.permission : "unsupported"
+  );
+  const [isEnabling, setIsEnabling] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof Notification !== "undefined") setPermission(Notification.permission);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleEnable = async () => {
+    if (typeof Notification === "undefined") return;
+    setIsEnabling(true);
+    try {
+      const result = await Notification.requestPermission();
+      setPermission(result);
+      if (result === "granted") {
+        await registerPushSubscription(axiosInstance);
+        toast.success("Notifications enabled");
+      } else if (result === "denied") {
+        toast.error("Notifications blocked — enable them in your browser's site settings");
+      }
+    } finally {
+      setIsEnabling(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#DCF8C6]">
+      <div className="flex items-center gap-3">
+        {permission === "granted" ? (
+          <BellRing className="text-green-700 shrink-0" size={22} />
+        ) : permission === "denied" ? (
+          <BellOff className="text-red-600 shrink-0" size={22} />
+        ) : (
+          <Bell className="text-zinc-600 shrink-0" size={22} />
+        )}
+        <div>
+          <h3 className="font-semibold text-sm">Notifications</h3>
+          <p className="text-xs text-zinc-600">
+            {permission === "granted" && "Enabled — you'll get sound + popup alerts, even with the app closed."}
+            {permission === "denied" &&
+              "Blocked. Click the lock/info icon in your browser's address bar → Notifications → Allow, then reload."}
+            {permission === "default" && "Not enabled yet — click to allow notifications."}
+            {permission === "unsupported" && "Not supported in this browser."}
+          </p>
+        </div>
+      </div>
+      {permission === "default" && (
+        <button
+          onClick={handleEnable}
+          disabled={isEnabling}
+          className="btn btn-sm bg-green-600 hover:bg-green-700 text-white border-none shrink-0"
+        >
+          {isEnabling ? "Enabling…" : "Enable"}
+        </button>
+      )}
+    </div>
+  );
+};
 
 const SettingsPage = () => {
   const { theme, setTheme } = useThemeStore();
@@ -14,6 +82,8 @@ const SettingsPage = () => {
     <div className="min-h-screen pt-20 bg-[#ECE5DD]"> {/* ✅ full page bg */}
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="space-y-6 bg-[#DCF8C6] p-6 rounded-xl shadow-lg"> {/* ✅ inner card bg */}
+          <NotificationSettings />
+
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-semibold">Theme</h2>
             <p className="text-sm text-base-content/70">Choose a theme for your chat interface</p>

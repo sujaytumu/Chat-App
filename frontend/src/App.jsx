@@ -8,7 +8,7 @@ import NotificationManager from "./components/NotificationManager";
 import { lazy, Suspense } from "react";
 const CallManager = lazy(() => import("./components/CallManager"));
 
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { useEffect } from "react";
@@ -19,6 +19,8 @@ import { Toaster } from "react-hot-toast";
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
   const { theme } = useThemeStore();
+  const location = useLocation();
+  const isChatScreen = location.pathname === "/" && authUser;
 
   useEffect(() => {
     checkAuth();
@@ -36,8 +38,9 @@ const App = () => {
       data-theme={theme}
       className="min-h-screen flex flex-col bg-[#D9E5D8] text-gray-900" // ✅ soft green background
     >
-      {/* Navbar */}
-      <Navbar />
+      {/* Navbar — hidden on the chat screen itself to give messages more room;
+          Sidebar has its own compact profile/settings/logout icons instead */}
+      {!isChatScreen && <Navbar />}
 
       {authUser && <NotificationManager />}
       {authUser && (

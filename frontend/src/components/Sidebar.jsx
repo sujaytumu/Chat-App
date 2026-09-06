@@ -1,8 +1,9 @@
 import { useEffect, useState, useMemo, lazy, Suspense } from "react";
+import { Link } from "react-router-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { Users, UsersRound, Plus, Search } from "lucide-react";
+import { UsersRound, Plus, Search, Settings, LogOut } from "lucide-react";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 
@@ -26,7 +27,7 @@ const Sidebar = () => {
     isUsersLoading,
   } = useChatStore();
 
-  const { onlineUsers } = useAuthStore();
+  const { onlineUsers, authUser, logout } = useAuthStore();
   const [showOnlineOnly, setShowOnlineOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
@@ -77,19 +78,39 @@ const Sidebar = () => {
   return (
     <aside className="flex-shrink-0 bg-[#111B21] border-r border-black/40 flex flex-col w-20 lg:w-80 h-full mt-0">
       {/* Header */}
-      <div className="p-4 border-b border-black/30 flex flex-col gap-2">
+      <div className="p-3 border-b border-black/30 flex flex-col gap-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-[#E9EDEF]">
-            <Users className="size-6" />
-            <span className="font-medium hidden lg:block">Chats</span>
+          <Link to="/profile" className="flex items-center gap-2 shrink-0" title="Profile">
+            <img
+              src={authUser?.profilePic || "/avatar.png"}
+              alt="Me"
+              className="size-9 rounded-full object-cover"
+            />
+            <span className="font-medium hidden lg:block text-[#E9EDEF]">Chats</span>
+          </Link>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowCreateGroup(true)}
+              className="size-9 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 flex"
+              title="New group"
+            >
+              <Plus size={19} />
+            </button>
+            <Link
+              to="/settings"
+              className="size-9 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 hidden lg:flex"
+              title="Settings"
+            >
+              <Settings size={18} />
+            </Link>
+            <button
+              onClick={logout}
+              className="size-9 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 hidden lg:flex"
+              title="Logout"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
-          <button
-            onClick={() => setShowCreateGroup(true)}
-            className="size-8 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 hidden lg:flex"
-            title="New group"
-          >
-            <Plus size={18} />
-          </button>
         </div>
 
         {/* Search */}
@@ -103,14 +124,6 @@ const Sidebar = () => {
             className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[#202C33] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
           />
         </div>
-
-        <button
-          onClick={() => setShowCreateGroup(true)}
-          className="size-8 rounded-full flex items-center justify-center text-[#AEBAC1] hover:bg-white/10 mx-auto lg:hidden"
-          title="New group"
-        >
-          <Plus size={18} />
-        </button>
 
         {/* Online filter toggle */}
         <div className="mt-1 hidden lg:flex items-center gap-2">

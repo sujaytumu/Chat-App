@@ -289,7 +289,7 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || filePreview;
 
   return (
-    <div className="px-3 py-2.5 sm:px-4 sm:py-3 w-full bg-[#202C33]">
+    <div className="px-2 py-2 sm:px-3 sm:py-2 w-full bg-[#202C33]">
       {imagePreview && (
         <div className="mb-2.5 flex items-center gap-2">
           <div className="relative">
@@ -332,7 +332,7 @@ const MessageInput = () => {
 
       <form onSubmit={handleSendMessage} className="flex items-end gap-2">
         {isRecording ? (
-          <div className="flex-1 flex items-center gap-3 bg-[#2A3942] rounded-lg px-4 py-2.5 min-h-[42px]">
+          <div className="flex-1 flex items-center gap-3 bg-[#2A3942] rounded-lg px-3 py-2 min-h-[38px]">
             <button
               type="button"
               onClick={() => stopRecording(true)}
@@ -402,13 +402,13 @@ const MessageInput = () => {
               <button
                 type="button"
                 onClick={() => setShowAttachMenu((s) => !s)}
-                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
+                className="size-9 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
                 disabled={isProcessingAttachment}
               >
                 {isProcessingAttachment ? (
-                  <Loader2 size={21} className="animate-spin" />
+                  <Loader2 size={19} className="animate-spin" />
                 ) : (
-                  <Paperclip size={22} className="rotate-45" />
+                  <Paperclip size={20} className="rotate-45" />
                 )}
               </button>
             </div>
@@ -423,7 +423,7 @@ const MessageInput = () => {
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
-              className="flex-1 resize-none rounded-lg bg-[#2A3942] px-4 py-2.5 text-[15px] leading-[20px] max-h-32 min-h-[42px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
+              className="flex-1 resize-none rounded-lg bg-[#2A3942] px-3 py-2 text-[15px] leading-[20px] max-h-32 min-h-[38px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
               style={{ overflow: "hidden" }}
             />
           </>
@@ -432,25 +432,25 @@ const MessageInput = () => {
         {!isRecording && (text.trim() || hasAttachment) ? (
           <button
             type="submit"
-            className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
+            className="size-9 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
             disabled={isSending}
           >
-            {isSending ? <Loader2 size={20} className="animate-spin" /> : <WhatsAppSendIcon size={18} className="ml-0.5" />}
+            {isSending ? <Loader2 size={18} className="animate-spin" /> : <WhatsAppSendIcon size={16} className="ml-0.5" />}
           </button>
         ) : (
           <button
             type="button"
             onClick={isRecording ? () => stopRecording(false) : startRecording}
-            className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
+            className="size-9 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
             disabled={isSending}
             title={isRecording ? "Send voice message" : "Record voice message"}
           >
             {isSending ? (
-              <Loader2 size={20} className="animate-spin" />
+              <Loader2 size={18} className="animate-spin" />
             ) : isRecording ? (
-              <WhatsAppSendIcon size={18} className="ml-0.5" />
+              <WhatsAppSendIcon size={16} className="ml-0.5" />
             ) : (
-              <Mic size={20} />
+              <Mic size={18} />
             )}
           </button>
         )}
