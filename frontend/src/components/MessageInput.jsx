@@ -201,18 +201,18 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || filePreview;
 
   return (
-    <div className="p-3 sm:p-4 w-full bg-[#F0F0F0] border-t border-black/5">
+    <div className="px-3 py-2.5 sm:px-4 sm:py-3 w-full bg-[#202C33]">
       {imagePreview && (
-        <div className="mb-3 flex items-center gap-2">
+        <div className="mb-2.5 flex items-center gap-2">
           <div className="relative">
             <img
               src={imagePreview}
               alt="Preview"
-              className="w-20 h-20 object-cover rounded-lg border border-zinc-300"
+              className="w-20 h-20 object-cover rounded-lg border border-white/10"
             />
             <button
               onClick={clearAttachments}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-base-300 flex items-center justify-center"
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2A3942] text-[#E9EDEF] flex items-center justify-center"
               type="button"
             >
               <X className="size-3" />
@@ -222,17 +222,21 @@ const MessageInput = () => {
       )}
 
       {filePreview && (
-        <div className="mb-3 flex items-center gap-2 bg-white rounded-lg p-2 pr-3 max-w-xs shadow-sm">
-          <div className="size-10 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-            {filePreview.kind === "video" && <VideoIcon size={18} className="text-primary" />}
-            {filePreview.kind === "audio" && <Music size={18} className="text-primary" />}
-            {filePreview.kind === "document" && <FileText size={18} className="text-primary" />}
+        <div className="mb-2.5 flex items-center gap-2 bg-[#2A3942] rounded-lg p-2 pr-3 max-w-xs shadow-sm">
+          <div className="size-10 rounded-md bg-white/10 flex items-center justify-center shrink-0">
+            {filePreview.kind === "video" && <VideoIcon size={18} className="text-[#00A884]" />}
+            {filePreview.kind === "audio" && <Music size={18} className="text-[#00A884]" />}
+            {filePreview.kind === "document" && <FileText size={18} className="text-[#00A884]" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate">{filePreview.name}</p>
-            <p className="text-xs text-zinc-500">{formatFileSize(filePreview.size)}</p>
+            <p className="text-sm font-medium truncate text-[#E9EDEF]">{filePreview.name}</p>
+            <p className="text-xs text-[#8696A0]">{formatFileSize(filePreview.size)}</p>
           </div>
-          <button onClick={clearAttachments} type="button" className="btn btn-xs btn-circle btn-ghost">
+          <button
+            onClick={clearAttachments}
+            type="button"
+            className="size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10"
+          >
             <X size={14} />
           </button>
         </div>
@@ -241,27 +245,36 @@ const MessageInput = () => {
       <form onSubmit={handleSendMessage} className="flex items-end gap-2">
         <div className="relative" ref={attachMenuRef}>
           {showAttachMenu && (
-            <div className="absolute bottom-full left-0 mb-2 bg-base-100 rounded-xl shadow-xl border border-base-300 py-1.5 w-48 z-10">
+            <div className="absolute bottom-full left-0 mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
               <button
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
               >
-                <ImageIcon size={18} className="text-fuchsia-500" /> Photo &amp; Video
+                <span className="size-8 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
+                  <ImageIcon size={16} className="text-white" />
+                </span>
+                Photo &amp; Video
               </button>
               <button
                 type="button"
                 onClick={() => documentInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
               >
-                <FileText size={18} className="text-indigo-500" /> Document
+                <span className="size-8 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
+                  <FileText size={16} className="text-white" />
+                </span>
+                Document
               </button>
               <button
                 type="button"
                 onClick={() => audioInputRef.current?.click()}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 text-sm"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
               >
-                <Music size={18} className="text-orange-500" /> Audio
+                <span className="size-8 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
+                  <Music size={16} className="text-white" />
+                </span>
+                Audio
               </button>
             </div>
           )}
@@ -290,15 +303,13 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={() => setShowAttachMenu((s) => !s)}
-            className={`btn btn-circle btn-sm sm:btn-md border-none ${
-              hasAttachment ? "bg-primary text-primary-content" : "bg-white text-zinc-500"
-            }`}
+            className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
             disabled={isProcessingAttachment}
           >
             {isProcessingAttachment ? (
-              <Loader2 size={20} className="animate-spin" />
+              <Loader2 size={21} className="animate-spin" />
             ) : (
-              <Paperclip size={20} className="rotate-45" />
+              <Paperclip size={22} className="rotate-45" />
             )}
           </button>
         </div>
@@ -310,13 +321,13 @@ const MessageInput = () => {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           placeholder="Type a message"
-          className="flex-1 resize-none rounded-3xl bg-white px-4 py-2.5 text-sm sm:text-[15px] max-h-32 min-h-[42px] placeholder:text-zinc-400 shadow-sm border border-black/5 focus:outline-none focus:ring-2 focus:ring-primary/30"
+          className="flex-1 resize-none rounded-lg bg-[#2A3942] px-4 py-2.5 text-[15px] max-h-32 min-h-[42px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
           style={{ overflow: "hidden" }}
         />
 
         <button
           type="submit"
-          className="btn btn-circle btn-sm sm:btn-md bg-[#25D366] hover:bg-[#1fb356] border-none text-white shrink-0 disabled:bg-zinc-300"
+          className="size-10 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors disabled:bg-[#2A3942] disabled:text-[#5b6971]"
           disabled={(!text.trim() && !hasAttachment) || isSending}
         >
           {isSending ? <Loader2 size={20} className="animate-spin" /> : <Send size={19} className="ml-0.5" />}
