@@ -14,6 +14,17 @@ export default {
         },
       },
       fontFamily: {
+        sans: [
+          '"Segoe UI"',
+          "Helvetica Neue",
+          "Helvetica",
+          "Lucida Grande",
+          "Arial",
+          "Ubuntu",
+          "Cantarell",
+          '"Fira Sans"',
+          "sans-serif",
+        ],
         whatsapp: ["Segoe UI", "Helvetica Neue", "Helvetica", "Arial", "sans-serif"],
       },
     },

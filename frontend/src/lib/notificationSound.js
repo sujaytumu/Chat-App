@@ -37,18 +37,23 @@ export function playRingtone() {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
     const now = audioCtx.currentTime;
-    [0, 0.5].forEach((start) => {
+
+    // Classic dual-tone phone ring: two close frequencies mixed together,
+    // played for ~1s, silence for ~1s — repeats every 2s via the caller's
+    // setInterval, giving a "brrring… brrring…" cadence.
+    [440, 480].forEach((freq) => {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = "sine";
-      osc.frequency.value = 660;
-      gain.gain.setValueAtTime(0, now + start);
-      gain.gain.linearRampToValueAtTime(0.18, now + start + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + start + 0.35);
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.13, now + 0.05);
+      gain.gain.setValueAtTime(0.13, now + 0.85);
+      gain.gain.linearRampToValueAtTime(0, now + 1.0);
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-      osc.start(now + start);
-      osc.stop(now + start + 0.4);
+      osc.start(now);
+      osc.stop(now + 1.05);
     });
   } catch {
     // ignore
