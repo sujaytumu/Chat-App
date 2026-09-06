@@ -4,6 +4,8 @@ import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";//login
 import SettingsPage from "./pages/SettingsPage";//settings page
 import ProfilePage from "./pages/ProfilePage";
+import NotificationManager from "./components/NotificationManager";
+import CallManager from "./components/CallManager";
 
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
@@ -35,6 +37,9 @@ const App = () => {
     >
       {/* Navbar */}
       <Navbar />
+
+      {authUser && <NotificationManager />}
+      {authUser && <CallManager />}
 
       {/* Main routes */}
       <main className="flex-1">

@@ -8,41 +8,55 @@ import { getReceiverSocketId, io } from "../lib/socket.js";
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
-// Sidebar: direct-message contacts, each with last message + unread count
+// Sidebar: direct-message contacts, each with last message + unread count.
+// Uses two aggregations (not one query per contact) so this stays fast
+// regardless of how many contacts/messages exist.
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
+      .select("-password")
+      .lean();
 
-    const usersWithMeta = await Promise.all(
-      filteredUsers.map(async (user) => {
-        const lastMessage = await Message.findOne({
-          groupId: null,
-          $or: [
-            { senderId: loggedInUserId, receiverId: user._id },
-            { senderId: user._id, receiverId: loggedInUserId },
-          ],
-        })
-          .sort({ createdAt: -1 })
-          .lean();
+    const [lastMessages, unreadCounts] = await Promise.all([
+      Message.aggregate([
+        {
+          $match: {
+            groupId: null,
+            $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
+          },
+        },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: {
+              $cond: [{ $eq: ["$senderId", loggedInUserId] }, "$receiverId", "$senderId"],
+            },
+            text: { $first: "$text" },
+            image: { $first: "$image" },
+            createdAt: { $first: "$createdAt" },
+            senderId: { $first: "$senderId" },
+          },
+        },
+      ]),
+      Message.aggregate([
+        { $match: { receiverId: loggedInUserId, groupId: null, seen: false } },
+        { $group: { _id: "$senderId", count: { $sum: 1 } } },
+      ]),
+    ]);
 
-        const unreadCount = await Message.countDocuments({
-          senderId: user._id,
-          receiverId: loggedInUserId,
-          seen: false,
-        });
+    const lastMessageByUser = new Map(lastMessages.map((m) => [m._id.toString(), m]));
+    const unreadByUser = new Map(unreadCounts.map((u) => [u._id.toString(), u.count]));
 
-        return {
-          ...user.toObject(),
-          lastMessage: lastMessage
-            ? { text: lastMessage.text, image: lastMessage.image, createdAt: lastMessage.createdAt, senderId: lastMessage.senderId }
-            : null,
-          unreadCount,
-        };
-      })
-    );
+    const usersWithMeta = filteredUsers.map((user) => {
+      const lm = lastMessageByUser.get(user._id.toString());
+      return {
+        ...user,
+        lastMessage: lm ? { text: lm.text, image: lm.image, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        unreadCount: unreadByUser.get(user._id.toString()) || 0,
+      };
+    });
 
-    // Most recently active conversations first
     usersWithMeta.sort((a, b) => {
       const aTime = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
       const bTime = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;

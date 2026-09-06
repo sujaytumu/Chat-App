@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { X, Info, UsersRound } from "lucide-react";
+import { X, Info, UsersRound, Phone, Video } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import { useCallStore } from "../store/useCallStore";
 import GroupInfoModal from "./GroupInfoModal";
 
 const ChatHeader = () => {
   const { selectedChat, setSelectedChat, typingUsers } = useChatStore();
   const { onlineUsers } = useAuthStore();
+  const { startCall, callStatus } = useCallStore();
   const [showGroupInfo, setShowGroupInfo] = useState(false);
 
   if (!selectedChat) return null;
@@ -52,6 +54,26 @@ const ChatHeader = () => {
         </button>
 
         <div className="flex items-center gap-1">
+          {!isGroup && (
+            <>
+              <button
+                onClick={() => startCall(data, "audio")}
+                disabled={callStatus !== "idle" || !onlineUsers.includes(data._id)}
+                className="btn btn-sm btn-circle btn-ghost disabled:opacity-30"
+                title={onlineUsers.includes(data._id) ? "Voice call" : "User is offline"}
+              >
+                <Phone size={18} />
+              </button>
+              <button
+                onClick={() => startCall(data, "video")}
+                disabled={callStatus !== "idle" || !onlineUsers.includes(data._id)}
+                className="btn btn-sm btn-circle btn-ghost disabled:opacity-30"
+                title={onlineUsers.includes(data._id) ? "Video call" : "User is offline"}
+              >
+                <Video size={18} />
+              </button>
+            </>
+          )}
           {isGroup && (
             <button onClick={() => setShowGroupInfo(true)} className="btn btn-sm btn-circle btn-ghost">
               <Info size={18} />

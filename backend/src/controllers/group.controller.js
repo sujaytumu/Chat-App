@@ -54,33 +54,46 @@ export const createGroup = async (req, res) => {
   }
 };
 
-// All groups the logged-in user belongs to, with last message + unread count
+// All groups the logged-in user belongs to, with last message + unread count.
+// Two aggregations cover every group in one round trip each, instead of
+// two queries per group.
 export const getUserGroups = async (req, res) => {
   try {
     const myId = req.user._id;
     const groups = await Group.find({ members: myId }).populate("members", "-password").lean();
+    const groupIds = groups.map((g) => g._id);
 
-    const groupsWithMeta = await Promise.all(
-      groups.map(async (group) => {
-        const lastMessage = await Message.findOne({ groupId: group._id })
-          .sort({ createdAt: -1 })
-          .lean();
+    const [lastMessages, unreadCounts] = await Promise.all([
+      Message.aggregate([
+        { $match: { groupId: { $in: groupIds } } },
+        { $sort: { createdAt: -1 } },
+        {
+          $group: {
+            _id: "$groupId",
+            text: { $first: "$text" },
+            image: { $first: "$image" },
+            createdAt: { $first: "$createdAt" },
+            senderId: { $first: "$senderId" },
+          },
+        },
+      ]),
+      Message.aggregate([
+        { $match: { groupId: { $in: groupIds }, senderId: { $ne: myId }, seenBy: { $ne: myId } } },
+        { $group: { _id: "$groupId", count: { $sum: 1 } } },
+      ]),
+    ]);
 
-        const unreadCount = await Message.countDocuments({
-          groupId: group._id,
-          senderId: { $ne: myId },
-          seenBy: { $ne: myId },
-        });
+    const lastMessageByGroup = new Map(lastMessages.map((m) => [m._id.toString(), m]));
+    const unreadByGroup = new Map(unreadCounts.map((u) => [u._id.toString(), u.count]));
 
-        return {
-          ...group,
-          lastMessage: lastMessage
-            ? { text: lastMessage.text, image: lastMessage.image, createdAt: lastMessage.createdAt, senderId: lastMessage.senderId }
-            : null,
-          unreadCount,
-        };
-      })
-    );
+    const groupsWithMeta = groups.map((group) => {
+      const lm = lastMessageByGroup.get(group._id.toString());
+      return {
+        ...group,
+        lastMessage: lm ? { text: lm.text, image: lm.image, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        unreadCount: unreadByGroup.get(group._id.toString()) || 0,
+      };
+    });
 
     groupsWithMeta.sort((a, b) => {
       const aTime = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : new Date(a.createdAt).getTime();
