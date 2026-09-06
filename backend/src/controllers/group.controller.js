@@ -2,6 +2,7 @@ import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
+import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
@@ -135,15 +136,18 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, file } = req.body;
     const { id: groupId } = req.params;
     const senderId = req.user._id;
 
-    if (!text?.trim() && !image) {
-      return res.status(400).json({ error: "Message must have text or an image" });
+    if (!text?.trim() && !image && !file) {
+      return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
       return res.status(413).json({ error: "Image is too large (max 5MB)" });
+    }
+    if (file?.data && file.data.length > MAX_BASE64_LENGTH) {
+      return res.status(413).json({ error: "File is too large" });
     }
 
     const group = await Group.findById(groupId);
@@ -160,11 +164,17 @@ export const sendGroupMessage = async (req, res) => {
       imageUrl = uploadResponse.secure_url;
     }
 
+    let fileAttachment;
+    if (file?.data) {
+      fileAttachment = await uploadFileAttachment(file);
+    }
+
     const newMessage = await Message.create({
       senderId,
       groupId,
       text: text?.trim() || "",
       image: imageUrl,
+      file: fileAttachment,
       seenBy: [senderId],
     });
 

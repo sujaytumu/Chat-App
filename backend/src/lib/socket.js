@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import http from "http";
 import express from "express";
 import Group from "../models/group.model.js";
+import Message from "../models/message.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +39,32 @@ io.on("connection", async (socket) => {
       groups.forEach((group) => socket.join(group._id.toString()));
     } catch (err) {
       console.log("Error joining group rooms:", err.message);
+    }
+
+    // Catch up delivery receipts: any direct messages sent to this user while
+    // they were offline are now delivered, so flip the flag and tell the senders.
+    try {
+      const undelivered = await Message.find({
+        receiverId: userId,
+        groupId: null,
+        delivered: false,
+      }).select("_id senderId");
+
+      if (undelivered.length > 0) {
+        await Message.updateMany(
+          { _id: { $in: undelivered.map((m) => m._id) } },
+          { $set: { delivered: true } }
+        );
+        const senderIds = [...new Set(undelivered.map((m) => m.senderId.toString()))];
+        senderIds.forEach((senderId) => {
+          const senderSocketId = userSocketMap[senderId];
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("messagesDelivered", { by: userId });
+          }
+        });
+      }
+    } catch (err) {
+      console.log("Error catching up delivery receipts:", err.message);
     }
   }
 

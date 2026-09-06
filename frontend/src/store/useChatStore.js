@@ -109,6 +109,21 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  togglePinMessage: async (messageId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/pin/${messageId}`);
+      get().applyMessageUpdate(res.data);
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to update pin");
+    }
+  },
+
+  applyMessageUpdate: (updatedMessage) => {
+    set((state) => ({
+      messages: state.messages.map((m) => (m._id === updatedMessage._id ? updatedMessage : m)),
+    }));
+  },
+
   // ---- Group management ----
   createGroup: async ({ name, memberIds, groupPic }) => {
     try {
@@ -286,8 +301,24 @@ export const useChatStore = create((set, get) => ({
     socket.on("messagesSeen", ({ by }) => {
       const { selectedChat, messages } = get();
       if (selectedChat?.type === "direct" && selectedChat.data._id === by) {
-        set({ messages: messages.map((m) => ({ ...m, seen: true })) });
+        set({ messages: messages.map((m) => ({ ...m, seen: true, delivered: true })) });
       }
+    });
+
+    socket.on("messagesDelivered", ({ by }) => {
+      const { selectedChat, messages } = get();
+      if (selectedChat?.type === "direct" && selectedChat.data._id === by) {
+        set({
+          messages: messages.map((m) => (m.receiverId === by ? { ...m, delivered: true } : m)),
+        });
+      }
+    });
+
+    socket.on("messagePinned", (message) => {
+      get().applyMessageUpdate(message);
+    });
+    socket.on("messageUnpinned", (message) => {
+      get().applyMessageUpdate(message);
     });
 
     socket.on("typing", ({ fromUserId }) => {
@@ -359,6 +390,9 @@ export const useChatStore = create((set, get) => ({
       "newMessage",
       "newGroupMessage",
       "messagesSeen",
+      "messagesDelivered",
+      "messagePinned",
+      "messageUnpinned",
       "typing",
       "stopTyping",
       "groupTyping",

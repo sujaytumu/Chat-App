@@ -1,17 +1,22 @@
 import { useChatStore } from "../store/useChatStore";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import ImageLightbox from "./ImageLightbox";
+import MessageTicks from "./MessageTicks";
+import AttachmentContent from "./AttachmentContent";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
+import { Pin, PinOff, X } from "lucide-react";
 
 const ChatContainer = () => {
-  const { messages, isMessagesLoading, selectedChat, typingUsers } = useChatStore();
+  const { messages, isMessagesLoading, selectedChat, typingUsers, togglePinMessage } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
+  const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -24,11 +29,22 @@ const ChatContainer = () => {
     ? (typingUsers[`group:${data._id}`]?.size ?? 0) > 0
     : (typingUsers[data._id]?.size ?? 0) > 0;
 
+  const pinnedMessage = useMemo(() => {
+    const pinned = messages.filter((m) => m.pinned);
+    return pinned.length > 0 ? pinned[pinned.length - 1] : null;
+  }, [messages]);
+
   useEffect(() => {
     if (messageEndRef.current && messages) {
       messageEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isOtherTyping]);
+
+  const scrollToPinned = () => {
+    if (pinnedMessage) {
+      messageRefs.current[pinnedMessage._id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   if (isMessagesLoading) {
     return (
@@ -44,13 +60,45 @@ const ChatContainer = () => {
     <div className="flex-1 flex flex-col overflow-auto bg-[#ECE5DD]">
       <ChatHeader />
 
+      {pinnedMessage && (
+        <button
+          onClick={scrollToPinned}
+          className="flex items-center gap-2 px-4 py-2 bg-[#f5f0d8] border-b border-black/5 text-left hover:bg-[#efe8c8] transition-colors"
+        >
+          <Pin size={14} className="text-amber-700 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-amber-800">Pinned message</p>
+            <p className="text-sm truncate text-zinc-700">
+              {pinnedMessage.image ? "📷 Photo" : pinnedMessage.file ? `📎 ${pinnedMessage.file.name}` : pinnedMessage.text}
+            </p>
+          </div>
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePinMessage(pinnedMessage._id);
+            }}
+            className="btn btn-xs btn-circle btn-ghost shrink-0"
+            title="Unpin"
+          >
+            <X size={13} />
+          </span>
+        </button>
+      )}
+
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((message) => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
 
           return (
-            <div key={message._id} className={`flex items-end ${isMe ? "justify-end" : "justify-start"}`}>
+            <div
+              key={message._id}
+              ref={(el) => (messageRefs.current[message._id] = el)}
+              className={`flex items-end gap-0 group ${isMe ? "justify-end" : "justify-start"}`}
+              onMouseEnter={() => setHoveredId(message._id)}
+              onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
+            >
               {!isMe && (
                 <div className="w-8 h-8 rounded-full overflow-hidden mr-2 shrink-0">
                   <img
@@ -60,6 +108,19 @@ const ChatContainer = () => {
                   />
                 </div>
               )}
+
+              {isMe && (
+                <button
+                  onClick={() => togglePinMessage(message._id)}
+                  className={`btn btn-xs btn-circle btn-ghost mr-1 mb-1 transition-opacity ${
+                    hoveredId === message._id ? "opacity-100" : "opacity-0"
+                  }`}
+                  title={message.pinned ? "Unpin" : "Pin"}
+                >
+                  {message.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                </button>
+              )}
+
               <div
                 className={`max-w-[65%] sm:max-w-[45%] px-3 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
                   isMe ? "bg-[#25D366] text-white rounded-br-none" : "bg-white text-black rounded-bl-none"
@@ -70,6 +131,11 @@ const ChatContainer = () => {
                     {sender?.fullName || "Unknown"}
                   </span>
                 )}
+                {message.pinned && (
+                  <span className="flex items-center gap-1 text-[10px] mb-0.5 opacity-70">
+                    <Pin size={10} /> Pinned
+                  </span>
+                )}
                 {message.image && (
                   <img
                     src={message.image}
@@ -78,6 +144,7 @@ const ChatContainer = () => {
                     className="max-w-[220px] rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
                   />
                 )}
+                {message.file && <AttachmentContent file={message.file} />}
                 {message.text && <span style={{ whiteSpace: "pre-wrap" }}>{message.text}</span>}
                 <span
                   className={`self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap ${
@@ -85,10 +152,23 @@ const ChatContainer = () => {
                   }`}
                 >
                   {formatMessageTime(message.createdAt)}
-                  {isMe && !isGroup && message.seen && <span>✓✓</span>}
+                  {isMe && !isGroup && <MessageTicks message={message} />}
                   {isMe && isGroup && message.seenBy?.length > 1 && <span>✓✓</span>}
                 </span>
               </div>
+
+              {!isMe && (
+                <button
+                  onClick={() => togglePinMessage(message._id)}
+                  className={`btn btn-xs btn-circle btn-ghost ml-1 mb-1 transition-opacity ${
+                    hoveredId === message._id ? "opacity-100" : "opacity-0"
+                  }`}
+                  title={message.pinned ? "Unpin" : "Pin"}
+                >
+                  {message.pinned ? <PinOff size={13} /> : <Pin size={13} />}
+                </button>
+              )}
+
               {isMe && (
                 <div className="w-8 h-8 rounded-full overflow-hidden ml-2 shrink-0">
                   <img

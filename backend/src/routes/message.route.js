@@ -5,6 +5,7 @@ import {
   getUsersForSidebar,
   sendMessage,
   markMessagesAsSeen,
+  togglePinMessage,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -14,5 +15,6 @@ router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);
 router.put("/seen/:id", protectRoute, markMessagesAsSeen);
+router.put("/pin/:id", protectRoute, togglePinMessage);
 
 export default router;
