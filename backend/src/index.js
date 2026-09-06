@@ -20,7 +20,7 @@ const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim());
 
-app.use(express.json({ limit: "10mb" })); // raised so base64 image messages fit
+app.use(express.json({ limit: "18mb" })); // fits base64 image/video/document/audio payloads
 app.use(cookieParser());
 app.use(
   cors({

@@ -27,7 +27,7 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    // Direct messages: has this been seen by the receiver?
+    // Direct messages: has this been seen / delivered to the receiver?
     seen: {
       type: Boolean,
       default: false,
@@ -36,6 +36,10 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    delivered: {
+      type: Boolean,
+      default: false,
+    },
     // Group messages: which members have seen this message
     seenBy: [
       {
@@ -43,6 +47,21 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    // Non-image attachment: video, audio, or generic document
+    file: {
+      url: { type: String },
+      name: { type: String },
+      size: { type: Number },
+      type: { type: String, enum: ["video", "audio", "document"] },
+    },
+    pinned: {
+      type: Boolean,
+      default: false,
+    },
+    pinnedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true }
 );

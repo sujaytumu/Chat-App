@@ -4,6 +4,7 @@ import Group from "../models/group.model.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
+import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -92,16 +93,18 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, file } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
-    if (!text?.trim() && !image) {
-      return res.status(400).json({ error: "Message must have text or an image" });
+    if (!text?.trim() && !image && !file) {
+      return res.status(400).json({ error: "Message must have text or an attachment" });
     }
-
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
       return res.status(413).json({ error: "Image is too large (max 5MB)" });
+    }
+    if (file?.data && file.data.length > MAX_BASE64_LENGTH) {
+      return res.status(413).json({ error: "File is too large" });
     }
 
     let imageUrl;
@@ -113,16 +116,26 @@ export const sendMessage = async (req, res) => {
       imageUrl = uploadResponse.secure_url;
     }
 
+    let fileAttachment;
+    if (file?.data) {
+      fileAttachment = await uploadFileAttachment(file);
+    }
+
+    // If the receiver currently has an active socket, the message will land
+    // instantly, so we can mark it delivered right away.
+    const receiverSocketId = getReceiverSocketId(receiverId);
+
     const newMessage = new Message({
       senderId,
       receiverId,
       text: text?.trim() || "",
       image: imageUrl,
+      file: fileAttachment,
+      delivered: !!receiverSocketId,
     });
 
     await newMessage.save();
 
-    const receiverSocketId = getReceiverSocketId(receiverId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
     }
@@ -130,6 +143,49 @@ export const sendMessage = async (req, res) => {
     res.status(201).json(newMessage);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Toggle pin state on a message. Allowed for either participant in a direct
+// chat, or any member of the group the message belongs to.
+export const togglePinMessage = async (req, res) => {
+  try {
+    const { id: messageId } = req.params;
+    const myId = req.user._id;
+
+    const message = await Message.findById(messageId);
+    if (!message) return res.status(404).json({ error: "Message not found" });
+
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      if (!group || !group.members.some((m) => m.equals(myId))) {
+        return res.status(403).json({ error: "You are not part of this conversation" });
+      }
+    } else {
+      const isParticipant = message.senderId.equals(myId) || message.receiverId?.equals(myId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "You are not part of this conversation" });
+      }
+    }
+
+    message.pinned = !message.pinned;
+    message.pinnedAt = message.pinned ? new Date() : null;
+    await message.save();
+
+    const eventName = message.pinned ? "messagePinned" : "messageUnpinned";
+    if (message.groupId) {
+      io.to(message.groupId.toString()).emit(eventName, message);
+    } else {
+      [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+        const socketId = getReceiverSocketId(uid);
+        if (socketId) io.to(socketId).emit(eventName, message);
+      });
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.log("Error in togglePinMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -142,7 +198,7 @@ export const markMessagesAsSeen = async (req, res) => {
 
     const result = await Message.updateMany(
       { senderId, receiverId: myId, seen: false },
-      { $set: { seen: true, seenAt: new Date() } }
+      { $set: { seen: true, seenAt: new Date(), delivered: true } }
     );
 
     if (result.modifiedCount > 0) {
