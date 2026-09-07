@@ -6,6 +6,8 @@ import MessageSkeleton from "./skeletons/MessageSkeleton";
 import ImageLightbox from "./ImageLightbox";
 import MessageTicks from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
+import LocationCard from "./LocationCard";
+import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
 import { Pin, PinOff, X } from "lucide-react";
@@ -57,7 +59,7 @@ const ChatContainer = () => {
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-auto bg-[#0B141A]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -66,7 +68,7 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-auto bg-[#0B141A]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
       <ChatHeader />
 
       {pinnedMessage && (
@@ -99,6 +101,9 @@ const ChatContainer = () => {
         {messages.map((message) => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
+          const location = message.text ? parseLocationMessage(message.text) : null;
+          const isSticker =
+            !message.image && !message.file && !location && isStickerMessage(message.text);
 
           return (
             <div
@@ -130,44 +135,56 @@ const ChatContainer = () => {
                 </button>
               )}
 
-              <div
-                className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
-                  isMe ? "bg-[#005C4B] text-[#E9EDEF] rounded-br-none" : "bg-[#202C33] text-[#E9EDEF] rounded-bl-none"
-                }`}
-              >
-                {isGroup && !isMe && (
-                  <span className="text-xs font-semibold text-[#00A884] mb-0.5">
-                    {sender?.fullName || "Unknown"}
+              {isSticker ? (
+                <div className="flex flex-col items-center px-1">
+                  <span className="text-6xl leading-none">{message.text.trim()}</span>
+                  <span className="text-[10px] text-[#8696A0] mt-1 flex items-center gap-1">
+                    {formatMessageTime(message.createdAt)}
+                    {isMe && !isGroup && <MessageTicks message={message} />}
                   </span>
-                )}
-                {message.pinned && (
-                  <span className="flex items-center gap-1 text-[10px] mb-0.5 text-[#8696A0]">
-                    <Pin size={10} /> Pinned
-                  </span>
-                )}
-                {message.image && (
-                  <img
-                    src={message.image}
-                    alt="Attachment"
-                    loading="lazy"
-                    onClick={() => setLightboxSrc(message.image)}
-                    className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
-                  />
-                )}
-                {message.file && <AttachmentContent file={message.file} />}
-                {message.text && (
-                  <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
-                    {message.text}
-                  </span>
-                )}
-                <span
-                  className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]"
+                </div>
+              ) : (
+                <div
+                  className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
+                    isMe ? "bg-[#005C4B] text-[#E9EDEF] rounded-br-none" : "bg-[#202C33] text-[#E9EDEF] rounded-bl-none"
+                  }`}
                 >
-                  {formatMessageTime(message.createdAt)}
-                  {isMe && !isGroup && <MessageTicks message={message} />}
-                  {isMe && isGroup && message.seenBy?.length > 1 && <span className="text-[#53BDEB]">✓✓</span>}
-                </span>
-              </div>
+                  {isGroup && !isMe && (
+                    <span className="text-xs font-semibold text-[#00A884] mb-0.5">
+                      {sender?.fullName || "Unknown"}
+                    </span>
+                  )}
+                  {message.pinned && (
+                    <span className="flex items-center gap-1 text-[10px] mb-0.5 text-[#8696A0]">
+                      <Pin size={10} /> Pinned
+                    </span>
+                  )}
+                  {message.image && (
+                    <img
+                      src={message.image}
+                      alt="Attachment"
+                      loading="lazy"
+                      onClick={() => setLightboxSrc(message.image)}
+                      className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+                  {message.file && <AttachmentContent file={message.file} />}
+                  {location ? (
+                    <LocationCard location={location} />
+                  ) : (
+                    message.text && (
+                      <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
+                        {message.text}
+                      </span>
+                    )
+                  )}
+                  <span className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]">
+                    {formatMessageTime(message.createdAt)}
+                    {isMe && !isGroup && <MessageTicks message={message} />}
+                    {isMe && isGroup && message.seenBy?.length > 1 && <span className="text-[#53BDEB]">✓✓</span>}
+                  </span>
+                </div>
+              )}
 
               {!isMe && (
                 <button

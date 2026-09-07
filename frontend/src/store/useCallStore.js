@@ -211,6 +211,10 @@ export const useCallStore = create((set, get) => ({
       get().resetCall();
     });
 
+    socket.on("callRinging", ({ reason }) => {
+      toast(reason || "Ringing…", { icon: "📞" });
+    });
+
     socket.on("callFailed", ({ reason }) => {
       toast.error(reason || "Call failed");
       get().resetCall();
@@ -220,7 +224,7 @@ export const useCallStore = create((set, get) => ({
   unsubscribeFromCallSocket: () => {
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
-    ["incomingCall", "callAnswered", "iceCandidate", "callRejected", "callEnded", "callFailed"].forEach(
+    ["incomingCall", "callAnswered", "iceCandidate", "callRejected", "callEnded", "callFailed", "callRinging"].forEach(
       (event) => socket.off(event)
     );
     set({ callSubscribed: false });
