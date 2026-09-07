@@ -20,6 +20,7 @@ const ChatContainer = () => {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const prevChatKeyRef = useRef(null);
+  const justOpenedRef = useRef(false);
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -49,7 +50,25 @@ const ChatContainer = () => {
     prevChatKeyRef.current = chatKey;
 
     messageEndRef.current.scrollIntoView({ behavior: isFreshOpen ? "auto" : "smooth" });
+
+    // Images/videos loading asynchronously after this point can grow the
+    // content height and leave the "bottom" we just scrolled to stale —
+    // keep re-anchoring for a moment after a fresh open so late-loading
+    // media doesn't leave the view stuck partway up the conversation.
+    if (isFreshOpen) {
+      justOpenedRef.current = true;
+      const timeout = setTimeout(() => {
+        justOpenedRef.current = false;
+      }, 1200);
+      return () => clearTimeout(timeout);
+    }
   }, [messages, isOtherTyping, selectedChat, data._id]);
+
+  const handleMediaLoaded = () => {
+    if (justOpenedRef.current) {
+      messageEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+  };
 
   const scrollToPinned = () => {
     if (pinnedMessage) {
@@ -163,12 +182,12 @@ const ChatContainer = () => {
                     <img
                       src={message.image}
                       alt="Attachment"
-                      loading="lazy"
+                      onLoad={handleMediaLoaded}
                       onClick={() => setLightboxSrc(message.image)}
                       className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
                     />
                   )}
-                  {message.file && <AttachmentContent file={message.file} />}
+                  {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
                   {location ? (
                     <LocationCard location={location} />
                   ) : (

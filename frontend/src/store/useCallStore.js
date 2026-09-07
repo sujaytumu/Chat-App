@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
-import { playRingtone } from "../lib/notificationSound";
+import { playRingtone, primeAudio } from "../lib/notificationSound";
 
 const ICE_SERVERS = {
   iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
@@ -182,6 +182,7 @@ export const useCallStore = create((set, get) => ({
         callType,
       });
       playRingtone();
+      primeAudio();
       ringtoneInterval = setInterval(playRingtone, 2000);
     });
 

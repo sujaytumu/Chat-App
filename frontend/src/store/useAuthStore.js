@@ -101,6 +101,19 @@ export const useAuthStore = create((set, get) => ({
       set({ onlineUsers: userIds });
     });
 
+    // Fires on the very first connect AND every automatic reconnect after a
+    // dropped connection. Any messages sent while disconnected never arrived
+    // via socket, so silently resync the sidebar and the open conversation —
+    // otherwise they'd only show up once the user manually switches chats.
+    socket.on("connect", () => {
+      useChatStore.getState().getUsers();
+      useChatStore.getState().getGroups();
+      const selectedChat = useChatStore.getState().selectedChat;
+      if (selectedChat) {
+        useChatStore.getState().getMessages();
+      }
+    });
+
     // Wire up chat-related socket listeners (messages, typing, groups) once
     useChatStore.getState().subscribeToSocket();
     useCallStore.getState().subscribeToCallSocket();

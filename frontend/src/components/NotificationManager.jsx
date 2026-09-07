@@ -23,20 +23,21 @@ const NotificationManager = () => {
     trySubscribe();
 
     // Some browsers only honor a permission request that follows a genuine
-    // user gesture — retry once on the user's first click/keypress. This is
-    // also the earliest point a browser will let us actually play audio, so
-    // unlock the notification sound here too.
-    const retry = () => {
+    // user gesture, and Web Audio stays fully locked until one occurs too.
+    // Keep priming on every interaction (cheap no-op once already unlocked)
+    // rather than just the first one, since a single early attempt can
+    // sometimes fail silently (e.g. fired before full page interactivity).
+    const onGesture = () => {
       primeAudio();
       trySubscribe();
-      window.removeEventListener("click", retry);
-      window.removeEventListener("keydown", retry);
     };
-    window.addEventListener("click", retry, { once: true });
-    window.addEventListener("keydown", retry, { once: true });
+    window.addEventListener("click", onGesture);
+    window.addEventListener("keydown", onGesture);
+    window.addEventListener("touchstart", onGesture);
     return () => {
-      window.removeEventListener("click", retry);
-      window.removeEventListener("keydown", retry);
+      window.removeEventListener("click", onGesture);
+      window.removeEventListener("keydown", onGesture);
+      window.removeEventListener("touchstart", onGesture);
     };
   }, []);
 
