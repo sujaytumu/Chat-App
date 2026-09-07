@@ -188,7 +188,7 @@ export const sendGroupMessage = async (req, res) => {
         sendPushToUser(memberId, {
           title: `${req.user.fullName} in ${group.name}`,
           body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
-          icon: group.groupPic || "/whatsapp-icon.jpg",
+          icon: group.groupPic || "/icon-192.png",
           tag: `group-${groupId}`,
           data: { url: "/", chatType: "group", chatId: groupId.toString() },
         });

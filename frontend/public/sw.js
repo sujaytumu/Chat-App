@@ -23,8 +23,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title || "Talkies", {
       body,
-      icon: icon || "/whatsapp-icon.jpg",
-      badge: "/whatsapp-icon.jpg",
+      icon: icon || "/icon-192.png",
+      badge: "/icon-192.png",
       tag,
       data,
       renotify: true,

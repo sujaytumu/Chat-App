@@ -22,6 +22,16 @@ const io = new Server(server, {
 // Used to store online users: { userId: socketId }
 const userSocketMap = {};
 
+// Calls placed to someone who isn't currently connected are held here for a
+// short grace period. If they open the app (e.g. from the missed-call push
+// notification) within that window, the call is delivered to them as if it
+// just came in — the caller's side stays in a "ringing" state meanwhile.
+// Note: this only works if they open the app within the grace period; a web
+// app fundamentally can't wake a fully closed browser/phone the way a native
+// VoIP push can, so this is the closest practical approximation of that.
+const pendingCalls = new Map(); // toUserId -> { offer, callType, fromUser, fromUserId, timeout }
+const CALL_GRACE_PERIOD_MS = 45_000;
+
 export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
@@ -67,6 +77,19 @@ io.on("connection", async (socket) => {
     } catch (err) {
       console.log("Error catching up delivery receipts:", err.message);
     }
+
+    // Deliver any call that was placed to this user while they were offline
+    // and is still within its grace period.
+    const pending = pendingCalls.get(userId);
+    if (pending) {
+      clearTimeout(pending.timeout);
+      pendingCalls.delete(userId);
+      socket.emit("incomingCall", {
+        fromUser: pending.fromUser,
+        offer: pending.offer,
+        callType: pending.callType,
+      });
+    }
   }
 
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
@@ -100,18 +123,34 @@ io.on("connection", async (socket) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
-    } else {
-      socket.emit("callFailed", { reason: "User is offline" });
-      // They're not connected to receive the live call, but push a
-      // "missed call" notification so they at least see it when they're back.
+      return;
+    }
+
+    // Not connected right now — push a notification and hold the call for a
+    // short grace period in case they open the app in time. Tell the caller
+    // we're "ringing" rather than failing immediately.
+    sendPushToUser(toUserId, {
+      title: fromUser?.fullName || "Someone",
+      body: `Incoming ${callType === "video" ? "video" : "voice"} call`,
+      icon: fromUser?.profilePic || "/icon-192.png",
+      tag: `call-${userId}`,
+      data: { url: "/", chatType: "direct", chatId: userId },
+    });
+
+    const timeout = setTimeout(() => {
+      pendingCalls.delete(toUserId);
+      socket.emit("callFailed", { reason: "No answer" });
       sendPushToUser(toUserId, {
         title: fromUser?.fullName || "Someone",
         body: `Missed ${callType === "video" ? "video" : "voice"} call`,
-        icon: fromUser?.profilePic || "/whatsapp-icon.jpg",
+        icon: fromUser?.profilePic || "/icon-192.png",
         tag: `call-${userId}`,
         data: { url: "/", chatType: "direct", chatId: userId },
       });
-    }
+    }, CALL_GRACE_PERIOD_MS);
+
+    pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
+    socket.emit("callRinging", { reason: "Waiting for them to come online" });
   });
 
   socket.on("answerCall", ({ toUserId, answer }) => {
