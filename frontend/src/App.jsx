@@ -5,8 +5,7 @@ import LoginPage from "./pages/LoginPage";//login
 import SettingsPage from "./pages/SettingsPage";//settings page
 import ProfilePage from "./pages/ProfilePage";
 import NotificationManager from "./components/NotificationManager";
-import { lazy, Suspense } from "react";
-const CallManager = lazy(() => import("./components/CallManager"));
+import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
@@ -44,9 +43,7 @@ const App = () => {
 
       {authUser && <NotificationManager />}
       {authUser && (
-        <Suspense fallback={null}>
-          <CallManager />
-        </Suspense>
+        <CallManager />
       )}
 
       {/* Main routes */}
