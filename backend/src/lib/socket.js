@@ -3,6 +3,7 @@ import http from "http";
 import express from "express";
 import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
+import { sendPushToUser } from "./webPush.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -101,6 +102,15 @@ io.on("connection", async (socket) => {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
     } else {
       socket.emit("callFailed", { reason: "User is offline" });
+      // They're not connected to receive the live call, but push a
+      // "missed call" notification so they at least see it when they're back.
+      sendPushToUser(toUserId, {
+        title: fromUser?.fullName || "Someone",
+        body: `Missed ${callType === "video" ? "video" : "voice"} call`,
+        icon: fromUser?.profilePic || "/whatsapp-icon.jpg",
+        tag: `call-${userId}`,
+        data: { url: "/", chatType: "direct", chatId: userId },
+      });
     }
   });
 

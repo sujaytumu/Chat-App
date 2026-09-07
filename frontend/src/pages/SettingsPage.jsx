@@ -1,8 +1,9 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send, Bell, BellOff, BellRing } from "lucide-react";
+import { Send, Bell, BellOff, BellRing, Download, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { registerPushSubscription } from "../lib/notificationSound";
+import { useInstallPrompt } from "../lib/useInstallPrompt";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 
@@ -75,6 +76,51 @@ const NotificationSettings = () => {
   );
 };
 
+const InstallAppControl = () => {
+  const { isInstalled, promptInstall } = useInstallPrompt();
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+  const handleInstall = async () => {
+    const outcome = await promptInstall();
+    if (outcome === "accepted") toast.success("App installed");
+    else if (outcome === "unavailable" && isIOS) {
+      toast("On iPhone/iPad: tap Share, then 'Add to Home Screen'", { icon: "📲", duration: 5000 });
+    } else if (outcome === "unavailable") {
+      toast("Look for an install icon in your browser's address bar", { icon: "📲", duration: 5000 });
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#DCF8C6]">
+      <div className="flex items-center gap-3">
+        {isInstalled ? (
+          <CheckCircle2 className="text-green-700 shrink-0" size={22} />
+        ) : (
+          <Download className="text-zinc-600 shrink-0" size={22} />
+        )}
+        <div>
+          <h3 className="font-semibold text-sm">Install app</h3>
+          <p className="text-xs text-zinc-600">
+            {isInstalled
+              ? "Already installed — opens like a native app from your home screen."
+              : isIOS
+              ? "iPhone/iPad: tap Share → Add to Home Screen for the best notification support."
+              : "Install for quicker access and more reliable notifications."}
+          </p>
+        </div>
+      </div>
+      {!isInstalled && !isIOS && (
+        <button
+          onClick={handleInstall}
+          className="btn btn-sm bg-green-600 hover:bg-green-700 text-white border-none shrink-0"
+        >
+          Install
+        </button>
+      )}
+    </div>
+  );
+};
+
 const SettingsPage = () => {
   const { theme, setTheme } = useThemeStore();
 
@@ -83,6 +129,7 @@ const SettingsPage = () => {
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="space-y-6 bg-[#DCF8C6] p-6 rounded-xl shadow-lg"> {/* ✅ inner card bg */}
           <NotificationSettings />
+          <InstallAppControl />
 
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-semibold">Theme</h2>
