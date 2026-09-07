@@ -2,6 +2,19 @@
 // need to ship/license an audio asset.
 let audioCtx;
 
+// Browsers block Web Audio until a genuine user gesture (click/keydown/tap)
+// happens on the page. Call this on that first gesture so the AudioContext
+// is already running by the time a notification sound is actually needed —
+// otherwise the very first notification after page load can play silently.
+export function primeAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch {
+    // ignore
+  }
+}
+
 export function playNotificationSound() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();

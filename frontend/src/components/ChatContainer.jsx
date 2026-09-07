@@ -17,6 +17,7 @@ const ChatContainer = () => {
   const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
+  const prevChatKeyRef = useRef(null);
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -35,10 +36,18 @@ const ChatContainer = () => {
   }, [messages]);
 
   useEffect(() => {
-    if (messageEndRef.current && messages) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages, isOtherTyping]);
+    if (!messageEndRef.current) return;
+
+    // Jump straight to the bottom instantly when a chat is first opened —
+    // animating a smooth scroll through the whole history looks like a
+    // random mid-chat jump/lag. Only new messages arriving in an already-
+    // open chat get the smooth scroll.
+    const chatKey = `${selectedChat.type}:${data._id}`;
+    const isFreshOpen = prevChatKeyRef.current !== chatKey;
+    prevChatKeyRef.current = chatKey;
+
+    messageEndRef.current.scrollIntoView({ behavior: isFreshOpen ? "auto" : "smooth" });
+  }, [messages, isOtherTyping, selectedChat, data._id]);
 
   const scrollToPinned = () => {
     if (pinnedMessage) {

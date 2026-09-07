@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useChatStore } from "../store/useChatStore";
-import { requestNotificationPermission, registerPushSubscription } from "../lib/notificationSound";
+import { requestNotificationPermission, registerPushSubscription, primeAudio } from "../lib/notificationSound";
 import { axiosInstance } from "../lib/axios";
 
 const BASE_TITLE = "Talkies";
@@ -23,8 +23,11 @@ const NotificationManager = () => {
     trySubscribe();
 
     // Some browsers only honor a permission request that follows a genuine
-    // user gesture — retry once on the user's first click/keypress just in case.
+    // user gesture — retry once on the user's first click/keypress. This is
+    // also the earliest point a browser will let us actually play audio, so
+    // unlock the notification sound here too.
     const retry = () => {
+      primeAudio();
       trySubscribe();
       window.removeEventListener("click", retry);
       window.removeEventListener("keydown", retry);

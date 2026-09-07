@@ -59,22 +59,21 @@ const ChatHeader = () => {
             <>
               <button
                 onClick={() => startCall(data, "audio")}
-                disabled={callStatus !== "idle" || !onlineUsers.includes(data._id)}
+                disabled={callStatus !== "idle"}
                 className={iconBtn}
-                title={onlineUsers.includes(data._id) ? "Voice call" : "User is offline"}
+                title="Voice call"
               >
                 <Phone size={19} />
               </button>
               <button
                 onClick={() => startCall(data, "video")}
-                disabled={callStatus !== "idle" || !onlineUsers.includes(data._id)}
+                disabled={callStatus !== "idle"}
                 className={iconBtn}
-                title={onlineUsers.includes(data._id) ? "Video call" : "User is offline"}
+                title="Video call"
               >
                 <Video size={20} />
               </button>
-            </>
-          )}
+            </>          )}
           {isGroup && (
             <button onClick={() => setShowGroupInfo(true)} className={iconBtn}>
               <Info size={19} />
