@@ -8,14 +8,37 @@ import {
   Mic,
   MicOff,
   Volume2,
-  ScreenShare,
-  ScreenShareOff,
+  UploadCloud,
+  MoreHorizontal,
+  UserPlus,
+  Minimize2,
+  Lock,
 } from "lucide-react";
+import toast from "react-hot-toast";
 
-const controlBtn = (active) =>
-  `size-14 rounded-full flex items-center justify-center transition-colors ${
-    active ? "bg-white text-black" : "bg-white/20 text-white hover:bg-white/30"
-  }`;
+const AVATAR_COLORS = ["#00695C", "#4527A0", "#AD1457", "#2E7D32", "#1565C0", "#EF6C00"];
+const colorForName = (name = "") => {
+  const code = name.charCodeAt(0) || 0;
+  return AVATAR_COLORS[code % AVATAR_COLORS.length];
+};
+
+// Big avatar with a colored-letter fallback (matches WhatsApp's style when
+// a contact has no photo) instead of a generic silhouette.
+const CallAvatar = ({ user, size = "size-28" }) => {
+  if (user?.profilePic) {
+    return <img src={user.profilePic} alt={user.fullName} className={`${size} rounded-full object-cover`} />;
+  }
+  return (
+    <div
+      className={`${size} rounded-full flex items-center justify-center text-white text-4xl font-medium`}
+      style={{ backgroundColor: colorForName(user?.fullName) }}
+    >
+      {user?.fullName?.[0]?.toUpperCase() || "?"}
+    </div>
+  );
+};
+
+const gridBtn = "size-16 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 text-white transition-colors";
 
 const CallManager = () => {
   const {
@@ -28,21 +51,22 @@ const CallManager = () => {
     isVideoOff,
     isRemoteRinging,
     isScreenSharing,
-    audioOutputDevices,
+    isSpeakerOn,
     acceptCall,
     rejectCall,
     endCall,
     toggleMute,
     toggleVideo,
     toggleScreenShare,
-    loadAudioOutputDevices,
-    setAudioOutputDevice,
+    toggleSpeakerOutput,
+    upgradeToVideo,
   } = useCallStore();
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
-  const [showSpeakerMenu, setShowSpeakerMenu] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
@@ -57,6 +81,10 @@ const CallManager = () => {
     }
   }, [remoteStream, callType]);
 
+  useEffect(() => {
+    if (callStatus === "idle") setIsMinimized(false);
+  }, [callStatus]);
+
   if (callStatus === "idle") return null;
 
   // ---- Incoming call ----
@@ -66,11 +94,9 @@ const CallManager = () => {
         <div className="bg-[#1F2C34] rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
           <div className="relative mx-auto mb-4 size-24">
             <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
-            <img
-              src={remoteUser?.profilePic || "/avatar.png"}
-              alt={remoteUser?.fullName}
-              className="relative size-24 rounded-full object-cover ring-4 ring-[#00A884]/40"
-            />
+            <div className="relative">
+              <CallAvatar user={remoteUser} size="size-24" />
+            </div>
           </div>
           <h3 className="text-xl font-semibold text-white">{remoteUser?.fullName}</h3>
           <p className="text-sm text-[#8696A0] mb-6">
@@ -101,35 +127,63 @@ const CallManager = () => {
     );
   }
 
+  // ---- Minimized pill (tap to expand) ----
+  if (isMinimized) {
+    return (
+      <button
+        onClick={() => setIsMinimized(false)}
+        className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#1F2C34] rounded-full pl-2 pr-4 py-2 flex items-center gap-2 shadow-2xl"
+      >
+        <CallAvatar user={remoteUser} size="size-8" />
+        <span className="text-white text-sm font-medium">{remoteUser?.fullName}</span>
+        <span className="text-[#00A884] text-xs">
+          {callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : "In call"}
+        </span>
+      </button>
+    );
+  }
+
   // ---- Outgoing / active call ----
   const isVideo = callType === "video";
   const statusText =
-    callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : isVideo ? "Video call" : "Voice call · connected";
+    callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : isVideo ? "Video call" : "Voice call";
 
   return (
     <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
 
+      {/* Top bar: minimize / name + encrypted / add participant */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-2 relative z-10">
+        <button
+          onClick={() => setIsMinimized(true)}
+          className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
+        >
+          <Minimize2 size={18} />
+        </button>
+        <div className="text-center">
+          <h3 className="text-white font-medium">{remoteUser?.fullName}</h3>
+          <p className="text-xs text-white/60 flex items-center justify-center gap-1">
+            <Lock size={10} /> End-to-end encrypted
+          </p>
+        </div>
+        <button
+          onClick={() => toast("Group calling isn't supported yet", { icon: "👥" })}
+          className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
+        >
+          <UserPlus size={18} />
+        </button>
+      </div>
+
       {isVideo ? (
         <div className="relative flex-1 bg-black">
-          <video
-            id="call-remote-video"
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="w-full h-full object-cover"
-          />
+          <video id="call-remote-video" ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
           {!remoteStream && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-              <div className="relative mb-4 size-24">
+              <div className="relative mb-4">
                 {callStatus === "calling" && (
                   <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
                 )}
-                <img
-                  src={remoteUser?.profilePic || "/avatar.png"}
-                  alt={remoteUser?.fullName}
-                  className="relative size-24 rounded-full object-cover"
-                />
+                <CallAvatar user={remoteUser} />
               </div>
               <p className="text-lg font-medium">{remoteUser?.fullName}</p>
               <p className="text-sm text-[#8696A0] mt-1">{statusText}</p>
@@ -145,95 +199,85 @@ const CallManager = () => {
         </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-white">
-          <div className="relative mb-4 size-28">
+          <div className="relative mb-4">
             {callStatus === "calling" && (
               <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
             )}
-            <img
-              src={remoteUser?.profilePic || "/avatar.png"}
-              alt={remoteUser?.fullName}
-              className="relative size-28 rounded-full object-cover ring-4 ring-white/10"
-            />
+            <CallAvatar user={remoteUser} />
           </div>
           <h3 className="text-xl font-semibold">{remoteUser?.fullName}</h3>
           <p className="text-sm text-white/70 mt-1">{statusText}</p>
         </div>
       )}
 
-      {/* Control row — mirrors WhatsApp's call-screen layout: secondary
-          controls (mute, speaker, video, screen share) in a row, End Call
-          as the distinct larger red button */}
-      <div className="p-6 sm:p-8 bg-black/40">
-        <div className="flex items-center justify-center gap-4 sm:gap-6 mb-5">
+      {/* Bottom control panel — 2x3 grid matching WhatsApp:
+          Speaker / Video / Mute
+          More    / Share / End */}
+      <div className="relative bg-black/50 rounded-t-3xl px-6 pt-6 pb-8">
+        <div className="grid grid-cols-3 gap-x-6 gap-y-5 max-w-xs mx-auto">
           <div className="flex flex-col items-center gap-1.5">
-            <button onClick={toggleMute} className={controlBtn(isMuted)}>
-              {isMuted ? <MicOff size={22} /> : <Mic size={22} />}
+            <button onClick={toggleSpeakerOutput} className={`${gridBtn} ${isSpeakerOn ? "bg-white text-black hover:bg-white/90" : ""}`}>
+              <Volume2 size={24} />
             </button>
-            <span className="text-[11px] text-white/70">{isMuted ? "Unmute" : "Mute"}</span>
+            <span className="text-xs text-white/70">Speaker</span>
           </div>
 
-          <div className="relative flex flex-col items-center gap-1.5">
+          <div className="flex flex-col items-center gap-1.5">
             <button
-              onClick={() => {
-                loadAudioOutputDevices();
-                setShowSpeakerMenu((s) => !s);
-              }}
-              className={controlBtn(false)}
+              onClick={isVideo ? toggleVideo : upgradeToVideo}
+              className={`${gridBtn} ${isVideo && isVideoOff ? "bg-white text-black hover:bg-white/90" : ""}`}
             >
-              <Volume2 size={22} />
+              {isVideo && isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
             </button>
-            <span className="text-[11px] text-white/70">Speaker</span>
+            <span className="text-xs text-white/70">Video</span>
+          </div>
 
-            {showSpeakerMenu && (
-              <div className="absolute bottom-full mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-56 z-10">
-                {audioOutputDevices.length === 0 ? (
-                  <p className="text-xs text-[#8696A0] px-4 py-2">
-                    Output picker isn&apos;t supported in this browser
-                  </p>
-                ) : (
-                  audioOutputDevices.map((d) => (
-                    <button
-                      key={d.deviceId}
-                      onClick={() => {
-                        setAudioOutputDevice(d.deviceId);
-                        setShowSpeakerMenu(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-[#D1D7DB] hover:bg-white/5 truncate"
-                    >
-                      {d.label || "Audio output"}
-                    </button>
-                  ))
-                )}
+          <div className="flex flex-col items-center gap-1.5">
+            <button onClick={toggleMute} className={`${gridBtn} ${isMuted ? "bg-white text-black hover:bg-white/90" : ""}`}>
+              {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
+            </button>
+            <span className="text-xs text-white/70">Mute</span>
+          </div>
+
+          <div className="flex flex-col items-center gap-1.5 relative">
+            <button onClick={() => setShowMoreMenu((s) => !s)} className={gridBtn}>
+              <MoreHorizontal size={24} />
+            </button>
+            <span className="text-xs text-white/70">More</span>
+            {showMoreMenu && (
+              <div className="absolute bottom-full mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-44 z-10">
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    setIsMinimized(true);
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                >
+                  Switch to chat
+                </button>
               </div>
             )}
           </div>
 
-          {isVideo && (
-            <div className="flex flex-col items-center gap-1.5">
-              <button onClick={toggleVideo} className={controlBtn(isVideoOff)}>
-                {isVideoOff ? <VideoOff size={22} /> : <Video size={22} />}
-              </button>
-              <span className="text-[11px] text-white/70">Video</span>
-            </div>
-          )}
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={isVideo ? toggleScreenShare : () => toast("Screen share needs a video call", { icon: "🖥️" })}
+              className={`${gridBtn} ${isScreenSharing ? "bg-white text-black hover:bg-white/90" : ""}`}
+            >
+              <UploadCloud size={24} />
+            </button>
+            <span className="text-xs text-white/70">Share</span>
+          </div>
 
-          {isVideo && (
-            <div className="flex flex-col items-center gap-1.5">
-              <button onClick={toggleScreenShare} className={controlBtn(isScreenSharing)}>
-                {isScreenSharing ? <ScreenShareOff size={22} /> : <ScreenShare size={22} />}
-              </button>
-              <span className="text-[11px] text-white/70">Share</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-center">
-          <button
-            onClick={endCall}
-            className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
-          >
-            <PhoneOff size={26} />
-          </button>
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              onClick={endCall}
+              className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
+            >
+              <PhoneOff size={24} />
+            </button>
+            <span className="text-xs text-white/70">End</span>
+          </div>
         </div>
       </div>
     </div>

@@ -11,6 +11,7 @@ let pc = null;
 let ringtoneInterval = null;
 let pendingCandidates = [];
 let cameraTrack = null; // kept so screen share can revert back to it
+let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
 
 const stopLocalTracks = (stream) => {
   stream?.getTracks().forEach((track) => track.stop());
@@ -49,6 +50,11 @@ export const useCallStore = create((set, get) => ({
 
       pc.ontrack = (event) => {
         set({ remoteStream: event.streams[0] });
+        // If the other side upgraded to video mid-call, a video track
+        // arrives after the call started as audio-only — switch our UI too.
+        if (event.track.kind === "video" && get().callType !== "video") {
+          set({ callType: "video" });
+        }
       };
       pc.onicecandidate = (event) => {
         if (event.candidate) {
@@ -56,8 +62,20 @@ export const useCallStore = create((set, get) => ({
         }
       };
 
+      pc.onnegotiationneeded = async () => {
+        if (!initialNegotiationDone) return; // skip the automatic initial firing
+        try {
+          const renegotiationOffer = await pc.createOffer();
+          await pc.setLocalDescription(renegotiationOffer);
+          socket.emit("webrtcRenegotiate", { toUserId: user._id, offer: renegotiationOffer });
+        } catch {
+          // ignore — best-effort renegotiation
+        }
+      };
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
+      initialNegotiationDone = true;
 
       socket.emit("callUser", {
         toUserId: user._id,
@@ -90,10 +108,25 @@ export const useCallStore = create((set, get) => ({
 
       pc.ontrack = (event) => {
         set({ remoteStream: event.streams[0] });
+        // If the other side upgraded to video mid-call, a video track
+        // arrives after the call started as audio-only — switch our UI too.
+        if (event.track.kind === "video" && get().callType !== "video") {
+          set({ callType: "video" });
+        }
       };
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("iceCandidate", { toUserId: remoteUser._id, candidate: event.candidate });
+        }
+      };
+      pc.onnegotiationneeded = async () => {
+        if (!initialNegotiationDone) return;
+        try {
+          const renegotiationOffer = await pc.createOffer();
+          await pc.setLocalDescription(renegotiationOffer);
+          socket.emit("webrtcRenegotiate", { toUserId: remoteUser._id, offer: renegotiationOffer });
+        } catch {
+          // ignore — best-effort renegotiation
         }
       };
 
@@ -103,6 +136,7 @@ export const useCallStore = create((set, get) => ({
 
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+      initialNegotiationDone = true;
 
       socket.emit("answerCall", { toUserId: remoteUser._id, answer });
     } catch {
@@ -142,6 +176,23 @@ export const useCallStore = create((set, get) => ({
     set({ isVideoOff: !isVideoOff });
   },
 
+  // Upgrades an in-progress voice call to video, mirroring WhatsApp's
+  // "tap the video icon during a voice call" behavior.
+  upgradeToVideo: async () => {
+    const { callType, localStream } = get();
+    if (callType === "video" || !pc) return;
+    try {
+      const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      const videoTrack = videoStream.getVideoTracks()[0];
+      cameraTrack = videoTrack;
+      pc.addTrack(videoTrack, localStream); // fires onnegotiationneeded, which re-signals
+      const newStream = new MediaStream([...(localStream?.getAudioTracks() || []), videoTrack]);
+      set({ localStream: newStream, callType: "video" });
+    } catch {
+      toast.error("Could not access camera");
+    }
+  },
+
   stopRingtone: () => {
     if (ringtoneInterval) {
       clearInterval(ringtoneInterval);
@@ -156,6 +207,7 @@ export const useCallStore = create((set, get) => ({
       pc = null;
     }
     pendingCandidates = [];
+    initialNegotiationDone = false;
     stopLocalTracks(get().localStream);
     if (cameraTrack) {
       cameraTrack.stop();
@@ -203,6 +255,40 @@ export const useCallStore = create((set, get) => ({
       }
     }
     set({ isSpeakerOn: true });
+  },
+
+  // Single-tap speaker toggle (matches WhatsApp's simple on/off behavior).
+  // True earpiece-vs-speaker routing is OS-managed and not something a
+  // browser can control; this toggles between the default output and any
+  // device whose label suggests it's a speaker, when the browser exposes
+  // that (Chrome/Edge via setSinkId — Safari has no equivalent API).
+  toggleSpeakerOutput: async () => {
+    const remoteAudioEl = document.getElementById("call-remote-audio");
+    const remoteVideoEl = document.getElementById("call-remote-video");
+    const supportsSinkId = remoteAudioEl?.setSinkId || remoteVideoEl?.setSinkId;
+
+    if (!supportsSinkId || !navigator.mediaDevices?.enumerateDevices) {
+      toast("Speaker routing is controlled by your device on this browser", { icon: "🔊" });
+      return;
+    }
+
+    try {
+      await get().loadAudioOutputDevices();
+      const devices = get().audioOutputDevices;
+      const speakerDevice = devices.find((d) => /speaker/i.test(d.label));
+      const nextIsSpeakerOn = !get().isSpeakerOn;
+      const targetId = nextIsSpeakerOn ? speakerDevice?.deviceId || "default" : "default";
+
+      for (const el of [remoteAudioEl, remoteVideoEl]) {
+        if (el?.setSinkId) await el.setSinkId(targetId).catch(() => {});
+      }
+      set({ isSpeakerOn: nextIsSpeakerOn });
+      if (!speakerDevice) {
+        toast("No separate speaker device found on this device", { icon: "🔊" });
+      }
+    } catch {
+      toast.error("Couldn't switch audio output");
+    }
   },
 
   toggleScreenShare: async () => {
@@ -292,6 +378,29 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
+    // Mid-call renegotiation (voice -> video upgrade)
+    socket.on("webrtcRenegotiateOffer", async ({ offer }) => {
+      if (!pc) return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        const toUserId = get().remoteUser?._id;
+        if (toUserId) socket.emit("webrtcRenegotiateAnswer", { toUserId, answer });
+      } catch {
+        // ignore — best-effort renegotiation
+      }
+    });
+
+    socket.on("webrtcRenegotiateAnswer", async ({ answer }) => {
+      if (!pc) return;
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch {
+        // ignore
+      }
+    });
+
     socket.on("callRejected", () => {
       toast("Call declined", { icon: "📵" });
       get().resetCall();
@@ -320,6 +429,8 @@ export const useCallStore = create((set, get) => ({
       "callAnswered",
       "remoteDeviceRinging",
       "iceCandidate",
+      "webrtcRenegotiateOffer",
+      "webrtcRenegotiateAnswer",
       "callRejected",
       "callEnded",
       "callFailed",

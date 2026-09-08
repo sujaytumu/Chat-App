@@ -45,6 +45,26 @@ export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
 
+// Creates a "Voice/Video call · <outcome>" chat bubble — like WhatsApp's
+// inline call-log entries — and pushes it live to whichever side is online.
+async function postCallSummaryMessage(callerId, calleeId, callType, status, durationSeconds = 0) {
+  try {
+    const message = await Message.create({
+      senderId: callerId,
+      receiverId: calleeId,
+      text: "",
+      callInfo: { callType, status, durationSeconds },
+      delivered: !!userSocketMap[calleeId],
+    });
+    [callerId, calleeId].forEach((uid) => {
+      const socketId = userSocketMap[uid];
+      if (socketId) io.to(socketId).emit("newMessage", message);
+    });
+  } catch (err) {
+    console.log("Error posting call summary message:", err.message);
+  }
+}
+
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
   if (userId) {
@@ -185,6 +205,7 @@ io.on("connection", async (socket) => {
         CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
         activeCallLogs.delete(pairKey(userId, toUserId));
       }
+      postCallSummaryMessage(userId, toUserId, callType, "missed");
     }, CALL_GRACE_PERIOD_MS);
 
     pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
@@ -220,6 +241,23 @@ io.on("connection", async (socket) => {
     }
   });
 
+  // Mid-call renegotiation — used to upgrade a voice call to video (adding
+  // a video track requires a fresh offer/answer exchange on the same
+  // already-connected peer connection).
+  socket.on("webrtcRenegotiate", ({ toUserId, offer }) => {
+    const receiverSocketId = userSocketMap[toUserId];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("webrtcRenegotiateOffer", { offer });
+    }
+  });
+
+  socket.on("webrtcRenegotiateAnswer", ({ toUserId, answer }) => {
+    const receiverSocketId = userSocketMap[toUserId];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("webrtcRenegotiateAnswer", { answer });
+    }
+  });
+
   socket.on("rejectCall", ({ toUserId }) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
@@ -228,7 +266,11 @@ io.on("connection", async (socket) => {
     const key = pairKey(userId, toUserId);
     const logId = activeCallLogs.get(key);
     if (logId) {
-      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
+      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() })
+        .then((log) => {
+          if (log) postCallSummaryMessage(log.callerId, log.calleeId, log.callType, "declined");
+        })
+        .catch(() => {});
       activeCallLogs.delete(key);
     }
   });
@@ -246,11 +288,19 @@ io.on("connection", async (socket) => {
         if (log) {
           const endedAt = new Date();
           const wasAnswered = log.status === "answered";
+          const durationSeconds = wasAnswered ? Math.round((endedAt - log.startedAt) / 1000) : 0;
           await CallLog.findByIdAndUpdate(logId, {
             status: wasAnswered ? "answered" : "missed",
             endedAt,
-            durationSeconds: wasAnswered ? Math.round((endedAt - log.startedAt) / 1000) : 0,
+            durationSeconds,
           });
+          postCallSummaryMessage(
+            log.callerId,
+            log.calleeId,
+            log.callType,
+            wasAnswered ? "answered" : "missed",
+            durationSeconds
+          );
         }
       } catch (err) {
         console.log("Error finalizing call log:", err.message);
