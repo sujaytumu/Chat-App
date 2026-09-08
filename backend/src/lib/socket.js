@@ -3,6 +3,7 @@ import http from "http";
 import express from "express";
 import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
+import CallLog from "../models/callLog.model.js";
 import { sendPushToUser } from "./webPush.js";
 
 const app = express();
@@ -37,6 +38,8 @@ const userSocketMap = {};
 // VoIP push can, so this is the closest practical approximation of that.
 const pendingCalls = new Map(); // toUserId -> { offer, callType, fromUser, fromUserId, timeout }
 const CALL_GRACE_PERIOD_MS = 45_000;
+const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
+const pairKey = (a, b) => [a, b].sort().join("_");
 
 export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
@@ -125,7 +128,19 @@ io.on("connection", async (socket) => {
   });
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
-  socket.on("callUser", ({ toUserId, offer, callType, fromUser }) => {
+  socket.on("callUser", async ({ toUserId, offer, callType, fromUser }) => {
+    try {
+      const log = await CallLog.create({
+        callerId: userId,
+        calleeId: toUserId,
+        callType,
+        status: "ringing",
+      });
+      activeCallLogs.set(pairKey(userId, toUserId), log._id);
+    } catch (err) {
+      console.log("Error creating call log:", err.message);
+    }
+
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
@@ -165,6 +180,11 @@ io.on("connection", async (socket) => {
         tag: `call-${userId}`,
         data: { url: "/", chatType: "direct", chatId: userId },
       });
+      const logId = activeCallLogs.get(pairKey(userId, toUserId));
+      if (logId) {
+        CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+        activeCallLogs.delete(pairKey(userId, toUserId));
+      }
     }, CALL_GRACE_PERIOD_MS);
 
     pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
@@ -175,6 +195,21 @@ io.on("connection", async (socket) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callAnswered", { answer });
+    }
+    const logId = activeCallLogs.get(pairKey(userId, toUserId));
+    if (logId) {
+      CallLog.findByIdAndUpdate(logId, { status: "answered" }).catch(() => {});
+    }
+  });
+
+  // Callee's client acks that the call actually reached them and their
+  // device is now audibly ringing — lets the caller's UI switch from
+  // "Calling…" to "Ringing…", mirroring the sent → delivered distinction
+  // used for message ticks.
+  socket.on("callRingingAck", ({ toUserId }) => {
+    const callerSocketId = userSocketMap[toUserId];
+    if (callerSocketId) {
+      io.to(callerSocketId).emit("remoteDeviceRinging");
     }
   });
 
@@ -190,12 +225,37 @@ io.on("connection", async (socket) => {
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callRejected");
     }
+    const key = pairKey(userId, toUserId);
+    const logId = activeCallLogs.get(key);
+    if (logId) {
+      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
+      activeCallLogs.delete(key);
+    }
   });
 
-  socket.on("endCall", ({ toUserId }) => {
+  socket.on("endCall", async ({ toUserId }) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callEnded");
+    }
+    const key = pairKey(userId, toUserId);
+    const logId = activeCallLogs.get(key);
+    if (logId) {
+      try {
+        const log = await CallLog.findById(logId);
+        if (log) {
+          const endedAt = new Date();
+          const wasAnswered = log.status === "answered";
+          await CallLog.findByIdAndUpdate(logId, {
+            status: wasAnswered ? "answered" : "missed",
+            endedAt,
+            durationSeconds: wasAnswered ? Math.round((endedAt - log.startedAt) / 1000) : 0,
+          });
+        }
+      } catch (err) {
+        console.log("Error finalizing call log:", err.message);
+      }
+      activeCallLogs.delete(key);
     }
   });
 

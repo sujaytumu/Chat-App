@@ -4,6 +4,9 @@ import SignUpPage from "./pages/SignUpPage";
 import LoginPage from "./pages/LoginPage";//login
 import SettingsPage from "./pages/SettingsPage";//settings page
 import ProfilePage from "./pages/ProfilePage";
+import CallsPage from "./pages/CallsPage";
+import StatusPage from "./pages/StatusPage";
+import MainLayout from "./components/MainLayout";
 import NotificationManager from "./components/NotificationManager";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
@@ -19,7 +22,7 @@ const App = () => {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
   const { theme } = useThemeStore();
   const location = useLocation();
-  const isChatScreen = location.pathname === "/" && authUser;
+  const isChatScreen = ["/", "/calls", "/status"].includes(location.pathname) && authUser;
 
   useEffect(() => {
     checkAuth();
@@ -51,7 +54,39 @@ const App = () => {
         <Routes>
           <Route
             path="/"
-            element={authUser ? <HomePage /> : <Navigate to="/login" />}
+            element={
+              authUser ? (
+                <MainLayout>
+                  <HomePage />
+                </MainLayout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/calls"
+            element={
+              authUser ? (
+                <MainLayout>
+                  <CallsPage />
+                </MainLayout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="/status"
+            element={
+              authUser ? (
+                <MainLayout>
+                  <StatusPage />
+                </MainLayout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
           />
           <Route
             path="/signup"
