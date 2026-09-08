@@ -146,7 +146,7 @@ export const sendMessage = async (req, res) => {
     sendPushToUser(receiverId, {
       title: req.user.fullName,
       body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
-      icon: req.user.profilePic || "/icon-192.png",
+      icon: req.user.profilePic || "/icon-v2-192.png",
       tag: `dm-${senderId}`,
       data: { url: "/", chatType: "direct", chatId: senderId.toString() },
     });

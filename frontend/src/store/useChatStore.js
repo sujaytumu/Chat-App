@@ -9,7 +9,7 @@ function notifyIncoming(senderName, message, isGroup = false) {
   const body = message.image ? "📷 Photo" : message.text || "New message";
   showDesktopNotification(isGroup ? `${senderName}` : senderName, {
     body: isGroup && message.text ? message.text : body,
-    icon: "/icon-192.png",
+    icon: "/icon-v2-192.png",
     tag: isGroup ? `group-${message.groupId}` : `dm-${message.senderId}`,
   });
 }

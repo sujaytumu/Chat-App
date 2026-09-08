@@ -23,8 +23,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title || "Talkies", {
       body,
-      icon: icon || "/icon-192.png",
-      badge: "/icon-192.png",
+      icon: icon || "/icon-v2-192.png",
+      badge: "/icon-v2-192.png",
       tag,
       data,
       renotify: true,

@@ -17,6 +17,12 @@ const io = new Server(server, {
     origin: allowedOrigins,
     credentials: true,
   },
+  // Detect a dead/stalled connection (common on free-tier proxies that can
+  // silently drop idle connections) much faster than the 45s default, so
+  // reconnection — and the resync that follows it — kicks in quickly instead
+  // of messages appearing to silently stall.
+  pingInterval: 10000,
+  pingTimeout: 8000,
 });
 
 // Used to store online users: { userId: socketId }
@@ -123,6 +129,18 @@ io.on("connection", async (socket) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
+      // Also push a system-level notification. Browsers block Web Audio
+      // playback until a user gesture has happened on the page, so if the
+      // person hasn't tapped/clicked recently, the in-app ringtone can be
+      // silent — a push notification's sound comes from the OS, not the
+      // page, and isn't subject to that restriction.
+      sendPushToUser(toUserId, {
+        title: `${fromUser?.fullName || "Someone"} is calling…`,
+        body: callType === "video" ? "Incoming video call" : "Incoming voice call",
+        icon: fromUser?.profilePic || "/icon-v2-192.png",
+        tag: `incoming-call-${userId}`,
+        data: { url: "/", chatType: "direct", chatId: userId },
+      });
       return;
     }
 
@@ -132,7 +150,7 @@ io.on("connection", async (socket) => {
     sendPushToUser(toUserId, {
       title: fromUser?.fullName || "Someone",
       body: `Incoming ${callType === "video" ? "video" : "voice"} call`,
-      icon: fromUser?.profilePic || "/icon-192.png",
+      icon: fromUser?.profilePic || "/icon-v2-192.png",
       tag: `call-${userId}`,
       data: { url: "/", chatType: "direct", chatId: userId },
     });
@@ -143,7 +161,7 @@ io.on("connection", async (socket) => {
       sendPushToUser(toUserId, {
         title: fromUser?.fullName || "Someone",
         body: `Missed ${callType === "video" ? "video" : "voice"} call`,
-        icon: fromUser?.profilePic || "/icon-192.png",
+        icon: fromUser?.profilePic || "/icon-v2-192.png",
         tag: `call-${userId}`,
         data: { url: "/", chatType: "direct", chatId: userId },
       });
