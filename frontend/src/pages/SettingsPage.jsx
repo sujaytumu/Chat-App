@@ -1,8 +1,14 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send, Bell, BellOff, BellRing, Download, CheckCircle2 } from "lucide-react";
+import { Send, Bell, BellOff, BellRing, Download, CheckCircle2, Volume2, VolumeX, Phone, PhoneOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { registerPushSubscription } from "../lib/notificationSound";
+import { registerPushSubscription, playNotificationSound, playRingtone } from "../lib/notificationSound";
+import {
+  isMessageSoundEnabled,
+  setMessageSoundEnabled,
+  isCallRingtoneEnabled,
+  setCallRingtoneEnabled,
+} from "../lib/soundSettings";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
@@ -121,6 +127,47 @@ const InstallAppControl = () => {
   );
 };
 
+const SoundSettings = () => {
+  const [messageSound, setMessageSound] = useState(isMessageSoundEnabled());
+  const [ringtone, setRingtone] = useState(isCallRingtoneEnabled());
+
+  const handleToggleMessage = () => {
+    const next = !messageSound;
+    setMessageSound(next);
+    setMessageSoundEnabled(next);
+    if (next) playNotificationSound();
+  };
+
+  const handleToggleRingtone = () => {
+    const next = !ringtone;
+    setRingtone(next);
+    setCallRingtoneEnabled(next);
+    if (next) playRingtone();
+  };
+
+  return (
+    <div className="p-4 rounded-xl bg-[#DCF8C6] space-y-3">
+      <h3 className="font-semibold text-sm">Sounds</h3>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          {messageSound ? <Volume2 size={18} className="text-green-700" /> : <VolumeX size={18} className="text-zinc-500" />}
+          <span className="text-sm">Message notification sound</span>
+        </div>
+        <input type="checkbox" className="toggle toggle-success toggle-sm" checked={messageSound} onChange={handleToggleMessage} />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          {ringtone ? <Phone size={18} className="text-green-700" /> : <PhoneOff size={18} className="text-zinc-500" />}
+          <span className="text-sm">Call ringtone</span>
+        </div>
+        <input type="checkbox" className="toggle toggle-success toggle-sm" checked={ringtone} onChange={handleToggleRingtone} />
+      </div>
+    </div>
+  );
+};
+
 const SettingsPage = () => {
   const { theme, setTheme } = useThemeStore();
 
@@ -129,6 +176,7 @@ const SettingsPage = () => {
       <div className="container mx-auto px-4 max-w-5xl">
         <div className="space-y-6 bg-[#DCF8C6] p-6 rounded-xl shadow-lg"> {/* ✅ inner card bg */}
           <NotificationSettings />
+          <SoundSettings />
           <InstallAppControl />
 
           <div className="flex flex-col gap-1">

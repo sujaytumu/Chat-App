@@ -1,5 +1,7 @@
 // Generates a short two-tone "ding" using the Web Audio API so we don't
 // need to ship/license an audio asset.
+import { isMessageSoundEnabled, isCallRingtoneEnabled } from "./soundSettings";
+
 let audioCtx;
 
 // Browsers block Web Audio until a genuine user gesture (click/keydown/tap)
@@ -16,6 +18,7 @@ export function primeAudio() {
 }
 
 export function playNotificationSound() {
+  if (!isMessageSoundEnabled()) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();
@@ -46,6 +49,7 @@ export function playNotificationSound() {
 }
 
 export function playRingtone() {
+  if (!isCallRingtoneEnabled()) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === "suspended") audioCtx.resume();

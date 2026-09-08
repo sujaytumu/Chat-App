@@ -10,6 +10,7 @@ const ICE_SERVERS = {
 let pc = null;
 let ringtoneInterval = null;
 let pendingCandidates = [];
+let cameraTrack = null; // kept so screen share can revert back to it
 
 const stopLocalTracks = (stream) => {
   stream?.getTracks().forEach((track) => track.stop());
@@ -25,6 +26,10 @@ export const useCallStore = create((set, get) => ({
   remoteStream: null,
   isMuted: false,
   isVideoOff: false,
+  isRemoteRinging: false, // true once the callee's device has actually started ringing
+  isSpeakerOn: true,
+  isScreenSharing: false,
+  audioOutputDevices: [],
   callSubscribed: false,
 
   startCall: async (user, callType) => {
@@ -152,6 +157,10 @@ export const useCallStore = create((set, get) => ({
     }
     pendingCandidates = [];
     stopLocalTracks(get().localStream);
+    if (cameraTrack) {
+      cameraTrack.stop();
+      cameraTrack = null;
+    }
     set({
       callStatus: "idle",
       remoteUser: null,
@@ -160,7 +169,81 @@ export const useCallStore = create((set, get) => ({
       remoteStream: null,
       isMuted: false,
       isVideoOff: false,
+      isRemoteRinging: false,
+      isScreenSharing: false,
     });
+  },
+
+  // Web has no real "earpiece vs speaker" switch like a native phone app —
+  // that routing is OS-managed. What IS possible is picking which audio
+  // OUTPUT DEVICE plays the call (works in Chrome/Edge; Safari doesn't
+  // support setSinkId at all). List devices so the UI can offer a picker.
+  loadAudioOutputDevices: async () => {
+    try {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const outputs = devices.filter((d) => d.kind === "audiooutput");
+      set({ audioOutputDevices: outputs });
+    } catch {
+      // ignore — picker just won't be available
+    }
+  },
+
+  setAudioOutputDevice: async (deviceId) => {
+    const remoteAudioEl = document.getElementById("call-remote-audio");
+    const remoteVideoEl = document.getElementById("call-remote-video");
+    for (const el of [remoteAudioEl, remoteVideoEl]) {
+      if (el?.setSinkId) {
+        try {
+          await el.setSinkId(deviceId);
+        } catch {
+          toast.error("Couldn't switch audio output on this device");
+          return;
+        }
+      }
+    }
+    set({ isSpeakerOn: true });
+  },
+
+  toggleScreenShare: async () => {
+    const { isScreenSharing, localStream, callType } = get();
+    if (callType !== "video" || !pc) return;
+
+    const videoSender = pc.getSenders().find((s) => s.track?.kind === "video");
+    if (!videoSender) return;
+
+    if (!isScreenSharing) {
+      try {
+        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenTrack = displayStream.getVideoTracks()[0];
+        cameraTrack = localStream?.getVideoTracks()[0] || cameraTrack;
+        await videoSender.replaceTrack(screenTrack);
+
+        // Stop sharing if the user uses the browser's own "Stop sharing" UI
+        screenTrack.onended = () => get().toggleScreenShare();
+
+        const newStream = new MediaStream([
+          ...(localStream?.getAudioTracks() || []),
+          screenTrack,
+        ]);
+        set({ localStream: newStream, isScreenSharing: true });
+      } catch {
+        // user cancelled the picker — no-op
+      }
+    } else {
+      try {
+        if (cameraTrack) {
+          await videoSender.replaceTrack(cameraTrack);
+          const newStream = new MediaStream([
+            ...(localStream?.getAudioTracks() || []),
+            cameraTrack,
+          ]);
+          set({ localStream: newStream, isScreenSharing: false });
+        }
+      } catch {
+        set({ isScreenSharing: false });
+      }
+    }
   },
 
   subscribeToCallSocket: () => {
@@ -184,6 +267,9 @@ export const useCallStore = create((set, get) => ({
       playRingtone();
       primeAudio();
       ringtoneInterval = setInterval(playRingtone, 2000);
+      // Tell the caller our device actually got the call and is ringing —
+      // lets their screen switch from "Calling…" to "Ringing…"
+      socket.emit("callRingingAck", { toUserId: fromUser._id });
     });
 
     socket.on("callAnswered", async ({ answer }) => {
@@ -191,7 +277,11 @@ export const useCallStore = create((set, get) => ({
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
       pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)));
       pendingCandidates = [];
-      set({ callStatus: "in-call" });
+      set({ callStatus: "in-call", isRemoteRinging: false });
+    });
+
+    socket.on("remoteDeviceRinging", () => {
+      set({ isRemoteRinging: true });
     });
 
     socket.on("iceCandidate", ({ candidate }) => {
@@ -225,9 +315,16 @@ export const useCallStore = create((set, get) => ({
   unsubscribeFromCallSocket: () => {
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
-    ["incomingCall", "callAnswered", "iceCandidate", "callRejected", "callEnded", "callFailed", "callRinging"].forEach(
-      (event) => socket.off(event)
-    );
+    [
+      "incomingCall",
+      "callAnswered",
+      "remoteDeviceRinging",
+      "iceCandidate",
+      "callRejected",
+      "callEnded",
+      "callFailed",
+      "callRinging",
+    ].forEach((event) => socket.off(event));
     set({ callSubscribed: false });
   },
 }));
