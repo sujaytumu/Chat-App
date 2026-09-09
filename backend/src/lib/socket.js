@@ -45,6 +45,28 @@ export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
 
+// Creates a "Voice/Video call · <outcome>" chat bubble — like WhatsApp's
+// inline call-log entries — and pushes it live to whichever side is online.
+// Called exactly once per genuine call attempt outcome (missed/declined/
+// ended), never speculatively or repeatedly.
+async function postCallSummaryMessage(callerId, calleeId, callType, status, durationSeconds = 0) {
+  try {
+    const message = await Message.create({
+      senderId: callerId,
+      receiverId: calleeId,
+      text: "",
+      callInfo: { callType, status, durationSeconds },
+      delivered: !!userSocketMap[calleeId],
+    });
+    [callerId, calleeId].forEach((uid) => {
+      const socketId = userSocketMap[uid];
+      if (socketId) io.to(socketId).emit("newMessage", message);
+    });
+  } catch (err) {
+    console.log("Error posting call summary message:", err.message);
+  }
+}
+
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
   if (userId) {
@@ -128,7 +150,7 @@ io.on("connection", async (socket) => {
   });
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
-  socket.on("callUser", async ({ toUserId, offer, callType, fromUser }) => {
+  socket.on("callUser", async ({ toUserId, offer, callType, fromUser }, ack) => {
     try {
       const log = await CallLog.create({
         callerId: userId,
@@ -144,6 +166,7 @@ io.on("connection", async (socket) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
+      if (typeof ack === "function") ack({ delivered: true });
       // Also push a system-level notification. Browsers block Web Audio
       // playback until a user gesture has happened on the page, so if the
       // person hasn't tapped/clicked recently, the in-app ringtone can be
@@ -158,6 +181,8 @@ io.on("connection", async (socket) => {
       });
       return;
     }
+
+    if (typeof ack === "function") ack({ delivered: false, reason: "offline" });
 
     // Not connected right now — push a notification and hold the call for a
     // short grace period in case they open the app in time. Tell the caller
@@ -185,16 +210,20 @@ io.on("connection", async (socket) => {
         CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
         activeCallLogs.delete(pairKey(userId, toUserId));
       }
+      postCallSummaryMessage(userId, toUserId, callType, "missed");
     }, CALL_GRACE_PERIOD_MS);
 
     pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
     socket.emit("callRinging", { reason: "Waiting for them to come online" });
   });
 
-  socket.on("answerCall", ({ toUserId, answer }) => {
+  socket.on("answerCall", ({ toUserId, answer }, ack) => {
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callAnswered", { answer });
+      if (typeof ack === "function") ack({ delivered: true });
+    } else if (typeof ack === "function") {
+      ack({ delivered: false, reason: "caller disconnected" });
     }
     const logId = activeCallLogs.get(pairKey(userId, toUserId));
     if (logId) {
@@ -245,7 +274,11 @@ io.on("connection", async (socket) => {
     const key = pairKey(userId, toUserId);
     const logId = activeCallLogs.get(key);
     if (logId) {
-      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
+      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() })
+        .then((log) => {
+          if (log) postCallSummaryMessage(log.callerId, log.calleeId, log.callType, "declined");
+        })
+        .catch(() => {});
       activeCallLogs.delete(key);
     }
   });
@@ -269,6 +302,13 @@ io.on("connection", async (socket) => {
             endedAt,
             durationSeconds,
           });
+          postCallSummaryMessage(
+            log.callerId,
+            log.calleeId,
+            log.callType,
+            wasAnswered ? "answered" : "missed",
+            durationSeconds
+          );
         }
       } catch (err) {
         console.log("Error finalizing call log:", err.message);
