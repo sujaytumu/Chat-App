@@ -37,7 +37,6 @@ export const getUsersForSidebar = async (req, res) => {
             text: { $first: "$text" },
             image: { $first: "$image" },
             file: { $first: "$file" },
-            callInfo: { $first: "$callInfo" },
             createdAt: { $first: "$createdAt" },
             senderId: { $first: "$senderId" },
           },
@@ -56,7 +55,7 @@ export const getUsersForSidebar = async (req, res) => {
       const lm = lastMessageByUser.get(user._id.toString());
       return {
         ...user,
-        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, callInfo: lm.callInfo, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, createdAt: lm.createdAt, senderId: lm.senderId } : null,
         unreadCount: unreadByUser.get(user._id.toString()) || 0,
       };
     });

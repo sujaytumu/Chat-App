@@ -54,13 +54,6 @@ const messageSchema = new mongoose.Schema(
       size: { type: Number },
       type: { type: String, enum: ["video", "audio", "document"] },
     },
-    // Call summary bubble (shown inline in the chat, like WhatsApp's
-    // "Voice call · No answer" / "Video call · 5:32" entries)
-    callInfo: {
-      callType: { type: String, enum: ["audio", "video"] },
-      status: { type: String, enum: ["answered", "missed", "declined"] },
-      durationSeconds: { type: Number, default: 0 },
-    },
     pinned: {
       type: Boolean,
       default: false,

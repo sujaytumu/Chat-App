@@ -45,26 +45,6 @@ export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
 
-// Creates a "Voice/Video call · <outcome>" chat bubble — like WhatsApp's
-// inline call-log entries — and pushes it live to whichever side is online.
-async function postCallSummaryMessage(callerId, calleeId, callType, status, durationSeconds = 0) {
-  try {
-    const message = await Message.create({
-      senderId: callerId,
-      receiverId: calleeId,
-      text: "",
-      callInfo: { callType, status, durationSeconds },
-      delivered: !!userSocketMap[calleeId],
-    });
-    [callerId, calleeId].forEach((uid) => {
-      const socketId = userSocketMap[uid];
-      if (socketId) io.to(socketId).emit("newMessage", message);
-    });
-  } catch (err) {
-    console.log("Error posting call summary message:", err.message);
-  }
-}
-
 io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
   if (userId) {
@@ -205,7 +185,6 @@ io.on("connection", async (socket) => {
         CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
         activeCallLogs.delete(pairKey(userId, toUserId));
       }
-      postCallSummaryMessage(userId, toUserId, callType, "missed");
     }, CALL_GRACE_PERIOD_MS);
 
     pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
@@ -266,11 +245,7 @@ io.on("connection", async (socket) => {
     const key = pairKey(userId, toUserId);
     const logId = activeCallLogs.get(key);
     if (logId) {
-      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() })
-        .then((log) => {
-          if (log) postCallSummaryMessage(log.callerId, log.calleeId, log.callType, "declined");
-        })
-        .catch(() => {});
+      CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
       activeCallLogs.delete(key);
     }
   });
@@ -294,13 +269,6 @@ io.on("connection", async (socket) => {
             endedAt,
             durationSeconds,
           });
-          postCallSummaryMessage(
-            log.callerId,
-            log.calleeId,
-            log.callType,
-            wasAnswered ? "answered" : "missed",
-            durationSeconds
-          );
         }
       } catch (err) {
         console.log("Error finalizing call log:", err.message);

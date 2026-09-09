@@ -7,7 +7,6 @@ import ImageLightbox from "./ImageLightbox";
 import MessageTicks from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
-import CallLogBubble from "./CallLogBubble";
 import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
@@ -179,30 +178,24 @@ const ChatContainer = () => {
                       <Pin size={10} /> Pinned
                     </span>
                   )}
-                  {message.callInfo ? (
-                    <CallLogBubble callInfo={message.callInfo} isMe={isMe} />
+                  {message.image && (
+                    <img
+                      src={message.image}
+                      alt="Attachment"
+                      onLoad={handleMediaLoaded}
+                      onClick={() => setLightboxSrc(message.image)}
+                      className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+                  {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
+                  {location ? (
+                    <LocationCard location={location} />
                   ) : (
-                    <>
-                      {message.image && (
-                        <img
-                          src={message.image}
-                          alt="Attachment"
-                          onLoad={handleMediaLoaded}
-                          onClick={() => setLightboxSrc(message.image)}
-                          className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
-                        />
-                      )}
-                      {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
-                      {location ? (
-                        <LocationCard location={location} />
-                      ) : (
-                        message.text && (
-                          <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
-                            {message.text}
-                          </span>
-                        )
-                      )}
-                    </>
+                    message.text && (
+                      <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
+                        {message.text}
+                      </span>
+                    )
                   )}
                   <span className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]">
                     {formatMessageTime(message.createdAt)}
