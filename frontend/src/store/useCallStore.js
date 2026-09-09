@@ -35,11 +35,23 @@ const ICE_SERVERS = {
 // Watches the actual media connection (not just signaling) and gives clear
 // feedback + cleans up if it genuinely fails or drops — instead of a call
 // silently sitting there connected-in-name-only with no audio flowing.
+// Tries an ICE restart first on "failed", since that's often recoverable
+// (a brief network hiccup), rather than hanging up on the first blip.
 function attachConnectionWatchdog(peerConnection, get) {
   let disconnectTimer = null;
+  let restartAttempted = false;
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
     if (state === "failed") {
+      if (!restartAttempted && peerConnection.restartIce) {
+        restartAttempted = true;
+        try {
+          peerConnection.restartIce();
+          return; // give the restart a chance before giving up
+        } catch {
+          // fall through to hanging up
+        }
+      }
       toast.error("Call couldn't connect — network issue");
       get().endCall();
     } else if (state === "disconnected") {
@@ -52,8 +64,42 @@ function attachConnectionWatchdog(peerConnection, get) {
       }, 8000);
     } else if (state === "connected" || state === "completed") {
       clearTimeout(disconnectTimer);
+      restartAttempted = false;
     }
   };
+}
+
+// Emits a call-signaling event and waits for the server's acknowledgment
+// that it was actually delivered. If the ack doesn't arrive in time (the
+// message can be silently lost if the connection blips at the exact moment
+// of sending), retries once automatically rather than leaving both sides
+// stuck — this was very likely why calls sometimes appeared to connect on
+// one side with the other never finding out.
+function emitWithRetry(socket, event, payload, { timeoutMs = 4000, retries = 1 } = {}) {
+  return new Promise((resolve) => {
+    let attempt = 0;
+    const tryEmit = () => {
+      attempt++;
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        if (attempt <= retries) {
+          tryEmit();
+        } else {
+          resolve({ delivered: false, reason: "timeout" });
+        }
+      }, timeoutMs);
+
+      socket.emit(event, payload, (response) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(response || { delivered: true });
+      });
+    };
+    tryEmit();
+  });
 }
 
 let pc = null;
@@ -81,11 +127,20 @@ export const useCallStore = create((set, get) => ({
   isScreenSharing: false,
   audioOutputDevices: [],
   callSubscribed: false,
+  callCooldownUntil: 0,
 
   startCall: async (user, callType) => {
     const socket = useAuthStore.getState().socket;
     const authUser = useAuthStore.getState().authUser;
     if (!socket) return;
+    if (get().callStatus !== "idle") {
+      toast.error("Already in a call");
+      return;
+    }
+    if (Date.now() < get().callCooldownUntil) {
+      toast("Please wait a moment before calling again", { icon: "⏳" });
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -134,12 +189,17 @@ export const useCallStore = create((set, get) => ({
       await pc.setLocalDescription(offer);
       initialNegotiationDone = true;
 
-      socket.emit("callUser", {
+      const result = await emitWithRetry(socket, "callUser", {
         toUserId: user._id,
         offer,
         callType,
         fromUser: { _id: authUser._id, fullName: authUser.fullName, profilePic: authUser.profilePic },
       });
+
+      if (!result.delivered && result.reason === "timeout") {
+        toast.error("Couldn't reach the server — check your connection");
+        get().resetCall();
+      }
     } catch {
       toast.error("Could not access camera/microphone");
       get().resetCall();
@@ -196,7 +256,11 @@ export const useCallStore = create((set, get) => ({
       await pc.setLocalDescription(answer);
       initialNegotiationDone = true;
 
-      socket.emit("answerCall", { toUserId: remoteUser._id, answer });
+      const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer });
+      if (!result.delivered) {
+        toast.error("Couldn't reach them — the call may have already ended");
+        get().resetCall();
+      }
     } catch {
       toast.error("Could not access camera/microphone");
       get().endCall();
@@ -281,6 +345,7 @@ export const useCallStore = create((set, get) => ({
       isVideoOff: false,
       isRemoteRinging: false,
       isScreenSharing: false,
+      callCooldownUntil: Date.now() + 2000, // brief guard against accidental rapid re-tapping
     });
   },
 
@@ -404,7 +469,12 @@ export const useCallStore = create((set, get) => ({
     set({ callSubscribed: true });
 
     socket.on("incomingCall", ({ fromUser, offer, callType }) => {
-      // Busy? auto-reject
+      // Busy? auto-reject — but first self-heal an inconsistent stale state
+      // (callStatus says busy but there's no actual active connection),
+      // which would otherwise silently block every future incoming call.
+      if (get().callStatus !== "idle" && !pc) {
+        get().resetCall();
+      }
       if (get().callStatus !== "idle") {
         socket.emit("rejectCall", { toUserId: fromUser._id });
         return;
@@ -424,7 +494,10 @@ export const useCallStore = create((set, get) => ({
     });
 
     socket.on("callAnswered", async ({ answer }) => {
-      if (!pc) return;
+      if (!pc) {
+        console.warn("Received callAnswered but no active peer connection — call may have already ended");
+        return;
+      }
       await pc.setRemoteDescription(new RTCSessionDescription(answer));
       pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)));
       pendingCandidates = [];

@@ -12,6 +12,16 @@ const truncate = (str, n) => (str && str.length > n ? str.slice(0, n) + "…" : 
 const lastMessagePreview = (lastMessage, authUserId) => {
   if (!lastMessage) return "No messages yet";
   const prefix = lastMessage.senderId === authUserId ? "You: " : "";
+  if (lastMessage.callInfo) {
+    const icon = lastMessage.callInfo.callType === "video" ? "📹" : "📞";
+    const label =
+      lastMessage.callInfo.status === "answered"
+        ? "Call"
+        : lastMessage.callInfo.status === "declined"
+        ? "Declined call"
+        : "Missed call";
+    return `${icon} ${label}`;
+  }
   if (lastMessage.image && !lastMessage.text) return `${prefix}📷 Photo`;
   return `${prefix}${truncate(lastMessage.text, 28)}`;
 };

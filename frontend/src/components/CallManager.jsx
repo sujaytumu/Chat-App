@@ -67,19 +67,43 @@ const CallManager = () => {
   const remoteAudioRef = useRef(null);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [audioBlocked, setAudioBlocked] = useState(false);
 
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
   }, [localStream]);
 
+  // Explicitly call .play() and surface a "tap to enable audio" prompt if
+  // the browser blocks it — assigning srcObject inside a React effect can
+  // land just outside the window browsers consider a direct user gesture,
+  // silently blocking autoplay (audio/video looks connected, but nothing
+  // is heard). This is likely the source of "call connects but no sound"
+  // on some browsers even with a TURN server in place.
   useEffect(() => {
+    const tryPlay = async (el) => {
+      if (!el) return;
+      try {
+        await el.play();
+        setAudioBlocked(false);
+      } catch {
+        setAudioBlocked(true);
+      }
+    };
+
     if (callType === "video" && remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+      tryPlay(remoteVideoRef.current);
     }
     if (callType === "audio" && remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
+      tryPlay(remoteAudioRef.current);
     }
   }, [remoteStream, callType]);
+
+  const unblockAudio = () => {
+    [remoteAudioRef.current, remoteVideoRef.current].forEach((el) => el?.play().catch(() => {}));
+    setAudioBlocked(false);
+  };
 
   useEffect(() => {
     if (callStatus === "idle") setIsMinimized(false);
@@ -151,6 +175,15 @@ const CallManager = () => {
   return (
     <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
+
+      {audioBlocked && (
+        <button
+          onClick={unblockAudio}
+          className="absolute top-16 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-black text-sm font-medium px-4 py-2 rounded-full shadow-lg"
+        >
+          🔇 Tap to enable audio
+        </button>
+      )}
 
       {/* Top bar: minimize / name + encrypted / add participant */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2 relative z-10">
