@@ -3,9 +3,58 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { playRingtone, primeAudio } from "../lib/notificationSound";
 
+// STUN alone frequently fails to establish a working media path on mobile
+// carrier networks (symmetric NAT / CGNAT is extremely common on VoLTE/5G),
+// which is exactly the "call connects but there's zero audio" symptom — the
+// signaling succeeds, but no direct peer-to-peer route for the actual media
+// can be found. A TURN server relays the media through itself as a fallback
+// whenever a direct route isn't possible. Using Open Relay's free public
+// TURN service (openrelay.metered.ca) in addition to STUN.
 const ICE_SERVERS = {
-  iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }],
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
 };
+
+// Watches the actual media connection (not just signaling) and gives clear
+// feedback + cleans up if it genuinely fails or drops — instead of a call
+// silently sitting there connected-in-name-only with no audio flowing.
+function attachConnectionWatchdog(peerConnection, get) {
+  let disconnectTimer = null;
+  peerConnection.oniceconnectionstatechange = () => {
+    const state = peerConnection.iceConnectionState;
+    if (state === "failed") {
+      toast.error("Call couldn't connect — network issue");
+      get().endCall();
+    } else if (state === "disconnected") {
+      clearTimeout(disconnectTimer);
+      disconnectTimer = setTimeout(() => {
+        if (peerConnection.iceConnectionState === "disconnected") {
+          toast.error("Call connection lost");
+          get().endCall();
+        }
+      }, 8000);
+    } else if (state === "connected" || state === "completed") {
+      clearTimeout(disconnectTimer);
+    }
+  };
+}
 
 let pc = null;
 let ringtoneInterval = null;
@@ -28,7 +77,7 @@ export const useCallStore = create((set, get) => ({
   isMuted: false,
   isVideoOff: false,
   isRemoteRinging: false, // true once the callee's device has actually started ringing
-  isSpeakerOn: true,
+  isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
   isScreenSharing: false,
   audioOutputDevices: [],
   callSubscribed: false,
@@ -45,7 +94,15 @@ export const useCallStore = create((set, get) => ({
       });
       set({ localStream: stream, callType, remoteUser: user, callStatus: "calling" });
 
+      // If we already know they're online, show "Ringing…" right away rather
+      // than waiting on the ack round-trip — only genuinely-offline calls
+      // should sit at a plain "Calling…" while the server holds it open.
+      if (useAuthStore.getState().onlineUsers.includes(user._id)) {
+        set({ isRemoteRinging: true });
+      }
+
       pc = new RTCPeerConnection(ICE_SERVERS);
+      attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
@@ -104,6 +161,7 @@ export const useCallStore = create((set, get) => ({
       set({ localStream: stream, callStatus: "in-call" });
 
       pc = new RTCPeerConnection(ICE_SERVERS);
+      attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
@@ -275,16 +333,23 @@ export const useCallStore = create((set, get) => ({
     try {
       await get().loadAudioOutputDevices();
       const devices = get().audioOutputDevices;
-      const speakerDevice = devices.find((d) => /speaker/i.test(d.label));
+      const speakerDevice = devices.find((d) => /speaker|loud/i.test(d.label));
+      const earpieceDevice = devices.find((d) => /earpiece|receiver|handset/i.test(d.label));
       const nextIsSpeakerOn = !get().isSpeakerOn;
-      const targetId = nextIsSpeakerOn ? speakerDevice?.deviceId || "default" : "default";
+      const targetId = nextIsSpeakerOn
+        ? speakerDevice?.deviceId || "default"
+        : earpieceDevice?.deviceId || "default";
 
       for (const el of [remoteAudioEl, remoteVideoEl]) {
         if (el?.setSinkId) await el.setSinkId(targetId).catch(() => {});
       }
       set({ isSpeakerOn: nextIsSpeakerOn });
-      if (!speakerDevice) {
-        toast("No separate speaker device found on this device", { icon: "🔊" });
+      toast(nextIsSpeakerOn ? "Speaker on" : "Speaker off", { icon: "🔊", duration: 1200 });
+      if (!speakerDevice && !earpieceDevice) {
+        toast("Your device doesn't expose separate speaker/earpiece outputs to the browser", {
+          icon: "ℹ️",
+          duration: 3000,
+        });
       }
     } catch {
       toast.error("Couldn't switch audio output");
