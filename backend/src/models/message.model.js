@@ -54,14 +54,6 @@ const messageSchema = new mongoose.Schema(
       size: { type: Number },
       type: { type: String, enum: ["video", "audio", "document"] },
     },
-    // Call summary bubble — one entry per genuine call attempt outcome
-    // (never created speculatively/repeatedly), matching WhatsApp's inline
-    // "Voice call · No answer" / "Video call · 5:32" entries.
-    callInfo: {
-      callType: { type: String, enum: ["audio", "video"] },
-      status: { type: String, enum: ["answered", "missed", "declined"] },
-      durationSeconds: { type: Number, default: 0 },
-    },
     pinned: {
       type: Boolean,
       default: false,
@@ -70,6 +62,16 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    deletedForEveryone: {
+      type: Boolean,
+      default: false,
+    },
+    deletedFor: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   { timestamps: true }
 );

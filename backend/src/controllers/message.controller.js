@@ -37,7 +37,6 @@ export const getUsersForSidebar = async (req, res) => {
             text: { $first: "$text" },
             image: { $first: "$image" },
             file: { $first: "$file" },
-            callInfo: { $first: "$callInfo" },
             createdAt: { $first: "$createdAt" },
             senderId: { $first: "$senderId" },
           },
@@ -56,7 +55,7 @@ export const getUsersForSidebar = async (req, res) => {
       const lm = lastMessageByUser.get(user._id.toString());
       return {
         ...user,
-        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, callInfo: lm.callInfo, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, createdAt: lm.createdAt, senderId: lm.senderId } : null,
         unreadCount: unreadByUser.get(user._id.toString()) || 0,
       };
     });
@@ -81,6 +80,7 @@ export const getMessages = async (req, res) => {
 
     const messages = await Message.find({
       groupId: null,
+      deletedFor: { $ne: myId },
       $or: [
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
@@ -224,6 +224,66 @@ export const markMessagesAsSeen = async (req, res) => {
     res.status(200).json({ modifiedCount: result.modifiedCount });
   } catch (error) {
     console.log("Error in markMessagesAsSeen controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// "Delete for me" (hides it only in the requester's own view) or "Delete
+// for everyone" (sender only — clears the content and marks it deleted for
+// all participants, like WhatsApp's "This message was deleted").
+export const deleteMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { mode } = req.body; // "me" | "everyone"
+    const myId = req.user._id;
+
+    if (mode !== "me" && mode !== "everyone") {
+      return res.status(400).json({ error: "Invalid delete mode" });
+    }
+
+    const message = await Message.findById(id);
+    if (!message) return res.status(404).json({ error: "Message not found" });
+
+    if (message.groupId) {
+      const group = await Group.findById(message.groupId);
+      if (!group || !group.members.some((m) => m.equals(myId))) {
+        return res.status(403).json({ error: "You are not part of this conversation" });
+      }
+    } else {
+      const isParticipant = message.senderId.equals(myId) || message.receiverId?.equals(myId);
+      if (!isParticipant) {
+        return res.status(403).json({ error: "You are not part of this conversation" });
+      }
+    }
+
+    if (mode === "everyone") {
+      if (!message.senderId.equals(myId)) {
+        return res.status(403).json({ error: "You can only delete your own messages for everyone" });
+      }
+      message.deletedForEveryone = true;
+      message.text = "";
+      message.image = "";
+      message.file = undefined;
+      await message.save();
+
+      if (message.groupId) {
+        io.to(message.groupId.toString()).emit("messageDeleted", message);
+      } else {
+        [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+          const socketId = getReceiverSocketId(uid);
+          if (socketId) io.to(socketId).emit("messageDeleted", message);
+        });
+      }
+    } else {
+      if (!message.deletedFor.some((u) => u.equals(myId))) {
+        message.deletedFor.push(myId);
+        await message.save();
+      }
+    }
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.log("Error in deleteMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
