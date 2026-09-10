@@ -107,6 +107,7 @@ let ringtoneInterval = null;
 let pendingCandidates = [];
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
+let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
 const stopLocalTracks = (stream) => {
   stream?.getTracks().forEach((track) => track.stop());
@@ -142,12 +143,21 @@ export const useCallStore = create((set, get) => ({
       return;
     }
 
+    // Claim the "busy" state synchronously, before any async work (including
+    // the getUserMedia permission prompt, which can take a noticeable
+    // moment). Without this, there's a window where callStatus is still
+    // "idle" while a call is already being placed — an incoming call
+    // arriving in that window wouldn't correctly detect we're mid-dial,
+    // corrupting the shared connection state.
+    set({ callStatus: "calling", callType, remoteUser: user });
+    callClaimedAt = Date.now();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: callType === "video",
       });
-      set({ localStream: stream, callType, remoteUser: user, callStatus: "calling" });
+      set({ localStream: stream });
 
       // If we already know they're online, show "Ringing…" right away rather
       // than waiting on the ack round-trip — only genuinely-offline calls
@@ -330,6 +340,7 @@ export const useCallStore = create((set, get) => ({
     }
     pendingCandidates = [];
     initialNegotiationDone = false;
+    callClaimedAt = 0;
     stopLocalTracks(get().localStream);
     if (cameraTrack) {
       cameraTrack.stop();
@@ -469,16 +480,21 @@ export const useCallStore = create((set, get) => ({
     set({ callSubscribed: true });
 
     socket.on("incomingCall", ({ fromUser, offer, callType }) => {
-      // Busy? auto-reject — but first self-heal an inconsistent stale state
-      // (callStatus says busy but there's no actual active connection),
-      // which would otherwise silently block every future incoming call.
-      if (get().callStatus !== "idle" && !pc) {
+      // Busy? auto-reject — but first self-heal a genuinely stale state
+      // (callStatus says busy but there's no active connection AND it's
+      // been long enough that this can't just be the brief setup window
+      // between claiming "calling"/"incoming" and the peer connection
+      // actually being created) — otherwise every future incoming call
+      // would be silently blocked forever after any past error.
+      const STALE_THRESHOLD_MS = 12000;
+      if (get().callStatus !== "idle" && !pc && Date.now() - callClaimedAt > STALE_THRESHOLD_MS) {
         get().resetCall();
       }
       if (get().callStatus !== "idle") {
         socket.emit("rejectCall", { toUserId: fromUser._id });
         return;
       }
+      callClaimedAt = Date.now();
       set({
         callStatus: "incoming",
         remoteUser: fromUser,
