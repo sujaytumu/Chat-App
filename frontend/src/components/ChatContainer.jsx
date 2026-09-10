@@ -7,14 +7,14 @@ import ImageLightbox from "./ImageLightbox";
 import MessageTicks from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
-import CallLogBubble from "./CallLogBubble";
 import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
-import { Pin, PinOff, X } from "lucide-react";
+import { Pin, X } from "lucide-react";
+import MessageActionMenu from "./MessageActionMenu";
 
 const ChatContainer = () => {
-  const { messages, isMessagesLoading, selectedChat, typingUsers, togglePinMessage } = useChatStore();
+  const { messages, isMessagesLoading, selectedChat, typingUsers, togglePinMessage, deleteMessage } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
   const messageRefs = useRef({});
@@ -143,19 +143,25 @@ const ChatContainer = () => {
                 </div>
               )}
 
-              {isMe && (
-                <button
-                  onClick={() => togglePinMessage(message._id)}
-                  className={`size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 mr-1 mb-1 transition-opacity ${
-                    hoveredId === message._id ? "opacity-100" : "opacity-0"
-                  }`}
-                  title={message.pinned ? "Unpin" : "Pin"}
-                >
-                  {message.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-                </button>
+              {isMe && !message.deletedForEveryone && (
+                <MessageActionMenu
+                  message={message}
+                  isMe={isMe}
+                  visible={hoveredId === message._id}
+                  onTogglePin={() => togglePinMessage(message._id)}
+                  onDelete={(mode) => deleteMessage(message._id, mode)}
+                />
               )}
 
-              {isSticker ? (
+              {message.deletedForEveryone ? (
+                <div
+                  className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg italic text-[#8696A0] text-[14.2px] flex items-center gap-1.5 ${
+                    isMe ? "bg-[#005C4B]/40 rounded-br-none" : "bg-[#202C33]/60 rounded-bl-none"
+                  }`}
+                >
+                  🚫 This message was deleted
+                </div>
+              ) : isSticker ? (
                 <div className="flex flex-col items-center px-1">
                   <span className="text-6xl leading-none">{message.text.trim()}</span>
                   <span className="text-[10px] text-[#8696A0] mt-1 flex items-center gap-1">
@@ -179,30 +185,24 @@ const ChatContainer = () => {
                       <Pin size={10} /> Pinned
                     </span>
                   )}
-                  {message.callInfo ? (
-                    <CallLogBubble callInfo={message.callInfo} />
+                  {message.image && (
+                    <img
+                      src={message.image}
+                      alt="Attachment"
+                      onLoad={handleMediaLoaded}
+                      onClick={() => setLightboxSrc(message.image)}
+                      className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+                  {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
+                  {location ? (
+                    <LocationCard location={location} />
                   ) : (
-                    <>
-                      {message.image && (
-                        <img
-                          src={message.image}
-                          alt="Attachment"
-                          onLoad={handleMediaLoaded}
-                          onClick={() => setLightboxSrc(message.image)}
-                          className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
-                        />
-                      )}
-                      {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
-                      {location ? (
-                        <LocationCard location={location} />
-                      ) : (
-                        message.text && (
-                          <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
-                            {message.text}
-                          </span>
-                        )
-                      )}
-                    </>
+                    message.text && (
+                      <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
+                        {message.text}
+                      </span>
+                    )
                   )}
                   <span className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]">
                     {formatMessageTime(message.createdAt)}
@@ -212,16 +212,14 @@ const ChatContainer = () => {
                 </div>
               )}
 
-              {!isMe && (
-                <button
-                  onClick={() => togglePinMessage(message._id)}
-                  className={`size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 ml-1 mb-1 transition-opacity ${
-                    hoveredId === message._id ? "opacity-100" : "opacity-0"
-                  }`}
-                  title={message.pinned ? "Unpin" : "Pin"}
-                >
-                  {message.pinned ? <PinOff size={13} /> : <Pin size={13} />}
-                </button>
+              {!isMe && !message.deletedForEveryone && (
+                <MessageActionMenu
+                  message={message}
+                  isMe={isMe}
+                  visible={hoveredId === message._id}
+                  onTogglePin={() => togglePinMessage(message._id)}
+                  onDelete={(mode) => deleteMessage(message._id, mode)}
+                />
               )}
 
               {isMe && (

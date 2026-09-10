@@ -75,7 +75,6 @@ export const getUserGroups = async (req, res) => {
             text: { $first: "$text" },
             image: { $first: "$image" },
             file: { $first: "$file" },
-            callInfo: { $first: "$callInfo" },
             createdAt: { $first: "$createdAt" },
             senderId: { $first: "$senderId" },
           },
@@ -94,7 +93,7 @@ export const getUserGroups = async (req, res) => {
       const lm = lastMessageByGroup.get(group._id.toString());
       return {
         ...group,
-        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, callInfo: lm.callInfo, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, createdAt: lm.createdAt, senderId: lm.senderId } : null,
         unreadCount: unreadByGroup.get(group._id.toString()) || 0,
       };
     });
@@ -122,7 +121,7 @@ export const getGroupMessages = async (req, res) => {
       return res.status(403).json({ error: "You are not a member of this group" });
     }
 
-    const messages = await Message.find({ groupId }).sort({ createdAt: 1 });
+    const messages = await Message.find({ groupId, deletedFor: { $ne: myId } }).sort({ createdAt: 1 });
 
     // Mark unseen messages as seen by me
     await Message.updateMany(

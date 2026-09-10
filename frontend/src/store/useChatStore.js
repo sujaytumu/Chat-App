@@ -152,6 +152,21 @@ export const useChatStore = create((set, get) => ({
     }));
   },
 
+  // mode: "me" removes it only from this device's view; "everyone" clears
+  // the content for all participants (sender only), like WhatsApp.
+  deleteMessage: async (messageId, mode) => {
+    try {
+      const res = await axiosInstance.delete(`/messages/${messageId}`, { data: { mode } });
+      if (mode === "me") {
+        set((state) => ({ messages: state.messages.filter((m) => m._id !== messageId) }));
+      } else {
+        get().applyMessageUpdate(res.data);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to delete message");
+    }
+  },
+
   // ---- Group management ----
   createGroup: async ({ name, memberIds, groupPic }) => {
     try {
@@ -348,6 +363,9 @@ export const useChatStore = create((set, get) => ({
     socket.on("messageUnpinned", (message) => {
       get().applyMessageUpdate(message);
     });
+    socket.on("messageDeleted", (message) => {
+      get().applyMessageUpdate(message);
+    });
 
     socket.on("typing", ({ fromUserId }) => {
       set((state) => {
@@ -421,6 +439,7 @@ export const useChatStore = create((set, get) => ({
       "messagesDelivered",
       "messagePinned",
       "messageUnpinned",
+      "messageDeleted",
       "typing",
       "stopTyping",
       "groupTyping",
