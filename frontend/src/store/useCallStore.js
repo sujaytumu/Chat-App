@@ -266,7 +266,10 @@ export const useCallStore = create((set, get) => ({
       await pc.setLocalDescription(answer);
       initialNegotiationDone = true;
 
-      const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer });
+      const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer }, {
+        timeoutMs: 4000,
+        retries: 2, // extra chance to catch a caller who's mid-reconnect after a brief drop
+      });
       if (!result.delivered) {
         toast.error("Couldn't reach them — the call may have already ended");
         get().resetCall();

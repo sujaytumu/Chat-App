@@ -121,6 +121,23 @@ export const useAuthStore = create((set, get) => ({
     // Wire up chat-related socket listeners (messages, typing, groups) once
     useChatStore.getState().subscribeToSocket();
     useCallStore.getState().subscribeToCallSocket();
+
+    // Mobile browsers pause/throttle JS timers (including Socket.IO's own
+    // reconnection backoff) while a tab is backgrounded, to save battery.
+    // Coming back to a stale, still-disconnected socket that's quietly
+    // waiting on a throttled timer — rather than reconnecting immediately —
+    // is very likely why calls/messages sometimes don't arrive even though
+    // the person is "online": their tab was backgrounded, the connection
+    // died, and nothing nudged it to reconnect the moment they came back.
+    // Force an immediate reconnect attempt as soon as the tab is visible
+    // again, instead of waiting on that backoff timer to catch up.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && socket && !socket.connected) {
+        socket.connect();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleVisibilityChange);
   },
   disconnectSocket: () => {
     useChatStore.getState().unsubscribeFromSocket();
