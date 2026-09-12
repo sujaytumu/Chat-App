@@ -44,7 +44,7 @@ const MessageInput = () => {
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
   const attachMenuRef = useRef(null);
-  const { sendMessage, emitTyping, emitStopTyping, selectedChat } = useChatStore();
+  const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo } = useChatStore();
 
   const typingTimeoutRef = useRef(null);
 
@@ -362,6 +362,19 @@ const MessageInput = () => {
 
   return (
     <div className="px-2 py-2 sm:px-3 sm:py-2 w-full bg-[#202C33]">
+      {replyingTo && (
+        <div className="mb-2 flex items-center gap-2 bg-[#2A3942] rounded-lg pl-3 pr-2 py-2">
+          <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
+            <p className="text-xs font-medium text-[#00A884]">Replying to</p>
+            <p className="text-xs text-[#8696A0] truncate">
+              {replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : replyingTo.text}
+            </p>
+          </div>
+          <button onClick={clearReplyingTo} className="text-[#8696A0] hover:text-white shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+      )}
       {imagePreview && (
         <div className="mb-2.5 flex items-center gap-2">
           <div className="relative">

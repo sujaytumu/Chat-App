@@ -85,7 +85,9 @@ export const getMessages = async (req, res) => {
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
-    }).sort({ createdAt: 1 });
+    })
+      .sort({ createdAt: 1 })
+      .populate("replyTo", "text image file senderId");
 
     res.status(200).json(messages);
   } catch (error) {
@@ -96,7 +98,7 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, file } = req.body;
+    const { text, image, file, replyTo } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -127,6 +129,7 @@ export const sendMessage = async (req, res) => {
     // If the receiver currently has an active socket, the message will land
     // instantly, so we can mark it delivered right away.
     const receiverSocketId = getReceiverSocketId(receiverId);
+    const isDelivered = !!receiverSocketId;
 
     const newMessage = new Message({
       senderId,
@@ -134,10 +137,13 @@ export const sendMessage = async (req, res) => {
       text: text?.trim() || "",
       image: imageUrl,
       file: fileAttachment,
-      delivered: !!receiverSocketId,
+      replyTo: replyTo || null,
+      delivered: isDelivered,
+      deliveredAt: isDelivered ? new Date() : null,
     });
 
     await newMessage.save();
+    await newMessage.populate("replyTo", "text image file senderId");
 
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
@@ -284,6 +290,46 @@ export const deleteMessage = async (req, res) => {
     res.status(200).json(message);
   } catch (error) {
     console.log("Error in deleteMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Toggle starred (personal bookmark, not shared with the other participant)
+export const toggleStarMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+
+    const message = await Message.findById(id);
+    if (!message) return res.status(404).json({ error: "Message not found" });
+
+    const alreadyStarred = message.starredBy.some((u) => u.equals(myId));
+    if (alreadyStarred) {
+      message.starredBy = message.starredBy.filter((u) => !u.equals(myId));
+    } else {
+      message.starredBy.push(myId);
+    }
+    await message.save();
+
+    res.status(200).json(message);
+  } catch (error) {
+    console.log("Error in toggleStarMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getStarredMessages = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const messages = await Message.find({ starredBy: myId })
+      .sort({ createdAt: -1 })
+      .populate("senderId", "fullName profilePic")
+      .populate("receiverId", "fullName profilePic")
+      .limit(200);
+
+    res.status(200).json(messages);
+  } catch (error) {
+    console.log("Error in getStarredMessages controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

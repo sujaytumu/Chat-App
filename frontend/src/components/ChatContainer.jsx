@@ -7,19 +7,33 @@ import ImageLightbox from "./ImageLightbox";
 import MessageTicks from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
+import ForwardMessageModal from "./ForwardMessageModal";
+import MessageInfoModal from "./MessageInfoModal";
 import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
+import { translateAndToast } from "../lib/translate";
 import { Pin, X } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 
 const ChatContainer = () => {
-  const { messages, isMessagesLoading, selectedChat, typingUsers, togglePinMessage, deleteMessage } = useChatStore();
+  const {
+    messages,
+    isMessagesLoading,
+    selectedChat,
+    typingUsers,
+    togglePinMessage,
+    deleteMessage,
+    setReplyingTo,
+    toggleStarMessage,
+  } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
   const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
   const prevChatKeyRef = useRef(null);
   const justOpenedRef = useRef(false);
 
@@ -77,6 +91,10 @@ const ChatContainer = () => {
     }
   };
 
+  const scrollToMessage = (id) => {
+    messageRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+
   if (isMessagesLoading) {
     return (
       <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
@@ -124,6 +142,26 @@ const ChatContainer = () => {
           const location = message.text ? parseLocationMessage(message.text) : null;
           const isSticker =
             !message.image && !message.file && !location && isStickerMessage(message.text);
+          const replySender = message.replyTo
+            ? isGroup
+              ? membersById[message.replyTo.senderId]
+              : message.replyTo.senderId === authUser._id
+              ? authUser
+              : data
+            : null;
+
+          const menuProps = {
+            message,
+            isMe,
+            authUserId: authUser._id,
+            visible: hoveredId === message._id,
+            onTogglePin: () => togglePinMessage(message._id),
+            onDelete: (mode) => deleteMessage(message._id, mode),
+            onReply: () => setReplyingTo(message),
+            onToggleStar: () => toggleStarMessage(message._id),
+            onForward: () => setForwardingMessage(message),
+            onInfo: () => setInfoMessage(message),
+          };
 
           return (
             <div
@@ -143,15 +181,7 @@ const ChatContainer = () => {
                 </div>
               )}
 
-              {isMe && !message.deletedForEveryone && (
-                <MessageActionMenu
-                  message={message}
-                  isMe={isMe}
-                  visible={hoveredId === message._id}
-                  onTogglePin={() => togglePinMessage(message._id)}
-                  onDelete={(mode) => deleteMessage(message._id, mode)}
-                />
-              )}
+              {isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
 
               {message.deletedForEveryone ? (
                 <div
@@ -185,6 +215,19 @@ const ChatContainer = () => {
                       <Pin size={10} /> Pinned
                     </span>
                   )}
+                  {message.replyTo && (
+                    <button
+                      onClick={() => scrollToMessage(message.replyTo._id)}
+                      className="flex flex-col items-start text-left mb-1 px-2 py-1 rounded bg-black/20 border-l-2 border-[#00A884] max-w-full"
+                    >
+                      <span className="text-xs font-medium text-[#00A884]">
+                        {replySender?.fullName || "Message"}
+                      </span>
+                      <span className="text-xs text-[#8696A0] truncate max-w-[220px]">
+                        {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.text}
+                      </span>
+                    </button>
+                  )}
                   {message.image && (
                     <img
                       src={message.image}
@@ -204,6 +247,14 @@ const ChatContainer = () => {
                       </span>
                     )
                   )}
+                  {message.text && !location && (
+                    <button
+                      onClick={() => translateAndToast(message.text)}
+                      className="self-start text-[11px] text-[#53BDEB] mt-0.5 hover:underline"
+                    >
+                      Translate
+                    </button>
+                  )}
                   <span className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]">
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
@@ -212,15 +263,7 @@ const ChatContainer = () => {
                 </div>
               )}
 
-              {!isMe && !message.deletedForEveryone && (
-                <MessageActionMenu
-                  message={message}
-                  isMe={isMe}
-                  visible={hoveredId === message._id}
-                  onTogglePin={() => togglePinMessage(message._id)}
-                  onDelete={(mode) => deleteMessage(message._id, mode)}
-                />
-              )}
+              {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
 
               {isMe && (
                 <div className="w-8 h-8 rounded-full overflow-hidden ml-2 shrink-0">
@@ -248,6 +291,10 @@ const ChatContainer = () => {
       <MessageInput />
 
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      {forwardingMessage && (
+        <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
+      )}
+      {infoMessage && <MessageInfoModal message={infoMessage} onClose={() => setInfoMessage(null)} />}
     </div>
   );
 };
