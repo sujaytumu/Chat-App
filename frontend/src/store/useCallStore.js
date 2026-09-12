@@ -204,11 +204,15 @@ export const useCallStore = create((set, get) => ({
         offer,
         callType,
         fromUser: { _id: authUser._id, fullName: authUser.fullName, profilePic: authUser.profilePic },
-      });
+      }, { timeoutMs: 7000, retries: 2 });
 
       if (!result.delivered && result.reason === "timeout") {
-        toast.error("Couldn't reach the server — check your connection");
-        get().resetCall();
+        // Don't kill the call here — a slow ack (e.g. a sluggish server
+        // response) isn't proof the call itself failed to go through, and
+        // aborting on a false alarm was worse than just letting it continue.
+        // The existing 45s "no answer" flow is the real backstop for a call
+        // that genuinely never reached anyone.
+        console.warn("callUser wasn't acknowledged after retries — continuing to wait anyway");
       }
     } catch {
       toast.error("Could not access camera/microphone");
@@ -267,12 +271,17 @@ export const useCallStore = create((set, get) => ({
       initialNegotiationDone = true;
 
       const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer }, {
-        timeoutMs: 4000,
-        retries: 2, // extra chance to catch a caller who's mid-reconnect after a brief drop
+        timeoutMs: 7000,
+        retries: 2,
       });
       if (!result.delivered) {
-        toast.error("Couldn't reach them — the call may have already ended");
-        get().resetCall();
+        // Don't hang up here on a bare ack failure — if the answer genuinely
+        // never reached the caller, the peer connection will never actually
+        // establish (no ICE connectivity), and the connection watchdog
+        // below will catch that and end the call with a clear reason. That's
+        // a more accurate signal than guessing off a single ack timeout,
+        // which was wrongly killing calls that were actually still fine.
+        console.warn("answerCall wasn't acknowledged after retries — relying on the connection watchdog");
       }
     } catch {
       toast.error("Could not access camera/microphone");
@@ -489,7 +498,7 @@ export const useCallStore = create((set, get) => ({
       // between claiming "calling"/"incoming" and the peer connection
       // actually being created) — otherwise every future incoming call
       // would be silently blocked forever after any past error.
-      const STALE_THRESHOLD_MS = 12000;
+      const STALE_THRESHOLD_MS = 25000;
       if (get().callStatus !== "idle" && !pc && Date.now() - callClaimedAt > STALE_THRESHOLD_MS) {
         get().resetCall();
       }

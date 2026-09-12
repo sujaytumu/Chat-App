@@ -121,7 +121,9 @@ export const getGroupMessages = async (req, res) => {
       return res.status(403).json({ error: "You are not a member of this group" });
     }
 
-    const messages = await Message.find({ groupId, deletedFor: { $ne: myId } }).sort({ createdAt: 1 });
+    const messages = await Message.find({ groupId, deletedFor: { $ne: myId } })
+      .sort({ createdAt: 1 })
+      .populate("replyTo", "text image file senderId");
 
     // Mark unseen messages as seen by me
     await Message.updateMany(
@@ -138,7 +140,7 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image, file } = req.body;
+    const { text, image, file, replyTo } = req.body;
     const { id: groupId } = req.params;
     const senderId = req.user._id;
 
@@ -171,14 +173,16 @@ export const sendGroupMessage = async (req, res) => {
       fileAttachment = await uploadFileAttachment(file);
     }
 
-    const newMessage = await Message.create({
+    let newMessage = await Message.create({
       senderId,
       groupId,
       text: text?.trim() || "",
       image: imageUrl,
       file: fileAttachment,
+      replyTo: replyTo || null,
       seenBy: [senderId],
     });
+    newMessage = await newMessage.populate("replyTo", "text image file senderId");
 
     io.to(groupId.toString()).emit("newGroupMessage", newMessage);
 

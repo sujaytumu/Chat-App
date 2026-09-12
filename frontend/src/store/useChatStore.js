@@ -26,6 +26,7 @@ export const useChatStore = create((set, get) => ({
 
   messages: [],
   isMessagesLoading: false,
+  replyingTo: null, // message currently being replied to (shown above the input)
 
   // userId (direct) / groupId (group) -> Set of typing userIds
   typingUsers: {},
@@ -94,15 +95,16 @@ export const useChatStore = create((set, get) => ({
   },
 
   sendMessage: async (messageData) => {
-    const { selectedChat, messages } = get();
+    const { selectedChat, messages, replyingTo } = get();
     if (!selectedChat) return;
     try {
       const url =
         selectedChat.type === "direct"
           ? `/messages/send/${selectedChat.data._id}`
           : `/groups/${selectedChat.data._id}/messages`;
-      const res = await axiosInstance.post(url, messageData);
-      set({ messages: [...messages, res.data] });
+      const payload = replyingTo ? { ...messageData, replyTo: replyingTo._id } : messageData;
+      const res = await axiosInstance.post(url, payload);
+      set({ messages: [...messages, res.data], replyingTo: null });
 
       // Bump this chat to the top of the sidebar and refresh its preview
       // immediately — don't wait for a refetch.
@@ -164,6 +166,37 @@ export const useChatStore = create((set, get) => ({
       }
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to delete message");
+    }
+  },
+
+  setReplyingTo: (message) => set({ replyingTo: message }),
+  clearReplyingTo: () => set({ replyingTo: null }),
+
+  toggleStarMessage: async (messageId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/star/${messageId}`);
+      get().applyMessageUpdate(res.data);
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to update star");
+    }
+  },
+
+  forwardMessage: async (message, targetChat) => {
+    try {
+      const url =
+        targetChat.type === "direct"
+          ? `/messages/send/${targetChat.data._id}`
+          : `/groups/${targetChat.data._id}/messages`;
+      await axiosInstance.post(url, {
+        text: message.text || "",
+        image: message.image || undefined,
+        file: message.file
+          ? { data: message.file.url, name: message.file.name, mimeType: "", size: message.file.size }
+          : undefined,
+      });
+      toast.success("Message forwarded");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to forward message");
     }
   },
 

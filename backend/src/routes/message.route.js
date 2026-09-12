@@ -7,16 +7,20 @@ import {
   markMessagesAsSeen,
   togglePinMessage,
   deleteMessage,
+  toggleStarMessage,
+  getStarredMessages,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
 
 router.get("/users", protectRoute, getUsersForSidebar);
+router.get("/starred/all", protectRoute, getStarredMessages);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);
 router.put("/seen/:id", protectRoute, markMessagesAsSeen);
 router.put("/pin/:id", protectRoute, togglePinMessage);
+router.put("/star/:id", protectRoute, toggleStarMessage);
 router.delete("/:id", protectRoute, deleteMessage);
 
 export default router;
