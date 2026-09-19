@@ -1,93 +1,103 @@
 import { useChatStore } from "../store/useChatStore";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
+import ImageLightbox from "./ImageLightbox";
+import MessageTicks from "./MessageTicks";
+import AttachmentContent from "./AttachmentContent";
+import LocationCard from "./LocationCard";
+import ForwardMessageModal from "./ForwardMessageModal";
+import MessageInfoModal from "./MessageInfoModal";
+import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime } from "../lib/utils";
+import { translateAndToast } from "../lib/translate";
+import { Pin, X } from "lucide-react";
+import MessageActionMenu from "./MessageActionMenu";
 
 const ChatContainer = () => {
   const {
     messages,
-    getMessages,
     isMessagesLoading,
-    selectedUser,
-    subscribeToMessages,
-    unsubscribeFromMessages,
-    socket, // Assuming socket is exposed here or accessible via the store
+    selectedChat,
+    typingUsers,
+    togglePinMessage,
+    deleteMessage,
+    setReplyingTo,
+    toggleStarMessage,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
-  const [typingUsers, setTypingUsers] = useState(new Set());
+  const messageRefs = useRef({});
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [infoMessage, setInfoMessage] = useState(null);
+  const prevChatKeyRef = useRef(null);
+  const justOpenedRef = useRef(false);
 
-  useEffect(() => {
-    getMessages(selectedUser._id);
-    subscribeToMessages();
-    return () => unsubscribeFromMessages();
-  }, [selectedUser._id, getMessages, subscribeToMessages, unsubscribeFromMessages]);
+  const isGroup = selectedChat.type === "group";
+  const data = selectedChat.data;
 
-  useEffect(() => {
-    if (messageEndRef.current && messages) {
-      messageEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+  const membersById = isGroup
+    ? Object.fromEntries(data.members.map((m) => [m._id, m]))
+    : {};
+
+  const isOtherTyping = isGroup
+    ? (typingUsers[`group:${data._id}`]?.size ?? 0) > 0
+    : (typingUsers[data._id]?.size ?? 0) > 0;
+
+  const pinnedMessage = useMemo(() => {
+    const pinned = messages.filter((m) => m.pinned);
+    return pinned.length > 0 ? pinned[pinned.length - 1] : null;
   }, [messages]);
 
-  // Listen for typing events
   useEffect(() => {
-    if (!socket) return;
+    if (!messageEndRef.current) return;
 
-    const handleTyping = ({ fromUserId }) => {
-      if (fromUserId === selectedUser._id) {
-        setTypingUsers((prev) => new Set(prev).add(fromUserId));
-      }
-    };
+    // Jump straight to the bottom instantly when a chat is first opened —
+    // animating a smooth scroll through the whole history looks like a
+    // random mid-chat jump/lag. Only new messages arriving in an already-
+    // open chat get the smooth scroll.
+    const chatKey = `${selectedChat.type}:${data._id}`;
+    const isFreshOpen = prevChatKeyRef.current !== chatKey;
+    prevChatKeyRef.current = chatKey;
 
-    const handleStopTyping = ({ fromUserId }) => {
-      if (fromUserId === selectedUser._id) {
-        setTypingUsers((prev) => {
-          const copy = new Set(prev);
-          copy.delete(fromUserId);
-          return copy;
-        });
-      }
-    };
+    messageEndRef.current.scrollIntoView({ behavior: isFreshOpen ? "auto" : "smooth" });
 
-    const handleMessageSeen = ({ messageId, seenBy }) => {
-      // Optionally update message state to mark message as seen
-      // This depends on your store update method - example:
-      // updateMessageSeen(messageId, seenBy);
-    };
+    // Images/videos loading asynchronously after this point can grow the
+    // content height and leave the "bottom" we just scrolled to stale —
+    // keep re-anchoring for a moment after a fresh open so late-loading
+    // media doesn't leave the view stuck partway up the conversation.
+    if (isFreshOpen) {
+      justOpenedRef.current = true;
+      const timeout = setTimeout(() => {
+        justOpenedRef.current = false;
+      }, 1200);
+      return () => clearTimeout(timeout);
+    }
+  }, [messages, isOtherTyping, selectedChat, data._id]);
 
-    socket.on("typing", handleTyping);
-    socket.on("stopTyping", handleStopTyping);
-    socket.on("messageSeen", handleMessageSeen);
+  const handleMediaLoaded = () => {
+    if (justOpenedRef.current) {
+      messageEndRef.current?.scrollIntoView({ behavior: "auto" });
+    }
+  };
 
-    return () => {
-      socket.off("typing", handleTyping);
-      socket.off("stopTyping", handleStopTyping);
-      socket.off("messageSeen", handleMessageSeen);
-    };
-  }, [socket, selectedUser._id]);
+  const scrollToPinned = () => {
+    if (pinnedMessage) {
+      messageRefs.current[pinnedMessage._id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
-  // Emit messageSeen when messages from selectedUser are displayed
-  useEffect(() => {
-    if (!socket || !messages.length) return;
-
-    // Collect messages sent by selectedUser that are not seen yet
-    const unseenMessages = messages.filter(
-      (msg) => msg.senderId === selectedUser._id && !msg.seen
-    );
-
-    unseenMessages.forEach((msg) => {
-      socket.emit("messageSeen", { messageId: msg._id, fromUserId: msg.senderId });
-      // Optionally update locally that this message has been seen to prevent duplicate emits
-      // markMessageSeenLocally(msg._id);
-    });
-  }, [messages, selectedUser._id, socket]);
+  const scrollToMessage = (id) => {
+    messageRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-auto bg-[#ECE5DD]">
+      <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -96,61 +106,167 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-auto bg-[#ECE5DD]">
+    <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
       <ChatHeader />
-      {/* Typing indicator */}
-      {typingUsers.has(selectedUser._id) && (
-        <div className="px-4 text-sm italic text-gray-600">{selectedUser.name} is typing...</div>
+
+      {pinnedMessage && (
+        <button
+          onClick={scrollToPinned}
+          className="flex items-center gap-2 px-4 py-2 bg-[#202C33] border-b border-black/30 text-left hover:bg-[#26333c] transition-colors"
+        >
+          <Pin size={14} className="text-[#00A884] shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-[#00A884]">Pinned message</p>
+            <p className="text-sm truncate text-[#D1D7DB]">
+              {pinnedMessage.image ? "📷 Photo" : pinnedMessage.file ? `📎 ${pinnedMessage.file.name}` : pinnedMessage.text}
+            </p>
+          </div>
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePinMessage(pinnedMessage._id);
+            }}
+            className="size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 shrink-0"
+            title="Unpin"
+          >
+            <X size={13} />
+          </span>
+        </button>
       )}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((message) => {
           const isMe = message.senderId === authUser._id;
+          const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
+          const location = message.text ? parseLocationMessage(message.text) : null;
+          const isSticker =
+            !message.image && !message.file && !location && isStickerMessage(message.text);
+          const replySender = message.replyTo
+            ? isGroup
+              ? membersById[message.replyTo.senderId]
+              : message.replyTo.senderId === authUser._id
+              ? authUser
+              : data
+            : null;
+
+          const menuProps = {
+            message,
+            isMe,
+            authUserId: authUser._id,
+            visible: hoveredId === message._id,
+            onTogglePin: () => togglePinMessage(message._id),
+            onDelete: (mode) => deleteMessage(message._id, mode),
+            onReply: () => setReplyingTo(message),
+            onToggleStar: () => toggleStarMessage(message._id),
+            onForward: () => setForwardingMessage(message),
+            onInfo: () => setInfoMessage(message),
+          };
+
           return (
             <div
               key={message._id}
-              className={`flex items-end ${isMe ? "justify-end" : "justify-start"}`}
-              ref={messageEndRef}
+              ref={(el) => (messageRefs.current[message._id] = el)}
+              className={`flex items-end gap-0 group ${isMe ? "justify-end" : "justify-start"}`}
+              onMouseEnter={() => setHoveredId(message._id)}
+              onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
             >
               {!isMe && (
-                <div className="w-8 h-8 rounded-full overflow-hidden mr-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden mr-2 shrink-0">
                   <img
-                    src={selectedUser.profilePic || "/avatar.png"}
+                    src={sender?.profilePic || "/avatar.png"}
                     alt="profile pic"
                     className="w-full h-full object-cover"
                   />
                 </div>
               )}
-              <div
-                className={`max-w-[45%] px-3 py-1.5 rounded-lg break-words shadow-sm flex items-end pl-3 ${
-                  isMe
-                    ? "bg-[#25D366] text-white rounded-br-none"
-                    : "bg-white text-black rounded-bl-none"
-                }`}
-                style={{ whiteSpace: "pre-wrap" }}
-              >
-                {message.text}
-                {message.image && (
-                  <img
-                    src={message.image}
-                    alt="Attachment"
-                    className="sm:max-w-[150px] rounded-md mt-1"
-                  />
-                )}
-                <span
-                  className={`ml-2 text-[10px] leading-none flex-shrink-0 self-end whitespace-nowrap ${
-                    isMe ? "text-white/80" : "text-black/60"
+
+              {isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
+
+              {message.deletedForEveryone ? (
+                <div
+                  className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg italic text-[#8696A0] text-[14.2px] flex items-center gap-1.5 ${
+                    isMe ? "bg-[#005C4B]/40 rounded-br-none" : "bg-[#202C33]/60 rounded-bl-none"
                   }`}
-                  style={{ minWidth: "32px", textAlign: "right" }}
                 >
-                  {formatMessageTime(message.createdAt)}
-                </span>
-                {/* Show Seen indicator */}
-                {isMe && message.seen && (
-                  <span className="ml-1 text-[9px] leading-none self-end text-white/70">✓✓ Seen</span>
-                )}
-              </div>
+                  🚫 This message was deleted
+                </div>
+              ) : isSticker ? (
+                <div className="flex flex-col items-center px-1">
+                  <span className="text-6xl leading-none">{message.text.trim()}</span>
+                  <span className="text-[10px] text-[#8696A0] mt-1 flex items-center gap-1">
+                    {formatMessageTime(message.createdAt)}
+                    {isMe && !isGroup && <MessageTicks message={message} />}
+                  </span>
+                </div>
+              ) : (
+                <div
+                  className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
+                    isMe ? "bg-[#005C4B] text-[#E9EDEF] rounded-br-none" : "bg-[#202C33] text-[#E9EDEF] rounded-bl-none"
+                  }`}
+                >
+                  {isGroup && !isMe && (
+                    <span className="text-xs font-semibold text-[#00A884] mb-0.5">
+                      {sender?.fullName || "Unknown"}
+                    </span>
+                  )}
+                  {message.pinned && (
+                    <span className="flex items-center gap-1 text-[10px] mb-0.5 text-[#8696A0]">
+                      <Pin size={10} /> Pinned
+                    </span>
+                  )}
+                  {message.replyTo && (
+                    <button
+                      onClick={() => scrollToMessage(message.replyTo._id)}
+                      className="flex flex-col items-start text-left mb-1 px-2 py-1 rounded bg-black/20 border-l-2 border-[#00A884] max-w-full"
+                    >
+                      <span className="text-xs font-medium text-[#00A884]">
+                        {replySender?.fullName || "Message"}
+                      </span>
+                      <span className="text-xs text-[#8696A0] truncate max-w-[220px]">
+                        {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.text}
+                      </span>
+                    </button>
+                  )}
+                  {message.image && (
+                    <img
+                      src={message.image}
+                      alt="Attachment"
+                      onLoad={handleMediaLoaded}
+                      onClick={() => setLightboxSrc(message.image)}
+                      className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                    />
+                  )}
+                  {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
+                  {location ? (
+                    <LocationCard location={location} />
+                  ) : (
+                    message.text && (
+                      <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
+                        {message.text}
+                      </span>
+                    )
+                  )}
+                  {message.text && !location && (
+                    <button
+                      onClick={() => translateAndToast(message.text)}
+                      className="self-start text-[11px] text-[#53BDEB] mt-0.5 hover:underline"
+                    >
+                      Translate
+                    </button>
+                  )}
+                  <span className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]">
+                    {formatMessageTime(message.createdAt)}
+                    {isMe && !isGroup && <MessageTicks message={message} />}
+                    {isMe && isGroup && message.seenBy?.length > 1 && <span className="text-[#53BDEB]">✓✓</span>}
+                  </span>
+                </div>
+              )}
+
+              {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
+
               {isMe && (
-                <div className="w-8 h-8 rounded-full overflow-hidden ml-2">
+                <div className="w-8 h-8 rounded-full overflow-hidden ml-2 shrink-0">
                   <img
                     src={authUser.profilePic || "/avatar.png"}
                     alt="profile pic"
@@ -161,8 +277,24 @@ const ChatContainer = () => {
             </div>
           );
         })}
+
+        {isOtherTyping && (
+          <div className="flex items-center gap-1 px-2">
+            <span className="size-2 rounded-full bg-zinc-400 animate-bounce [animation-delay:-0.3s]" />
+            <span className="size-2 rounded-full bg-zinc-400 animate-bounce [animation-delay:-0.15s]" />
+            <span className="size-2 rounded-full bg-zinc-400 animate-bounce" />
+          </div>
+        )}
+        <div ref={messageEndRef} />
       </div>
+
       <MessageInput />
+
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      {forwardingMessage && (
+        <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
+      )}
+      {infoMessage && <MessageInfoModal message={infoMessage} onClose={() => setInfoMessage(null)} />}
     </div>
   );
 };

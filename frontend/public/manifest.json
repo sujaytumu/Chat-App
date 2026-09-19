@@ -1,0 +1,15 @@
+{
+  "name": "Talkies",
+  "short_name": "Talkies",
+  "description": "Real-time chat, groups, calls, and more",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B141A",
+  "theme_color": "#202C33",
+  "icons": [
+    { "src": "/icon-v2-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-v2-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-v2-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-v2-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
