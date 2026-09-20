@@ -45,60 +45,12 @@ export function getReceiverSocketId(userId) {
   return userSocketMap[userId];
 }
 
-io.on("connection", async (socket) => {
+io.on("connection", (socket) => {
   const userId = socket.handshake.query.userId;
+
   if (userId) {
     userSocketMap[userId] = socket.id;
-
-    // Join a personal room (handy for future targeted broadcasts)
-    socket.join(userId);
-
-    // Join every group room this user belongs to, so group messages reach them
-    try {
-      const groups = await Group.find({ members: userId }).select("_id");
-      groups.forEach((group) => socket.join(group._id.toString()));
-    } catch (err) {
-      console.log("Error joining group rooms:", err.message);
-    }
-
-    // Catch up delivery receipts: any direct messages sent to this user while
-    // they were offline are now delivered, so flip the flag and tell the senders.
-    try {
-      const undelivered = await Message.find({
-        receiverId: userId,
-        groupId: null,
-        delivered: false,
-      }).select("_id senderId");
-
-      if (undelivered.length > 0) {
-        await Message.updateMany(
-          { _id: { $in: undelivered.map((m) => m._id) } },
-          { $set: { delivered: true } }
-        );
-        const senderIds = [...new Set(undelivered.map((m) => m.senderId.toString()))];
-        senderIds.forEach((senderId) => {
-          const senderSocketId = userSocketMap[senderId];
-          if (senderSocketId) {
-            io.to(senderSocketId).emit("messagesDelivered", { by: userId });
-          }
-        });
-      }
-    } catch (err) {
-      console.log("Error catching up delivery receipts:", err.message);
-    }
-
-    // Deliver any call that was placed to this user while they were offline
-    // and is still within its grace period.
-    const pending = pendingCalls.get(userId);
-    if (pending) {
-      clearTimeout(pending.timeout);
-      pendingCalls.delete(userId);
-      socket.emit("incomingCall", {
-        fromUser: pending.fromUser,
-        offer: pending.offer,
-        callType: pending.callType,
-      });
-    }
+    socket.join(userId); // personal room, handy for future targeted broadcasts
   }
 
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
@@ -287,6 +239,64 @@ io.on("connection", async (socket) => {
     delete userSocketMap[userId];
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
+
+  // ---- Everything below is background setup that does NOT need to block
+  // listener registration above. This used to run before the socket.on(...)
+  // calls (inside an async connection handler), which meant an event like
+  // "callUser" arriving from a client while these awaits were still in
+  // flight would find no listener registered yet and be silently dropped —
+  // a real, structural bug, not just network flakiness. ----
+  if (userId) {
+    (async () => {
+      // Join every group room this user belongs to, so group messages reach them
+      try {
+        const groups = await Group.find({ members: userId }).select("_id");
+        groups.forEach((group) => socket.join(group._id.toString()));
+      } catch (err) {
+        console.log("Error joining group rooms:", err.message);
+      }
+
+      // Catch up delivery receipts: any direct messages sent to this user
+      // while they were offline are now delivered, so flip the flag and
+      // tell the senders.
+      try {
+        const undelivered = await Message.find({
+          receiverId: userId,
+          groupId: null,
+          delivered: false,
+        }).select("_id senderId");
+
+        if (undelivered.length > 0) {
+          await Message.updateMany(
+            { _id: { $in: undelivered.map((m) => m._id) } },
+            { $set: { delivered: true } }
+          );
+          const senderIds = [...new Set(undelivered.map((m) => m.senderId.toString()))];
+          senderIds.forEach((senderId) => {
+            const senderSocketId = userSocketMap[senderId];
+            if (senderSocketId) {
+              io.to(senderSocketId).emit("messagesDelivered", { by: userId });
+            }
+          });
+        }
+      } catch (err) {
+        console.log("Error catching up delivery receipts:", err.message);
+      }
+
+      // Deliver any call that was placed to this user while they were
+      // offline and is still within its grace period.
+      const pending = pendingCalls.get(userId);
+      if (pending) {
+        clearTimeout(pending.timeout);
+        pendingCalls.delete(userId);
+        socket.emit("incomingCall", {
+          fromUser: pending.fromUser,
+          offer: pending.offer,
+          callType: pending.callType,
+        });
+      }
+    })();
+  }
 });
 
 export { io, app, server };
