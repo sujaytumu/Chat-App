@@ -238,6 +238,34 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     delete userSocketMap[userId];
     io.emit("getOnlineUsers", Object.keys(userSocketMap));
+
+    // If this user drops (tab closed, network died, phone locked hard)
+    // while a call involving them is active or ringing, the other side
+    // would otherwise never find out and could ring indefinitely — there's
+    // no clean "endCall" to catch this, since the disconnect itself is the
+    // only signal we get. Sweep both places calls are tracked and notify
+    // whoever's on the other end.
+    for (const [key, logId] of activeCallLogs.entries()) {
+      const [a, b] = key.split("_");
+      if (a !== userId && b !== userId) continue;
+      const otherId = a === userId ? b : a;
+      const otherSocketId = userSocketMap[otherId];
+      if (otherSocketId) {
+        io.to(otherSocketId).emit("callEnded");
+      }
+      CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+      activeCallLogs.delete(key);
+    }
+
+    // Also clear any call this user placed that's still waiting in the
+    // offline-callee grace period, so it doesn't get delivered to a caller
+    // who's no longer there to receive the answer.
+    for (const [toUserId, pending] of pendingCalls.entries()) {
+      if (pending.fromUserId === userId) {
+        clearTimeout(pending.timeout);
+        pendingCalls.delete(toUserId);
+      }
+    }
   });
 
   // ---- Everything below is background setup that does NOT need to block
