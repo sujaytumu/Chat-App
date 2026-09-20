@@ -11,7 +11,7 @@ import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
 import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
-import { formatMessageTime } from "../lib/utils";
+import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
 import { Pin, X } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
@@ -136,7 +136,7 @@ const ChatContainer = () => {
       )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((message) => {
+        {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
           const location = message.text ? parseLocationMessage(message.text) : null;
@@ -149,6 +149,8 @@ const ChatContainer = () => {
               ? authUser
               : data
             : null;
+          const showDateDivider =
+            index === 0 || isDifferentDay(messages[index - 1].createdAt, message.createdAt);
 
           const menuProps = {
             message,
@@ -164,8 +166,15 @@ const ChatContainer = () => {
           };
 
           return (
+            <div key={message._id}>
+            {showDateDivider && (
+              <div className="flex justify-center my-3">
+                <span className="bg-[#182229] text-[#8696A0] text-xs px-3 py-1 rounded-lg shadow-sm">
+                  {formatDateDivider(message.createdAt)}
+                </span>
+              </div>
+            )}
             <div
-              key={message._id}
               ref={(el) => (messageRefs.current[message._id] = el)}
               className={`flex items-end gap-0 group ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
@@ -274,6 +283,7 @@ const ChatContainer = () => {
                   />
                 </div>
               )}
+            </div>
             </div>
           );
         })}
