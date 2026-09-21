@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { useCallStore } from "../store/useCallStore";
 import {
   Phone,
-  PhoneOff,
   Video,
   VideoOff,
   Mic,
@@ -38,7 +37,8 @@ const CallAvatar = ({ user, size = "size-28" }) => {
   );
 };
 
-const gridBtn = "size-16 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 text-white transition-colors";
+const gridBtn = "size-16 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 text-white transition-all";
+const gridBtnActive = "bg-white text-black hover:bg-white/90 ring-[3px] ring-white ring-offset-2 ring-offset-black/50";
 
 const CallManager = () => {
   const {
@@ -132,7 +132,7 @@ const CallManager = () => {
                 onClick={rejectCall}
                 className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
               >
-                <PhoneOff size={26} />
+                <Phone size={26} className="rotate-[135deg]" />
               </button>
               <span className="text-xs text-[#8696A0]">Decline</span>
             </div>
@@ -249,7 +249,7 @@ const CallManager = () => {
       <div className="relative bg-black/50 rounded-t-3xl px-6 pt-6 pb-8">
         <div className="grid grid-cols-3 gap-x-6 gap-y-5 max-w-xs mx-auto">
           <div className="flex flex-col items-center gap-1.5">
-            <button onClick={toggleSpeakerOutput} className={`${gridBtn} ${isSpeakerOn ? "bg-white text-black hover:bg-white/90" : ""}`}>
+            <button onClick={toggleSpeakerOutput} className={`${gridBtn} ${isSpeakerOn ? gridBtnActive : ""}`}>
               <Volume2 size={24} />
             </button>
             <span className="text-xs text-white/70">Speaker</span>
@@ -258,7 +258,7 @@ const CallManager = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={isVideo ? toggleVideo : upgradeToVideo}
-              className={`${gridBtn} ${isVideo && isVideoOff ? "bg-white text-black hover:bg-white/90" : ""}`}
+              className={`${gridBtn} ${isVideo && isVideoOff ? gridBtnActive : ""}`}
             >
               {isVideo && isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
             </button>
@@ -266,7 +266,7 @@ const CallManager = () => {
           </div>
 
           <div className="flex flex-col items-center gap-1.5">
-            <button onClick={toggleMute} className={`${gridBtn} ${isMuted ? "bg-white text-black hover:bg-white/90" : ""}`}>
+            <button onClick={toggleMute} className={`${gridBtn} ${isMuted ? gridBtnActive : ""}`}>
               {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
             </button>
             <span className="text-xs text-white/70">Mute</span>
@@ -295,7 +295,7 @@ const CallManager = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={isVideo ? toggleScreenShare : () => toast("Screen share needs a video call", { icon: "🖥️" })}
-              className={`${gridBtn} ${isScreenSharing ? "bg-white text-black hover:bg-white/90" : ""}`}
+              className={`${gridBtn} ${isScreenSharing ? gridBtnActive : ""}`}
             >
               <UploadCloud size={24} />
             </button>
@@ -307,7 +307,7 @@ const CallManager = () => {
               onClick={endCall}
               className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
             >
-              <PhoneOff size={24} />
+              <Phone size={24} className="rotate-[135deg]" />
             </button>
             <span className="text-xs text-white/70">End</span>
           </div>
