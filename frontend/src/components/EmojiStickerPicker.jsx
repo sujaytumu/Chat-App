@@ -5,10 +5,27 @@ import { Smile, Sticker } from "lucide-react";
 // A curated set of large single-emoji "stickers" — tapping one sends it
 // immediately as an oversized sticker-style message (see ChatContainer's
 // sticker-detection rendering), the same one-tap send pattern WhatsApp uses.
-const STICKERS = [
-  "😂", "❤️", "🔥", "👍", "🙏", "😍", "😊", "🎉",
-  "😢", "😎", "🥳", "😴", "🤔", "😮", "👏", "💯",
-  "🤝", "🙌", "😅", "🥰", "😭", "🤣", "😁", "👌",
+const STICKER_CATEGORIES = [
+  {
+    label: "Reactions",
+    stickers: ["😂", "🤣", "❤️", "🔥", "👍", "👎", "😍", "🥰", "😊", "😢", "😭", "😮", "🤔", "😴", "😎", "🥳"],
+  },
+  {
+    label: "Gestures",
+    stickers: ["👏", "🙌", "🙏", "🤝", "💯", "👌", "✌️", "🤞", "👊", "✋", "🤙", "💪"],
+  },
+  {
+    label: "Animals",
+    stickers: ["🐶", "🐱", "🐼", "🦁", "🐸", "🐧", "🦋", "🐝"],
+  },
+  {
+    label: "Food",
+    stickers: ["🍕", "🍔", "🍟", "🍩", "🍦", "☕", "🍺", "🎂"],
+  },
+  {
+    label: "Fun & Nature",
+    stickers: ["🎉", "🎈", "⚽", "🎵", "☀️", "🌧️", "🌈", "⭐"],
+  },
 ];
 
 const EmojiStickerPicker = ({ onEmojiSelect, onStickerSelect, onClose }) => {
@@ -60,15 +77,22 @@ const EmojiStickerPicker = ({ onEmojiSelect, onStickerSelect, onClose }) => {
           previewConfig={{ showPreview: false }}
         />
       ) : (
-        <div className="grid grid-cols-6 gap-1 p-3 h-[360px] overflow-y-auto content-start">
-          {STICKERS.map((sticker) => (
-            <button
-              key={sticker}
-              onClick={() => onStickerSelect(sticker)}
-              className="text-4xl p-1.5 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              {sticker}
-            </button>
+        <div className="p-3 h-[360px] overflow-y-auto">
+          {STICKER_CATEGORIES.map((category) => (
+            <div key={category.label} className="mb-3">
+              <p className="text-xs font-medium text-[#8696A0] mb-1.5 px-1">{category.label}</p>
+              <div className="grid grid-cols-6 gap-1">
+                {category.stickers.map((sticker) => (
+                  <button
+                    key={sticker}
+                    onClick={() => onStickerSelect(sticker)}
+                    className="text-4xl p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  >
+                    {sticker}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
