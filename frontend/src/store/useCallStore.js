@@ -150,13 +150,35 @@ export const useCallStore = create((set, get) => ({
     // arriving in that window wouldn't correctly detect we're mid-dial,
     // corrupting the shared connection state.
     set({ callStatus: "calling", callType, remoteUser: user });
-    callClaimedAt = Date.now();
+    const claimedAt = Date.now();
+    callClaimedAt = claimedAt;
+    // If the user hits End/cancel (or the call is reset) while an await below
+    // is pending — e.g. the mic permission prompt — this call is no longer
+    // valid and must not carry on creating a connection / ringing the callee.
+    const isStale = () => get().callStatus !== "calling" || callClaimedAt !== claimedAt;
 
+    let stream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      if (!navigator.mediaDevices?.getUserMedia) {
+        toast.error("Calls need a secure (https) connection");
+        get().resetCall();
+        return;
+      }
+      stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: callType === "video",
       });
+    } catch {
+      toast.error("Could not access camera/microphone");
+      get().resetCall();
+      return;
+    }
+    if (isStale()) {
+      stopLocalTracks(stream);
+      return;
+    }
+
+    try {
       set({ localStream: stream });
 
       // If we already know they're online, show "Ringing…" right away rather
@@ -172,8 +194,6 @@ export const useCallStore = create((set, get) => ({
 
       pc.ontrack = (event) => {
         set({ remoteStream: event.streams[0] });
-        // If the other side upgraded to video mid-call, a video track
-        // arrives after the call started as audio-only — switch our UI too.
         if (event.track.kind === "video" && get().callType !== "video") {
           set({ callType: "video" });
         }
@@ -196,26 +216,29 @@ export const useCallStore = create((set, get) => ({
       };
 
       const offer = await pc.createOffer();
+      if (isStale()) {
+        get().resetCall();
+        return;
+      }
       await pc.setLocalDescription(offer);
       initialNegotiationDone = true;
 
+      // retries: 0 — re-emitting "callUser" makes the callee receive the same
+      // call several times (the second one used to be auto-rejected as
+      // "busy", which then hung up the caller). The server acks instantly now.
       const result = await emitWithRetry(socket, "callUser", {
         toUserId: user._id,
         offer,
         callType,
         fromUser: { _id: authUser._id, fullName: authUser.fullName, profilePic: authUser.profilePic },
-      }, { timeoutMs: 7000, retries: 2 });
+      }, { timeoutMs: 10000, retries: 0 });
 
       if (!result.delivered && result.reason === "timeout") {
-        // Don't kill the call here — a slow ack (e.g. a sluggish server
-        // response) isn't proof the call itself failed to go through, and
-        // aborting on a false alarm was worse than just letting it continue.
-        // The existing 45s "no answer" flow is the real backstop for a call
-        // that genuinely never reached anyone.
-        console.warn("callUser wasn't acknowledged after retries — continuing to wait anyway");
+        console.warn("callUser wasn't acknowledged — continuing to wait anyway");
       }
-    } catch {
-      toast.error("Could not access camera/microphone");
+    } catch (err) {
+      console.error("startCall failed:", err);
+      toast.error("Couldn't start the call");
       get().resetCall();
     }
   },
@@ -263,7 +286,7 @@ export const useCallStore = create((set, get) => ({
       };
 
       await pc.setRemoteDescription(new RTCSessionDescription(incomingOffer));
-      pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)));
+      pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
       pendingCandidates = [];
 
       const answer = await pc.createAnswer();
@@ -283,8 +306,9 @@ export const useCallStore = create((set, get) => ({
         // which was wrongly killing calls that were actually still fine.
         console.warn("answerCall wasn't acknowledged after retries — relying on the connection watchdog");
       }
-    } catch {
-      toast.error("Could not access camera/microphone");
+    } catch (err) {
+      console.error("acceptCall failed:", err);
+      toast.error("Couldn't answer the call — check mic/camera permission");
       get().endCall();
     }
   },
@@ -368,6 +392,7 @@ export const useCallStore = create((set, get) => ({
       isVideoOff: false,
       isRemoteRinging: false,
       isScreenSharing: false,
+      isSpeakerOn: false,
       callCooldownUntil: Date.now() + 2000, // brief guard against accidental rapid re-tapping
     });
   },
@@ -502,6 +527,12 @@ export const useCallStore = create((set, get) => ({
       if (get().callStatus !== "idle" && !pc && Date.now() - callClaimedAt > STALE_THRESHOLD_MS) {
         get().resetCall();
       }
+      // A duplicate of the call we're already ringing/in with the same person
+      // (e.g. a re-delivered offer) must be ignored — rejecting it would send
+      // "callRejected" to the caller and hang up the real call.
+      if (get().callStatus !== "idle" && get().remoteUser?._id === fromUser._id) {
+        return;
+      }
       if (get().callStatus !== "idle") {
         socket.emit("rejectCall", { toUserId: fromUser._id });
         return;
@@ -526,10 +557,17 @@ export const useCallStore = create((set, get) => ({
         console.warn("Received callAnswered but no active peer connection — call may have already ended");
         return;
       }
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)));
-      pendingCandidates = [];
-      set({ callStatus: "in-call", isRemoteRinging: false });
+      if (pc.signalingState !== "have-local-offer") return; // duplicate/late answer
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+        pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
+        pendingCandidates = [];
+        set({ callStatus: "in-call", isRemoteRinging: false });
+      } catch (err) {
+        console.error("Failed to apply call answer:", err);
+        toast.error("Call couldn't connect");
+        get().endCall();
+      }
     });
 
     socket.on("remoteDeviceRinging", () => {

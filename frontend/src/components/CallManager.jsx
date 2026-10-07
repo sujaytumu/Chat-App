@@ -98,7 +98,7 @@ const CallManager = () => {
       remoteAudioRef.current.srcObject = remoteStream;
       tryPlay(remoteAudioRef.current);
     }
-  }, [remoteStream, callType]);
+  }, [remoteStream, callType, isMinimized, callStatus]);
 
   const unblockAudio = () => {
     [remoteAudioRef.current, remoteVideoRef.current].forEach((el) => el?.play().catch(() => {}));
@@ -154,6 +154,8 @@ const CallManager = () => {
   // ---- Minimized pill (tap to expand) ----
   if (isMinimized) {
     return (
+      <>
+      <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
       <button
         onClick={() => setIsMinimized(false)}
         className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#1F2C34] rounded-full pl-2 pr-4 py-2 flex items-center gap-2 shadow-2xl"
@@ -164,6 +166,7 @@ const CallManager = () => {
           {callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : "In call"}
         </span>
       </button>
+      </>
     );
   }
 
