@@ -81,17 +81,22 @@ io.on("connection", (socket) => {
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
   socket.on("callUser", async ({ toUserId, offer, callType, fromUser }, ack) => {
-    try {
-      const log = await CallLog.create({
-        callerId: userId,
-        calleeId: toUserId,
-        callType,
-        status: "ringing",
+    // Never make signaling wait on the database — a slow/cold MongoDB used to
+    // delay the ack past the client's timeout, which triggered duplicate
+    // "callUser" retries and double-ringing / auto-reject on the callee.
+    const logPromise = CallLog.create({
+      callerId: userId,
+      calleeId: toUserId,
+      callType,
+      status: "ringing",
+    })
+      .then((log) => {
+        activeCallLogs.set(pairKey(userId, toUserId), log._id);
+      })
+      .catch((err) => {
+        console.log("Error creating call log:", err.message);
       });
-      activeCallLogs.set(pairKey(userId, toUserId), log._id);
-    } catch (err) {
-      console.log("Error creating call log:", err.message);
-    }
+    void logPromise;
 
     const receiverSocketId = userSocketMap[toUserId];
     if (receiverSocketId) {
