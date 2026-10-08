@@ -10,6 +10,19 @@ html {
 button, a, [role="button"], input, select, textarea, label, summary {
   touch-action: manipulation;
 }
+html,
+body,
+#root {
+  background-color: #0B141A;
+}
+/* While the chat shell is mounted the document itself never scrolls — only the
+   message list / chat list do. Prevents the header scrolling out of view. */
+html.app-locked,
+html.app-locked body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 body {
   overscroll-behavior-y: none;
   font-family: "Segoe UI", "Helvetica Neue", Helvetica, "Lucida Grande", Arial, Ubuntu, Cantarell,
