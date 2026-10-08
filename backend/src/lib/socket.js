@@ -225,6 +225,7 @@ io.on("connection", (socket) => {
       io.to(receiverSocketId).emit("remoteMediaState", {
         isMuted: !!state.isMuted,
         isVideoOff: !!state.isVideoOff,
+        isScreenSharing: !!state.isScreenSharing,
       });
     }
   });

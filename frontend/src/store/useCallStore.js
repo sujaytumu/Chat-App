@@ -141,9 +141,12 @@ let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for 
 // "muted" indicator. Safe to call any time; no-ops outside a call.
 const sendMediaState = (get) => {
   const socket = useAuthStore.getState().socket;
-  const { remoteUser, isMuted, isVideoOff, callStatus } = get();
+  const { remoteUser, isMuted, isVideoOff, isScreenSharing, callStatus } = get();
   if (!socket || !remoteUser || callStatus === "idle") return;
-  socket.emit("callMediaState", { toUserId: remoteUser._id, state: { isMuted, isVideoOff } });
+  socket.emit("callMediaState", {
+    toUserId: remoteUser._id,
+    state: { isMuted, isVideoOff, isScreenSharing },
+  });
 };
 
 const stopLocalTracks = (stream) => {
@@ -165,6 +168,7 @@ export const useCallStore = create((set, get) => ({
   isScreenSharing: false,
   remoteMuted: false, // the other person has muted their mic
   remoteVideoOff: false, // the other person has turned their camera off
+  remoteScreenSharing: false, // the other person is sharing their screen
   isReconnecting: false, // media path dropped; ICE is trying to recover it
   callStartedAt: null, // epoch ms when the call actually connected (drives the on-screen timer)
   audioOutputDevices: [],
@@ -381,7 +385,13 @@ export const useCallStore = create((set, get) => ({
   },
 
   toggleVideo: () => {
-    const { localStream, isVideoOff } = get();
+    const { localStream, isVideoOff, isScreenSharing } = get();
+    if (isScreenSharing) {
+      // The outgoing video track is the screen right now — toggling it would
+      // blank the share instead of the camera.
+      toast("Stop sharing your screen to change the camera", { icon: "🖥️" });
+      return;
+    }
     localStream?.getVideoTracks().forEach((track) => (track.enabled = isVideoOff));
     set({ isVideoOff: !isVideoOff });
     sendMediaState(get);
@@ -439,6 +449,7 @@ export const useCallStore = create((set, get) => ({
       isReconnecting: false,
       remoteMuted: false,
       remoteVideoOff: false,
+      remoteScreenSharing: false,
       callStartedAt: null,
       callCooldownUntil: Date.now() + 2000, // brief guard against accidental rapid re-tapping
     });
@@ -520,39 +531,76 @@ export const useCallStore = create((set, get) => ({
     const { isScreenSharing, localStream, callType } = get();
     if (callType !== "video" || !pc) return;
 
-    const videoSender = pc.getSenders().find((s) => s.track?.kind === "video");
+    // Reuse the call's existing video sender/transceiver for both starting and
+    // stopping a share, so switching never adds a second video m-line (which
+    // would need a full renegotiation and can leave the peer on a dead track).
+    // Looked up via the transceiver so it's still found if the sender's
+    // current track is null.
+    const videoTransceiver = pc
+      .getTransceivers()
+      .find((t) => t.sender.track?.kind === "video" || t.receiver.track?.kind === "video");
+    const videoSender = videoTransceiver?.sender;
     if (!videoSender) return;
 
+    const audioTracks = localStream?.getAudioTracks() || [];
+
     if (!isScreenSharing) {
+      let screenTrack;
       try {
         const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const screenTrack = displayStream.getVideoTracks()[0];
+        screenTrack = displayStream.getVideoTracks()[0];
+      } catch {
+        return; // user cancelled the picker — no-op
+      }
+      if (!pc || get().callStatus === "idle") {
+        screenTrack.stop(); // call ended while the picker was open
+        return;
+      }
+      try {
         cameraTrack = localStream?.getVideoTracks()[0] || cameraTrack;
         await videoSender.replaceTrack(screenTrack);
 
         // Stop sharing if the user uses the browser's own "Stop sharing" UI
-        screenTrack.onended = () => get().toggleScreenShare();
+        screenTrack.onended = () => {
+          if (get().isScreenSharing) get().toggleScreenShare();
+        };
 
-        const newStream = new MediaStream([
-          ...(localStream?.getAudioTracks() || []),
-          screenTrack,
-        ]);
-        set({ localStream: newStream, isScreenSharing: true });
+        set({
+          localStream: new MediaStream([...audioTracks, screenTrack]),
+          isScreenSharing: true,
+        });
+        sendMediaState(get);
       } catch {
-        // user cancelled the picker — no-op
+        screenTrack.stop();
+        toast.error("Couldn't start screen sharing");
       }
     } else {
+      const screenTrack = localStream?.getVideoTracks()[0];
       try {
-        if (cameraTrack) {
-          await videoSender.replaceTrack(cameraTrack);
-          const newStream = new MediaStream([
-            ...(localStream?.getAudioTracks() || []),
-            cameraTrack,
-          ]);
-          set({ localStream: newStream, isScreenSharing: false });
+        // The camera track may have ended while the screen was being shared
+        // (e.g. the device revoked it) — fetch a fresh one rather than
+        // sending a dead track to the peer.
+        if (!cameraTrack || cameraTrack.readyState === "ended") {
+          const camStream = await navigator.mediaDevices.getUserMedia({ video: true });
+          cameraTrack = camStream.getVideoTracks()[0];
         }
+        cameraTrack.enabled = !get().isVideoOff;
+        await videoSender.replaceTrack(cameraTrack);
+        set({
+          localStream: new MediaStream([...audioTracks, cameraTrack]),
+          isScreenSharing: false,
+        });
       } catch {
+        toast.error("Couldn't switch back to your camera");
         set({ isScreenSharing: false });
+      } finally {
+        // Release the capture (clears the browser's "sharing" indicator) —
+        // previously the screen track was left running after toggling off.
+        if (screenTrack && screenTrack !== cameraTrack) {
+          screenTrack.onended = null;
+          screenTrack.stop();
+        }
+        sendMediaState(get);
       }
     }
   },
@@ -619,9 +667,13 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
-    socket.on("remoteMediaState", ({ isMuted, isVideoOff }) => {
+    socket.on("remoteMediaState", ({ isMuted, isVideoOff, isScreenSharing }) => {
       if (get().callStatus === "idle") return;
-      set({ remoteMuted: !!isMuted, remoteVideoOff: !!isVideoOff });
+      set({
+        remoteMuted: !!isMuted,
+        remoteVideoOff: !!isVideoOff,
+        remoteScreenSharing: !!isScreenSharing,
+      });
     });
 
     socket.on("remoteDeviceRinging", () => {
