@@ -119,6 +119,7 @@ const CallManager = () => {
     isSpeakerOn,
     callStartedAt,
     isReconnecting,
+    remoteMuted,
     acceptCall,
     rejectCall,
     endCall,
@@ -288,6 +289,11 @@ const CallManager = () => {
           <p className="text-xs text-white/60 flex items-center justify-center gap-1">
             <Lock size={10} /> End-to-end encrypted
           </p>
+          {remoteMuted && callStatus === "in-call" && (
+            <p className="text-xs text-amber-300 flex items-center justify-center gap-1 mt-0.5">
+              <MicOff size={11} /> {remoteUser?.fullName?.split(" ")[0] || "They"} muted their mic
+            </p>
+          )}
         </div>
         <button
           onClick={() => toast("Group calling isn't supported yet", { icon: "👥" })}

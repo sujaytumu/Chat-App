@@ -216,6 +216,19 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Lets each side tell the other about its mic/camera state (muted, camera
+  // off) so the call screen can show an indicator — a muted track otherwise
+  // looks identical to silence. Pure relay, nothing is stored.
+  socket.on("callMediaState", ({ toUserId, state }) => {
+    const receiverSocketId = roomFor(toUserId);
+    if (receiverSocketId && state && typeof state === "object") {
+      io.to(receiverSocketId).emit("remoteMediaState", {
+        isMuted: !!state.isMuted,
+        isVideoOff: !!state.isVideoOff,
+      });
+    }
+  });
+
   socket.on("rejectCall", ({ toUserId }) => {
     socket.to(userId).emit("callEnded"); // stop ringing on my other devices
     const receiverSocketId = roomFor(toUserId);
