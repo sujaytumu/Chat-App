@@ -39,7 +39,7 @@ export const createGroup = async (req, res) => {
       createdBy: myId,
     });
 
-    const populatedGroup = await Group.findById(group._id).populate("members", "-password -pushSubscriptions -archivedChats");
+    const populatedGroup = await Group.findById(group._id).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
 
     // Notify every member in real time so the group shows up instantly
     uniqueMembers.forEach((memberId) => {
@@ -63,12 +63,12 @@ export const createGroup = async (req, res) => {
 export const getUserGroups = async (req, res) => {
   try {
     const myId = req.user._id;
-    const groups = await Group.find({ members: myId }).populate("members", "-password -pushSubscriptions -archivedChats").lean();
+    const groups = await Group.find({ members: myId }).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats").lean();
     const groupIds = groups.map((g) => g._id);
 
     const [lastMessages, unreadCounts] = await Promise.all([
       Message.aggregate([
-        { $match: { groupId: { $in: groupIds } } },
+        { $match: { groupId: { $in: groupIds }, deletedFor: { $ne: myId } } },
         { $sort: { createdAt: -1 } },
         {
           $group: {
@@ -82,7 +82,7 @@ export const getUserGroups = async (req, res) => {
         },
       ]),
       Message.aggregate([
-        { $match: { groupId: { $in: groupIds }, senderId: { $ne: myId }, seenBy: { $ne: myId } } },
+        { $match: { groupId: { $in: groupIds }, senderId: { $ne: myId }, seenBy: { $ne: myId }, deletedFor: { $ne: myId } } },
         { $group: { _id: "$groupId", count: { $sum: 1 } } },
       ]),
     ]);
@@ -214,7 +214,9 @@ export const sendGroupMessage = async (req, res) => {
           chatId: groupId.toString(),
           messageId: newMessage._id.toString(),
         },
-      }
+      },
+      {},
+      `g:${groupId}`
     );
 
     res.status(201).json(newMessage);
@@ -240,7 +242,7 @@ export const addMembers = async (req, res) => {
     group.members.push(...newMembers);
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
 
     newMembers.forEach((memberId) => {
       const socketId = getReceiverSocketId(memberId);
@@ -273,7 +275,7 @@ export const removeMember = async (req, res) => {
     group.admins = group.admins.filter((a) => !a.equals(memberId));
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
 
     const removedSocketId = getReceiverSocketId(memberId);
@@ -309,7 +311,7 @@ export const leaveGroup = async (req, res) => {
       await Group.findByIdAndDelete(groupId);
     } else {
       await group.save();
-      const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
+      const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
       io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
     }
 
@@ -346,7 +348,7 @@ export const updateGroupInfo = async (req, res) => {
     }
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
 
     res.status(200).json(populatedGroup);
