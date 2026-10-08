@@ -61,6 +61,47 @@ const useCallDuration = (startedAt) => {
   return startedAt ? formatDuration(seconds) : null;
 };
 
+// Keeps the screen awake while a call is active so phones don't sleep (and
+// drop the call UI) mid-call. Browsers release the lock whenever the tab is
+// hidden, so it's re-requested when the page becomes visible again. Silently
+// does nothing where the Screen Wake Lock API isn't supported.
+const useCallWakeLock = (active) => {
+  useEffect(() => {
+    if (!active || !("wakeLock" in navigator)) return;
+    let sentinel = null;
+    let cancelled = false;
+
+    const acquire = async () => {
+      try {
+        const lock = await navigator.wakeLock.request("screen");
+        if (cancelled) {
+          lock.release().catch(() => {});
+          return;
+        }
+        sentinel = lock;
+        lock.addEventListener("release", () => {
+          if (sentinel === lock) sentinel = null;
+        });
+      } catch {
+        // denied (e.g. low battery saver mode) — the call still works
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible" && !sentinel) acquire();
+    };
+
+    acquire();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      sentinel?.release().catch(() => {});
+      sentinel = null;
+    };
+  }, [active]);
+};
+
 const gridBtn = "size-16 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 text-white transition-all";
 const gridBtnActive = "bg-white text-black hover:bg-white/90 ring-[3px] ring-white ring-offset-2 ring-offset-black/50";
 
@@ -94,6 +135,7 @@ const CallManager = () => {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const callDuration = useCallDuration(callStartedAt);
+  useCallWakeLock(callStatus === "calling" || callStatus === "in-call");
 
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
