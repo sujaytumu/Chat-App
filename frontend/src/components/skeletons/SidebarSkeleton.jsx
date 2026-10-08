@@ -1,35 +1,28 @@
-import { Users } from "lucide-react";
-
+// Loading placeholder for the chat list — same shape as the real list so the
+// layout doesn't jump when chats arrive.
 const SidebarSkeleton = () => {
-  // Create 8 skeleton items
-  const skeletonContacts = Array(8).fill(null);
+  const rows = Array(8).fill(null);
 
   return (
-    <aside
-      className="h-full w-20 lg:w-72 border-r border-base-300 
-    flex flex-col transition-all duration-200"
-    >
-      {/* Header */}
-      <div className="border-b border-base-300 w-full p-5">
-        <div className="flex items-center gap-2">
-          <Users className="w-6 h-6" />
-          <span className="font-medium hidden lg:block">Contacts</span>
-        </div>
+    <aside className="h-full w-full lg:w-[400px] xl:w-[420px] shrink-0 bg-[#0B141A] flex flex-col lg:border-r lg:border-white/5">
+      <div className="px-4 pt-4 pb-3">
+        <div className="h-7 w-32 rounded-md bg-white/10 animate-pulse" />
       </div>
-
-      {/* Skeleton Contacts */}
-      <div className="overflow-y-auto w-full py-3">
-        {skeletonContacts.map((_, idx) => (
-          <div key={idx} className="w-full p-3 flex items-center gap-3">
-            {/* Avatar skeleton */}
-            <div className="relative mx-auto lg:mx-0">
-              <div className="skeleton size-12 rounded-full" />
-            </div>
-
-            {/* User info skeleton - only visible on larger screens */}
-            <div className="hidden lg:block text-left min-w-0 flex-1">
-              <div className="skeleton h-4 w-32 mb-2" />
-              <div className="skeleton h-3 w-16" />
+      <div className="px-4 pb-3">
+        <div className="h-12 rounded-full bg-white/10 animate-pulse" />
+      </div>
+      <div className="flex gap-2 px-4 pb-3">
+        {[14, 20, 20, 18].map((w, i) => (
+          <div key={i} className="h-9 rounded-full bg-white/10 animate-pulse" style={{ width: `${w * 4}px` }} />
+        ))}
+      </div>
+      <div className="overflow-hidden">
+        {rows.map((_, idx) => (
+          <div key={idx} className="px-4 py-3 flex items-center gap-4">
+            <div className="size-14 rounded-full bg-white/10 animate-pulse shrink-0" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="h-4 w-40 rounded bg-white/10 animate-pulse" />
+              <div className="h-3.5 w-56 max-w-full rounded bg-white/10 animate-pulse" />
             </div>
           </div>
         ))}

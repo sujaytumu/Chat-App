@@ -6,3 +6,12 @@ body {
   font-family: "Segoe UI", "Helvetica Neue", Helvetica, "Lucida Grande", Arial, Ubuntu, Cantarell,
     "Fira Sans", sans-serif;
 }
+
+/* Hide scrollbars on horizontally scrolling chip rows (still scrollable). */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

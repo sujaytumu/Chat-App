@@ -39,6 +39,8 @@ export const getUsersForSidebar = async (req, res) => {
             file: { $first: "$file" },
             createdAt: { $first: "$createdAt" },
             senderId: { $first: "$senderId" },
+            delivered: { $first: "$delivered" },
+            seen: { $first: "$seen" },
           },
         },
       ]),
@@ -55,7 +57,17 @@ export const getUsersForSidebar = async (req, res) => {
       const lm = lastMessageByUser.get(user._id.toString());
       return {
         ...user,
-        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        lastMessage: lm
+          ? {
+              text: lm.text,
+              image: lm.image,
+              file: lm.file,
+              createdAt: lm.createdAt,
+              senderId: lm.senderId,
+              delivered: lm.delivered,
+              seen: lm.seen,
+            }
+          : null,
         unreadCount: unreadByUser.get(user._id.toString()) || 0,
       };
     });

@@ -1,57 +1,108 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { MessageCircle, Phone, CircleDot } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
+import { useChatStore } from "../store/useChatStore";
+import Avatar from "./Avatar";
 
 const items = [
   { to: "/", icon: MessageCircle, label: "Chats", end: true },
-  { to: "/status", icon: CircleDot, label: "Status" },
+  { to: "/status", icon: CircleDot, label: "Updates" },
   { to: "/calls", icon: Phone, label: "Calls" },
 ];
 
-// WhatsApp's persistent nav: Chats / Status / Calls / You — a vertical rail
-// on desktop, a bottom tab bar on mobile.
+// WhatsApp's persistent nav: Chats / Updates / Calls / You — a vertical rail
+// on desktop, a bottom tab bar (with a pill behind the active icon) on phones.
 const MainNav = () => {
   const { authUser } = useAuthStore();
+  const unread = useChatStore((s) =>
+    [...s.users, ...s.groups].reduce((sum, c) => sum + (c.unreadCount || 0), 0)
+  );
+  const hasOpenChat = useChatStore((s) => !!s.selectedChat);
+  const { pathname } = useLocation();
 
-  const linkClass = ({ isActive }) =>
-    `flex flex-col items-center justify-center gap-1 transition-colors ${
-      isActive ? "text-[#00A884]" : "text-[#8696A0] hover:text-[#D1D7DB]"
-    }`;
+  // On a phone an open chat takes the whole screen, like WhatsApp.
+  const hideOnPhone = hasOpenChat && pathname === "/";
 
   return (
     <>
       {/* Desktop: vertical rail */}
-      <nav className="hidden lg:flex flex-col items-center w-16 bg-[#111B21] border-r border-black/40 py-4 gap-6 shrink-0">
+      <nav className="hidden lg:flex flex-col items-center w-[72px] bg-[#111B21] border-r border-white/5 py-4 gap-3 shrink-0">
         {items.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className={linkClass} title={label}>
+          <NavLink
+            key={to}
+            to={to}
+            end={end}
+            title={label}
+            className={({ isActive }) =>
+              `relative size-11 rounded-xl flex items-center justify-center transition-colors ${
+                isActive ? "bg-[#2A3942] text-[#E9EDEF]" : "text-[#AEBAC1] hover:bg-white/5"
+              }`
+            }
+          >
             <Icon size={22} />
+            {to === "/" && unread > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
           </NavLink>
         ))}
         <div className="flex-1" />
-        <NavLink to="/profile" className={linkClass} title="You">
-          <img
-            src={authUser?.profilePic || "/avatar.png"}
-            alt="You"
-            className="size-8 rounded-full object-cover"
-          />
+        <NavLink
+          to="/profile"
+          title="You"
+          className={({ isActive }) =>
+            `size-11 rounded-xl flex items-center justify-center transition-colors ${
+              isActive ? "bg-[#2A3942]" : "hover:bg-white/5"
+            }`
+          }
+        >
+          <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-8" textSize="text-sm" />
         </NavLink>
       </nav>
 
-      {/* Mobile: bottom bar */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 h-16 bg-[#111B21] border-t border-black/40 flex items-center justify-around z-30">
+      {/* Phone: bottom bar */}
+      <nav
+        className={`${
+          hideOnPhone ? "hidden" : "flex"
+        } lg:hidden fixed bottom-0 inset-x-0 h-[72px] bg-[#0B141A] border-t border-white/5 items-stretch justify-around z-30`}
+      >
         {items.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className={linkClass}>
-            <Icon size={22} />
-            <span className="text-[10px]">{label}</span>
+          <NavLink key={to} to={to} end={end} className="flex-1 flex flex-col items-center justify-center gap-1">
+            {({ isActive }) => (
+              <>
+                <span
+                  className={`relative h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
+                    isActive ? "bg-[#103629] text-[#E9EDEF]" : "text-[#AEBAC1]"
+                  }`}
+                >
+                  <Icon size={24} strokeWidth={isActive ? 2.4 : 2} />
+                  {to === "/" && unread > 0 && (
+                    <span className="absolute top-0 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  )}
+                </span>
+                <span className={`text-xs ${isActive ? "text-[#E9EDEF] font-semibold" : "text-[#AEBAC1]"}`}>
+                  {label}
+                </span>
+              </>
+            )}
           </NavLink>
         ))}
-        <NavLink to="/profile" className={linkClass}>
-          <img
-            src={authUser?.profilePic || "/avatar.png"}
-            alt="You"
-            className="size-6 rounded-full object-cover"
-          />
-          <span className="text-[10px]">You</span>
+        <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center gap-1">
+          {({ isActive }) => (
+            <>
+              <span
+                className={`h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
+                  isActive ? "bg-[#103629]" : ""
+                }`}
+              >
+                <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
+              </span>
+              <span className={`text-xs ${isActive ? "text-[#E9EDEF] font-semibold" : "text-[#AEBAC1]"}`}>You</span>
+            </>
+          )}
         </NavLink>
       </nav>
     </>
