@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { startNotificationActionListener } from "../lib/notificationActions";
 import { useChatStore } from "../store/useChatStore";
 import { requestNotificationPermission, registerPushSubscription, primeAudio } from "../lib/notificationSound";
 import { loadCustomTone } from "../lib/soundSettings";
@@ -13,6 +15,10 @@ const BASE_TITLE = "Talkies";
 const NotificationManager = () => {
   const users = useChatStore((s) => s.users);
   const groups = useChatStore((s) => s.groups);
+  const navigate = useNavigate();
+
+  // Taps on message / call notifications (Answer, open chat).
+  useEffect(() => startNotificationActionListener(() => navigate("/")), [navigate]);
 
   useEffect(() => {
     // Warm the cache of any sounds the person picked in Settings so the very

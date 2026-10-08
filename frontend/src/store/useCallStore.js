@@ -2,7 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { startRingtone, stopRingtoneSound, primeAudio } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
 
 // STUN alone frequently fails to establish a working media path on mobile
 // carrier networks (symmetric NAT / CGNAT is extremely common on VoLTE/5G),
@@ -135,6 +135,7 @@ let pendingCandidates = [];
 let voiceOriginShare = false; // screen share started from a voice call (no camera to go back to)
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
+let ringDeferred = false; // incoming ring held back while a phone's system notification is alerting
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
 // Tells the other side our current mic/camera state so it can show a
@@ -183,6 +184,7 @@ export const useCallStore = create((set, get) => ({
   remoteVideoOff: false, // the other person has turned their camera off
   remoteScreenSharing: false, // the other person is sharing their screen
   isReconnecting: false, // media path dropped; ICE is trying to recover it
+  autoAnswer: null, // { from, until } — "Answer" tapped on a notification before the call reached this device
   callStartedAt: null, // epoch ms when the call actually connected (drives the on-screen timer)
   audioOutputDevices: [],
   callSubscribed: false,
@@ -428,6 +430,7 @@ export const useCallStore = create((set, get) => ({
   },
 
   stopRingtone: () => {
+    ringDeferred = false;
     stopRingtoneSound();
   },
 
@@ -665,6 +668,13 @@ export const useCallStore = create((set, get) => ({
     set({ callSubscribed: true });
     getIceConfig(); // warm the cache so answering/placing a call isn't delayed
 
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "visible" && ringDeferred && get().callStatus === "incoming") {
+        ringDeferred = false;
+        startRingtone();
+      }
+    });
+
     socket.on("incomingCall", ({ fromUser, offer, callType }) => {
       // Busy? auto-reject — but first self-heal a genuinely stale state
       // (callStatus says busy but there's no active connection AND it's
@@ -693,11 +703,27 @@ export const useCallStore = create((set, get) => ({
         incomingOffer: offer,
         callType,
       });
-      primeAudio();
-      startRingtone(); // plays the tone chosen in Settings (or their own file) and vibrates
       // Tell the caller our device actually got the call and is ringing —
       // lets their screen switch from "Calling…" to "Ringing…"
       socket.emit("callRingingAck", { toUserId: fromUser._id });
+
+      // They already pressed "Answer" on the notification: pick up right away
+      // instead of ringing.
+      const auto = get().autoAnswer;
+      if (auto && auto.from === fromUser._id && Date.now() < auto.until) {
+        set({ autoAnswer: null });
+        get().acceptCall();
+        return;
+      }
+
+      primeAudio();
+      // Phone in the background: the system notification is already ringing —
+      // hold our own ring until the app is brought to the front.
+      if (shouldLeaveToSystemAlert()) {
+        ringDeferred = true;
+      } else {
+        startRingtone(); // plays the tone chosen in Settings (or their own file) and vibrates
+      }
     });
 
     socket.on("callAnswered", async ({ answer }) => {
