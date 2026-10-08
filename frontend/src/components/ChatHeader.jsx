@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { ArrowLeft, Info, Phone, Video, MoreVertical, X, Archive, ArchiveRestore } from "lucide-react";
+import { ArrowLeft, Info, Phone, Video, MoreVertical, X, Archive, ArchiveRestore, Search } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
@@ -13,7 +13,7 @@ const iconBtn =
 const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
 
 const ChatHeader = () => {
-  const { selectedChat, setSelectedChat, typingUsers, setChatArchived } = useChatStore();
+  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen } = useChatStore();
   const { onlineUsers, authUser } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
   const [showGroupInfo, setShowGroupInfo] = useState(false);
@@ -111,6 +111,15 @@ const ChatHeader = () => {
                   <Info size={18} className="text-[#AEBAC1]" /> Group info
                 </button>
               )}
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setChatSearchOpen(true);
+                }}
+              >
+                <Search size={18} className="text-[#AEBAC1]" /> Search
+              </button>
               <button
                 className={menuItem}
                 onClick={() => {

@@ -475,3 +475,66 @@ export const deleteChatForMe = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+// Search message text. Everywhere the person can see (default), or inside one
+// chat (?chatType=direct|group&chatId=...). Never returns messages they deleted
+// for themselves or for everyone.
+export const searchMessages = async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    if (q.length < 2 || q.length > 100) return res.status(200).json([]);
+    const myId = req.user._id;
+    const { chatType, chatId } = req.query;
+    const rx = new RegExp(escapeRegex(q), "i"); // literal match, so no regex injection
+
+    let scope;
+    if (chatType === "direct" && mongoose.isValidObjectId(chatId)) {
+      scope = {
+        groupId: null,
+        $or: [
+          { senderId: myId, receiverId: chatId },
+          { senderId: chatId, receiverId: myId },
+        ],
+      };
+    } else if (chatType === "group" && mongoose.isValidObjectId(chatId)) {
+      const isMember = await Group.exists({ _id: chatId, members: myId });
+      if (!isMember) return res.status(403).json({ error: "You are not a member of this group" });
+      scope = { groupId: chatId };
+    } else {
+      const groups = await Group.find({ members: myId }).select("_id").lean();
+      scope = {
+        $or: [
+          { groupId: null, $or: [{ senderId: myId }, { receiverId: myId }] },
+          { groupId: { $in: groups.map((g) => g._id) } },
+        ],
+      };
+    }
+
+    const found = await Message.find({
+      $and: [scope],
+      text: rx,
+      deletedFor: { $ne: myId },
+      deletedForEveryone: { $ne: true },
+    })
+      .sort({ createdAt: -1 })
+      .limit(40)
+      .select("text senderId receiverId groupId createdAt")
+      .lean();
+
+    res.status(200).json(
+      found.map((msg) => ({
+        _id: msg._id,
+        text: msg.text,
+        createdAt: msg.createdAt,
+        senderId: msg.senderId,
+        chatType: msg.groupId ? "group" : "direct",
+        chatId: msg.groupId || (String(msg.senderId) === String(myId) ? msg.receiverId : msg.senderId),
+      }))
+    );
+  } catch (error) {
+    console.log("Error in searchMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

@@ -27,6 +27,7 @@ import {
   Check,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import SearchSnippet from "./SearchSnippet";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 
@@ -61,6 +62,8 @@ const Sidebar = () => {
     setChatPinned,
     setChatMuted,
     deleteChat,
+    searchMessages,
+    jumpToMessage,
   } = useChatStore(
     useShallow((st) => ({
       getUsers: st.getUsers,
@@ -75,6 +78,8 @@ const Sidebar = () => {
       setChatPinned: st.setChatPinned,
       setChatMuted: st.setChatMuted,
       deleteChat: st.deleteChat,
+      searchMessages: st.searchMessages,
+      jumpToMessage: st.jumpToMessage,
     }))
   );
 
@@ -84,6 +89,32 @@ const Sidebar = () => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+
+  // ---- Message search (server-side), shown under the matching chats ----
+  const [msgResults, setMsgResults] = useState([]);
+  const [msgSearching, setMsgSearching] = useState(false);
+  const searchSeq = useRef(0);
+  useEffect(() => {
+    const term = search.trim();
+    if (term.length < 2) {
+      setMsgResults([]);
+      setMsgSearching(false);
+      return;
+    }
+    const mine = ++searchSeq.current;
+    setMsgSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const found = await searchMessages(term);
+        if (mine === searchSeq.current) setMsgResults(found);
+      } catch {
+        if (mine === searchSeq.current) setMsgResults([]);
+      } finally {
+        if (mine === searchSeq.current) setMsgSearching(false);
+      }
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search, searchMessages]);
 
   // ---- Long-press selection (like WhatsApp): hold a chat to select it, tap more
   // to add, then Pin / Mute / Archive / Delete from the bar on top.
@@ -483,7 +514,44 @@ const Sidebar = () => {
           );
         })}
 
-        {items.length === 0 && (
+        {!showArchived && search.trim().length >= 2 && msgResults.length > 0 && (
+          <div className="pt-2">
+            <p className="px-4 py-2 text-[13px] font-medium text-[#25D366]">Messages</p>
+            {msgResults.map((r) => {
+              const chat =
+                r.chatType === "group"
+                  ? groups.find((g) => g._id === r.chatId)
+                  : users.find((u) => u._id === r.chatId);
+              if (!chat) return null;
+              const name = r.chatType === "group" ? chat.name : chat.fullName;
+              return (
+                <button
+                  key={r._id}
+                  onClick={() => jumpToMessage({ type: r.chatType, data: chat }, r._id)}
+                  className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34]"
+                >
+                  <Avatar
+                    src={r.chatType === "group" ? chat.groupPic : chat.profilePic}
+                    name={name}
+                    isGroup={r.chatType === "group"}
+                    size="size-12"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[16px] text-[#E9EDEF] truncate">{name}</p>
+                      <span className="text-xs text-[#8696A0] shrink-0">
+                        {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                    <SearchSnippet text={r.text} query={search} className="text-[14px] text-[#8696A0] line-clamp-1" />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {items.length === 0 && msgResults.length === 0 && !msgSearching && (
           <div className="text-center text-[#8696A0] py-10 px-6 text-[15px]">
             {search
               ? `No chats matching “${search}”`
