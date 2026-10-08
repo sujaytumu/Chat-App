@@ -1,13 +1,37 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
-import { Send, Bell, BellOff, BellRing, Download, CheckCircle2, Volume2, VolumeX, Phone, PhoneOff } from "lucide-react";
-import { useEffect, useState } from "react";
-import { registerPushSubscription, playNotificationSound, playRingtone } from "../lib/notificationSound";
+import {
+  Send,
+  Bell,
+  BellOff,
+  BellRing,
+  Download,
+  CheckCircle2,
+  Volume2,
+  VolumeX,
+  Phone,
+  PhoneOff,
+  Play,
+  Music,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { registerPushSubscription, previewCallTone, previewMessageTone, stopTonePreview } from "../lib/notificationSound";
 import {
   isMessageSoundEnabled,
   setMessageSoundEnabled,
   isCallRingtoneEnabled,
   setCallRingtoneEnabled,
+  CALL_TONES,
+  MESSAGE_TONES,
+  getCallTone,
+  setCallTone,
+  getMessageTone,
+  setMessageTone,
+  getCustomToneName,
+  saveCustomTone,
+  removeCustomTone,
+  MAX_CUSTOM_TONE_BYTES,
 } from "../lib/soundSettings";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
 import { axiosInstance } from "../lib/axios";
@@ -127,43 +151,164 @@ const InstallAppControl = () => {
   );
 };
 
+// One row for a sound setting: on/off switch, a tone list with preview, and
+// the option to pick the person's own audio file from their device.
+const TonePicker = ({ kind, label, Icon, IconOff, enabled, onToggle, tones, getTone, setTone, preview }) => {
+  const [tone, setToneState] = useState(getTone());
+  const [customName, setCustomName] = useState(getCustomToneName(kind));
+  const fileInputRef = useRef(null);
+
+  const choose = (id) => {
+    setToneState(id);
+    setTone(id);
+    preview(id);
+  };
+
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file later
+    if (!file) return;
+    if (file.size > MAX_CUSTOM_TONE_BYTES) {
+      toast.error("That file is too large — pick one under 4 MB");
+      return;
+    }
+    try {
+      await saveCustomTone(kind, file);
+      setCustomName(file.name);
+      choose("custom");
+      toast.success("Sound saved on this device");
+    } catch (err) {
+      toast.error(err.message || "Couldn't save that sound");
+    }
+  };
+
+  const handleRemoveCustom = async () => {
+    await removeCustomTone(kind);
+    setCustomName("");
+    if (tone === "custom") {
+      const fallback = tones[0].id;
+      setToneState(fallback);
+      setTone(fallback);
+    }
+    stopTonePreview();
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          {enabled ? <Icon size={18} className="text-green-700" /> : <IconOff size={18} className="text-zinc-500" />}
+          <span className="text-sm">{label}</span>
+        </div>
+        <input type="checkbox" className="toggle toggle-success toggle-sm" checked={enabled} onChange={onToggle} />
+      </div>
+
+      {enabled && (
+        <div className="pl-7 space-y-2">
+          <div className="flex items-center gap-2">
+            <select
+              className="select select-sm select-bordered flex-1 min-w-0 bg-white"
+              value={tone}
+              onChange={(e) => choose(e.target.value)}
+            >
+              {tones.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+              {customName && <option value="custom">My sound: {customName}</option>}
+            </select>
+            <button
+              type="button"
+              onClick={() => preview(tone)}
+              className="btn btn-sm btn-circle bg-green-600 hover:bg-green-700 text-white border-none shrink-0"
+              aria-label="Play this sound"
+            >
+              <Play size={14} />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="btn btn-xs btn-outline gap-1.5"
+            >
+              <Music size={12} /> {customName ? "Choose a different sound" : "Choose a sound from this device"}
+            </button>
+            {customName && (
+              <button
+                type="button"
+                onClick={handleRemoveCustom}
+                className="btn btn-xs btn-ghost text-red-600 gap-1"
+                aria-label="Remove my sound"
+              >
+                <Trash2 size={12} /> Remove
+              </button>
+            )}
+            <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={handleFile} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SoundSettings = () => {
   const [messageSound, setMessageSound] = useState(isMessageSoundEnabled());
   const [ringtone, setRingtone] = useState(isCallRingtoneEnabled());
+
+  // Don't leave a preview playing when leaving the page.
+  useEffect(() => stopTonePreview, []);
 
   const handleToggleMessage = () => {
     const next = !messageSound;
     setMessageSound(next);
     setMessageSoundEnabled(next);
-    if (next) playNotificationSound();
+    if (next) previewMessageTone(getMessageTone());
   };
 
   const handleToggleRingtone = () => {
     const next = !ringtone;
     setRingtone(next);
     setCallRingtoneEnabled(next);
-    if (next) playRingtone();
+    if (next) previewCallTone(getCallTone());
   };
 
   return (
-    <div className="p-4 rounded-xl bg-[#DCF8C6] space-y-3">
-      <h3 className="font-semibold text-sm">Sounds</h3>
-
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          {messageSound ? <Volume2 size={18} className="text-green-700" /> : <VolumeX size={18} className="text-zinc-500" />}
-          <span className="text-sm">Message notification sound</span>
-        </div>
-        <input type="checkbox" className="toggle toggle-success toggle-sm" checked={messageSound} onChange={handleToggleMessage} />
+    <div className="p-4 rounded-xl bg-[#DCF8C6] space-y-4">
+      <div>
+        <h3 className="font-semibold text-sm">Sounds</h3>
+        <p className="text-xs text-base-content/60">
+          Saved on this device — set it on your phone and laptop separately.
+        </p>
       </div>
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          {ringtone ? <Phone size={18} className="text-green-700" /> : <PhoneOff size={18} className="text-zinc-500" />}
-          <span className="text-sm">Call ringtone</span>
-        </div>
-        <input type="checkbox" className="toggle toggle-success toggle-sm" checked={ringtone} onChange={handleToggleRingtone} />
-      </div>
+      <TonePicker
+        kind="message"
+        label="Message notification sound"
+        Icon={Volume2}
+        IconOff={VolumeX}
+        enabled={messageSound}
+        onToggle={handleToggleMessage}
+        tones={MESSAGE_TONES}
+        getTone={getMessageTone}
+        setTone={setMessageTone}
+        preview={previewMessageTone}
+      />
+
+      <TonePicker
+        kind="call"
+        label="Call ringtone"
+        Icon={Phone}
+        IconOff={PhoneOff}
+        enabled={ringtone}
+        onToggle={handleToggleRingtone}
+        tones={CALL_TONES}
+        getTone={getCallTone}
+        setTone={setCallTone}
+        preview={previewCallTone}
+      />
     </div>
   );
 };
