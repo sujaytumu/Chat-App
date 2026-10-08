@@ -69,6 +69,9 @@ const messageSchema = new mongoose.Schema(
       name: { type: String },
       size: { type: Number },
       type: { type: String, enum: ["video", "audio", "document"] },
+      // Voice notes
+      duration: { type: Number },
+      waveform: { type: [Number], default: undefined },
     },
     pinned: {
       type: Boolean,

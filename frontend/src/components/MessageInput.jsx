@@ -234,6 +234,29 @@ const MessageInput = () => {
       audioChunksRef.current = [];
       discardRecordingRef.current = false;
 
+      // Loudness profile for the waveform shown on the voice note (sampled while recording)
+      const peaks = [];
+      let analyserTimer = null;
+      let audioCtx = null;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new Ctx();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const buf = new Uint8Array(analyser.fftSize);
+        analyserTimer = setInterval(() => {
+          analyser.getByteTimeDomainData(buf);
+          let max = 0;
+          for (let i = 0; i < buf.length; i++) max = Math.max(max, Math.abs(buf[i] - 128));
+          peaks.push(max / 128); // 0..1
+        }, 100);
+      } catch {
+        // no analyser available — the player falls back to a generic waveform
+      }
+      const startedAt = Date.now();
+
       const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = recorder;
@@ -245,6 +268,21 @@ const MessageInput = () => {
       recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         clearInterval(recordingIntervalRef.current);
+        clearInterval(analyserTimer);
+        audioCtx?.close().catch(() => {});
+        const duration = (Date.now() - startedAt) / 1000;
+        // squash the samples into 40 bars, scaled so the loudest bar is full height
+        const BARS = 40;
+        let waveform;
+        if (peaks.length >= 8) {
+          const per = peaks.length / BARS;
+          const raw = Array.from({ length: BARS }, (_, i) => {
+            const slice = peaks.slice(Math.floor(i * per), Math.max(Math.floor(i * per) + 1, Math.floor((i + 1) * per)));
+            return Math.max(...slice);
+          });
+          const top = Math.max(...raw, 0.05);
+          waveform = raw.map((v) => Math.round(Math.max(0.08, v / top) * 100));
+        }
 
         if (discardRecordingRef.current || audioChunksRef.current.length === 0) {
           setIsRecording(false);
@@ -263,7 +301,7 @@ const MessageInput = () => {
           });
           await sendMessage({
             text: "",
-            file: { data, name: `Voice message.webm`, mimeType: blob.type, size: blob.size },
+            file: { data, name: `Voice message.webm`, mimeType: blob.type, size: blob.size, duration, waveform },
           });
         } catch {
           toast.error("Could not send voice message");

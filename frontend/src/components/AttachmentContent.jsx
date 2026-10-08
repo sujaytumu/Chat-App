@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { FileText, Music, Download, AlertCircle } from "lucide-react";
+import { FileText, Download, AlertCircle } from "lucide-react";
+import VoiceMessagePlayer from "./VoiceMessagePlayer";
 import { formatFileSize, fileIconKind } from "../lib/fileUtils";
 
 const DownloadFallbackCard = ({ file, label }) => (
@@ -47,12 +48,7 @@ const AttachmentContent = ({ file, onMediaLoaded }) => {
 
   if (file.type === "audio") {
     if (audioFailed) return <DownloadFallbackCard file={file} label="Voice message" />;
-    return (
-      <div className="flex items-center gap-2 mb-1 min-w-[220px]">
-        <Music size={18} className="shrink-0 opacity-70" />
-        <audio src={file.url} controls onError={() => setAudioFailed(true)} className="h-9 max-w-[200px]" />
-      </div>
-    );
+    return <VoiceMessagePlayer file={file} onError={() => setAudioFailed(true)} />;
   }
 
   const kind = fileIconKind(file.name);
