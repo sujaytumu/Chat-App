@@ -9,7 +9,7 @@ export const getCallHistory = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(100);
 
-    res.status(200).json(calls);
+    res.status(200).json(calls.filter((c) => c.callerId && c.calleeId));
   } catch (error) {
     console.log("Error in getCallHistory controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
