@@ -1,46 +1,61 @@
-import { useEffect, useState, useMemo, lazy, Suspense } from "react";
+import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
-import { UsersRound, Plus, Search, Settings, LogOut } from "lucide-react";
+import Avatar from "./Avatar";
+import MessageTicks from "./MessageTicks";
+import { formatChatListTime } from "../lib/utils";
+import { UserRoundPlus, Search, Settings, LogOut, MoreVertical, X, UserRound, UsersRound } from "lucide-react";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 
-const truncate = (str, n) => (str && str.length > n ? str.slice(0, n) + "…" : str);
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "unread", label: "Unread" },
+  { id: "groups", label: "Groups" },
+  { id: "online", label: "Online" },
+];
 
-const lastMessagePreview = (lastMessage, authUserId) => {
+const lastMessagePreview = (lastMessage) => {
   if (!lastMessage) return "No messages yet";
-  const prefix = lastMessage.senderId === authUserId ? "You: " : "";
-  if (lastMessage.image && !lastMessage.text) return `${prefix}📷 Photo`;
-  return `${prefix}${truncate(lastMessage.text, 28)}`;
+  if (lastMessage.image && !lastMessage.text) return "📷 Photo";
+  if (lastMessage.file && !lastMessage.text) return `📎 ${lastMessage.file.name || "File"}`;
+  return lastMessage.text || "";
 };
 
+const menuItem =
+  "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
+
 const Sidebar = () => {
-  const {
-    getUsers,
-    getGroups,
-    users,
-    groups,
-    selectedChat,
-    setSelectedChat,
-    isUsersLoading,
-  } = useChatStore();
+  const { getUsers, getGroups, users, groups, selectedChat, setSelectedChat, isUsersLoading } = useChatStore();
 
   const { onlineUsers, authUser, logout } = useAuthStore();
-  const [showOnlineOnly, setShowOnlineOnly] = useState(false);
+  const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     getUsers();
     getGroups();
   }, [getUsers, getGroups]);
 
+  useEffect(() => {
+    if (!showMenu) return;
+    const onDown = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setShowMenu(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showMenu]);
+
   const items = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
     const directItems = users
-      .filter((u) => !showOnlineOnly || onlineUsers.includes(u._id))
-      .filter((u) => u.fullName.toLowerCase().includes(search.toLowerCase()))
+      .filter((u) => u.fullName.toLowerCase().includes(q))
       .map((u) => ({
         type: "direct",
         data: u,
@@ -54,8 +69,7 @@ const Sidebar = () => {
       }));
 
     const groupItems = groups
-      .filter(() => !showOnlineOnly)
-      .filter((g) => g.name.toLowerCase().includes(search.toLowerCase()))
+      .filter((g) => g.name.toLowerCase().includes(q))
       .map((g) => ({
         type: "group",
         data: g,
@@ -70,139 +84,156 @@ const Sidebar = () => {
           : new Date(g.createdAt).getTime(),
       }));
 
-    return [...directItems, ...groupItems].sort((a, b) => b.sortTime - a.sortTime);
-  }, [users, groups, showOnlineOnly, search, onlineUsers]);
+    return [...directItems, ...groupItems]
+      .filter((item) => {
+        if (filter === "unread") return item.unreadCount > 0;
+        if (filter === "groups") return item.type === "group";
+        if (filter === "online") return item.online;
+        return true;
+      })
+      .sort((a, b) => b.sortTime - a.sortTime);
+  }, [users, groups, filter, search, onlineUsers]);
+
+  const totalUnread = useMemo(
+    () => [...users, ...groups].reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+    [users, groups]
+  );
 
   if (isUsersLoading) return <SidebarSkeleton />;
 
   return (
-    <aside className="flex-shrink-0 bg-[#111B21] border-r border-black/40 flex flex-col w-20 lg:w-80 h-full mt-0">
-      {/* Header */}
-      <div className="p-3 border-b border-black/30 flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Link to="/profile" className="flex items-center gap-2 shrink-0" title="Profile">
-            <img
-              src={authUser?.profilePic || "/avatar.png"}
-              alt="Me"
-              className="size-9 rounded-full object-cover"
-            />
-            <span className="font-medium hidden lg:block text-[#E9EDEF]">Chats</span>
-          </Link>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowCreateGroup(true)}
-              className="size-9 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 flex"
-              title="New group"
-            >
-              <Plus size={19} />
-            </button>
-            <Link
-              to="/settings"
-              className="size-9 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 hidden lg:flex"
-              title="Settings"
-            >
-              <Settings size={18} />
-            </Link>
-            <button
-              onClick={logout}
-              className="size-9 rounded-full items-center justify-center text-[#AEBAC1] hover:bg-white/10 hidden lg:flex"
-              title="Logout"
-            >
-              <LogOut size={18} />
-            </button>
-          </div>
-        </div>
+    <aside className="relative flex flex-col w-full lg:w-[400px] xl:w-[420px] shrink-0 h-full bg-[#0B141A] lg:border-r lg:border-white/5">
+      {/* Title + menu */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Talkies</h1>
 
-        {/* Search */}
-        <div className="relative hidden lg:block">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-[#8696A0]" />
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setShowMenu((s) => !s)}
+            className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
+            aria-label="Menu"
+          >
+            <MoreVertical size={22} />
+          </button>
+          {showMenu && (
+            <div className="absolute right-0 top-full mt-1 w-56 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowCreateGroup(true);
+                }}
+              >
+                <UsersRound size={18} className="text-[#AEBAC1]" /> New group
+              </button>
+              <Link to="/profile" className={menuItem} onClick={() => setShowMenu(false)}>
+                <UserRound size={18} className="text-[#AEBAC1]" /> Profile
+              </Link>
+              <Link to="/settings" className={menuItem} onClick={() => setShowMenu(false)}>
+                <Settings size={18} className="text-[#AEBAC1]" /> Settings
+              </Link>
+              <button className={`${menuItem} text-red-400`} onClick={logout}>
+                <LogOut size={18} /> Log out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Search pill */}
+      <div className="px-4 pb-3">
+        <div className="flex items-center gap-3 h-12 rounded-full bg-[#1F2C34] px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
+          <Search size={20} className="text-[#8696A0] shrink-0" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats"
-            className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-[#202C33] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[16px] text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none"
           />
-        </div>
-
-        {/* Online filter toggle */}
-        <div className="mt-1 hidden lg:flex items-center gap-2">
-          <label className="cursor-pointer flex items-center gap-2 text-[#D1D7DB]">
-            <input
-              type="checkbox"
-              checked={showOnlineOnly}
-              onChange={(e) => setShowOnlineOnly(e.target.checked)}
-              className="accent-[#00A884] size-3.5"
-            />
-            <span className="text-sm">Show online only</span>
-          </label>
-          <span className="text-xs text-[#8696A0]">
-            ({Math.max(onlineUsers.length - 1, 0)} online)
-          </span>
+          {search && (
+            <button onClick={() => setSearch("")} className="text-[#8696A0] hover:text-white" aria-label="Clear search">
+              <X size={18} />
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Filter chips */}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 pb-3">
+        {FILTERS.map(({ id, label }) => {
+          const active = filter === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setFilter(id)}
+              className={`h-9 px-4 rounded-full text-[15px] whitespace-nowrap border transition-colors ${
+                active
+                  ? "bg-[#103629] border-transparent text-[#D9FDD3] font-medium"
+                  : "border-[#2A3942] text-[#8696A0] hover:bg-white/5"
+              }`}
+            >
+              {label}
+              {id === "unread" && totalUnread > 0 && <span className="ml-1.5 text-[#25D366]">{totalUnread}</span>}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Chat list */}
-      <div className="overflow-y-auto flex-1 py-2">
+      <div className="overflow-y-auto flex-1 pb-24">
         {items.map((item) => {
-          const isSelected =
-            selectedChat?.type === item.type && selectedChat.data._id === item.data._id;
+          const isSelected = selectedChat?.type === item.type && selectedChat.data._id === item.data._id;
+          const hasUnread = item.unreadCount > 0;
+          const sentByMe = item.lastMessage && item.lastMessage.senderId === authUser?._id;
+
           return (
             <button
               key={item.key}
               onClick={() => setSelectedChat({ type: item.type, data: item.data })}
-              className={`w-full p-3 flex items-center gap-3 hover:bg-[#202C33] transition-colors ${
-                isSelected ? "bg-[#2A3942]" : ""
+              className={`w-full px-4 py-3 flex items-center gap-4 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
+                isSelected ? "lg:bg-[#2A3942]" : ""
               }`}
             >
-              <div className="relative mx-auto lg:mx-0 shrink-0">
-                {item.type === "group" ? (
-                  <div className="size-12 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                    {item.avatar ? (
-                      <img src={item.avatar} alt={item.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <UsersRound className="size-6 text-[#00A884]" />
-                    )}
-                  </div>
-                ) : (
-                  <img
-                    src={item.avatar || "/avatar.png"}
-                    alt={item.name}
-                    className="size-12 object-cover rounded-full"
-                  />
-                )}
+              <div className="relative shrink-0">
+                <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-14" />
                 {item.online && (
-                  <span className="absolute bottom-0 right-0 size-3 bg-[#00A884] rounded-full ring-2 ring-[#111B21]" />
-                )}
-                {item.unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#00A884] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
-                    {item.unreadCount > 9 ? "9+" : item.unreadCount}
-                  </span>
+                  <span className="absolute bottom-0 right-0 size-3.5 bg-[#25D366] rounded-full ring-[3px] ring-[#0B141A]" />
                 )}
               </div>
 
-              <div className="hidden lg:block text-left min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium truncate text-[#E9EDEF]">{item.name}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[17px] text-[#E9EDEF] truncate">{item.name}</span>
                   {item.lastMessage && (
                     <span
-                      className={`text-[10px] shrink-0 ${
-                        item.unreadCount > 0 ? "text-[#00A884] font-semibold" : "text-[#8696A0]"
-                      }`}
+                      className={`text-xs shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-[#8696A0]"}`}
                     >
-                      {new Date(item.lastMessage.createdAt).toLocaleTimeString("en-US", {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatChatListTime(item.lastMessage.createdAt)}
                     </span>
                   )}
                 </div>
-                <div
-                  className={`text-sm truncate ${
-                    item.unreadCount > 0 ? "text-[#E9EDEF] font-semibold" : "text-[#8696A0]"
-                  }`}
-                >
-                  {lastMessagePreview(item.lastMessage, useAuthStore.getState().authUser?._id)}
+                <div className="flex items-center justify-between gap-3 mt-0.5">
+                  <span
+                    className={`flex items-center gap-1 min-w-0 text-[15px] ${
+                      hasUnread ? "text-[#E9EDEF]" : "text-[#8696A0]"
+                    }`}
+                  >
+                    {sentByMe && item.type === "direct" && (
+                      <span className="shrink-0 text-[#8696A0]">
+                        <MessageTicks message={item.lastMessage} />
+                      </span>
+                    )}
+                    <span className="truncate">
+                      {sentByMe && item.type === "group" ? "You: " : ""}
+                      {lastMessagePreview(item.lastMessage)}
+                    </span>
+                  </span>
+                  {hasUnread && (
+                    <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#25D366] text-[#0B141A] text-xs font-semibold flex items-center justify-center">
+                      {item.unreadCount > 99 ? "99+" : item.unreadCount}
+                    </span>
+                  )}
                 </div>
               </div>
             </button>
@@ -210,9 +241,21 @@ const Sidebar = () => {
         })}
 
         {items.length === 0 && (
-          <div className="text-center text-[#8696A0] py-4 px-2 text-sm">No chats found</div>
+          <div className="text-center text-[#8696A0] py-10 px-6 text-[15px]">
+            {search ? `No chats matching “${search}”` : filter === "all" ? "No chats yet" : "Nothing here"}
+          </div>
         )}
       </div>
+
+      {/* Floating action button */}
+      <button
+        onClick={() => setShowCreateGroup(true)}
+        className="absolute bottom-5 right-5 size-14 rounded-2xl bg-[#25D366] hover:bg-[#21c05e] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+        aria-label="New group"
+        title="New group"
+      >
+        <UserRoundPlus size={24} />
+      </button>
 
       {showCreateGroup && (
         <Suspense fallback={null}>

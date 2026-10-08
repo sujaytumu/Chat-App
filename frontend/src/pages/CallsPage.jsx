@@ -48,7 +48,7 @@ const CallsPage = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0B141A] overflow-hidden pb-16 lg:pb-0">
+    <div className="flex-1 flex flex-col bg-[#0B141A] overflow-hidden pb-[72px] lg:pb-0">
       <div className="p-4 border-b border-black/30">
         <h2 className="text-lg font-semibold text-[#E9EDEF]">Calls</h2>
       </div>

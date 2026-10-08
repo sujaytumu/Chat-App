@@ -37,3 +37,18 @@ export function isDifferentDay(a, b) {
     da.getDate() !== db.getDate()
   );
 }
+
+// Chat-list timestamp, WhatsApp style: time today ("08:23"), "Yesterday",
+// otherwise the date ("05/10/2026").
+export function formatChatListTime(date) {
+  const d = new Date(date);
+  const now = new Date();
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate());
+  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+
+  if (dayDiff <= 0) return formatMessageTime(date);
+  if (dayDiff === 1) return "Yesterday";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dd}/${mm}/${d.getFullYear()}`;
+}

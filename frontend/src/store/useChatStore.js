@@ -379,6 +379,12 @@ export const useChatStore = create((set, get) => ({
       if (selectedChat?.type === "direct" && selectedChat.data._id === by) {
         set({ messages: messages.map((m) => ({ ...m, seen: true, delivered: true })) });
       }
+      // Keep the ticks in the chat list in sync too.
+      set((state) => ({
+        users: state.users.map((u) =>
+          u._id === by && u.lastMessage ? { ...u, lastMessage: { ...u.lastMessage, seen: true, delivered: true } } : u
+        ),
+      }));
     });
 
     socket.on("messagesDelivered", ({ by }) => {
@@ -388,6 +394,11 @@ export const useChatStore = create((set, get) => ({
           messages: messages.map((m) => (m.receiverId === by ? { ...m, delivered: true } : m)),
         });
       }
+      set((state) => ({
+        users: state.users.map((u) =>
+          u._id === by && u.lastMessage ? { ...u, lastMessage: { ...u.lastMessage, delivered: true } } : u
+        ),
+      }));
     });
 
     socket.on("messagePinned", (message) => {
