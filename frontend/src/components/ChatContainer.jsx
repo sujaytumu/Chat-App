@@ -4,7 +4,7 @@ import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import ImageLightbox from "./ImageLightbox";
-import MessageTicks from "./MessageTicks";
+import MessageTicks, { GroupMessageTicks } from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
 import ForwardMessageModal from "./ForwardMessageModal";
@@ -288,6 +288,9 @@ const ChatContainer = () => {
                   <span className="text-[11px] text-[#8696A0] mt-1 flex items-center gap-1">
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
+                    {isMe && isGroup && (
+                      <GroupMessageTicks message={message} members={data.members} senderId={authUser._id} />
+                    )}
                   </span>
                 </div>
               ) : (
@@ -357,7 +360,9 @@ const ChatContainer = () => {
                   >
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
-                    {isMe && isGroup && message.seenBy?.length > 1 && <span className="text-[#53BDEB]">✓✓</span>}
+                    {isMe && isGroup && (
+                      <GroupMessageTicks message={message} members={data.members} senderId={authUser._id} />
+                    )}
                   </span>
                 </div>
               )}
@@ -400,7 +405,11 @@ const ChatContainer = () => {
       {forwardingMessage && (
         <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
       )}
-      {infoMessage && <MessageInfoModal message={infoMessage} onClose={() => setInfoMessage(null)} />}
+      {infoMessage && <MessageInfoModal
+          message={infoMessage}
+          members={isGroup ? data.members : undefined}
+          onClose={() => setInfoMessage(null)}
+        />}
     </div>
   );
 };

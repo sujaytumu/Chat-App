@@ -4,6 +4,7 @@ import cloudinary from "../lib/cloudinary.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUsers } from "../lib/webPush.js";
+import { markGroupSeen } from "../lib/groupReceipts.js";
 
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
@@ -134,10 +135,7 @@ export const getGroupMessages = async (req, res) => {
     const messages = page.reverse();
 
     // Mark unseen messages as seen by me
-    await Message.updateMany(
-      { groupId, senderId: { $ne: myId }, seenBy: { $ne: myId } },
-      { $addToSet: { seenBy: myId } }
-    );
+    await markGroupSeen(io, groupId, myId);
 
     res.status(200).json(messages);
   } catch (error) {
@@ -181,9 +179,16 @@ export const sendGroupMessage = async (req, res) => {
       fileAttachment = await uploadFileAttachment(file);
     }
 
+    // Members who are online right now receive it instantly -> already "delivered"
+    const now = new Date();
+    const deliveredTo = group.members
+      .filter((m) => !m.equals(senderId) && getReceiverSocketId(m.toString()))
+      .map((m) => ({ user: m, at: now }));
+
     let newMessage = await Message.create({
       senderId,
       groupId,
+      deliveredTo,
       text: text?.trim() || "",
       image: imageUrl,
       file: fileAttachment,
@@ -203,7 +208,12 @@ export const sendGroupMessage = async (req, res) => {
         body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
         icon: group.groupPic || "/icon-v2-192.png",
         tag: `group-${groupId}`,
-        data: { url: "/", chatType: "group", chatId: groupId.toString() },
+        data: {
+          url: "/",
+          chatType: "group",
+          chatId: groupId.toString(),
+          messageId: newMessage._id.toString(),
+        },
       }
     );
 

@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
+import { markGroupDelivered } from "../lib/groupReceipts.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io } from "../lib/socket.js";
@@ -392,6 +393,12 @@ export const ackDelivered = async (req, res) => {
   try {
     const { messageId } = req.body || {};
     if (!mongoose.isValidObjectId(messageId)) return res.status(400).json({ error: "Invalid message" });
+    const probe = await Message.findById(messageId).select("groupId").lean();
+    if (probe?.groupId) {
+      const member = await Group.exists({ _id: probe.groupId, members: req.user._id });
+      if (member) await markGroupDelivered(io, req.user._id, { messageIds: [messageId] });
+      return res.status(200).json({ ok: true });
+    }
     const msg = await Message.findOneAndUpdate(
       { _id: messageId, receiverId: req.user._id, delivered: false },
       { $set: { delivered: true, deliveredAt: new Date() } },
