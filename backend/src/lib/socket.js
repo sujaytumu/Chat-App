@@ -6,6 +6,7 @@ import Message from "../models/message.model.js";
 import CallLog from "../models/callLog.model.js";
 import User from "../models/user.model.js";
 import { sendPushToUser } from "./webPush.js";
+import { markGroupDelivered } from "./groupReceipts.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -365,6 +366,8 @@ io.on("connection", (socket) => {
       try {
         const groups = await Group.find({ members: userId }).select("_id");
         groups.forEach((group) => socket.join(group._id.toString()));
+        // Group messages sent while they were offline are now delivered
+        if (groups.length) markGroupDelivered(io, userId, { groupIds: groups.map((g) => g._id) });
       } catch (err) {
         console.log("Error joining group rooms:", err.message);
       }

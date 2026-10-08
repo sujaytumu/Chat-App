@@ -47,6 +47,22 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    // Group messages: per-member delivery / read receipts with times, for the
+    // WhatsApp-style "Message info" (seenBy above stays the fast unread filter).
+    deliveredTo: [
+      {
+        _id: false,
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    seenLog: [
+      {
+        _id: false,
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     // Non-image attachment: video, audio, or generic document
     file: {
       url: { type: String },
