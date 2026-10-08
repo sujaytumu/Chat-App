@@ -137,6 +137,15 @@ let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
+// Tells the other side our current mic/camera state so it can show a
+// "muted" indicator. Safe to call any time; no-ops outside a call.
+const sendMediaState = (get) => {
+  const socket = useAuthStore.getState().socket;
+  const { remoteUser, isMuted, isVideoOff, callStatus } = get();
+  if (!socket || !remoteUser || callStatus === "idle") return;
+  socket.emit("callMediaState", { toUserId: remoteUser._id, state: { isMuted, isVideoOff } });
+};
+
 const stopLocalTracks = (stream) => {
   stream?.getTracks().forEach((track) => track.stop());
 };
@@ -154,6 +163,8 @@ export const useCallStore = create((set, get) => ({
   isRemoteRinging: false, // true once the callee's device has actually started ringing
   isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
   isScreenSharing: false,
+  remoteMuted: false, // the other person has muted their mic
+  remoteVideoOff: false, // the other person has turned their camera off
   isReconnecting: false, // media path dropped; ICE is trying to recover it
   callStartedAt: null, // epoch ms when the call actually connected (drives the on-screen timer)
   audioOutputDevices: [],
@@ -366,12 +377,14 @@ export const useCallStore = create((set, get) => ({
     const { localStream, isMuted } = get();
     localStream?.getAudioTracks().forEach((track) => (track.enabled = isMuted));
     set({ isMuted: !isMuted });
+    sendMediaState(get);
   },
 
   toggleVideo: () => {
     const { localStream, isVideoOff } = get();
     localStream?.getVideoTracks().forEach((track) => (track.enabled = isVideoOff));
     set({ isVideoOff: !isVideoOff });
+    sendMediaState(get);
   },
 
   // Upgrades an in-progress voice call to video, mirroring WhatsApp's
@@ -424,6 +437,8 @@ export const useCallStore = create((set, get) => ({
       isScreenSharing: false,
       isSpeakerOn: false,
       isReconnecting: false,
+      remoteMuted: false,
+      remoteVideoOff: false,
       callStartedAt: null,
       callCooldownUntil: Date.now() + 2000, // brief guard against accidental rapid re-tapping
     });
@@ -596,11 +611,17 @@ export const useCallStore = create((set, get) => ({
         pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
         pendingCandidates = [];
         set({ callStatus: "in-call", isRemoteRinging: false, callStartedAt: Date.now() });
+        sendMediaState(get);
       } catch (err) {
         console.error("Failed to apply call answer:", err);
         toast.error("Call couldn't connect");
         get().endCall();
       }
+    });
+
+    socket.on("remoteMediaState", ({ isMuted, isVideoOff }) => {
+      if (get().callStatus === "idle") return;
+      set({ remoteMuted: !!isMuted, remoteVideoOff: !!isVideoOff });
     });
 
     socket.on("remoteDeviceRinging", () => {
@@ -665,6 +686,7 @@ export const useCallStore = create((set, get) => ({
       "incomingCall",
       "callAnswered",
       "remoteDeviceRinging",
+      "remoteMediaState",
       "iceCandidate",
       "webrtcRenegotiateOffer",
       "webrtcRenegotiateAnswer",
