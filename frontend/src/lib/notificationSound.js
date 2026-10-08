@@ -98,6 +98,25 @@ if (typeof document !== "undefined") {
   });
 }
 
+// ---- Who alerts: the page or the system? -----------------------------------
+// When Web Push is set up on this device the service worker shows a system
+// notification for anything that arrives while the app isn't in front. On a
+// phone a background page is frozen and can't play sound, so the system
+// notification must do the alerting and the page stays quiet (otherwise: two
+// sounds). On desktop a hidden page is still alive, so it plays the person's
+// chosen tone and the system notification is shown silently.
+let pushActive = false;
+export function setPushActive(active) {
+  pushActive = !!active;
+}
+export function isPushActive() {
+  return pushActive;
+}
+const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+export function shouldLeaveToSystemAlert() {
+  return pushActive && document.visibilityState !== "visible" && isMobileDevice();
+}
+
 // Android phones can vibrate with the ring (iOS Safari has no vibration API).
 const RING_VIBRATION = [700, 400, 700, 400];
 export function vibrateForCall() {
@@ -391,6 +410,7 @@ export async function registerPushSubscription(axiosInstance) {
     }
 
     await axiosInstance.post("/push/subscribe", subscription.toJSON());
+    setPushActive(true);
   } catch (err) {
     console.log("Push subscription failed:", err.message);
   }

@@ -3,10 +3,20 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
 import { readChatCache, writeChatCache } from "../lib/chatCache";
-import { playNotificationSound, showDesktopNotification } from "../lib/notificationSound";
+import {
+  playNotificationSound,
+  showDesktopNotification,
+  shouldLeaveToSystemAlert,
+  isPushActive,
+} from "../lib/notificationSound";
 
 function notifyIncoming(senderName, message, isGroup = false) {
+  // Phone with the app in the background: the system notification (from Web
+  // Push) carries the sound — don't also try to play one from a frozen page.
+  if (shouldLeaveToSystemAlert()) return;
   playNotificationSound();
+  // With Web Push active the service worker shows the notification itself.
+  if (isPushActive()) return;
   const body = message.image ? "📷 Photo" : message.text || "New message";
   showDesktopNotification(isGroup ? `${senderName}` : senderName, {
     body: isGroup && message.text ? message.text : body,
