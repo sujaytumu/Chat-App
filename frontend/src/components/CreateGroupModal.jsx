@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
-import { X, Users, Camera, Loader2 } from "lucide-react";
+import { X, Users, Camera, Loader2, Check } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { compressImage } from "../lib/imageUtils";
+import Avatar from "./Avatar";
 import toast from "react-hot-toast";
 
 const CreateGroupModal = ({ onClose, onCreated }) => {
@@ -48,82 +49,97 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
     }
   };
 
+  const canCreate = name.trim().length > 0 && selectedIds.length > 0 && !isCreating;
+
   return (
-    <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-base-100 rounded-xl w-full max-w-md max-h-[85vh] flex flex-col shadow-xl">
-        <div className="flex items-center justify-between p-4 border-b border-base-300">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Users size={18} /> New group
+    <div
+      className="fixed inset-0 z-[90] bg-black/70 flex items-end sm:items-center justify-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#111B21] text-[#E9EDEF] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 h-16 shrink-0">
+          <h3 className="text-[20px] font-medium flex items-center gap-3">
+            <Users size={22} className="text-[#8696A0]" /> New group
           </h3>
-          <button onClick={onClose} className="btn btn-sm btn-circle btn-ghost">
-            <X size={16} />
+          <button
+            onClick={onClose}
+            className="size-11 rounded-full flex items-center justify-center text-[#AEBAC1] hover:bg-white/10 active:bg-white/15"
+            aria-label="Close"
+          >
+            <X size={22} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-4 space-y-3 border-b border-base-300">
-            <div className="flex items-center gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="px-4 pb-3 shrink-0">
+            <div className="flex items-center gap-4">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="relative size-14 rounded-full bg-base-200 flex items-center justify-center overflow-hidden shrink-0"
+                className="relative size-16 rounded-full bg-[#233138] hover:bg-[#2A3942] flex items-center justify-center overflow-hidden shrink-0"
+                aria-label="Group photo"
               >
                 {groupPic ? (
                   <img src={groupPic} alt="Group" className="w-full h-full object-cover" />
                 ) : (
-                  <Camera size={20} className="text-zinc-400" />
+                  <Camera size={24} className="text-[#8696A0]" />
                 )}
               </button>
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                className="hidden"
-                onChange={handlePicChange}
-              />
+              <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePicChange} />
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Group name"
-                className="input input-bordered flex-1"
+                className="flex-1 min-w-0 bg-transparent border-0 border-b-2 border-[#2A3942] focus:border-[#25D366] focus:outline-none focus:ring-0 text-[18px] text-[#E9EDEF] placeholder:text-[#8696A0] py-2 transition-colors"
                 maxLength={50}
                 autoFocus
               />
             </div>
-            <p className="text-xs text-zinc-500">
-              {selectedIds.length} member{selectedIds.length !== 1 ? "s" : ""} selected
+            <p className="text-[13px] text-[#25D366] mt-3 font-medium">
+              {selectedIds.length === 0
+                ? "Add members"
+                : `${selectedIds.length} member${selectedIds.length !== 1 ? "s" : ""} selected`}
             </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            {users.map((user) => (
-              <label
-                key={user._id}
-                className="flex items-center gap-3 px-4 py-2.5 hover:bg-base-200 cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  className="checkbox checkbox-sm"
-                  checked={selectedIds.includes(user._id)}
-                  onChange={() => toggleMember(user._id)}
-                />
-                <img
-                  src={user.profilePic || "/avatar.png"}
-                  alt={user.fullName}
-                  className="size-9 rounded-full object-cover"
-                />
-                <span className="font-medium truncate">{user.fullName}</span>
-              </label>
-            ))}
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {users.map((user) => {
+              const checked = selectedIds.includes(user._id);
+              return (
+                <button
+                  type="button"
+                  key={user._id}
+                  onClick={() => toggleMember(user._id)}
+                  className="w-full flex items-center gap-4 px-4 py-2.5 hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] text-left transition-colors"
+                >
+                  <Avatar src={user.profilePic} name={user.fullName} size="size-12" />
+                  <span className="flex-1 min-w-0 text-[17px] truncate">{user.fullName}</span>
+                  <span
+                    className={`size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
+                      checked ? "bg-[#25D366] border-[#25D366] text-[#0B141A]" : "border-[#55646D]"
+                    }`}
+                  >
+                    {checked && <Check size={14} strokeWidth={3} />}
+                  </span>
+                </button>
+              );
+            })}
             {users.length === 0 && (
-              <p className="text-center text-zinc-500 py-6 text-sm">No contacts to add yet</p>
+              <p className="text-center text-[#8696A0] py-8 text-[15px]">No contacts to add yet</p>
             )}
           </div>
 
-          <div className="p-4 border-t border-base-300">
-            <button type="submit" className="btn btn-primary w-full" disabled={isCreating}>
-              {isCreating ? <Loader2 className="animate-spin" size={18} /> : "Create group"}
+          <div className="p-4 shrink-0 pb-[calc(16px+env(safe-area-inset-bottom))]">
+            <button
+              type="submit"
+              disabled={!canCreate}
+              className="w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] text-[16px] font-semibold flex items-center justify-center hover:bg-[#21c05e] active:scale-[.99] disabled:bg-[#1F2C34] disabled:text-[#667781] transition-colors"
+            >
+              {isCreating ? <Loader2 className="animate-spin" size={20} /> : "Create group"}
             </button>
           </div>
         </form>
