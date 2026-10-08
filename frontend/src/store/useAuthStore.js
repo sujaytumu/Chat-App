@@ -8,16 +8,34 @@ import { useCallStore } from "./useCallStore";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
 
+// Last signed-in user, remembered on this device. Lets the app open straight
+// into the chat list (instead of a spinner while a sleeping server wakes up)
+// and verify the session in the background. Wiped on logout (clearChatCache
+// removes every "talkies-cache-*" key) and whenever the server says the
+// session is no longer valid.
+const AUTH_CACHE_KEY = "talkies-cache-auth";
+const readCachedAuth = () => {
+  try {
+    return JSON.parse(localStorage.getItem(AUTH_CACHE_KEY) || "null");
+  } catch {
+    return null;
+  }
+};
+const cachedAuthUser = readCachedAuth();
+
 export const useAuthStore = create((set, get) => ({
-  authUser: null,
+  authUser: cachedAuthUser,
   isSigningUp: false,
   isLoggingIn: false,
   isUpdatingProfile: false,
-  isCheckingAuth: true,
+  isCheckingAuth: !cachedAuthUser,
   onlineUsers: [],
   socket: null,
 
   checkAuth: async () => {
+    // Known user from last time: connect the realtime socket right away,
+    // in parallel with verifying the session.
+    if (get().authUser) get().connectSocket();
     try {
       const res = await axiosInstance.get("/auth/check");
 
@@ -25,7 +43,13 @@ export const useAuthStore = create((set, get) => ({
       get().connectSocket();
     } catch (error) {
       console.log("Error in checkAuth:", error);
-      set({ authUser: null });
+      const status = error.response?.status;
+      // Only a real "not signed in" answer signs the person out. A slow/asleep
+      // server or no network must not kick them out of a cached session.
+      if (!get().authUser || status === 401 || status === 404) {
+        set({ authUser: null });
+        get().disconnectSocket();
+      }
     } finally {
       set({ isCheckingAuth: false });
     }
@@ -88,12 +112,15 @@ export const useAuthStore = create((set, get) => ({
 
   connectSocket: () => {
     const { authUser } = get();
-    if (!authUser || get().socket?.connected) return;
+    if (!authUser || get().socket) return; // socket.io reconnects by itself — never open a second one
 
     const socket = io(BASE_URL, {
       query: {
         userId: authUser._id,
       },
+      // WebSocket straight away (polling only as a fallback): skips the slow
+      // HTTP-polling handshake + upgrade, so realtime is up much sooner.
+      transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 500,
@@ -145,7 +172,19 @@ export const useAuthStore = create((set, get) => ({
     useChatStore.getState().unsubscribeFromSocket();
     useCallStore.getState().unsubscribeFromCallSocket();
     useCallStore.getState().resetCall();
-    if (get().socket?.connected) get().socket.disconnect();
+    get().socket?.disconnect();
     set({ socket: null });
   },
 }));
+
+// Keep the on-device copy of the signed-in user current (login, profile edit,
+// archive changes…) from one place.
+useAuthStore.subscribe((state, prev) => {
+  if (state.authUser === prev.authUser) return;
+  try {
+    if (state.authUser) localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(state.authUser));
+    else localStorage.removeItem(AUTH_CACHE_KEY);
+  } catch {
+    // storage unavailable — caching is only an optimisation
+  }
+});
