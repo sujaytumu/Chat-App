@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Same key format: chats pinned to the top (max 3) and chats whose
+    // notifications are muted.
+    pinnedChats: { type: [String], default: [] },
+    mutedChats: { type: [String], default: [] },
     // Web Push subscriptions (one per browser/device the user has granted
     // notification permission on)
     pushSubscriptions: [

@@ -11,6 +11,9 @@ import {
   getStarredMessages,
   setChatArchived,
   ackDelivered,
+  setChatPinned,
+  setChatMuted,
+  deleteChatForMe,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -22,6 +25,9 @@ router.get("/:id", protectRoute, getMessages);
 router.post("/send/:id", protectRoute, sendMessage);
 router.put("/archive", protectRoute, setChatArchived);
 router.post("/ack-delivered", protectRoute, ackDelivered);
+router.put("/pin-chat", protectRoute, setChatPinned);
+router.put("/mute-chat", protectRoute, setChatMuted);
+router.delete("/chat/:chatType/:chatId", protectRoute, deleteChatForMe);
 router.put("/seen/:id", protectRoute, markMessagesAsSeen);
 router.put("/pin/:id", protectRoute, togglePinMessage);
 router.put("/star/:id", protectRoute, toggleStarMessage);

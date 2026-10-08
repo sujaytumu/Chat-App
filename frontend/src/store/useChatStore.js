@@ -11,6 +11,9 @@ import {
 } from "../lib/notificationSound";
 
 function notifyIncoming(senderName, message, isGroup = false) {
+  // Muted chats stay silent (the unread badge still counts).
+  const muteKey = isGroup ? `g:${message.groupId}` : `d:${message.senderId}`;
+  if (useAuthStore.getState().authUser?.mutedChats?.includes(muteKey)) return;
   // Phone with the app in the background: the system notification (from Web
   // Push) carries the sound — don't also try to play one from a frozen page.
   if (shouldLeaveToSystemAlert()) return;
@@ -28,6 +31,11 @@ function notifyIncoming(senderName, message, isGroup = false) {
 const PAGE_SIZE = 80; // messages fetched per page (newest first, older on demand)
 const msgCache = new Map(); // chatKey -> last known messages (instant re-open)
 const chatKeyOf = (chat) => `${chat.type === "group" ? "g" : "d"}:${chat.data._id}`;
+const FLAG_API = {
+  archivedChats: { url: "/messages/archive", body: (v) => ({ archived: v }), on: "Chat archived", off: "Chat unarchived", icon: "🗄️" },
+  pinnedChats: { url: "/messages/pin-chat", body: (v) => ({ value: v }), on: "Chat pinned", off: "Chat unpinned", icon: "📌" },
+  mutedChats: { url: "/messages/mute-chat", body: (v) => ({ value: v }), on: "Notifications muted", off: "Notifications on", icon: "🔕" },
+};
 let usersInFlight = null;
 let groupsInFlight = null;
 
@@ -102,31 +110,69 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  // Archive / unarchive a chat for this account (synced across devices by the
-  // server). Updates the list optimistically and rolls back if the call fails.
-  setChatArchived: async (chat, archived) => {
-    const key = `${chat.type === "group" ? "g" : "d"}:${chat.data._id}`;
+  // Per-account chat flags (archived / pinned / muted), synced across devices by
+  // the server. Updates the list optimistically and rolls back if the call fails.
+  // Returns true when it worked. `silent` skips the toast (bulk actions).
+  setChatFlag: async (field, chat, value, { silent = false } = {}) => {
+    const api = FLAG_API[field];
+    const key = chatKeyOf(chat);
     const authUser = useAuthStore.getState().authUser;
-    if (!authUser) return;
-    const prev = authUser.archivedChats || [];
-    const next = archived ? [...new Set([...prev, key])] : prev.filter((k) => k !== key);
-    useAuthStore.setState({ authUser: { ...authUser, archivedChats: next } });
+    if (!authUser) return false;
+    const prev = authUser[field] || [];
+    const next = value ? [...new Set([...prev, key])] : prev.filter((k) => k !== key);
+    useAuthStore.setState({ authUser: { ...authUser, [field]: next } });
     try {
-      const res = await axiosInstance.put("/messages/archive", {
+      const res = await axiosInstance.put(api.url, {
         chatType: chat.type,
         chatId: chat.data._id,
-        archived,
+        ...api.body(value),
       });
-      useAuthStore.setState((st) => ({
-        authUser: st.authUser ? { ...st.authUser, archivedChats: res.data.archivedChats } : st.authUser,
+      useAuthStore.setState((state) => ({
+        authUser: state.authUser ? { ...state.authUser, [field]: res.data[field] } : state.authUser,
       }));
-      toast(archived ? "Chat archived" : "Chat unarchived", { icon: archived ? "🗄️" : "📤" });
+      if (!silent) toast(value ? api.on : api.off, { icon: api.icon });
+      return true;
     } catch (error) {
-      useAuthStore.setState((st) => ({
-        authUser: st.authUser ? { ...st.authUser, archivedChats: prev } : st.authUser,
+      useAuthStore.setState((state) => ({
+        authUser: state.authUser ? { ...state.authUser, [field]: prev } : state.authUser,
       }));
-      toast.error(error.response?.data?.error || "Couldn't update archive");
+      toast.error(error.response?.data?.error || "Couldn't update chat");
+      return false;
     }
+  },
+
+  setChatArchived: (chat, archived, opts) => get().setChatFlag("archivedChats", chat, archived, opts),
+  setChatPinned: (chat, pinned, opts) => get().setChatFlag("pinnedChats", chat, pinned, opts),
+  setChatMuted: (chat, muted, opts) => get().setChatFlag("mutedChats", chat, muted, opts),
+
+  // Delete a chat for me (the other side keeps theirs).
+  deleteChat: async (chat) => {
+    try {
+      await axiosInstance.delete(`/messages/chat/${chat.type}/${chat.data._id}`);
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't delete chat");
+      return false;
+    }
+    const key = chatKeyOf(chat);
+    const id = chat.data._id;
+    msgCache.delete(key);
+    writeChatCache(useAuthStore.getState().authUser?._id, `msgs-${key}`, []);
+    set((state) => {
+      const cur = state.selectedChat;
+      const isOpen = cur && cur.type === chat.type && cur.data._id === id;
+      return {
+        users:
+          chat.type === "direct"
+            ? state.users.map((u) => (u._id === id ? { ...u, lastMessage: null, unreadCount: 0 } : u))
+            : state.users,
+        groups:
+          chat.type === "group"
+            ? state.groups.map((g) => (g._id === id ? { ...g, lastMessage: null, unreadCount: 0 } : g))
+            : state.groups,
+        messages: isOpen ? [] : state.messages,
+      };
+    });
+    return true;
   },
 
   setSelectedChat: (chat) => {
@@ -586,8 +632,10 @@ export const useChatStore = create((set, get) => ({
     });
 
     // Archive list changed on another device (or this one) — keep in sync.
-    socket.on("archivedChats", (archivedChats) => {
-      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, archivedChats } } : {}));
+    ["archivedChats", "pinnedChats", "mutedChats"].forEach((field) => {
+      socket.on(field, (list) => {
+        useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, [field]: list } } : {}));
+      });
     });
 
     socket.on("groupCreated", (group) => {
@@ -639,6 +687,8 @@ export const useChatStore = create((set, get) => ({
       "groupUpdated",
       "removedFromGroup",
       "archivedChats",
+      "pinnedChats",
+      "mutedChats",
       "groupReceipts",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });

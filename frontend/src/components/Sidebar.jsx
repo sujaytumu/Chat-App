@@ -7,7 +7,26 @@ import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import Avatar from "./Avatar";
 import MessageTicks from "./MessageTicks";
 import { formatChatListTime } from "../lib/utils";
-import { UserRoundPlus, Search, Settings, LogOut, MoreVertical, X, UserRound, UsersRound, Archive, ArchiveRestore, ArrowLeft } from "lucide-react";
+import {
+  UserRoundPlus,
+  Search,
+  Settings,
+  LogOut,
+  MoreVertical,
+  X,
+  UserRound,
+  UsersRound,
+  Archive,
+  ArchiveRestore,
+  ArrowLeft,
+  Pin,
+  PinOff,
+  Trash2,
+  Bell,
+  BellOff,
+  Check,
+} from "lucide-react";
+import toast from "react-hot-toast";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 
@@ -39,6 +58,9 @@ const Sidebar = () => {
     isUsersLoading,
     typingUsers,
     setChatArchived,
+    setChatPinned,
+    setChatMuted,
+    deleteChat,
   } = useChatStore(
     useShallow((st) => ({
       getUsers: st.getUsers,
@@ -50,6 +72,9 @@ const Sidebar = () => {
       isUsersLoading: st.isUsersLoading,
       typingUsers: st.typingUsers,
       setChatArchived: st.setChatArchived,
+      setChatPinned: st.setChatPinned,
+      setChatMuted: st.setChatMuted,
+      deleteChat: st.deleteChat,
     }))
   );
 
@@ -59,6 +84,49 @@ const Sidebar = () => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+
+  // ---- Long-press selection (like WhatsApp): hold a chat to select it, tap more
+  // to add, then Pin / Mute / Archive / Delete from the bar on top.
+  const [selected, setSelected] = useState(() => new Set());
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const pressTimer = useRef(null);
+  const pressStart = useRef(null);
+  const longPressed = useRef(false);
+  const selecting = selected.size > 0;
+
+  const addSelected = (key) => setSelected((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  const toggleSelected = (key) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const clearSelected = () => setSelected(new Set());
+  const cancelPress = () => clearTimeout(pressTimer.current);
+  const startPress = (key, e) => {
+    longPressed.current = false;
+    const t = e.touches?.[0];
+    pressStart.current = t ? { x: t.clientX, y: t.clientY } : null;
+    clearTimeout(pressTimer.current);
+    pressTimer.current = setTimeout(() => {
+      longPressed.current = true;
+      navigator.vibrate?.(15);
+      addSelected(key);
+    }, 450);
+  };
+  const movePress = (e) => {
+    const t = e.touches?.[0];
+    if (!pressStart.current || !t) return;
+    if (Math.abs(t.clientX - pressStart.current.x) > 10 || Math.abs(t.clientY - pressStart.current.y) > 10) cancelPress();
+  };
+
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e) => e.key === "Escape" && setSelected(new Set());
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selecting]);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -77,6 +145,10 @@ const Sidebar = () => {
 
   const archivedKeys = authUser?.archivedChats;
   const archivedSet = useMemo(() => new Set(archivedKeys || []), [archivedKeys]);
+  const pinnedKeys = authUser?.pinnedChats;
+  const pinnedSet = useMemo(() => new Set(pinnedKeys || []), [pinnedKeys]);
+  const mutedKeys = authUser?.mutedChats;
+  const mutedSet = useMemo(() => new Set(mutedKeys || []), [mutedKeys]);
 
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -88,6 +160,8 @@ const Sidebar = () => {
         data: u,
         key: `d-${u._id}`,
         archived: archivedSet.has(`d:${u._id}`),
+        pinned: pinnedSet.has(`d:${u._id}`),
+        muted: mutedSet.has(`d:${u._id}`),
         name: u.fullName,
         avatar: u.profilePic,
         online: onlineUsers.includes(u._id),
@@ -103,6 +177,8 @@ const Sidebar = () => {
         data: g,
         key: `g-${g._id}`,
         archived: archivedSet.has(`g:${g._id}`),
+        pinned: pinnedSet.has(`g:${g._id}`),
+        muted: mutedSet.has(`g:${g._id}`),
         name: g.name,
         avatar: g.groupPic,
         online: false,
@@ -121,8 +197,40 @@ const Sidebar = () => {
         if (filter === "online") return item.online;
         return true;
       })
-      .sort((a, b) => b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers, archivedSet, showArchived]);
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, showArchived]);
+
+  const selectedItems = items.filter((i) => selected.has(i.key));
+  const allPinned = selectedItems.length > 0 && selectedItems.every((i) => i.pinned);
+  const allMuted = selectedItems.length > 0 && selectedItems.every((i) => i.muted);
+  const chatOf = (i) => ({ type: i.type, data: i.data });
+
+  const bulk = async (run, message) => {
+    const targets = selectedItems;
+    clearSelected();
+    const results = await Promise.all(targets.map((i) => run(i)));
+    if (results.every(Boolean) && message) toast(message(targets.length));
+  };
+  const onPin = () => {
+    if (!allPinned) {
+      const already = [...pinnedSet].filter((k) => !selectedItems.some((i) => `${i.type === "group" ? "g" : "d"}:${i.data._id}` === k)).length;
+      if (already + selectedItems.length > 3) return toast.error("You can only pin 3 chats");
+    }
+    bulk((i) => setChatPinned(chatOf(i), !allPinned, { silent: true }), () => (allPinned ? "Chat unpinned" : "Chat pinned"));
+  };
+  const onMute = () =>
+    bulk((i) => setChatMuted(chatOf(i), !allMuted, { silent: true }), () => (allMuted ? "Notifications on" : "Notifications muted"));
+  const onArchive = () =>
+    bulk((i) => setChatArchived(chatOf(i), !showArchived, { silent: true }), (n) =>
+      showArchived ? `${n} chat${n > 1 ? "s" : ""} unarchived` : `${n} chat${n > 1 ? "s" : ""} archived`
+    );
+  const onDelete = async () => {
+    setConfirmDelete(false);
+    const targets = selectedItems;
+    clearSelected();
+    for (const i of targets) await deleteChat(chatOf(i));
+    toast(`${targets.length} chat${targets.length > 1 ? "s" : ""} deleted`);
+  };
 
   const totalUnread = useMemo(
     () =>
@@ -144,8 +252,29 @@ const Sidebar = () => {
 
   return (
     <aside className="relative flex flex-col w-full lg:w-[400px] xl:w-[420px] shrink-0 h-full bg-[#0B141A] lg:border-r lg:border-white/5">
+      {selecting && (
+        <div className="flex items-center gap-1 px-2 pt-3 pb-3 bg-[#0B141A]">
+          <button onClick={clearSelected} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label="Cancel selection">
+            <X size={24} />
+          </button>
+          <span className="flex-1 text-[20px] font-medium text-[#E9EDEF] pl-1">{selected.size}</span>
+          <button onClick={onPin} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
+            {allPinned ? <PinOff size={22} /> : <Pin size={22} />}
+          </button>
+          <button onClick={() => setConfirmDelete(true)} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label="Delete" title="Delete">
+            <Trash2 size={22} />
+          </button>
+          <button onClick={onMute} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
+            {allMuted ? <Bell size={22} /> : <BellOff size={22} />}
+          </button>
+          <button onClick={onArchive} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
+            {showArchived ? <ArchiveRestore size={22} /> : <Archive size={22} />}
+          </button>
+        </div>
+      )}
+
       {/* Title + menu */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+      <div className={`${selecting ? "hidden" : "flex"} items-center justify-between px-4 pt-4 pb-3`}>
         {showArchived ? (
           <div className="flex items-center gap-2">
             <button
@@ -261,13 +390,34 @@ const Sidebar = () => {
           return (
             <div key={item.key} className="group relative">
             <button
-              onClick={() => setSelectedChat({ type: item.type, data: item.data })}
-              className={`w-full px-4 py-3 flex items-center gap-4 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
-                isSelected ? "lg:bg-[#2A3942]" : ""
+              onClick={() => {
+                if (longPressed.current) {
+                  longPressed.current = false;
+                  return;
+                }
+                if (selecting) toggleSelected(item.key);
+                else setSelectedChat({ type: item.type, data: item.data });
+              }}
+              onTouchStart={(e) => startPress(item.key, e)}
+              onTouchMove={movePress}
+              onTouchEnd={cancelPress}
+              onTouchCancel={cancelPress}
+              onContextMenu={(e) => {
+                e.preventDefault(); // right-click on desktop / long-press on Android
+                addSelected(item.key);
+              }}
+              style={{ WebkitTouchCallout: "none" }}
+              className={`w-full select-none px-4 py-3 flex items-center gap-4 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
+                selected.has(item.key) ? "bg-[#1F3A33]" : isSelected ? "lg:bg-[#2A3942]" : ""
               }`}
             >
               <div className="relative shrink-0">
                 <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-14" />
+                {selected.has(item.key) && (
+                  <span className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#25D366] text-[#0B141A] ring-2 ring-[#0B141A] flex items-center justify-center">
+                    <Check size={14} strokeWidth={3} />
+                  </span>
+                )}
                 {item.online && (
                   <span className="absolute bottom-0 right-0 size-3.5 bg-[#25D366] rounded-full ring-[3px] ring-[#0B141A]" />
                 )}
@@ -304,17 +454,26 @@ const Sidebar = () => {
                     </span>
                   </span>
                   )}
-                  {hasUnread && (
-                    <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#25D366] text-[#0B141A] text-xs font-semibold flex items-center justify-center">
-                      {item.unreadCount > 99 ? "99+" : item.unreadCount}
-                    </span>
-                  )}
+                  <span className="flex items-center gap-1.5 shrink-0 text-[#8696A0]">
+                    {item.muted && <BellOff size={15} />}
+                    {hasUnread ? (
+                      <span
+                        className={`min-w-[22px] h-[22px] px-1.5 rounded-full text-xs font-semibold flex items-center justify-center ${
+                          item.muted ? "bg-[#3B4A54] text-[#E9EDEF]" : "bg-[#25D366] text-[#0B141A]"
+                        }`}
+                      >
+                        {item.unreadCount > 99 ? "99+" : item.unreadCount}
+                      </span>
+                    ) : (
+                      item.pinned && <Pin size={15} className="rotate-45" />
+                    )}
+                  </span>
                 </div>
               </div>
             </button>
             <button
               onClick={() => setChatArchived({ type: item.type, data: item.data }, !item.archived)}
-              className="hidden lg:group-hover:flex absolute right-3 top-3 size-8 rounded-full items-center justify-center bg-[#233138] text-[#AEBAC1] hover:text-white shadow-md"
+              className={`hidden ${selecting ? "" : "lg:group-hover:flex"} absolute right-3 top-3 size-8 rounded-full items-center justify-center bg-[#233138] text-[#AEBAC1] hover:text-white shadow-md`}
               title={item.archived ? "Unarchive" : "Archive"}
               aria-label={item.archived ? "Unarchive chat" : "Archive chat"}
             >
@@ -346,6 +505,27 @@ const Sidebar = () => {
       >
         <UserRoundPlus size={24} />
       </button>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>
+          <div className="bg-[#233138] rounded-2xl w-full max-w-xs p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[17px] font-medium text-[#E9EDEF]">
+              Delete {selected.size > 1 ? `${selected.size} chats` : "this chat"}?
+            </h3>
+            <p className="text-sm text-[#8696A0] mt-2">
+              Messages are removed from your account only. {selected.size > 1 ? "Others keep their copies." : "The other side keeps their copy."}
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setConfirmDelete(false)} className="px-4 h-10 rounded-full text-[#25D366] hover:bg-white/5">
+                Cancel
+              </button>
+              <button onClick={onDelete} className="px-4 h-10 rounded-full text-red-400 hover:bg-white/5 font-medium">
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCreateGroup && (
         <Suspense fallback={null}>
