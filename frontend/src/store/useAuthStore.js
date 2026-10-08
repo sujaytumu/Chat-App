@@ -115,9 +115,7 @@ export const useAuthStore = create((set, get) => ({
     if (!authUser || get().socket) return; // socket.io reconnects by itself — never open a second one
 
     const socket = io(BASE_URL, {
-      query: {
-        userId: authUser._id,
-      },
+      withCredentials: true, // the signed login cookie is what proves who you are
       // WebSocket straight away (polling only as a fallback): skips the slow
       // HTTP-polling handshake + upgrade, so realtime is up much sooner.
       transports: ["websocket", "polling"],
@@ -129,6 +127,30 @@ export const useAuthStore = create((set, get) => ({
     socket.connect();
 
     set({ socket: socket });
+
+    // The server only accepts sockets that carry a valid login cookie. If it
+    // says no, find out whether the session really ended (-> signed out) or
+    // the cookie just didn't ride along this time (-> retry once).
+    let authRetried = false;
+    socket.on("connect", () => {
+      authRetried = false;
+    });
+    socket.on("connect_error", async (err) => {
+      if (err?.message !== "unauthorized") return;
+      try {
+        await axiosInstance.get("/auth/check");
+        if (!authRetried) {
+          authRetried = true;
+          setTimeout(() => socket.connect(), 1000);
+        }
+      } catch (error) {
+        const status = error.response?.status;
+        if (status === 401 || status === 404) {
+          get().disconnectSocket();
+          set({ authUser: null });
+        }
+      }
+    });
 
     socket.on("getOnlineUsers", (userIds) => {
       set({ onlineUsers: userIds });
