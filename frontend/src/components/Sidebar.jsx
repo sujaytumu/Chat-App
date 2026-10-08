@@ -28,7 +28,8 @@ const menuItem =
   "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
 
 const Sidebar = () => {
-  const { getUsers, getGroups, users, groups, selectedChat, setSelectedChat, isUsersLoading } = useChatStore();
+  const { getUsers, getGroups, users, groups, selectedChat, setSelectedChat, isUsersLoading, typingUsers } =
+    useChatStore();
 
   const { onlineUsers, authUser, logout } = useAuthStore();
   const [filter, setFilter] = useState("all");
@@ -186,6 +187,8 @@ const Sidebar = () => {
           const isSelected = selectedChat?.type === item.type && selectedChat.data._id === item.data._id;
           const hasUnread = item.unreadCount > 0;
           const sentByMe = item.lastMessage && item.lastMessage.senderId === authUser?._id;
+          const isTyping =
+            (typingUsers[item.type === "group" ? `group:${item.data._id}` : item.data._id]?.size ?? 0) > 0;
 
           return (
             <button
@@ -214,6 +217,9 @@ const Sidebar = () => {
                   )}
                 </div>
                 <div className="flex items-center justify-between gap-3 mt-0.5">
+                  {isTyping ? (
+                    <span className="min-w-0 truncate text-[15px] text-[#25D366]">typing…</span>
+                  ) : (
                   <span
                     className={`flex items-center gap-1 min-w-0 text-[15px] ${
                       hasUnread ? "text-[#E9EDEF]" : "text-[#8696A0]"
@@ -229,6 +235,7 @@ const Sidebar = () => {
                       {lastMessagePreview(item.lastMessage)}
                     </span>
                   </span>
+                  )}
                   {hasUnread && (
                     <span className="shrink-0 min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#25D366] text-[#0B141A] text-xs font-semibold flex items-center justify-center">
                       {item.unreadCount > 99 ? "99+" : item.unreadCount}

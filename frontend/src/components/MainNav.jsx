@@ -65,7 +65,7 @@ const MainNav = () => {
       <nav
         className={`${
           hideOnPhone ? "hidden" : "flex"
-        } lg:hidden fixed bottom-0 inset-x-0 h-[72px] bg-[#0B141A] border-t border-white/5 items-stretch justify-around z-30`}
+        } lg:hidden fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-[#0B141A] border-t border-white/5 items-stretch justify-around z-30`}
       >
         {items.map(({ to, icon: Icon, label, end }) => (
           <NavLink key={to} to={to} end={end} className="flex-1 flex flex-col items-center justify-center gap-1">
