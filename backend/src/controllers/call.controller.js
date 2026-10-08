@@ -15,3 +15,25 @@ export const getCallHistory = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// ICE (STUN/TURN) servers for WebRTC. Configure a TURN relay on the server with
+//   TURN_URLS=turn:host:80,turns:host:443?transport=tcp
+//   TURN_USERNAME=...   TURN_CREDENTIAL=...
+// Without a working TURN relay, calls between two different networks (e.g. a
+// phone on mobile data + a laptop on Wi-Fi) often connect "silently" with no
+// audio, then drop with "connection lost".
+export const getIceConfig = (req, res) => {
+  const iceServers = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+  ];
+  const urls = (process.env.TURN_URLS || "").split(",").map((u) => u.trim()).filter(Boolean);
+  if (urls.length && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL) {
+    iceServers.push({
+      urls,
+      username: process.env.TURN_USERNAME,
+      credential: process.env.TURN_CREDENTIAL,
+    });
+  }
+  res.status(200).json({ iceServers, hasTurn: iceServers.length > 2 });
+};

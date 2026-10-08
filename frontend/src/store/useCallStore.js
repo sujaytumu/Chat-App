@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
+import { axiosInstance } from "../lib/axios";
 import { playRingtone, primeAudio } from "../lib/notificationSound";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -32,6 +33,23 @@ const ICE_SERVERS = {
   ],
 };
 
+// Prefer the server-configured ICE servers (private TURN credentials from the
+// backend env); fall back to the built-in defaults above if that fails.
+let iceConfigCache = null;
+async function getIceConfig() {
+  if (iceConfigCache) return iceConfigCache;
+  try {
+    const res = await axiosInstance.get("/calls/ice-config", { timeout: 4000 });
+    if (res.data?.hasTurn) {
+      iceConfigCache = { iceServers: res.data.iceServers };
+      return iceConfigCache;
+    }
+  } catch {
+    // fall through to defaults
+  }
+  return ICE_SERVERS;
+}
+
 // Watches the actual media connection (not just signaling) and gives clear
 // feedback + cleans up if it genuinely fails or drops — instead of a call
 // silently sitting there connected-in-name-only with no audio flowing.
@@ -61,7 +79,7 @@ function attachConnectionWatchdog(peerConnection, get) {
           toast.error("Call connection lost");
           get().endCall();
         }
-      }, 8000);
+      }, 15000);
     } else if (state === "connected" || state === "completed") {
       clearTimeout(disconnectTimer);
       restartAttempted = false;
@@ -188,7 +206,7 @@ export const useCallStore = create((set, get) => ({
         set({ isRemoteRinging: true });
       }
 
-      pc = new RTCPeerConnection(ICE_SERVERS);
+      pc = new RTCPeerConnection(await getIceConfig());
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
@@ -257,7 +275,7 @@ export const useCallStore = create((set, get) => ({
       });
       set({ localStream: stream, callStatus: "in-call" });
 
-      pc = new RTCPeerConnection(ICE_SERVERS);
+      pc = new RTCPeerConnection(await getIceConfig());
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
@@ -515,6 +533,7 @@ export const useCallStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
     set({ callSubscribed: true });
+    getIceConfig(); // warm the cache so answering/placing a call isn't delayed
 
     socket.on("incomingCall", ({ fromUser, offer, callType }) => {
       // Busy? auto-reject — but first self-heal a genuinely stale state
