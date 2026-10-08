@@ -15,8 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { WaBack } from "../components/icons/WaIcons";
+import SettingsShell, { ToggleRow } from "../components/SettingsShell";
+import { getWallpaper, setWallpaper } from "../lib/uiSettings";
 import { registerPushSubscription, previewCallTone, previewMessageTone, stopTonePreview } from "../lib/notificationSound";
 import {
   isMessageSoundEnabled,
@@ -102,7 +102,7 @@ const NotificationSettings = () => {
   );
 };
 
-const InstallAppControl = () => {
+export const InstallAppControl = () => {
   const { isInstalled, promptInstall } = useInstallPrompt();
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
 
@@ -309,62 +309,61 @@ const SoundSettings = () => {
   );
 };
 
-const SettingsPage = () => {
+export const NotificationsPage = () => (
+  <SettingsShell title="Notifications">
+    <NotificationSettings />
+    <SoundSettings />
+  </SettingsShell>
+);
+
+export const AppearancePage = () => {
   const { theme, setTheme } = useThemeStore();
+  const [wallpaper, setWall] = useState(getWallpaper());
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-[#0B141A] text-[#E9EDEF] overflow-hidden">
-      <div className="flex items-center h-14 pl-1 pr-4 shrink-0">
-        <Link to="/profile" className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
-          <WaBack size={24} />
-        </Link>
-        <h1 className="text-[22px] font-normal pl-3">Settings</h1>
-      </div>
-      <div className="flex-1 overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-8">
-      <div className="container mx-auto px-4 max-w-5xl">
-        <div className="space-y-4 bg-[#111B21] p-3 sm:p-5 rounded-2xl">
-          <NotificationSettings />
-          <SoundSettings />
-          <InstallAppControl />
+    <SettingsShell title="Appearance">
+      <ToggleRow
+        title="Chat wallpaper"
+        sub="Show the doodle pattern behind messages"
+        checked={wallpaper}
+        onChange={(v) => {
+          setWall(v);
+          setWallpaper(v);
+        }}
+      />
 
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold">Theme</h2>
-            <p className="text-sm text-[#8696A0]">Choose a theme for your chat interface</p>
-          </div>
+      <div className="flex flex-col gap-1 pt-2">
+        <h2 className="text-lg font-semibold">Theme</h2>
+        <p className="text-sm text-[#8696A0]">Choose a theme for your chat interface</p>
+      </div>
 
-          {/* Theme Selection */}
-          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
-            {THEMES.map((t) => (
-              <button
-                key={t}
-                className={`
-                  group flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors
-                  ${theme === t ? "ring-2 ring-offset-2 ring-offset-[#111B21] ring-[#25D366]" : "hover:bg-white/5"}
-                `}
-                onClick={() => setTheme(t)}
-                data-theme={t}
-              >
-                <div className="relative h-8 w-full rounded-md overflow-hidden">
-                  <div className="absolute inset-0 grid grid-cols-4 gap-px p-1">
-                    <div className="rounded bg-primary"></div>
-                    <div className="rounded bg-secondary"></div>
-                    <div className="rounded bg-accent"></div>
-                    <div className="rounded bg-neutral"></div>
-                  </div>
-                </div>
-                <span className="text-[11px] font-medium truncate w-full text-center">
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
+        {THEMES.map((t) => (
+          <button
+            key={t}
+            className={`
+              group flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors
+              ${theme === t ? "ring-2 ring-offset-2 ring-offset-[#0B141A] ring-[#25D366]" : "hover:bg-white/5"}
+            `}
+            onClick={() => setTheme(t)}
+            data-theme={t}
+          >
+            <div className="relative h-8 w-full rounded-md overflow-hidden">
+              <div className="absolute inset-0 grid grid-cols-4 gap-px p-1">
+                <div className="rounded bg-primary"></div>
+                <div className="rounded bg-secondary"></div>
+                <div className="rounded bg-accent"></div>
+                <div className="rounded bg-neutral"></div>
+              </div>
+            </div>
+            <span className="text-[11px] font-medium truncate w-full text-center">
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </span>
+          </button>
+        ))}
       </div>
-      </div>
-    </div>
+    </SettingsShell>
   );
 };
 
-export default SettingsPage;
-
-
+export default NotificationsPage;

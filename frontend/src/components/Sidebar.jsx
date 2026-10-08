@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
+import { buzz } from "../lib/uiSettings";
 import {
   WaBack,
   WaKebab,
@@ -151,7 +152,7 @@ const Sidebar = () => {
     clearTimeout(pressTimer.current);
     pressTimer.current = setTimeout(() => {
       longPressed.current = true;
-      navigator.vibrate?.(15);
+      buzz(15);
       addSelected(key);
     }, 450);
   };

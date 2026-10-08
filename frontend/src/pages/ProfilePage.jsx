@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2 } from "lucide-react";
+import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
@@ -46,8 +46,14 @@ const ProfilePage = () => {
   };
 
   const rows = [
-    { icon: Bell, title: "Notifications", sub: "Message, group & call tones", to: "/settings" },
-    { icon: Palette, title: "Appearance", sub: "Chat theme, app theme", to: "/settings" },
+    { icon: KeyRound, title: "Account", sub: "Name, about, email, password", to: "/settings/account" },
+    { icon: Star, title: "Starred messages", sub: "Messages you've saved", to: "/starred" },
+    { icon: MessageSquareText, title: "Chats", sub: "Archive or unarchive all chats", to: "/settings/chats" },
+    { icon: Bell, title: "Notifications", sub: "Message, group & call tones", to: "/settings/notifications" },
+    { icon: Palette, title: "Appearance", sub: "Theme, chat wallpaper", to: "/settings/appearance" },
+    { icon: PieChart, title: "Storage and data", sub: "Cache and stored files", to: "/settings/storage" },
+    { icon: PersonStanding, title: "Accessibility", sub: "Animation, vibration", to: "/settings/accessibility" },
+    { icon: HelpCircle, title: "Help and feedback", sub: "App version, updates, report a problem", to: "/settings/help" },
     { icon: Users, title: "Invite a friend", onClick: share },
   ].filter((r) => !query.trim() || `${r.title} ${r.sub || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -105,7 +111,7 @@ const ProfilePage = () => {
             <button onClick={share} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Share">
               <Share2 size={24} strokeWidth={2.2} />
             </button>
-            <button onClick={() => fileRef.current?.click()} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Edit photo">
+            <button onClick={() => navigate("/settings/account")} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Edit profile">
               <Pencil size={24} strokeWidth={2.2} />
             </button>
           </>
@@ -123,7 +129,13 @@ const ProfilePage = () => {
               className="chat-wallpaper absolute inset-x-0 top-0 h-[300px] opacity-90 pointer-events-none"
               style={{ WebkitMaskImage: "linear-gradient(to bottom, #000 55%, transparent)", maskImage: "linear-gradient(to bottom, #000 55%, transparent)" }}
             />
-            <div className="relative flex flex-col items-center pt-8 pb-6">
+            <div className="relative flex flex-col items-center pt-6 pb-6">
+              {authUser?.about && (
+                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-[#1F2C34] px-5 py-3 text-[16px] text-[#E9EDEF] text-center">
+                  <span className="line-clamp-2 break-words">{authUser.about}</span>
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-3 rotate-45 bg-[#1F2C34]" />
+                </Link>
+              )}
               <button
                 onClick={() => fileRef.current?.click()}
                 className="relative rounded-full active:scale-[.98] transition-transform"

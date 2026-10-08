@@ -114,3 +114,19 @@ export function startVersionWatcher() {
     clearInterval(id);
   };
 }
+
+// Settings → Help: check right now and move to the newest build if there is one.
+export async function checkForUpdateNow() {
+  try {
+    const latest = await latestEntry();
+    const current = currentEntry();
+    if (!latest || !current) return "unknown";
+    if (latest === current) return "latest";
+    window.location.reload();
+    return "updating";
+  } catch {
+    return "unknown";
+  }
+}
+
+export const currentBuildId = () => currentEntry()?.match(/index-([A-Za-z0-9_-]+)\.js/)?.[1] || "dev";

@@ -29,7 +29,7 @@ const MainNav = () => {
   }, [users, groups, archived]);
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
-  const youActive = pathname === "/profile" || pathname === "/settings";
+  const youActive = pathname === "/profile" || pathname === "/starred" || pathname.startsWith("/settings");
 
   // On a phone an open chat takes the whole screen, like WhatsApp.
   const hideOnPhone = hasOpenChat && pathname === "/";

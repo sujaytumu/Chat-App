@@ -64,6 +64,7 @@ const apiLimiter = rateLimit({
 app.use("/api", apiLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
+app.use("/api/auth/change-password", authLimiter);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
