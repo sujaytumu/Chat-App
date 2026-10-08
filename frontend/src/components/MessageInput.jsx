@@ -12,6 +12,7 @@ import {
   Trash2,
   MapPin,
   Smile,
+  Camera,
 } from "lucide-react";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
@@ -40,6 +41,7 @@ const MessageInput = () => {
   const discardRecordingRef = useRef(false);
 
   const photoInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const documentInputRef = useRef(null);
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
@@ -69,7 +71,7 @@ const MessageInput = () => {
     setImagePreview(null);
     setImageFallback(null);
     setFilePreview(null);
-    [photoInputRef, documentInputRef, audioInputRef].forEach((ref) => {
+    [photoInputRef, cameraInputRef, documentInputRef, audioInputRef].forEach((ref) => {
       if (ref.current) ref.current.value = "";
     });
   };
@@ -361,7 +363,7 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
-    <div className="px-2 py-2 sm:px-3 sm:py-2 w-full bg-[#202C33]">
+    <div className="px-2 pt-1.5 pb-2 sm:px-3 w-full bg-[#0B141A] lg:bg-[#111B21] border-t border-white/5">
       {replyingTo && (
         <div className="mb-2 flex items-center gap-2 bg-[#2A3942] rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
@@ -434,9 +436,9 @@ const MessageInput = () => {
         </div>
       )}
 
-      <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+      <form onSubmit={handleSendMessage} className="flex items-end gap-1.5">
         {isRecording ? (
-          <div className="flex-1 flex items-center gap-3 bg-[#2A3942] rounded-lg px-3 py-2 min-h-[38px]">
+          <div className="flex-1 flex items-center gap-3 bg-[#1F2C34] rounded-full px-4 py-2 min-h-[48px]">
             <button
               type="button"
               onClick={() => stopRecording(true)}
@@ -450,10 +452,44 @@ const MessageInput = () => {
             <span className="text-[#8696A0] text-xs ml-auto hidden sm:inline">Recording voice message…</span>
           </div>
         ) : (
-          <>
+          <div className="flex-1 min-w-0 flex items-end gap-0.5 bg-[#1F2C34] rounded-[26px] px-1.5 py-1">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((s) => !s)}
+                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                aria-label="Emoji and stickers"
+              >
+                <Smile size={24} />
+              </button>
+              {showEmojiPicker && (
+                <Suspense fallback={null}>
+                  <EmojiStickerPicker
+                    onEmojiSelect={handleEmojiSelect}
+                    onStickerSelect={handleStickerSelect}
+                    onClose={() => setShowEmojiPicker(false)}
+                  />
+                </Suspense>
+              )}
+            </div>
+
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Message"
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-[22px] max-h-32 min-h-[40px] text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none"
+              style={{ overflow: "hidden" }}
+            />
+
             <div className="relative" ref={attachMenuRef}>
               {showAttachMenu && (
-                <div className="absolute bottom-full left-0 mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
+                <div className="absolute bottom-full right-0 mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
@@ -509,6 +545,14 @@ const MessageInput = () => {
                 ref={photoInputRef}
                 onChange={handlePhotoOrVideoChange}
               />
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                ref={cameraInputRef}
+                onChange={handlePhotoOrVideoChange}
+              />
               <input type="file" className="hidden" ref={documentInputRef} onChange={handleDocumentChange} />
               <input
                 type="file"
@@ -521,74 +565,57 @@ const MessageInput = () => {
               <button
                 type="button"
                 onClick={() => setShowAttachMenu((s) => !s)}
-                className="size-9 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
+                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
                 disabled={isProcessingAttachment}
+                aria-label="Attach"
               >
                 {isProcessingAttachment ? (
-                  <Loader2 size={19} className="animate-spin" />
+                  <Loader2 size={20} className="animate-spin" />
                 ) : (
-                  <Paperclip size={20} className="rotate-45" />
+                  <Paperclip size={22} className="rotate-45" />
                 )}
               </button>
             </div>
 
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={text}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message"
-              spellCheck={false}
-              autoComplete="off"
-              autoCorrect="off"
-              className="flex-1 resize-none rounded-lg bg-[#2A3942] px-3 py-2 text-[15px] leading-[20px] max-h-32 min-h-[38px] text-[#D1D7DB] placeholder:text-[#8696A0] focus:outline-none"
-              style={{ overflow: "hidden" }}
-            />
-
-            <div className="relative">
+            {!text.trim() && !hasAttachment && (
               <button
                 type="button"
-                onClick={() => setShowEmojiPicker((s) => !s)}
-                className="size-9 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 transition-colors shrink-0"
+                onClick={() => cameraInputRef.current?.click()}
+                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                disabled={isProcessingAttachment}
+                aria-label="Take a photo"
+                title="Camera"
               >
-                <Smile size={21} />
+                <Camera size={22} />
               </button>
-              {showEmojiPicker && (
-                <Suspense fallback={null}>
-                  <EmojiStickerPicker
-                    onEmojiSelect={handleEmojiSelect}
-                    onStickerSelect={handleStickerSelect}
-                    onClose={() => setShowEmojiPicker(false)}
-                  />
-                </Suspense>
-              )}
-            </div>
-          </>
+            )}
+          </div>
         )}
 
         {!isRecording && (text.trim() || hasAttachment) ? (
           <button
             type="submit"
-            className="size-9 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
+            className="size-12 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all shadow-md shadow-black/30"
             disabled={isSending}
+            aria-label="Send"
           >
-            {isSending ? <Loader2 size={18} className="animate-spin" /> : <WhatsAppSendIcon size={16} className="ml-0.5" />}
+            {isSending ? <Loader2 size={20} className="animate-spin" /> : <WhatsAppSendIcon size={20} className="ml-0.5" />}
           </button>
         ) : (
           <button
             type="button"
             onClick={isRecording ? () => stopRecording(false) : startRecording}
-            className="size-9 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white shrink-0 transition-colors"
+            className="size-12 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all shadow-md shadow-black/30"
             disabled={isSending}
+            aria-label={isRecording ? "Send voice message" : "Record voice message"}
             title={isRecording ? "Send voice message" : "Record voice message"}
           >
             {isSending ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2 size={20} className="animate-spin" />
             ) : isRecording ? (
-              <WhatsAppSendIcon size={16} className="ml-0.5" />
+              <WhatsAppSendIcon size={20} className="ml-0.5" />
             ) : (
-              <Mic size={18} />
+              <Mic size={24} />
             )}
           </button>
         )}

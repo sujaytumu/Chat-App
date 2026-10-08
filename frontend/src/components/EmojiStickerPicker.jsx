@@ -45,7 +45,7 @@ const EmojiStickerPicker = ({ onEmojiSelect, onStickerSelect, onClose }) => {
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-full right-0 mb-2 bg-[#233138] rounded-xl shadow-2xl z-20 overflow-hidden w-[320px]"
+      className="absolute bottom-full left-0 mb-2 bg-[#233138] rounded-xl shadow-2xl z-20 overflow-hidden w-[320px] max-w-[calc(100vw-1rem)]"
     >
       <div className="flex border-b border-white/10">
         <button
