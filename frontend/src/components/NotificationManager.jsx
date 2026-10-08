@@ -26,10 +26,23 @@ const NotificationManager = () => {
     loadCustomTone("call");
     loadCustomTone("message");
 
+    // Runs on every tap (some browsers only show the permission prompt after a
+    // real gesture), so it MUST be cheap: once subscribed — or once the person
+    // has said no — taps do nothing. (It used to fire 2 network calls on every
+    // single click/touch, which made the app feel laggy.)
+    let subscribed = false;
+    let busy = false;
     const trySubscribe = async () => {
-      const result = await requestNotificationPermission();
-      if (result === "granted") {
-        await registerPushSubscription(axiosInstance);
+      if (subscribed || busy) return;
+      if (typeof Notification !== "undefined" && Notification.permission === "denied") return;
+      busy = true;
+      try {
+        const result = await requestNotificationPermission();
+        if (result === "granted") {
+          subscribed = await registerPushSubscription(axiosInstance);
+        }
+      } finally {
+        busy = false;
       }
     };
     trySubscribe();
