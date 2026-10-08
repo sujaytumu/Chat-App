@@ -1,4 +1,5 @@
 import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
 import http from "http";
 import express from "express";
 import Group from "../models/group.model.js";
@@ -70,8 +71,31 @@ export function getReceiverSocketId(userId) {
   return roomFor(userId);
 }
 
+// Who is connecting is decided by the signed login cookie — never by anything
+// the browser claims. (It used to trust ?userId=..., so anyone could connect as
+// someone else: read their calls/typing, make calls "from" them, etc.)
+io.use(async (socket, next) => {
+  try {
+    const raw = socket.handshake.headers.cookie || "";
+    const pair = raw
+      .split(";")
+      .map((c) => c.trim())
+      .find((c) => c.startsWith("jwt="));
+    if (!pair) return next(new Error("unauthorized"));
+    const decoded = jwt.verify(decodeURIComponent(pair.slice(4)), process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId).select("fullName profilePic").lean();
+    if (!user) return next(new Error("unauthorized"));
+    socket.data.userId = String(user._id);
+    // Trusted identity shown to the other side of a call
+    socket.data.profile = { _id: String(user._id), fullName: user.fullName, profilePic: user.profilePic };
+    next();
+  } catch {
+    next(new Error("unauthorized"));
+  }
+});
+
 io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId;
+  const userId = socket.data.userId;
 
   if (userId) {
     if (!userSockets.has(userId)) userSockets.set(userId, new Set());
@@ -98,15 +122,18 @@ io.on("connection", (socket) => {
 
   // ---- Typing indicators (group) ----
   socket.on("groupTyping", ({ groupId }) => {
+    if (!socket.rooms.has(String(groupId))) return;
     socket.to(groupId).emit("groupTyping", { fromUserId: userId, groupId });
   });
 
   socket.on("groupStopTyping", ({ groupId }) => {
+    if (!socket.rooms.has(String(groupId))) return;
     socket.to(groupId).emit("groupStopTyping", { fromUserId: userId, groupId });
   });
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
-  socket.on("callUser", async ({ toUserId, offer, callType, fromUser }, ack) => {
+  socket.on("callUser", async ({ toUserId, offer, callType }, ack) => {
+    const fromUser = socket.data.profile; // never trust a client-supplied caller identity
     // Never make signaling wait on the database — a slow/cold MongoDB used to
     // delay the ack past the client's timeout, which triggered duplicate
     // "callUser" retries and double-ringing / auto-reject on the callee.
