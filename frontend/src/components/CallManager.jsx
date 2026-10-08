@@ -120,6 +120,7 @@ const CallManager = () => {
     callStartedAt,
     isReconnecting,
     remoteMuted,
+    remoteScreenSharing,
     acceptCall,
     rejectCall,
     endCall,
@@ -289,6 +290,11 @@ const CallManager = () => {
           <p className="text-xs text-white/60 flex items-center justify-center gap-1">
             <Lock size={10} /> End-to-end encrypted
           </p>
+          {isScreenSharing && (
+            <p className="text-xs text-[#00A884] flex items-center justify-center gap-1 mt-0.5">
+              <UploadCloud size={11} /> You're sharing your screen
+            </p>
+          )}
           {remoteMuted && callStatus === "in-call" && (
             <p className="text-xs text-amber-300 flex items-center justify-center gap-1 mt-0.5">
               <MicOff size={11} /> {remoteUser?.fullName?.split(" ")[0] || "They"} muted their mic
@@ -305,7 +311,19 @@ const CallManager = () => {
 
       {isVideo ? (
         <div className="relative flex-1 bg-black">
-          <video id="call-remote-video" ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <video
+            id="call-remote-video"
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            // A shared screen must not be cropped like a camera feed is.
+            className={`w-full h-full ${remoteScreenSharing ? "object-contain bg-black" : "object-cover"}`}
+          />
+          {remoteScreenSharing && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
+              <UploadCloud size={12} /> {remoteUser?.fullName?.split(" ")[0] || "They"} is sharing their screen
+            </div>
+          )}
           {!remoteStream && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
               <div className="relative mb-4">
