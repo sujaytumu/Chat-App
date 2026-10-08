@@ -118,6 +118,7 @@ const CallManager = () => {
     isScreenSharing,
     isSpeakerOn,
     callStartedAt,
+    isReconnecting,
     acceptCall,
     rejectCall,
     endCall,
@@ -231,7 +232,13 @@ const CallManager = () => {
         <CallAvatar user={remoteUser} size="size-8" />
         <span className="text-white text-sm font-medium">{remoteUser?.fullName}</span>
         <span className="text-[#00A884] text-xs">
-          {callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : callDuration || "In call"}
+          {callStatus === "calling"
+            ? isRemoteRinging
+              ? "Ringing…"
+              : "Calling…"
+            : isReconnecting
+              ? "Reconnecting…"
+              : callDuration || "In call"}
         </span>
       </button>
       </>
@@ -245,7 +252,9 @@ const CallManager = () => {
       ? isRemoteRinging
         ? "Ringing…"
         : "Calling…"
-      : callDuration || (isVideo ? "Video call" : "Voice call");
+      : isReconnecting
+        ? "Reconnecting…"
+        : callDuration || (isVideo ? "Video call" : "Voice call");
 
   return (
     <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col">
@@ -258,6 +267,12 @@ const CallManager = () => {
         >
           🔇 Tap to enable audio
         </button>
+      )}
+
+      {isReconnecting && callStatus === "in-call" && (
+        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-20 bg-amber-500 text-black text-sm font-medium px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+          <span className="size-2 rounded-full bg-black animate-pulse" /> Reconnecting…
+        </div>
       )}
 
       {/* Top bar: minimize / name + encrypted / add participant */}
