@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, Forward, Info } from "lucide-react";
+import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, Forward, Info, Languages } from "lucide-react";
 import toast from "react-hot-toast";
 
 // Hover trigger + dropdown for per-message actions, matching WhatsApp's
 // long-press/hover message menu.
-const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo }) => {
+const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo, onTranslate }) => {
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const menuRef = useRef(null);
@@ -70,6 +70,18 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 >
                   <Copy size={16} />
                   Copy
+                </button>
+              )}
+              {onTranslate && (
+                <button
+                  onClick={() => {
+                    onTranslate();
+                    close();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                >
+                  <Languages size={16} />
+                  Translate
                 </button>
               )}
               <button

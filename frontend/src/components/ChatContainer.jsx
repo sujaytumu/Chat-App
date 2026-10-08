@@ -15,6 +15,12 @@ import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/uti
 import { translateAndToast } from "../lib/translate";
 import { Pin, X } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
+import Avatar from "./Avatar";
+
+// WhatsApp tints each person's name in a group differently.
+const SENDER_COLORS = ["#25D366", "#53BDEB", "#E8A33D", "#B794F6", "#F472B6", "#A3E635"];
+const colorForId = (id = "") =>
+  SENDER_COLORS[[...String(id)].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % SENDER_COLORS.length];
 
 const ChatContainer = () => {
   const {
@@ -97,7 +103,7 @@ const ChatContainer = () => {
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
+      <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper">
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -106,13 +112,13 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-[#0B141A]">
+    <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0">
       <ChatHeader />
 
       {pinnedMessage && (
         <button
           onClick={scrollToPinned}
-          className="flex items-center gap-2 px-4 py-2 bg-[#202C33] border-b border-black/30 text-left hover:bg-[#26333c] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#1F2C34] border-b border-white/5 text-left hover:bg-[#26333c] transition-colors"
         >
           <Pin size={14} className="text-[#00A884] shrink-0" />
           <div className="min-w-0 flex-1">
@@ -135,22 +141,27 @@ const ChatContainer = () => {
         </button>
       )}
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-3 sm:px-[6%] lg:px-[8%] py-3">
         {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
           const location = message.text ? parseLocationMessage(message.text) : null;
           const isSticker =
             !message.image && !message.file && !location && isStickerMessage(message.text);
+          const replyFromMe = message.replyTo?.senderId === authUser._id;
           const replySender = message.replyTo
             ? isGroup
               ? membersById[message.replyTo.senderId]
-              : message.replyTo.senderId === authUser._id
+              : replyFromMe
               ? authUser
               : data
             : null;
-          const showDateDivider =
-            index === 0 || isDifferentDay(messages[index - 1].createdAt, message.createdAt);
+          const prev = messages[index - 1];
+          const showDateDivider = index === 0 || isDifferentDay(prev.createdAt, message.createdAt);
+          // The first bubble of a run from the same person gets a tail and a
+          // little extra space above it, like WhatsApp.
+          const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
+          const hasText = !!message.text && !location;
 
           const menuProps = {
             message,
@@ -163,76 +174,85 @@ const ChatContainer = () => {
             onToggleStar: () => toggleStarMessage(message._id),
             onForward: () => setForwardingMessage(message),
             onInfo: () => setInfoMessage(message),
+            onTranslate: hasText ? () => translateAndToast(message.text) : undefined,
           };
 
           return (
-            <div key={message._id}>
+            <div key={message._id} className={isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}>
             {showDateDivider && (
               <div className="flex justify-center my-3">
-                <span className="bg-[#182229] text-[#8696A0] text-xs px-3 py-1 rounded-lg shadow-sm">
+                <span className="bg-[#1F2C34]/95 text-[#8696A0] text-[12.5px] px-3 py-1 rounded-lg shadow-sm">
                   {formatDateDivider(message.createdAt)}
                 </span>
               </div>
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`flex items-end gap-0 group ${isMe ? "justify-end" : "justify-start"}`}
+              className={`flex items-end group ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
               onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
             >
-              {!isMe && (
-                <div className="w-8 h-8 rounded-full overflow-hidden mr-2 shrink-0">
-                  <img
-                    src={sender?.profilePic || "/avatar.png"}
-                    alt="profile pic"
-                    className="w-full h-full object-cover"
+              {isGroup && !isMe &&
+                (isFirstInGroup ? (
+                  <Avatar
+                    src={sender?.profilePic}
+                    name={sender?.fullName}
+                    size="size-7"
+                    textSize="text-xs"
+                    className="mr-3 mb-0.5"
                   />
-                </div>
-              )}
+                ) : (
+                  <div className="w-7 mr-3 shrink-0" />
+                ))}
 
               {isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
 
               {message.deletedForEveryone ? (
                 <div
-                  className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg italic text-[#8696A0] text-[14.2px] flex items-center gap-1.5 ${
-                    isMe ? "bg-[#005C4B]/40 rounded-br-none" : "bg-[#202C33]/60 rounded-bl-none"
-                  }`}
+                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-2xl italic text-[#8696A0] text-[14.5px] flex items-center gap-1.5 ${
+                    isMe ? "bg-[#144D37]/70" : "bg-[#1F2C34]/80"
+                  } ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                 >
                   🚫 This message was deleted
                 </div>
               ) : isSticker ? (
                 <div className="flex flex-col items-center px-1">
                   <span className="text-6xl leading-none">{message.text.trim()}</span>
-                  <span className="text-[10px] text-[#8696A0] mt-1 flex items-center gap-1">
+                  <span className="text-[11px] text-[#8696A0] mt-1 flex items-center gap-1">
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
                   </span>
                 </div>
               ) : (
                 <div
-                  className={`max-w-[70%] sm:max-w-[55%] px-2.5 py-1.5 rounded-lg break-words shadow-sm flex flex-col ${
-                    isMe ? "bg-[#005C4B] text-[#E9EDEF] rounded-br-none" : "bg-[#202C33] text-[#E9EDEF] rounded-bl-none"
+                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[60%] px-2.5 pt-1.5 pb-1.5 rounded-2xl break-words shadow-sm flex flex-col text-[#E9EDEF] ${
+                    isMe ? "bg-[#144D37]" : "bg-[#1F2C34]"
+                  } ${
+                    isFirstInGroup ? (isMe ? "rounded-tr-none bubble-tail-out" : "rounded-tl-none bubble-tail-in") : ""
                   }`}
                 >
-                  {isGroup && !isMe && (
-                    <span className="text-xs font-semibold text-[#00A884] mb-0.5">
+                  {isGroup && !isMe && isFirstInGroup && (
+                    <span
+                      className="text-[13px] font-medium mb-0.5"
+                      style={{ color: colorForId(message.senderId) }}
+                    >
                       {sender?.fullName || "Unknown"}
                     </span>
                   )}
                   {message.pinned && (
-                    <span className="flex items-center gap-1 text-[10px] mb-0.5 text-[#8696A0]">
+                    <span className="flex items-center gap-1 text-[11px] mb-0.5 text-[#8696A0]">
                       <Pin size={10} /> Pinned
                     </span>
                   )}
                   {message.replyTo && (
                     <button
                       onClick={() => scrollToMessage(message.replyTo._id)}
-                      className="flex flex-col items-start text-left mb-1 px-2 py-1 rounded bg-black/20 border-l-2 border-[#00A884] max-w-full"
+                      className="flex flex-col items-start text-left w-full mb-1.5 pl-2.5 pr-2 py-1.5 rounded-lg bg-black/25 border-l-4 border-[#25D366]"
                     >
-                      <span className="text-xs font-medium text-[#00A884]">
-                        {replySender?.fullName || "Message"}
+                      <span className="text-[13px] font-medium text-[#25D366]">
+                        {replyFromMe ? "You" : replySender?.fullName || "Message"}
                       </span>
-                      <span className="text-xs text-[#8696A0] truncate max-w-[220px]">
+                      <span className="text-[13.5px] text-[#AEBAC1] line-clamp-2 break-all">
                         {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.text}
                       </span>
                     </button>
@@ -243,7 +263,7 @@ const ChatContainer = () => {
                       alt="Attachment"
                       onLoad={handleMediaLoaded}
                       onClick={() => setLightboxSrc(message.image)}
-                      className="max-w-[260px] max-h-[320px] w-auto h-auto object-cover rounded-md mb-1 cursor-pointer hover:opacity-90 transition-opacity"
+                      className="max-w-full w-[260px] max-h-[320px] h-auto object-cover rounded-lg mb-1 cursor-pointer hover:opacity-90 transition-opacity"
                     />
                   )}
                   {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
@@ -251,20 +271,21 @@ const ChatContainer = () => {
                     <LocationCard location={location} />
                   ) : (
                     message.text && (
-                      <span className="text-[14.2px] leading-[19px]" style={{ whiteSpace: "pre-wrap" }}>
+                      <span className="text-[15px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
                         {message.text}
+                        {/* reserves room so the last line never runs under the time */}
+                        <span
+                          aria-hidden="true"
+                          className={`inline-block ${isMe ? "w-[66px]" : "w-[44px]"}`}
+                        />
                       </span>
                     )
                   )}
-                  {message.text && !location && (
-                    <button
-                      onClick={() => translateAndToast(message.text)}
-                      className="self-start text-[11px] text-[#53BDEB] mt-0.5 hover:underline"
-                    >
-                      Translate
-                    </button>
-                  )}
-                  <span className="self-end mt-0.5 text-[10px] leading-none flex items-center gap-1 whitespace-nowrap text-[#8696A0]">
+                  <span
+                    className={`${
+                      hasText ? "absolute bottom-1 right-2" : "self-end mt-0.5"
+                    } text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-[#E9EDEF]/60`}
+                  >
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
                     {isMe && isGroup && message.seenBy?.length > 1 && <span className="text-[#53BDEB]">✓✓</span>}
@@ -273,26 +294,16 @@ const ChatContainer = () => {
               )}
 
               {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
-
-              {isMe && (
-                <div className="w-8 h-8 rounded-full overflow-hidden ml-2 shrink-0">
-                  <img
-                    src={authUser.profilePic || "/avatar.png"}
-                    alt="profile pic"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
             </div>
             </div>
           );
         })}
 
         {isOtherTyping && (
-          <div className="flex items-center gap-1 px-2">
-            <span className="size-2 rounded-full bg-zinc-400 animate-bounce [animation-delay:-0.3s]" />
-            <span className="size-2 rounded-full bg-zinc-400 animate-bounce [animation-delay:-0.15s]" />
-            <span className="size-2 rounded-full bg-zinc-400 animate-bounce" />
+          <div className="mt-2 inline-flex items-center gap-1 px-3.5 py-3 rounded-2xl rounded-tl-none bg-[#1F2C34]">
+            <span className="size-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:-0.3s]" />
+            <span className="size-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:-0.15s]" />
+            <span className="size-2 rounded-full bg-[#8696A0] animate-bounce" />
           </div>
         )}
         <div ref={messageEndRef} />

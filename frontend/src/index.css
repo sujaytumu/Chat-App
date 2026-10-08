@@ -15,3 +15,29 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Dark chat wallpaper: a faint tiled doodle pattern over the base colour. */
+.chat-wallpaper {
+  background-color: #0B141A;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='%23ffffff' stroke-opacity='0.055' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='30' cy='32' r='9'/%3E%3Cpolygon points='122,16 126,26 137,27 129,34 131,45 122,39 113,45 115,34 107,27 118,26' transform='rotate(12 122 30)'/%3E%3Cpath d='M208 52c-12-9-18-17-12-24 5-6 12-3 12 3 0-6 7-9 12-3 6 7 0 15-12 24z'/%3E%3Crect x='38' y='100' width='26' height='22' rx='6' transform='rotate(-14 51 111)'/%3E%3Cpath d='M112 116q8-14 16 0t16 0t16 0'/%3E%3Cpath d='M190 98h34a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-20l-10 9v-9h-4a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8z'/%3E%3Cpath d='M30 186v18M21 195h18'/%3E%3Cpath d='M118 178a16 16 0 1 0 14 24a13 13 0 0 1-14-24z'/%3E%3Cpath d='M186 214l12-20l12 20z' transform='rotate(8 198 205)'/%3E%3Cpath d='M236 170v26a7 7 0 1 1-4-6v-18l14-4v18' transform='scale(.9) translate(26 14)'/%3E%3Ccircle cx='84' cy='60' r='2'/%3E%3Ccircle cx='160' cy='150' r='2'/%3E%3Ccircle cx='70' cy='236' r='2'/%3E%3Ccircle cx='232' cy='88' r='2'/%3E%3Cpath d='M150 232c6-10 14-10 20 0'/%3E%3C/svg%3E");
+  background-size: 260px 260px;
+}
+
+/* Message bubble "tails" — only drawn on the first bubble of a run. */
+.bubble-tail-out::before,
+.bubble-tail-in::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 14px;
+  background: inherit;
+}
+.bubble-tail-out::before {
+  right: -8px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.bubble-tail-in::before {
+  left: -8px;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
