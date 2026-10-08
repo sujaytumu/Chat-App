@@ -26,8 +26,19 @@ const io = new Server(server, {
   pingTimeout: 8000,
 });
 
-// Used to store online users: { userId: socketId }
-const userSocketMap = {};
+// Online presence: a user can have several live sockets at once (a second tab,
+// a phone + laptop, or an old socket that hasn't timed out yet while the new
+// one has already reconnected). The old code kept ONE socket id per user and
+// deleted it on ANY disconnect — so a reload/reconnect made an online user look
+// offline: messages stayed single-tick, calls showed "Calling…" forever, and
+// answer / ICE messages were dropped. Now a user is online while at least one
+// socket is connected, and every targeted emit goes to the user's personal room
+// (each socket joins room === userId) so all their devices get it.
+const userSockets = new Map(); // userId -> Set<socketId>
+const isOnline = (id) => (userSockets.get(id)?.size || 0) > 0;
+const onlineIds = () => [...userSockets.keys()];
+const roomFor = (id) => (isOnline(id) ? id : undefined);
+const DISCONNECT_CALL_GRACE_MS = 8000;
 
 // Calls placed to someone who isn't currently connected are held here for a
 // short grace period. If they open the app (e.g. from the missed-call push
@@ -41,30 +52,34 @@ const CALL_GRACE_PERIOD_MS = 45_000;
 const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
 const pairKey = (a, b) => [a, b].sort().join("_");
 
+// Returns the user's personal room name when they're online (truthy), else
+// undefined. Callers do io.to(<return value>).emit(...), which reaches every
+// socket the user has open.
 export function getReceiverSocketId(userId) {
-  return userSocketMap[userId];
+  return roomFor(userId);
 }
 
 io.on("connection", (socket) => {
   const userId = socket.handshake.query.userId;
 
   if (userId) {
-    userSocketMap[userId] = socket.id;
-    socket.join(userId); // personal room, handy for future targeted broadcasts
+    if (!userSockets.has(userId)) userSockets.set(userId, new Set());
+    userSockets.get(userId).add(socket.id);
+    socket.join(userId); // personal room — all of this user's devices
   }
 
-  io.emit("getOnlineUsers", Object.keys(userSocketMap));
+  io.emit("getOnlineUsers", onlineIds());
 
   // ---- Typing indicators (1:1) ----
   socket.on("typing", ({ toUserId }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("typing", { fromUserId: userId });
     }
   });
 
   socket.on("stopTyping", ({ toUserId }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("stopTyping", { fromUserId: userId });
     }
@@ -98,7 +113,7 @@ io.on("connection", (socket) => {
       });
     void logPromise;
 
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
       if (typeof ack === "function") ack({ delivered: true });
@@ -152,7 +167,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("answerCall", ({ toUserId, answer }, ack) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    socket.to(userId).emit("callEnded"); // stop ringing on my other devices
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callAnswered", { answer });
       if (typeof ack === "function") ack({ delivered: true });
@@ -170,14 +186,14 @@ io.on("connection", (socket) => {
   // "Calling…" to "Ringing…", mirroring the sent → delivered distinction
   // used for message ticks.
   socket.on("callRingingAck", ({ toUserId }) => {
-    const callerSocketId = userSocketMap[toUserId];
+    const callerSocketId = roomFor(toUserId);
     if (callerSocketId) {
       io.to(callerSocketId).emit("remoteDeviceRinging");
     }
   });
 
   socket.on("iceCandidate", ({ toUserId, candidate }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("iceCandidate", { candidate });
     }
@@ -187,21 +203,22 @@ io.on("connection", (socket) => {
   // a video track requires a fresh offer/answer exchange on the same
   // already-connected peer connection).
   socket.on("webrtcRenegotiate", ({ toUserId, offer }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("webrtcRenegotiateOffer", { offer });
     }
   });
 
   socket.on("webrtcRenegotiateAnswer", ({ toUserId, answer }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("webrtcRenegotiateAnswer", { answer });
     }
   });
 
   socket.on("rejectCall", ({ toUserId }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    socket.to(userId).emit("callEnded"); // stop ringing on my other devices
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callRejected");
     }
@@ -214,7 +231,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("endCall", async ({ toUserId }) => {
-    const receiverSocketId = userSocketMap[toUserId];
+    const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callEnded");
     }
@@ -241,36 +258,45 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    delete userSocketMap[userId];
-    io.emit("getOnlineUsers", Object.keys(userSocketMap));
+    if (!userId) return;
 
-    // If this user drops (tab closed, network died, phone locked hard)
-    // while a call involving them is active or ringing, the other side
-    // would otherwise never find out and could ring indefinitely — there's
-    // no clean "endCall" to catch this, since the disconnect itself is the
-    // only signal we get. Sweep both places calls are tracked and notify
-    // whoever's on the other end.
-    for (const [key, logId] of activeCallLogs.entries()) {
-      const [a, b] = key.split("_");
-      if (a !== userId && b !== userId) continue;
-      const otherId = a === userId ? b : a;
-      const otherSocketId = userSocketMap[otherId];
-      if (otherSocketId) {
-        io.to(otherSocketId).emit("callEnded");
-      }
-      CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
-      activeCallLogs.delete(key);
-    }
+    const sockets = userSockets.get(userId);
+    sockets?.delete(socket.id);
+    if (!sockets || sockets.size === 0) userSockets.delete(userId);
+    io.emit("getOnlineUsers", onlineIds());
 
-    // Also clear any call this user placed that's still waiting in the
-    // offline-callee grace period, so it doesn't get delivered to a caller
-    // who's no longer there to receive the answer.
-    for (const [toUserId, pending] of pendingCalls.entries()) {
-      if (pending.fromUserId === userId) {
-        clearTimeout(pending.timeout);
-        pendingCalls.delete(toUserId);
+    // The user still has another live socket (reload, second tab, quick
+    // reconnect) — they're not gone, so don't tear anything down.
+    if (isOnline(userId)) return;
+
+    // If this user stays gone (tab closed, network died) while a call
+    // involving them is active or ringing, the other side would otherwise
+    // never find out. Wait a short grace period first so a brief network blip
+    // or reconnect doesn't kill a perfectly good call.
+    setTimeout(() => {
+      if (isOnline(userId)) return; // they came back
+
+      for (const [key, logId] of activeCallLogs.entries()) {
+        const [a, b] = key.split("_");
+        if (a !== userId && b !== userId) continue;
+        const otherId = a === userId ? b : a;
+        const otherRoom = roomFor(otherId);
+        if (otherRoom) {
+          io.to(otherRoom).emit("callEnded");
+        }
+        CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+        activeCallLogs.delete(key);
       }
-    }
+
+      // Also clear any call this user placed that's still waiting in the
+      // offline-callee grace period.
+      for (const [toUserId, pending] of pendingCalls.entries()) {
+        if (pending.fromUserId === userId) {
+          clearTimeout(pending.timeout);
+          pendingCalls.delete(toUserId);
+        }
+      }
+    }, DISCONNECT_CALL_GRACE_MS);
   });
 
   // ---- Everything below is background setup that does NOT need to block
@@ -306,7 +332,7 @@ io.on("connection", (socket) => {
           );
           const senderIds = [...new Set(undelivered.map((m) => m.senderId.toString()))];
           senderIds.forEach((senderId) => {
-            const senderSocketId = userSocketMap[senderId];
+            const senderSocketId = roomFor(senderId);
             if (senderSocketId) {
               io.to(senderSocketId).emit("messagesDelivered", { by: userId });
             }
