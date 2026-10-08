@@ -82,6 +82,33 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Archive / unarchive a chat for this account (synced across devices by the
+  // server). Updates the list optimistically and rolls back if the call fails.
+  setChatArchived: async (chat, archived) => {
+    const key = `${chat.type === "group" ? "g" : "d"}:${chat.data._id}`;
+    const authUser = useAuthStore.getState().authUser;
+    if (!authUser) return;
+    const prev = authUser.archivedChats || [];
+    const next = archived ? [...new Set([...prev, key])] : prev.filter((k) => k !== key);
+    useAuthStore.setState({ authUser: { ...authUser, archivedChats: next } });
+    try {
+      const res = await axiosInstance.put("/messages/archive", {
+        chatType: chat.type,
+        chatId: chat.data._id,
+        archived,
+      });
+      useAuthStore.setState((st) => ({
+        authUser: st.authUser ? { ...st.authUser, archivedChats: res.data.archivedChats } : st.authUser,
+      }));
+      toast(archived ? "Chat archived" : "Chat unarchived", { icon: archived ? "🗄️" : "📤" });
+    } catch (error) {
+      useAuthStore.setState((st) => ({
+        authUser: st.authUser ? { ...st.authUser, archivedChats: prev } : st.authUser,
+      }));
+      toast.error(error.response?.data?.error || "Couldn't update archive");
+    }
+  },
+
   setSelectedChat: (chat) => {
     set({ selectedChat: chat, messages: [] });
     if (!chat) return;
@@ -468,6 +495,11 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
+    // Archive list changed on another device (or this one) — keep in sync.
+    socket.on("archivedChats", (archivedChats) => {
+      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, archivedChats } } : {}));
+    });
+
     socket.on("groupCreated", (group) => {
       set((state) => {
         if (state.groups.some((g) => g._id === group._id)) return {};
@@ -516,6 +548,7 @@ export const useChatStore = create((set, get) => ({
       "groupCreated",
       "groupUpdated",
       "removedFromGroup",
+      "archivedChats",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });
   },
