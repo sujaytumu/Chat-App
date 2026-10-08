@@ -1,11 +1,5 @@
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
-import SignUpPage from "./pages/SignUpPage";
-import LoginPage from "./pages/LoginPage";//login
-import SettingsPage from "./pages/SettingsPage";//settings page
-import ProfilePage from "./pages/ProfilePage";
-import CallsPage from "./pages/CallsPage";
-import StatusPage from "./pages/StatusPage";
 import MainLayout from "./components/MainLayout";
 import NotificationManager from "./components/NotificationManager";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -14,11 +8,35 @@ import CallManager from "./components/CallManager"; // NOT lazy: calls must be r
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { startVersionWatcher } from "./lib/versionCheck";
 
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
+
+// Secondary screens load on demand so the chat screen (what people open the
+// app for) downloads and starts faster. They're prefetched once the app is
+// idle (below), so switching tabs is still instant.
+const loaders = {
+  SignUpPage: () => import("./pages/SignUpPage"),
+  LoginPage: () => import("./pages/LoginPage"),
+  SettingsPage: () => import("./pages/SettingsPage"),
+  ProfilePage: () => import("./pages/ProfilePage"),
+  CallsPage: () => import("./pages/CallsPage"),
+  StatusPage: () => import("./pages/StatusPage"),
+};
+const SignUpPage = lazy(loaders.SignUpPage);
+const LoginPage = lazy(loaders.LoginPage);
+const SettingsPage = lazy(loaders.SettingsPage);
+const ProfilePage = lazy(loaders.ProfilePage);
+const CallsPage = lazy(loaders.CallsPage);
+const StatusPage = lazy(loaders.StatusPage);
+
+const RouteFallback = () => (
+  <div className="flex items-center justify-center h-[60dvh]">
+    <Loader className="size-8 animate-spin text-[#25D366]" />
+  </div>
+);
 
 const App = () => {
   const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
@@ -29,6 +47,14 @@ const App = () => {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Warm the other screens' code in the background once the app is idle.
+  useEffect(() => {
+    if (!authUser) return;
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+    const id = idle(() => Object.values(loaders).forEach((load) => load().catch(() => {})));
+    return () => (window.cancelIdleCallback || clearTimeout)(id);
+  }, [authUser]);
 
   // Move to the newest build whenever a newer one is deployed (no stale UI).
   useEffect(() => startVersionWatcher(), []);
@@ -59,6 +85,7 @@ const App = () => {
       {/* Main routes */}
       <main className="flex-1">
         <ErrorBoundary key={location.pathname}>
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route
             path="/"
@@ -110,6 +137,7 @@ const App = () => {
             element={authUser ? <ProfilePage /> : <Navigate to="/login" />}
           />
         </Routes>
+        </Suspense>
         </ErrorBoundary>
       </main>
 
