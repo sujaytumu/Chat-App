@@ -1,4 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
+import { useBackToClose } from "../lib/useBackToClose";
 import { useEffect, useRef, useState, useMemo } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
@@ -44,6 +45,8 @@ const ChatContainer = () => {
     isFetchingMessages,
   } = useChatStore();
   const { authUser } = useAuthStore();
+  // Phone Back closes the in-chat search bar first (before leaving the chat).
+  useBackToClose(chatSearchOpen, () => useChatStore.getState().setChatSearchOpen(false));
   const messageEndRef = useRef(null);
   const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
