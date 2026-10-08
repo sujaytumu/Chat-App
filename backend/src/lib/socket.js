@@ -126,6 +126,7 @@ io.on("connection", (socket) => {
         title: `${fromUser?.fullName || "Someone"} is calling…`,
         body: callType === "video" ? "Incoming video call" : "Incoming voice call",
         icon: fromUser?.profilePic || "/icon-v2-192.png",
+        isCall: true,
         tag: `incoming-call-${userId}`,
         data: { url: "/", chatType: "direct", chatId: userId },
       });
@@ -141,6 +142,7 @@ io.on("connection", (socket) => {
       title: fromUser?.fullName || "Someone",
       body: `Incoming ${callType === "video" ? "video" : "voice"} call`,
       icon: fromUser?.profilePic || "/icon-v2-192.png",
+      isCall: true,
       tag: `call-${userId}`,
       data: { url: "/", chatType: "direct", chatId: userId },
     });

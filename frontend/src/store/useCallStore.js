@@ -2,7 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { playRingtone, primeAudio } from "../lib/notificationSound";
+import { playRingtone, primeAudio, stopVibration } from "../lib/notificationSound";
 
 // STUN alone frequently fails to establish a working media path on mobile
 // carrier networks (symmetric NAT / CGNAT is extremely common on VoLTE/5G),
@@ -419,6 +419,7 @@ export const useCallStore = create((set, get) => ({
       clearInterval(ringtoneInterval);
       ringtoneInterval = null;
     }
+    stopVibration();
   },
 
   resetCall: () => {
