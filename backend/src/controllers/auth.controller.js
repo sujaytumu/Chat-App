@@ -100,23 +100,70 @@ export const logout = (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { profilePic } = req.body;
+    const { profilePic, fullName, about } = req.body;
     const userId = req.user._id;
+    const update = {};
 
-    if (!profilePic) {
-      return res.status(400).json({ message: "Profile pic is required" });
+    if (fullName !== undefined) {
+      if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length > 50) {
+        return res.status(400).json({ message: "Name must be 1-50 characters" });
+      }
+      update.fullName = fullName.trim();
     }
 
-    const uploadResponse = await cloudinary.uploader.upload(profilePic);
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { profilePic: uploadResponse.secure_url },
-      { new: true }
+    if (about !== undefined) {
+      if (typeof about !== "string" || about.trim().length > 139) {
+        return res.status(400).json({ message: "About must be at most 139 characters" });
+      }
+      update.about = about.trim();
+    }
+
+    if (profilePic !== undefined) {
+      if (typeof profilePic !== "string" || !profilePic) {
+        return res.status(400).json({ message: "Profile pic is required" });
+      }
+      const uploadResponse = await cloudinary.uploader.upload(profilePic);
+      update.profilePic = uploadResponse.secure_url;
+    }
+
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ message: "Nothing to update" });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(userId, update, { new: true }).select(
+      "-password -pushSubscriptions"
     );
 
     res.status(200).json(updatedUser);
   } catch (error) {
     console.log("error in update profile:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (typeof currentPassword !== "string" || typeof newPassword !== "string") {
+      return res.status(400).json({ message: "Invalid input" });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const ok = await bcrypt.compare(currentPassword, user.password);
+    if (!ok) return res.status(400).json({ message: "Current password is incorrect" });
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.status(200).json({ message: "Password changed" });
+  } catch (error) {
+    console.log("error in change password:", error.message);
     res.status(500).json({ message: "Internal server error" });
   }
 };

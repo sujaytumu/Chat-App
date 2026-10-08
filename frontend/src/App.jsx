@@ -21,13 +21,22 @@ const loaders = {
   SignUpPage: () => import("./pages/SignUpPage"),
   LoginPage: () => import("./pages/LoginPage"),
   SettingsPage: () => import("./pages/SettingsPage"),
+  SettingsMore: () => import("./pages/SettingsMorePages"),
   ProfilePage: () => import("./pages/ProfilePage"),
   CallsPage: () => import("./pages/CallsPage"),
   StatusPage: () => import("./pages/StatusPage"),
 };
 const SignUpPage = lazy(loaders.SignUpPage);
 const LoginPage = lazy(loaders.LoginPage);
-const SettingsPage = lazy(loaders.SettingsPage);
+const NotificationsPage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.NotificationsPage })));
+const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.AppearancePage })));
+const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
+const AccountPage = more("AccountPage");
+const StarredPage = more("StarredPage");
+const ChatsSettingsPage = more("ChatsSettingsPage");
+const StoragePage = more("StoragePage");
+const AccessibilityPage = more("AccessibilityPage");
+const HelpPage = more("HelpPage");
 const ProfilePage = lazy(loaders.ProfilePage);
 const CallsPage = lazy(loaders.CallsPage);
 const StatusPage = lazy(loaders.StatusPage);
@@ -45,7 +54,7 @@ const App = () => {
   const navigate = useNavigate();
   const pathRef = useRef(location.pathname);
   pathRef.current = location.pathname;
-  const isChatScreen = ["/", "/calls", "/status", "/profile", "/settings"].includes(location.pathname) && authUser;
+  const isChatScreen = (["/", "/calls", "/status", "/profile", "/starred"].includes(location.pathname) || location.pathname.startsWith("/settings")) && authUser;
 
   useEffect(() => {
     checkAuth();
@@ -54,10 +63,11 @@ const App = () => {
   // Like WhatsApp, the app always opens on Chats: if it is (re)opened on
   // Updates / Calls / Profile / Settings, or you come back to it after being
   // away for a while, land on the main chat list instead.
-  const OTHER_SCREENS = ["/status", "/calls", "/profile", "/settings"];
+  const OTHER_SCREENS = ["/status", "/calls", "/profile", "/starred"];
+  const isOther = (path) => OTHER_SCREENS.includes(path) || path.startsWith("/settings");
   const signedIn = !!authUser;
   useEffect(() => {
-    if (signedIn && OTHER_SCREENS.includes(pathRef.current)) navigate("/", { replace: true });
+    if (signedIn && isOther(pathRef.current)) navigate("/", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
   useEffect(() => {
@@ -70,7 +80,7 @@ const App = () => {
       }
       const away = hiddenAt ? Date.now() - hiddenAt : 0;
       hiddenAt = null;
-      if (away > 15000 && OTHER_SCREENS.includes(pathRef.current)) navigate("/", { replace: true });
+      if (away > 15000 && isOther(pathRef.current)) navigate("/", { replace: true });
     };
     document.addEventListener("visibilitychange", onChange);
     return () => document.removeEventListener("visibilitychange", onChange);
@@ -165,17 +175,38 @@ const App = () => {
             path="/login"
             element={!authUser ? <LoginPage /> : <Navigate to="/" />}
           />
+          <Route path="/settings" element={<Navigate to="/profile" replace />} />
           <Route
-            path="/settings"
-            element={
-              authUser ? (
-                <MainLayout>
-                  <SettingsPage />
-                </MainLayout>
-              ) : (
-                <Navigate to="/login" />
-              )
-            }
+            path="/settings/account"
+            element={authUser ? <MainLayout><AccountPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/chats"
+            element={authUser ? <MainLayout><ChatsSettingsPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/notifications"
+            element={authUser ? <MainLayout><NotificationsPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/appearance"
+            element={authUser ? <MainLayout><AppearancePage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/storage"
+            element={authUser ? <MainLayout><StoragePage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/accessibility"
+            element={authUser ? <MainLayout><AccessibilityPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/help"
+            element={authUser ? <MainLayout><HelpPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/starred"
+            element={authUser ? <MainLayout><StarredPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/profile"
