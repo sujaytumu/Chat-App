@@ -37,6 +37,30 @@ const CallAvatar = ({ user, size = "size-28" }) => {
   );
 };
 
+// Formats elapsed seconds as m:ss, or h:mm:ss once a call passes an hour.
+const formatDuration = (totalSeconds) => {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const sec = String(totalSeconds % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+};
+
+// Live-updating elapsed time since the call connected (null until then).
+const useCallDuration = (startedAt) => {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!startedAt) {
+      setSeconds(0);
+      return;
+    }
+    const tick = () => setSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+  return startedAt ? formatDuration(seconds) : null;
+};
+
 const gridBtn = "size-16 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 text-white transition-all";
 const gridBtnActive = "bg-white text-black hover:bg-white/90 ring-[3px] ring-white ring-offset-2 ring-offset-black/50";
 
@@ -52,6 +76,7 @@ const CallManager = () => {
     isRemoteRinging,
     isScreenSharing,
     isSpeakerOn,
+    callStartedAt,
     acceptCall,
     rejectCall,
     endCall,
@@ -68,6 +93,7 @@ const CallManager = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const callDuration = useCallDuration(callStartedAt);
 
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
@@ -163,7 +189,7 @@ const CallManager = () => {
         <CallAvatar user={remoteUser} size="size-8" />
         <span className="text-white text-sm font-medium">{remoteUser?.fullName}</span>
         <span className="text-[#00A884] text-xs">
-          {callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : "In call"}
+          {callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : callDuration || "In call"}
         </span>
       </button>
       </>
@@ -173,7 +199,11 @@ const CallManager = () => {
   // ---- Outgoing / active call ----
   const isVideo = callType === "video";
   const statusText =
-    callStatus === "calling" ? (isRemoteRinging ? "Ringing…" : "Calling…") : isVideo ? "Video call" : "Voice call";
+    callStatus === "calling"
+      ? isRemoteRinging
+        ? "Ringing…"
+        : "Calling…"
+      : callDuration || (isVideo ? "Video call" : "Voice call");
 
   return (
     <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col">

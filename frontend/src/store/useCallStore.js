@@ -144,6 +144,7 @@ export const useCallStore = create((set, get) => ({
   isRemoteRinging: false, // true once the callee's device has actually started ringing
   isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
   isScreenSharing: false,
+  callStartedAt: null, // epoch ms when the call actually connected (drives the on-screen timer)
   audioOutputDevices: [],
   callSubscribed: false,
   callCooldownUntil: 0,
@@ -273,7 +274,7 @@ export const useCallStore = create((set, get) => ({
         audio: true,
         video: callType === "video",
       });
-      set({ localStream: stream, callStatus: "in-call" });
+      set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now() });
 
       pc = new RTCPeerConnection(await getIceConfig());
       attachConnectionWatchdog(pc, get);
@@ -411,6 +412,7 @@ export const useCallStore = create((set, get) => ({
       isRemoteRinging: false,
       isScreenSharing: false,
       isSpeakerOn: false,
+      callStartedAt: null,
       callCooldownUntil: Date.now() + 2000, // brief guard against accidental rapid re-tapping
     });
   },
@@ -581,7 +583,7 @@ export const useCallStore = create((set, get) => ({
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
         pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
         pendingCandidates = [];
-        set({ callStatus: "in-call", isRemoteRinging: false });
+        set({ callStatus: "in-call", isRemoteRinging: false, callStartedAt: Date.now() });
       } catch (err) {
         console.error("Failed to apply call answer:", err);
         toast.error("Call couldn't connect");
