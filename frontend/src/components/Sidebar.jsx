@@ -376,7 +376,8 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Filter chips */}
+      {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
+      {!showArchived && (
       <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 pb-3">
         {FILTERS.map(({ id, label }) => {
           const active = filter === id;
@@ -396,12 +397,16 @@ const Sidebar = () => {
           );
         })}
       </div>
+      )}
 
       {/* Chat list */}
       <div className="overflow-y-auto flex-1 pb-24">
         {!showArchived && archivedInfo.count > 0 && !search && filter === "all" && (
           <button
-            onClick={() => setShowArchived(true)}
+            onClick={() => {
+              setFilter("all");
+              setShowArchived(true);
+            }}
             className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] transition-colors"
           >
             <span className="size-14 flex items-center justify-center text-[#25D366]">
