@@ -52,6 +52,9 @@ export const useChatStore = create((set, get) => ({
   messages: [],
   hasMoreMessages: false,
   isLoadingOlder: false,
+  isFetchingMessages: false,
+  pendingJump: null, // { id } — a search result to scroll to once its chat/messages are loaded
+  chatSearchOpen: false,
   isMessagesLoading: false,
   replyingTo: null, // message currently being replied to (shown above the input)
 
@@ -177,7 +180,7 @@ export const useChatStore = create((set, get) => ({
 
   setSelectedChat: (chat) => {
     if (!chat) {
-      set({ selectedChat: null, messages: [], hasMoreMessages: false });
+      set({ selectedChat: null, messages: [], hasMoreMessages: false, chatSearchOpen: false, pendingJump: null });
       return;
     }
     // Re-opening a chat is instant: show what we last had (memory, then disk)
@@ -185,9 +188,31 @@ export const useChatStore = create((set, get) => ({
     const key = chatKeyOf(chat);
     const userId = useAuthStore.getState().authUser?._id;
     const cached = msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [];
-    set({ selectedChat: chat, messages: cached, hasMoreMessages: false });
+    set({ selectedChat: chat, messages: cached, hasMoreMessages: false, chatSearchOpen: false });
     get().getMessages();
   },
+
+  setChatSearchOpen: (open) => set({ chatSearchOpen: open }),
+
+  // Search messages: everywhere, or inside one chat when `chat` is given.
+  searchMessages: async (q, chat) => {
+    const params = { q };
+    if (chat) {
+      params.chatType = chat.type;
+      params.chatId = chat.data._id;
+    }
+    const res = await axiosInstance.get("/messages/search/all", { params });
+    return res.data;
+  },
+
+  // Open a chat and scroll to one message in it (loading older pages if needed).
+  jumpToMessage: (chat, messageId) => {
+    const cur = get().selectedChat;
+    const same = cur && cur.type === chat.type && cur.data._id === chat.data._id;
+    if (!same) get().setSelectedChat(chat);
+    set({ pendingJump: { id: messageId }, chatSearchOpen: false });
+  },
+  clearPendingJump: () => set({ pendingJump: null }),
 
   getMessages: async () => {
     const chat = get().selectedChat;
@@ -197,7 +222,7 @@ export const useChatStore = create((set, get) => ({
       return !!cur && cur.type === chat.type && cur.data._id === chat.data._id;
     };
     // Only show the skeleton when there is nothing at all to show yet.
-    set({ isMessagesLoading: get().messages.length === 0 });
+    set({ isMessagesLoading: get().messages.length === 0, isFetchingMessages: true });
     try {
       const url = chat.type === "direct" ? `/messages/${chat.data._id}` : `/groups/${chat.data._id}/messages`;
       const res = await axiosInstance.get(url, { params: { limit: PAGE_SIZE } });
@@ -234,7 +259,7 @@ export const useChatStore = create((set, get) => ({
     } catch (error) {
       if (isSame()) toast.error(error.response?.data?.error || "Failed to load messages");
     } finally {
-      if (isSame()) set({ isMessagesLoading: false });
+      if (isSame()) set({ isMessagesLoading: false, isFetchingMessages: false });
     }
   },
 
