@@ -99,6 +99,8 @@ io.on("connection", (socket) => {
     // Never make signaling wait on the database — a slow/cold MongoDB used to
     // delay the ack past the client's timeout, which triggered duplicate
     // "callUser" retries and double-ringing / auto-reject on the callee.
+    const callKey = pairKey(userId, toUserId);
+    activeCallLogs.set(callKey, null); // tracked right away, DB id attached below
     const logPromise = CallLog.create({
       callerId: userId,
       calleeId: toUserId,
@@ -106,7 +108,12 @@ io.on("connection", (socket) => {
       status: "ringing",
     })
       .then((log) => {
-        activeCallLogs.set(pairKey(userId, toUserId), log._id);
+        if (activeCallLogs.has(callKey)) {
+          activeCallLogs.set(callKey, log._id);
+        } else {
+          // call already ended before the log was written
+          CallLog.findByIdAndUpdate(log._id, { status: "missed", endedAt: new Date() }).catch(() => {});
+        }
       })
       .catch((err) => {
         console.log("Error creating call log:", err.message);
@@ -160,8 +167,8 @@ io.on("connection", (socket) => {
       const logId = activeCallLogs.get(pairKey(userId, toUserId));
       if (logId) {
         CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
-        activeCallLogs.delete(pairKey(userId, toUserId));
       }
+      activeCallLogs.delete(pairKey(userId, toUserId));
     }, CALL_GRACE_PERIOD_MS);
 
     pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
@@ -228,6 +235,7 @@ io.on("connection", (socket) => {
         isMuted: !!state.isMuted,
         isVideoOff: !!state.isVideoOff,
         isScreenSharing: !!state.isScreenSharing,
+        hasCamera: state.hasCamera !== false,
       });
     }
   });
@@ -242,8 +250,8 @@ io.on("connection", (socket) => {
     const logId = activeCallLogs.get(key);
     if (logId) {
       CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
-      activeCallLogs.delete(key);
     }
+    activeCallLogs.delete(key);
   });
 
   socket.on("endCall", async ({ toUserId }) => {
@@ -253,6 +261,7 @@ io.on("connection", (socket) => {
     }
     const key = pairKey(userId, toUserId);
     const logId = activeCallLogs.get(key);
+    activeCallLogs.delete(key);
     if (logId) {
       try {
         const log = await CallLog.findById(logId);
@@ -269,7 +278,6 @@ io.on("connection", (socket) => {
       } catch (err) {
         console.log("Error finalizing call log:", err.message);
       }
-      activeCallLogs.delete(key);
     }
   });
 
@@ -300,7 +308,9 @@ io.on("connection", (socket) => {
         if (otherRoom) {
           io.to(otherRoom).emit("callEnded");
         }
-        CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+        if (logId) {
+          CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+        }
         activeCallLogs.delete(key);
       }
 
