@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { clearChatCache } from "../lib/chatCache";
 import { axiosInstance } from "../lib/axios.js";
 import toast from "react-hot-toast";
 import { io } from "socket.io-client";
@@ -62,6 +63,7 @@ export const useAuthStore = create((set, get) => ({
   logout: async () => {
     try {
       await axiosInstance.post("/auth/logout");
+      clearChatCache();
       set({ authUser: null });
       toast.success("Logged out successfully");
       get().disconnectSocket();

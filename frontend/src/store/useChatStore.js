@@ -2,6 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "./useAuthStore";
+import { readChatCache, writeChatCache } from "../lib/chatCache";
 import { playNotificationSound, showDesktopNotification } from "../lib/notificationSound";
 
 function notifyIncoming(senderName, message, isGroup = false) {
@@ -34,10 +35,18 @@ export const useChatStore = create((set, get) => ({
   socketSubscribed: false,
 
   getUsers: async () => {
-    set({ isUsersLoading: true });
+    // Show the last-known list immediately (and only fall back to the skeleton
+    // when there's nothing at all to show), then refresh from the server.
+    const userId = useAuthStore.getState().authUser?._id;
+    if (get().users.length === 0) {
+      const cached = readChatCache(userId, "users");
+      if (cached?.length) set({ users: cached });
+    }
+    set({ isUsersLoading: get().users.length === 0 });
     try {
       const res = await axiosInstance.get("/messages/users");
       set({ users: res.data });
+      writeChatCache(userId, "users", res.data);
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load users");
     } finally {
@@ -46,10 +55,16 @@ export const useChatStore = create((set, get) => ({
   },
 
   getGroups: async () => {
-    set({ isGroupsLoading: true });
+    const userId = useAuthStore.getState().authUser?._id;
+    if (get().groups.length === 0) {
+      const cached = readChatCache(userId, "groups");
+      if (cached?.length) set({ groups: cached });
+    }
+    set({ isGroupsLoading: get().groups.length === 0 });
     try {
       const res = await axiosInstance.get("/groups");
       set({ groups: res.data });
+      writeChatCache(userId, "groups", res.data);
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load groups");
     } finally {
