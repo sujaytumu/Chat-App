@@ -15,7 +15,9 @@ import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/uti
 import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
+import toast from "react-hot-toast";
 import Avatar from "./Avatar";
+import ChatSearchBar from "./ChatSearchBar";
 import { optimizeImage } from "../lib/cdn";
 
 // WhatsApp tints each person's name in a group differently.
@@ -36,6 +38,10 @@ const ChatContainer = () => {
     hasMoreMessages,
     isLoadingOlder,
     loadOlderMessages,
+    chatSearchOpen,
+    pendingJump,
+    clearPendingJump,
+    isFetchingMessages,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
@@ -50,6 +56,8 @@ const ChatContainer = () => {
   const nearBottomRef = useRef(true); // is the reader at (or close to) the latest message?
   const [showJump, setShowJump] = useState(false);
   const [newWhileAway, setNewWhileAway] = useState(0);
+  const [highlightId, setHighlightId] = useState(null);
+  const jumpTries = useRef(0);
   const prependRef = useRef(null); // scroll position to restore after older messages are added on top
 
   const isGroup = selectedChat.type === "group";
@@ -75,6 +83,11 @@ const ChatContainer = () => {
       const { height, top } = prependRef.current;
       prependRef.current = null;
       scrollRef.current.scrollTop = top + (scrollRef.current.scrollHeight - height);
+      return;
+    }
+    // Jumping to a search result: don't fight it by scrolling to the bottom.
+    if (useChatStore.getState().pendingJump) {
+      prevChatKeyRef.current = `${selectedChat.type}:${data._id}`;
       return;
     }
     if (!messageEndRef.current) return;
@@ -113,6 +126,31 @@ const ChatContainer = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, isOtherTyping, selectedChat, data._id]);
+
+  // Search result -> scroll to it. If it's older than what's loaded, keep
+  // pulling older pages until it appears (bounded), then highlight it.
+  useEffect(() => {
+    if (!pendingJump) {
+      jumpTries.current = 0;
+      return;
+    }
+    const el = messageRefs.current[pendingJump.id];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightId(pendingJump.id);
+      clearPendingJump();
+      setTimeout(() => setHighlightId(null), 2200);
+      return;
+    }
+    if (isMessagesLoading || isFetchingMessages || isLoadingOlder) return;
+    if (hasMoreMessages && jumpTries.current < 15) {
+      jumpTries.current += 1;
+      loadOlderMessages();
+    } else {
+      clearPendingJump();
+      toast.error("Couldn't find that message");
+    }
+  }, [pendingJump, messages, isMessagesLoading, isFetchingMessages, isLoadingOlder, hasMoreMessages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLoadOlder = async () => {
     const el = scrollRef.current;
@@ -164,6 +202,7 @@ const ChatContainer = () => {
   return (
     <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0">
       <ChatHeader />
+      {chatSearchOpen && <ChatSearchBar />}
 
       {pinnedMessage && (
         <button
@@ -255,7 +294,9 @@ const ChatContainer = () => {
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`flex items-end group ${isMe ? "justify-end" : "justify-start"}`}
+              className={`flex items-end group rounded-lg transition-colors duration-700 ${
+                highlightId === message._id ? "bg-[#25D366]/20" : ""
+              } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
               onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
             >
