@@ -102,8 +102,15 @@ const useCallWakeLock = (active) => {
   }, [active]);
 };
 
-const gridBtn = "size-16 rounded-full flex items-center justify-center bg-white/10 hover:bg-white/15 text-white transition-all";
-const gridBtnActive = "bg-white text-black hover:bg-white/90 ring-[3px] ring-white ring-offset-2 ring-offset-black/50";
+// WhatsApp call controls: a dark circle normally, a solid white circle with a
+// dark icon while the control is on (speaker on, muted, camera off, sharing).
+// The two states are separate full class strings — mixing bg-white/10 and
+// bg-white on one element leaves the winner up to stylesheet order.
+const gridBtnBase = "size-16 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95";
+const gridBtnOff = `${gridBtnBase} bg-white/10 hover:bg-white/15 text-white`;
+const gridBtnOn = `${gridBtnBase} bg-white hover:bg-white/90 text-[#0B141A] shadow-lg shadow-white/10`;
+const gridBtn = gridBtnOff;
+const callBtn = (active) => (active ? gridBtnOn : gridBtnOff);
 
 const CallManager = () => {
   const {
@@ -363,7 +370,7 @@ const CallManager = () => {
       <div className="relative bg-black/50 rounded-t-3xl px-6 pt-6 pb-8">
         <div className="grid grid-cols-3 gap-x-6 gap-y-5 max-w-xs mx-auto">
           <div className="flex flex-col items-center gap-1.5">
-            <button onClick={toggleSpeakerOutput} className={`${gridBtn} ${isSpeakerOn ? gridBtnActive : ""}`}>
+            <button onClick={toggleSpeakerOutput} className={callBtn(isSpeakerOn)}>
               <Volume2 size={24} />
             </button>
             <span className="text-xs text-white/70">Speaker</span>
@@ -372,7 +379,7 @@ const CallManager = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={isVideo ? toggleVideo : upgradeToVideo}
-              className={`${gridBtn} ${isVideo && isVideoOff ? gridBtnActive : ""}`}
+              className={callBtn(isVideo && isVideoOff)}
             >
               {isVideo && isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
             </button>
@@ -380,7 +387,7 @@ const CallManager = () => {
           </div>
 
           <div className="flex flex-col items-center gap-1.5">
-            <button onClick={toggleMute} className={`${gridBtn} ${isMuted ? gridBtnActive : ""}`}>
+            <button onClick={toggleMute} className={callBtn(isMuted)}>
               {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
             </button>
             <span className="text-xs text-white/70">Mute</span>
@@ -409,7 +416,7 @@ const CallManager = () => {
           <div className="flex flex-col items-center gap-1.5">
             <button
               onClick={isVideo ? toggleScreenShare : () => toast("Screen share needs a video call", { icon: "🖥️" })}
-              className={`${gridBtn} ${isScreenSharing ? gridBtnActive : ""}`}
+              className={callBtn(isScreenSharing)}
             >
               <UploadCloud size={24} />
             </button>

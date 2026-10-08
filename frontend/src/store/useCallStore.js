@@ -135,6 +135,7 @@ let pendingCandidates = [];
 let voiceOriginShare = false; // screen share started from a voice call (no camera to go back to)
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
+let speakerNoticeShown = false; // the "phone decides the speaker" hint is shown once per page load
 let ringDeferred = false; // incoming ring held back while a phone's system notification is alerting
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
@@ -511,7 +512,17 @@ export const useCallStore = create((set, get) => ({
     const supportsSinkId = remoteAudioEl?.setSinkId || remoteVideoEl?.setSinkId;
 
     if (!supportsSinkId || !navigator.mediaDevices?.enumerateDevices) {
-      toast("Speaker routing is controlled by your device on this browser", { icon: "🔊" });
+      // Phone browsers (Android Chrome, iOS Safari) don't let a web page pick the
+      // earpiece or the loudspeaker — the phone decides. Still flip the button so
+      // it shows its on/off state like WhatsApp, and say so once, plainly.
+      set({ isSpeakerOn: !get().isSpeakerOn });
+      if (!speakerNoticeShown) {
+        speakerNoticeShown = true;
+        toast("This browser can't switch the speaker — your phone decides where call audio plays", {
+          icon: "🔊",
+          duration: 3500,
+        });
+      }
       return;
     }
 
