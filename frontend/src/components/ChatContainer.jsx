@@ -13,7 +13,7 @@ import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
-import { Pin, X } from "lucide-react";
+import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import Avatar from "./Avatar";
 
@@ -42,6 +42,10 @@ const ChatContainer = () => {
   const [infoMessage, setInfoMessage] = useState(null);
   const prevChatKeyRef = useRef(null);
   const justOpenedRef = useRef(false);
+  const scrollRef = useRef(null);
+  const nearBottomRef = useRef(true); // is the reader at (or close to) the latest message?
+  const [showJump, setShowJump] = useState(false);
+  const [newWhileAway, setNewWhileAway] = useState(0);
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -70,7 +74,18 @@ const ChatContainer = () => {
     const isFreshOpen = prevChatKeyRef.current !== chatKey;
     prevChatKeyRef.current = chatKey;
 
-    messageEndRef.current.scrollIntoView({ behavior: isFreshOpen ? "auto" : "smooth" });
+    // Like WhatsApp: a new message only pulls the view down if the reader is
+    // already at the bottom (or sent it themselves). Someone reading older
+    // messages stays where they are and gets a "jump to latest" button with a
+    // count instead of being yanked away.
+    const last = messages[messages.length - 1];
+    const sentByMe = last?.senderId === authUser._id;
+    if (isFreshOpen || nearBottomRef.current || sentByMe) {
+      messageEndRef.current.scrollIntoView({ behavior: isFreshOpen ? "auto" : "smooth" });
+      setNewWhileAway(0);
+    } else if (last) {
+      setNewWhileAway((n) => n + 1);
+    }
 
     // Images/videos loading asynchronously after this point can grow the
     // content height and leave the "bottom" we just scrolled to stale —
@@ -83,7 +98,22 @@ const ChatContainer = () => {
       }, 1200);
       return () => clearTimeout(timeout);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, isOtherTyping, selectedChat, data._id]);
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    nearBottomRef.current = distance < 160;
+    setShowJump(distance > 360);
+    if (distance < 160) setNewWhileAway(0);
+  };
+
+  const jumpToLatest = () => {
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setNewWhileAway(0);
+  };
 
   const handleMediaLoaded = () => {
     if (justOpenedRef.current) {
@@ -141,7 +171,12 @@ const ChatContainer = () => {
         </button>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 sm:px-[6%] lg:px-[8%] py-3">
+      <div className="relative flex-1 min-h-0 flex flex-col">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[6%] lg:px-[8%] py-3"
+      >
         {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
@@ -209,7 +244,7 @@ const ChatContainer = () => {
 
               {message.deletedForEveryone ? (
                 <div
-                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-2xl italic text-[#8696A0] text-[14.5px] flex items-center gap-1.5 ${
+                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-xl italic text-[#8696A0] text-[14.5px] flex items-center gap-1.5 ${
                     isMe ? "bg-[#144D37]/70" : "bg-[#1F2C34]/80"
                   } ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                 >
@@ -225,7 +260,7 @@ const ChatContainer = () => {
                 </div>
               ) : (
                 <div
-                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[60%] px-2.5 pt-1.5 pb-1.5 rounded-2xl break-words shadow-sm flex flex-col text-[#E9EDEF] ${
+                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[60%] px-2.5 pt-1.5 pb-1.5 rounded-xl break-words shadow-sm flex flex-col text-[#E9EDEF] ${
                     isMe ? "bg-[#144D37]" : "bg-[#1F2C34]"
                   } ${
                     isFirstInGroup ? (isMe ? "rounded-tr-none bubble-tail-out" : "rounded-tl-none bubble-tail-in") : ""
@@ -300,13 +335,29 @@ const ChatContainer = () => {
         })}
 
         {isOtherTyping && (
-          <div className="mt-2 inline-flex items-center gap-1 px-3.5 py-3 rounded-2xl rounded-tl-none bg-[#1F2C34]">
+          <div className="mt-2 inline-flex items-center gap-1 px-3.5 py-3 rounded-xl rounded-tl-none bg-[#1F2C34]">
             <span className="size-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:-0.3s]" />
             <span className="size-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:-0.15s]" />
             <span className="size-2 rounded-full bg-[#8696A0] animate-bounce" />
           </div>
         )}
         <div ref={messageEndRef} />
+      </div>
+
+      {showJump && (
+        <button
+          onClick={jumpToLatest}
+          className="absolute bottom-3 right-4 z-10 size-11 rounded-full bg-[#1F2C34] text-[#AEBAC1] hover:bg-[#2A3942] shadow-lg shadow-black/40 flex items-center justify-center transition-colors"
+          aria-label="Jump to latest message"
+        >
+          <ChevronDown size={26} />
+          {newWhileAway > 0 && (
+            <span className="absolute -top-2 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 rounded-full bg-[#25D366] text-[#0B141A] text-[11px] font-bold flex items-center justify-center">
+              {newWhileAway > 99 ? "99+" : newWhileAway}
+            </span>
+          )}
+        </button>
+      )}
       </div>
 
       <MessageInput />

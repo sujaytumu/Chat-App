@@ -363,7 +363,7 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
-    <div className="px-2 pt-1.5 pb-2 sm:px-3 w-full bg-[#0B141A] lg:bg-[#111B21] border-t border-white/5">
+    <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full bg-[#0B141A] lg:bg-[#111B21] border-t border-white/5">
       {replyingTo && (
         <div className="mb-2 flex items-center gap-2 bg-[#2A3942] rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">

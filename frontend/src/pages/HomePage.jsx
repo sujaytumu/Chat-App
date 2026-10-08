@@ -11,7 +11,7 @@ const HomePage = () => {
   return (
     <div
       className={`flex w-full h-full overflow-hidden bg-[#0B141A] ${
-        selectedChat ? "pb-0" : "pb-[72px]"
+        selectedChat ? "pb-0" : "pb-[calc(72px+env(safe-area-inset-bottom))]"
       } lg:pb-0`}
     >
       <div className={`${selectedChat ? "hidden lg:flex" : "flex"} w-full lg:w-auto shrink-0 min-h-0`}>

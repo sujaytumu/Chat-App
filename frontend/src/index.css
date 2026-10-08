@@ -50,3 +50,28 @@ body {
   left: -8px;
   clip-path: polygon(100% 0, 0 0, 100% 100%);
 }
+
+/* Thin, dark scrollbars (like WhatsApp Web) instead of the bright default. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #374248 transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: #374248;
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #4a575f;
+}
+
+/* Selected text uses the WhatsApp green instead of the browser blue. */
+::selection {
+  background: rgba(37, 211, 102, 0.35);
+}
