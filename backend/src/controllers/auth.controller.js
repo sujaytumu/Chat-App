@@ -6,12 +6,16 @@ import cloudinary from "../lib/cloudinary.js";
 export const signup = async (req, res) => {
   const { fullName, email, password } = req.body;
   try {
+    // Only plain strings (blocks {"$ne": null}-style query injection)
+    if ([fullName, email, password].some((v) => typeof v !== "string")) {
+      return res.status(400).json({ message: "Invalid input" });
+    }
     if (!fullName || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    if (password.length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
 
     const user = await User.findOne({ email });
@@ -53,6 +57,9 @@ export const signup = async (req, res) => {
 export const login = async (req, res) => {
   const { email, password } = req.body;
   try {
+    if (typeof email !== "string" || typeof password !== "string") {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
     const user = await User.findOne({ email });
 
     if (!user) {
