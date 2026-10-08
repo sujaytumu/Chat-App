@@ -1,4 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
+import { useBackToClose } from "../lib/useBackToClose";
 import Sidebar from "../components/Sidebar";
 import NoChatSelected from "../components/NoChatSelected";
 import ChatContainer from "../components/ChatContainer";
@@ -6,7 +7,10 @@ import ChatContainer from "../components/ChatContainer";
 // Phone: either the chat list OR the open chat, full screen (like WhatsApp).
 // Desktop (lg+): list and chat side by side.
 const HomePage = () => {
-  const { selectedChat } = useChatStore();
+  const { selectedChat, setSelectedChat } = useChatStore();
+
+  // Phone Back closes the open chat (back to the list) instead of leaving the app.
+  useBackToClose(!!selectedChat, () => setSelectedChat(null));
 
   return (
     <div

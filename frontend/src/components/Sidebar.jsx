@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
+import { useBackToClose } from "../lib/useBackToClose";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { useChatStore } from "../store/useChatStore";
@@ -89,6 +90,8 @@ const Sidebar = () => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  // Phone Back leaves the Archived folder (back to the main list).
+  useBackToClose(showArchived, () => setShowArchived(false));
 
   // ---- Message search (server-side), shown under the matching chats ----
   const [msgResults, setMsgResults] = useState([]);
