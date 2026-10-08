@@ -1,4 +1,5 @@
 import CallLog from "../models/callLog.model.js";
+import { declineCallFor } from "../lib/socket.js";
 
 export const getCallHistory = async (req, res) => {
   try {
@@ -36,4 +37,12 @@ export const getIceConfig = (req, res) => {
     });
   }
   res.status(200).json({ iceServers, hasTurn: iceServers.length > 2 });
+};
+
+// Decline an incoming call from a notification button (no open socket needed).
+export const declineCall = (req, res) => {
+  const callerId = String(req.body?.callerId || "");
+  if (!callerId) return res.status(400).json({ error: "callerId required" });
+  declineCallFor(String(req.user._id), callerId);
+  res.status(200).json({ ok: true });
 };
