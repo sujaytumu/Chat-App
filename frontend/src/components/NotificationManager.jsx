@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { requestNotificationPermission, registerPushSubscription, primeAudio } from "../lib/notificationSound";
+import { loadCustomTone } from "../lib/soundSettings";
 import { axiosInstance } from "../lib/axios";
 
 const BASE_TITLE = "Talkies";
@@ -14,6 +15,11 @@ const NotificationManager = () => {
   const groups = useChatStore((s) => s.groups);
 
   useEffect(() => {
+    // Warm the cache of any sounds the person picked in Settings so the very
+    // first ring / message tone plays without a load delay.
+    loadCustomTone("call");
+    loadCustomTone("message");
+
     const trySubscribe = async () => {
       const result = await requestNotificationPermission();
       if (result === "granted") {

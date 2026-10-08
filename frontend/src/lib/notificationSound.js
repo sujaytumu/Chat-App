@@ -1,8 +1,64 @@
-// Generates a short two-tone "ding" using the Web Audio API so we don't
-// need to ship/license an audio asset.
-import { isMessageSoundEnabled, isCallRingtoneEnabled } from "./soundSettings";
+// Notification / ringtone sounds. Built-in tones are synthesized with the
+// Web Audio API so we don't need to ship/license audio assets; people can also
+// pick their own sound file in Settings (played through an <audio> element).
+import {
+  isMessageSoundEnabled,
+  isCallRingtoneEnabled,
+  getCallTone,
+  getMessageTone,
+  loadCustomTone,
+} from "./soundSettings";
 
 let audioCtx;
+let audioUnlocked = false;
+
+// A 0-sample WAV, used to "unlock" <audio> elements inside a user gesture.
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
+let ringEl = null; // looping call ringtone (custom files)
+let msgEl = null; // one-shot message sound (custom files)
+let elementsUnlocked = false;
+
+function ensureElements() {
+  if (typeof Audio === "undefined") return;
+  if (!ringEl) {
+    ringEl = new Audio();
+    ringEl.preload = "auto";
+    ringEl.loop = true;
+  }
+  if (!msgEl) {
+    msgEl = new Audio();
+    msgEl.preload = "auto";
+  }
+}
+
+// Phones only allow programmatic <audio> playback once the element has been
+// played from a real tap. Do that with a silent clip on the first gesture so
+// a ring/message that arrives later can actually be heard.
+function unlockElements() {
+  if (elementsUnlocked) return;
+  ensureElements();
+  if (!ringEl || !msgEl) return;
+  elementsUnlocked = true;
+  [ringEl, msgEl].forEach((el) => {
+    const prev = { src: el.src, loop: el.loop };
+    el.muted = true;
+    el.loop = false;
+    el.src = SILENT_WAV;
+    el.play()
+      .then(() => {
+        el.pause();
+      })
+      .catch(() => {
+        elementsUnlocked = false; // try again on the next gesture
+      })
+      .finally(() => {
+        el.muted = false;
+        el.loop = prev.loop;
+        if (prev.src && !prev.src.startsWith("data:audio/wav")) el.src = prev.src;
+      });
+  });
+}
 
 // Browsers block Web Audio until a genuine user gesture (click/keydown/tap)
 // happens on the page. Call this on that first gesture so the AudioContext
@@ -28,9 +84,8 @@ export function primeAudio() {
   } catch {
     // ignore
   }
+  unlockElements();
 }
-
-let audioUnlocked = false;
 
 // Phones (iOS especially) suspend the audio context when the app is
 // backgrounded; make sure it is running again as soon as the page is
@@ -60,68 +115,242 @@ export function stopVibration() {
   }
 }
 
-export function playNotificationSound() {
-  if (!isMessageSoundEnabled()) return;
+// ---- Built-in tones --------------------------------------------------------
+// Each step: { freq, endFreq?, start, dur, gain?, type?, pluck? }
+//  - pluck: quick exponential decay (bell/pop); otherwise a sustained note with
+//    a short attack and release.
+
+function scheduleSteps(steps) {
+  audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
+  const now = audioCtx.currentTime;
+
+  steps.forEach(({ freq, endFreq, start, dur, gain: peak = 0.15, type = "sine", pluck = false }) => {
+    const t0 = now + start;
+    const t1 = t0 + dur;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, t0);
+    if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, t1);
+
+    gain.gain.setValueAtTime(0, t0);
+    if (pluck) {
+      gain.gain.linearRampToValueAtTime(peak, t0 + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, t1);
+    } else {
+      const release = Math.min(0.15, dur / 2);
+      gain.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.05, dur / 4));
+      gain.gain.setValueAtTime(peak, t1 - release);
+      gain.gain.linearRampToValueAtTime(0, t1);
+    }
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t0);
+    osc.stop(t1 + 0.05);
+  });
+}
+
+const notes = (freqs, gap, dur, extra = {}) =>
+  freqs.map((freq, i) => ({ freq, start: i * gap, dur, ...extra }));
+
+// One ring cycle each (the caller repeats every 2s).
+const CALL_PRESETS = {
+  // Classic dual-tone phone ring: two close frequencies, ~1s on / ~1s off.
+  classic: [
+    { freq: 440, start: 0, dur: 1.0, gain: 0.13 },
+    { freq: 480, start: 0, dur: 1.0, gain: 0.13 },
+  ],
+  digital: notes([1000, 1000, 1000], 0.25, 0.14, { gain: 0.08, type: "square" }),
+  chime: notes([523.25, 659.25, 783.99, 1046.5], 0.2, 0.7, { gain: 0.16, pluck: true }),
+  marimba: [
+    ...notes([392, 493.88, 587.33, 783.99], 0.2, 0.5, { gain: 0.2, type: "triangle", pluck: true }),
+    ...notes([587.33, 493.88, 392], 0.2, 0.5, { gain: 0.2, type: "triangle", pluck: true }).map((n) => ({
+      ...n,
+      start: n.start + 1.0,
+    })),
+  ],
+  trill: Array.from({ length: 14 }, (_, i) => ({
+    freq: i % 2 ? 1000 : 800,
+    start: i * 0.065,
+    dur: 0.06,
+    gain: 0.1,
+  })),
+};
+
+const MESSAGE_PRESETS = {
+  ding: [
+    { freq: 880, start: 0, dur: 0.12, gain: 0.15, pluck: true },
+    { freq: 1175, start: 0.1, dur: 0.18, gain: 0.15, pluck: true },
+  ],
+  pop: [{ freq: 700, endFreq: 250, start: 0, dur: 0.12, gain: 0.25, pluck: true }],
+  chime: [
+    { freq: 1046.5, start: 0, dur: 0.4, gain: 0.13, pluck: true },
+    { freq: 1318.5, start: 0.12, dur: 0.5, gain: 0.13, pluck: true },
+  ],
+  bubble: [
+    { freq: 400, endFreq: 900, start: 0, dur: 0.15, gain: 0.18, pluck: true },
+    { freq: 500, endFreq: 1100, start: 0.12, dur: 0.15, gain: 0.18, pluck: true },
+  ],
+  knock: [
+    { freq: 180, start: 0, dur: 0.1, gain: 0.35, type: "triangle", pluck: true },
+    { freq: 180, start: 0.14, dur: 0.1, gain: 0.35, type: "triangle", pluck: true },
+  ],
+};
+
+// ---- Playback --------------------------------------------------------------
+
+let ringToken = 0; // invalidates an in-flight start if the ring is stopped first
+let ringVibrateInterval = null;
+let ringSoundInterval = null;
+let previewTimer = null;
+let msgStopTimer = null;
+
+function playElement(el, url, { loop }) {
+  ensureElements();
+  el.loop = loop;
+  el.src = url;
+  el.currentTime = 0;
+  return el.play();
+}
+
+function stopElement(el) {
+  if (!el) return;
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
+    el.pause();
+    el.currentTime = 0;
+  } catch {
+    // ignore
+  }
+}
 
-    const now = audioCtx.currentTime;
-    const tones = [
-      { freq: 880, start: 0, duration: 0.12 },
-      { freq: 1175, start: 0.1, duration: 0.18 },
-    ];
-
-    tones.forEach(({ freq, start, duration }) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, now + start);
-      gain.gain.linearRampToValueAtTime(0.15, now + start + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + start + duration);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now + start);
-      osc.stop(now + start + duration + 0.02);
-    });
+function playPresetOnce(table, id, fallbackId) {
+  try {
+    scheduleSteps(table[id] || table[fallbackId]);
   } catch {
     // Audio isn't critical — fail silently (e.g. autoplay policy blocks it
     // until the user has interacted with the page once).
   }
 }
 
-export function playRingtone() {
-  if (!isCallRingtoneEnabled()) {
-    vibrateForCall(); // silent ringtone setting still buzzes phones that support it
+// Message sound (respects the on/off setting).
+export function playNotificationSound() {
+  if (!isMessageSoundEnabled()) return;
+  playMessageTone(getMessageTone());
+}
+
+async function playMessageTone(id) {
+  if (id === "custom") {
+    const url = await loadCustomTone("message");
+    if (url) {
+      try {
+        ensureElements();
+        await playElement(msgEl, url, { loop: false });
+        clearTimeout(msgStopTimer);
+        msgStopTimer = setTimeout(() => stopElement(msgEl), 6000); // cap long files
+        return;
+      } catch {
+        // fall back to the built-in sound below
+      }
+    }
+    playPresetOnce(MESSAGE_PRESETS, "ding", "ding");
     return;
   }
-  vibrateForCall();
-  try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
-    const now = audioCtx.currentTime;
+  playPresetOnce(MESSAGE_PRESETS, id, "ding");
+}
 
-    // Classic dual-tone phone ring: two close frequencies mixed together,
-    // played for ~1s, silence for ~1s — repeats every 2s via the caller's
-    // setInterval, giving a "brrring… brrring…" cadence.
-    [440, 480].forEach((freq) => {
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(0.13, now + 0.05);
-      gain.gain.setValueAtTime(0.13, now + 0.85);
-      gain.gain.linearRampToValueAtTime(0, now + 1.0);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start(now);
-      osc.stop(now + 1.05);
-    });
-  } catch {
-    // ignore
+// Incoming-call ringing: sound (built-in tone repeating every 2s, or the
+// person's own file looping) plus vibration. Call stopRingtoneSound() to end.
+export function startRingtone() {
+  stopRingtoneSound();
+  const token = ++ringToken;
+  vibrateForCall();
+  ringVibrateInterval = setInterval(vibrateForCall, 2000);
+
+  if (!isCallRingtoneEnabled()) return; // silent mode still buzzes
+
+  const startPreset = (id) => {
+    playPresetOnce(CALL_PRESETS, id, "classic");
+    ringSoundInterval = setInterval(() => playPresetOnce(CALL_PRESETS, id, "classic"), 2000);
+  };
+
+  const toneId = getCallTone();
+  if (toneId !== "custom") {
+    startPreset(toneId);
+    return;
   }
+
+  loadCustomTone("call").then(async (url) => {
+    if (token !== ringToken) return; // ring was stopped while loading
+    if (url) {
+      try {
+        ensureElements();
+        await playElement(ringEl, url, { loop: true });
+        return;
+      } catch {
+        // blocked or undecodable — fall back to the built-in ring
+      }
+    }
+    if (token === ringToken) startPreset("classic");
+  });
+}
+
+export function stopRingtoneSound() {
+  ringToken++;
+  clearInterval(ringVibrateInterval);
+  clearInterval(ringSoundInterval);
+  ringVibrateInterval = null;
+  ringSoundInterval = null;
+  stopElement(ringEl);
+  stopVibration();
+}
+
+// Settings previews — play the given tone once regardless of the on/off
+// switches, so people can hear what they're choosing.
+export function stopTonePreview() {
+  clearTimeout(previewTimer);
+  clearTimeout(msgStopTimer);
+  stopElement(ringEl);
+  stopElement(msgEl);
+}
+
+export async function previewCallTone(id) {
+  primeAudio();
+  stopTonePreview();
+  if (id === "custom") {
+    const url = await loadCustomTone("call");
+    if (!url) return false;
+    try {
+      ensureElements();
+      await playElement(ringEl, url, { loop: true });
+      previewTimer = setTimeout(() => stopElement(ringEl), 5000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  playPresetOnce(CALL_PRESETS, id, "classic");
+  return true;
+}
+
+export async function previewMessageTone(id) {
+  primeAudio();
+  stopTonePreview();
+  if (id === "custom") {
+    const url = await loadCustomTone("message");
+    if (!url) return false;
+    try {
+      ensureElements();
+        await playElement(msgEl, url, { loop: false });
+      previewTimer = setTimeout(() => stopElement(msgEl), 5000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  playPresetOnce(MESSAGE_PRESETS, id, "ding");
+  return true;
 }
 
 export async function requestNotificationPermission() {

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { playRingtone, primeAudio, stopVibration } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, primeAudio } from "../lib/notificationSound";
 
 // STUN alone frequently fails to establish a working media path on mobile
 // carrier networks (symmetric NAT / CGNAT is extremely common on VoLTE/5G),
@@ -131,7 +131,6 @@ function emitWithRetry(socket, event, payload, { timeoutMs = 4000, retries = 1 }
 }
 
 let pc = null;
-let ringtoneInterval = null;
 let pendingCandidates = [];
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
@@ -415,11 +414,7 @@ export const useCallStore = create((set, get) => ({
   },
 
   stopRingtone: () => {
-    if (ringtoneInterval) {
-      clearInterval(ringtoneInterval);
-      ringtoneInterval = null;
-    }
-    stopVibration();
+    stopRingtoneSound();
   },
 
   resetCall: () => {
@@ -641,9 +636,8 @@ export const useCallStore = create((set, get) => ({
         incomingOffer: offer,
         callType,
       });
-      playRingtone();
       primeAudio();
-      ringtoneInterval = setInterval(playRingtone, 2000);
+      startRingtone(); // plays the tone chosen in Settings (or their own file) and vibrates
       // Tell the caller our device actually got the call and is ringing —
       // lets their screen switch from "Calling…" to "Ringing…"
       socket.emit("callRingingAck", { toUserId: fromUser._id });
