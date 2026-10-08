@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
@@ -347,3 +348,25 @@ export const getStarredMessages = async (req, res) => {
 };
 
 export { MAX_IMAGE_BASE64_LENGTH };
+
+// Archive / unarchive a chat for the logged-in user (direct chat or group).
+// Body: { chatType: "direct" | "group", chatId, archived: boolean }.
+// Returns the full updated list and pushes it to all of the user's open
+// devices so every screen stays in sync.
+export const setChatArchived = async (req, res) => {
+  try {
+    const { chatType, chatId, archived } = req.body || {};
+    if (!["direct", "group"].includes(chatType) || !mongoose.isValidObjectId(chatId)) {
+      return res.status(400).json({ error: "Invalid chat" });
+    }
+    const key = `${chatType === "group" ? "g" : "d"}:${chatId}`;
+    const update = archived ? { $addToSet: { archivedChats: key } } : { $pull: { archivedChats: key } };
+    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("archivedChats");
+    const archivedChats = user?.archivedChats || [];
+    io.to(req.user._id.toString()).emit("archivedChats", archivedChats);
+    res.status(200).json({ archivedChats });
+  } catch (error) {
+    console.log("Error in setChatArchived controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
