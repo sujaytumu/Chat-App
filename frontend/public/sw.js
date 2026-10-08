@@ -18,7 +18,7 @@ self.addEventListener("push", (event) => {
     payload = { title: "Talkies", body: event.data.text() };
   }
 
-  const { title, body, icon, tag, data } = payload;
+  const { title, body, icon, tag, data, isCall } = payload;
 
   event.waitUntil(
     self.registration.showNotification(title || "Talkies", {
@@ -28,6 +28,10 @@ self.addEventListener("push", (event) => {
       tag,
       data,
       renotify: true,
+      // Incoming calls: keep the notification on screen until acted on
+      // (instead of vanishing after a few seconds) and buzz the phone.
+      requireInteraction: !!isCall,
+      vibrate: isCall ? [700, 400, 700, 400, 700, 400, 700] : [200, 100, 200],
     })
   );
 });

@@ -31,13 +31,13 @@ const NotificationManager = () => {
       primeAudio();
       trySubscribe();
     };
-    window.addEventListener("click", onGesture);
-    window.addEventListener("keydown", onGesture);
-    window.addEventListener("touchstart", onGesture);
+    // iOS Safari does NOT treat "touchstart" as an audio-unlocking gesture —
+    // only "touchend" / "click" count — which is a big reason ringtones were
+    // silent on iPhones. Listen for every kind of tap.
+    const events = ["click", "keydown", "touchstart", "touchend", "pointerup"];
+    events.forEach((e) => window.addEventListener(e, onGesture, { passive: true }));
     return () => {
-      window.removeEventListener("click", onGesture);
-      window.removeEventListener("keydown", onGesture);
-      window.removeEventListener("touchstart", onGesture);
+      events.forEach((e) => window.removeEventListener(e, onGesture));
     };
   }, []);
 

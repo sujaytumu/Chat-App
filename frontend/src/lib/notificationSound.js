@@ -11,7 +11,50 @@ let audioCtx;
 export function primeAudio() {
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
+    // iOS Safari can leave the context "interrupted" (after a call, lock
+    // screen, or switching apps) as well as "suspended" — resume both.
+    if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
+
+    // iOS only fully unlocks Web Audio once something has actually been
+    // *played* inside a user gesture, so push one silent sample through.
+    if (!audioUnlocked) {
+      const buffer = audioCtx.createBuffer(1, 1, 22050);
+      const source = audioCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(audioCtx.destination);
+      source.start(0);
+      audioUnlocked = true;
+    }
+  } catch {
+    // ignore
+  }
+}
+
+let audioUnlocked = false;
+
+// Phones (iOS especially) suspend the audio context when the app is
+// backgrounded; make sure it is running again as soon as the page is
+// visible so the next incoming call can actually ring.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && audioCtx && audioCtx.state !== "running") {
+      audioCtx.resume().catch(() => {});
+    }
+  });
+}
+
+// Android phones can vibrate with the ring (iOS Safari has no vibration API).
+const RING_VIBRATION = [700, 400, 700, 400];
+export function vibrateForCall() {
+  try {
+    navigator.vibrate?.(RING_VIBRATION);
+  } catch {
+    // ignore
+  }
+}
+export function stopVibration() {
+  try {
+    navigator.vibrate?.(0);
   } catch {
     // ignore
   }
@@ -21,7 +64,7 @@ export function playNotificationSound() {
   if (!isMessageSoundEnabled()) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
 
     const now = audioCtx.currentTime;
     const tones = [
@@ -49,10 +92,14 @@ export function playNotificationSound() {
 }
 
 export function playRingtone() {
-  if (!isCallRingtoneEnabled()) return;
+  if (!isCallRingtoneEnabled()) {
+    vibrateForCall(); // silent ringtone setting still buzzes phones that support it
+    return;
+  }
+  vibrateForCall();
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
     const now = audioCtx.currentTime;
 
     // Classic dual-tone phone ring: two close frequencies mixed together,
