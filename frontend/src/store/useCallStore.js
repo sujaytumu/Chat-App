@@ -132,19 +132,33 @@ function emitWithRetry(socket, event, payload, { timeoutMs = 4000, retries = 1 }
 
 let pc = null;
 let pendingCandidates = [];
+let voiceOriginShare = false; // screen share started from a voice call (no camera to go back to)
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
 // Tells the other side our current mic/camera state so it can show a
 // "muted" indicator. Safe to call any time; no-ops outside a call.
+// A track that arrives through an already-negotiated video slot (e.g. the
+// peer starts a screen share after an earlier one) can come with NO stream
+// attached — event.streams is empty. Using streams[0] blindly then wiped the
+// remote stream (no audio, no video). Fall back to adding it to the current one.
+function remoteStreamFor(event, get) {
+  if (event.streams[0]) return event.streams[0];
+  const stream = get().remoteStream || new MediaStream();
+  if (!stream.getTracks().includes(event.track)) stream.addTrack(event.track);
+  return stream;
+}
+
+const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+
 const sendMediaState = (get) => {
   const socket = useAuthStore.getState().socket;
   const { remoteUser, isMuted, isVideoOff, isScreenSharing, callStatus } = get();
   if (!socket || !remoteUser || callStatus === "idle") return;
   socket.emit("callMediaState", {
     toUserId: remoteUser._id,
-    state: { isMuted, isVideoOff, isScreenSharing },
+    state: { isMuted, isVideoOff, isScreenSharing, hasCamera: !voiceOriginShare },
   });
 };
 
@@ -209,7 +223,7 @@ export const useCallStore = create((set, get) => ({
         return;
       }
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: AUDIO_CONSTRAINTS,
         video: callType === "video",
       });
     } catch {
@@ -237,7 +251,7 @@ export const useCallStore = create((set, get) => ({
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
-        set({ remoteStream: event.streams[0] });
+        set({ remoteStream: remoteStreamFor(event, get) });
         if (event.track.kind === "video" && get().callType !== "video") {
           set({ callType: "video" });
         }
@@ -296,7 +310,7 @@ export const useCallStore = create((set, get) => ({
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: AUDIO_CONSTRAINTS,
         video: callType === "video",
       });
       set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now() });
@@ -306,7 +320,7 @@ export const useCallStore = create((set, get) => ({
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
       pc.ontrack = (event) => {
-        set({ remoteStream: event.streams[0] });
+        set({ remoteStream: remoteStreamFor(event, get) });
         // If the other side upgraded to video mid-call, a video track
         // arrives after the call started as audio-only — switch our UI too.
         if (event.track.kind === "video" && get().callType !== "video") {
@@ -419,6 +433,7 @@ export const useCallStore = create((set, get) => ({
 
   resetCall: () => {
     get().stopRingtone();
+    voiceOriginShare = false;
     if (pc) {
       pc.close();
       pc = null;
@@ -524,8 +539,17 @@ export const useCallStore = create((set, get) => ({
   },
 
   toggleScreenShare: async () => {
-    const { isScreenSharing, localStream, callType } = get();
-    if (callType !== "video" || !pc) return;
+    const { isScreenSharing, localStream } = get();
+    if (!pc || get().callStatus !== "in-call") {
+      toast("You can share your screen once the call connects", { icon: "🖥️" });
+      return;
+    }
+    // Phone browsers don't implement getDisplayMedia — say so instead of
+    // silently doing nothing.
+    if (!isScreenSharing && !navigator.mediaDevices?.getDisplayMedia) {
+      toast.error("Screen sharing isn't supported on this device or browser. Use Chrome, Edge or Firefox on a computer.", { duration: 5000 });
+      return;
+    }
 
     // Reuse the call's existing video sender/transceiver for both starting and
     // stopping a share, so switching never adds a second video m-line (which
@@ -535,8 +559,7 @@ export const useCallStore = create((set, get) => ({
     const videoTransceiver = pc
       .getTransceivers()
       .find((t) => t.sender.track?.kind === "video" || t.receiver.track?.kind === "video");
-    const videoSender = videoTransceiver?.sender;
-    if (!videoSender) return;
+    let videoSender = videoTransceiver?.sender; // undefined in a voice call: added on demand below
 
     const audioTracks = localStream?.getAudioTracks() || [];
 
@@ -554,7 +577,23 @@ export const useCallStore = create((set, get) => ({
       }
       try {
         cameraTrack = localStream?.getVideoTracks()[0] || cameraTrack;
-        await videoSender.replaceTrack(screenTrack);
+        voiceOriginShare = !cameraTrack;
+        if (videoSender) {
+          try {
+            videoSender.setStreams?.(localStream || new MediaStream());
+          } catch {
+            // not supported — receiver falls back to the current stream
+          }
+          await videoSender.replaceTrack(screenTrack);
+          // A video slot we only ever *received* on (peer shared earlier) is
+          // recvonly — replacing its track alone would send nothing.
+          if (videoTransceiver && videoTransceiver.direction !== "sendrecv" && videoTransceiver.direction !== "sendonly") {
+            videoTransceiver.direction = "sendrecv"; // renegotiates
+          }
+        } else {
+          // Sharing from a voice call: add a video track (renegotiates)
+          videoSender = pc.addTrack(screenTrack, localStream || new MediaStream());
+        }
 
         // Stop sharing if the user uses the browser's own "Stop sharing" UI
         screenTrack.onended = () => {
@@ -564,6 +603,7 @@ export const useCallStore = create((set, get) => ({
         set({
           localStream: new MediaStream([...audioTracks, screenTrack]),
           isScreenSharing: true,
+          callType: "video",
         });
         sendMediaState(get);
       } catch {
@@ -572,6 +612,23 @@ export const useCallStore = create((set, get) => ({
       }
     } else {
       const screenTrack = localStream?.getVideoTracks()[0];
+      if (voiceOriginShare && videoSender) {
+        // Started from a voice call: no camera to restore — just stop sending
+        // video and drop back to the voice layout.
+        try {
+          await videoSender.replaceTrack(null);
+        } catch {
+          // ignore — track already gone
+        }
+        if (screenTrack) {
+          screenTrack.onended = null;
+          screenTrack.stop();
+        }
+        set({ localStream: new MediaStream(audioTracks), isScreenSharing: false, callType: "audio" });
+        sendMediaState(get); // hasCamera:false tells the peer to drop back too
+        voiceOriginShare = false;
+        return;
+      }
       try {
         // The camera track may have ended while the screen was being shared
         // (e.g. the device revoked it) — fetch a fresh one rather than
@@ -662,13 +719,20 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
-    socket.on("remoteMediaState", ({ isMuted, isVideoOff, isScreenSharing }) => {
+    socket.on("remoteMediaState", ({ isMuted, isVideoOff, isScreenSharing, hasCamera }) => {
       if (get().callStatus === "idle") return;
-      set({
+      const wasSharing = get().remoteScreenSharing;
+      const patch = {
         remoteMuted: !!isMuted,
         remoteVideoOff: !!isVideoOff,
         remoteScreenSharing: !!isScreenSharing,
-      });
+      };
+      // They stopped a screen share that began in a voice call and have no
+      // camera: drop back to the voice layout (unless I'm sending my camera).
+      if (wasSharing && !isScreenSharing && hasCamera === false && !get().localStream?.getVideoTracks().length) {
+        patch.callType = "audio";
+      }
+      set(patch);
     });
 
     socket.on("remoteDeviceRinging", () => {
