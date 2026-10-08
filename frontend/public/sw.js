@@ -3,12 +3,109 @@
 
 const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test((self.navigator && self.navigator.userAgent) || "");
 
+// ---- App-shell caching: instant open, even when the server is asleep ----------
+// Hashed files under /assets/ never change, so they're served from the device
+// (no network at all after the first visit). The HTML page is fetched fresh
+// every time, but if the server doesn't answer within a couple of seconds
+// (cold start / bad signal) the last good copy is used so the app opens
+// immediately and then catches up — instead of a blank screen.
+const SHELL_CACHE = "talkies-shell-v1";
+const ASSET_CACHE = "talkies-assets-v1";
+const SHELL_TIMEOUT_MS = 2500;
+const MAX_ASSETS = 120;
+
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(
+        names.filter((n) => n.startsWith("talkies-") && n !== SHELL_CACHE && n !== ASSET_CACHE).map((n) => caches.delete(n))
+      );
+      // keep the asset cache from growing forever across deploys
+      const assets = await caches.open(ASSET_CACHE);
+      const keys = await assets.keys();
+      await Promise.all(keys.slice(0, Math.max(0, keys.length - MAX_ASSETS)).map((k) => assets.delete(k)));
+      await self.clients.claim();
+    })()
+  );
+});
+
+async function shellResponse(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match("/index.html");
+  if (!cached) return fetch(request);
+
+  const network = fetch(request).then((res) => {
+    if (!res.ok) throw new Error("bad shell response");
+    cache.put("/index.html", res.clone());
+    return res;
+  });
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(cached), SHELL_TIMEOUT_MS));
+  return Promise.race([network, timeout]).catch(() => cached);
+}
+
+async function assetResponse(request) {
+  const cache = await caches.open(ASSET_CACHE);
+  const hit = await cache.match(request);
+  if (hit) return hit;
+  const res = await fetch(request);
+  // The server answers unknown paths with the HTML page — never cache that as a script.
+  const type = res.headers.get("content-type") || "";
+  if (res.ok && !type.includes("text/html")) cache.put(request, res.clone());
+  return res;
+}
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/socket.io/") || url.pathname === "/sw.js") return;
+  if (req.cache === "no-store" || url.searchParams.has("v")) return; // the app's "is there a new version?" check
+
+  if (req.mode === "navigate") {
+    event.respondWith(shellResponse(req));
+  } else if (url.pathname.startsWith("/assets/")) {
+    event.respondWith(assetResponse(req));
+  }
+});
+
+// ---- Push subscription renewal -------------------------------------------------
+// Browsers occasionally rotate a push subscription. Without this the device
+// quietly stops getting notifications until the app is opened again.
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((c) => c.charCodeAt(0)));
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      try {
+        const res = await fetch("/api/push/vapid-public-key", { credentials: "include" });
+        const { publicKey } = await res.json();
+        if (!publicKey) return;
+        const sub = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sub.toJSON()),
+        });
+      } catch {
+        // will be re-subscribed next time the app opens
+      }
+    })()
+  );
 });
 
 self.addEventListener("push", (event) => {
@@ -51,6 +148,17 @@ self.addEventListener("push", (event) => {
         vibrate: isCall ? [700, 400, 700, 400, 700, 400, 700] : [200, 100, 200],
         actions: isCall && Array.isArray(actions) ? actions : undefined,
       });
+
+      // The message reached this device: tell the server so the sender gets
+      // the double tick ("delivered") even though the app is closed.
+      if (data && data.messageId) {
+        await fetch("/api/messages/ack-delivered", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messageId: data.messageId }),
+        }).catch(() => {});
+      }
     })()
   );
 });

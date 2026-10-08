@@ -25,6 +25,12 @@ function notifyIncoming(senderName, message, isGroup = false) {
   });
 }
 
+const PAGE_SIZE = 80; // messages fetched per page (newest first, older on demand)
+const msgCache = new Map(); // chatKey -> last known messages (instant re-open)
+const chatKeyOf = (chat) => `${chat.type === "group" ? "g" : "d"}:${chat.data._id}`;
+let usersInFlight = null;
+let groupsInFlight = null;
+
 export const useChatStore = create((set, get) => ({
   // Sidebar data
   users: [],
@@ -36,6 +42,8 @@ export const useChatStore = create((set, get) => ({
   selectedChat: null,
 
   messages: [],
+  hasMoreMessages: false,
+  isLoadingOlder: false,
   isMessagesLoading: false,
   replyingTo: null, // message currently being replied to (shown above the input)
 
@@ -44,7 +52,13 @@ export const useChatStore = create((set, get) => ({
 
   socketSubscribed: false,
 
-  getUsers: async () => {
+  getUsers: () => {
+    if (usersInFlight) return usersInFlight;
+    usersInFlight = get()._fetchUsers().finally(() => (usersInFlight = null));
+    return usersInFlight;
+  },
+
+  _fetchUsers: async () => {
     // Show the last-known list immediately (and only fall back to the skeleton
     // when there's nothing at all to show), then refresh from the server.
     const userId = useAuthStore.getState().authUser?._id;
@@ -64,7 +78,13 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  getGroups: async () => {
+  getGroups: () => {
+    if (groupsInFlight) return groupsInFlight;
+    groupsInFlight = get()._fetchGroups().finally(() => (groupsInFlight = null));
+    return groupsInFlight;
+  },
+
+  _fetchGroups: async () => {
     const userId = useAuthStore.getState().authUser?._id;
     if (get().groups.length === 0) {
       const cached = readChatCache(userId, "groups");
@@ -110,39 +130,88 @@ export const useChatStore = create((set, get) => ({
   },
 
   setSelectedChat: (chat) => {
-    set({ selectedChat: chat, messages: [] });
-    if (!chat) return;
+    if (!chat) {
+      set({ selectedChat: null, messages: [], hasMoreMessages: false });
+      return;
+    }
+    // Re-opening a chat is instant: show what we last had (memory, then disk)
+    // right away and refresh from the server in the background.
+    const key = chatKeyOf(chat);
+    const userId = useAuthStore.getState().authUser?._id;
+    const cached = msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [];
+    set({ selectedChat: chat, messages: cached, hasMoreMessages: false });
     get().getMessages();
   },
 
   getMessages: async () => {
-    const { selectedChat } = get();
-    if (!selectedChat) return;
-    set({ isMessagesLoading: true });
+    const chat = get().selectedChat;
+    if (!chat) return;
+    const isSame = () => {
+      const cur = get().selectedChat;
+      return !!cur && cur.type === chat.type && cur.data._id === chat.data._id;
+    };
+    // Only show the skeleton when there is nothing at all to show yet.
+    set({ isMessagesLoading: get().messages.length === 0 });
     try {
-      if (selectedChat.type === "direct") {
-        const res = await axiosInstance.get(`/messages/${selectedChat.data._id}`);
-        set({ messages: res.data });
+      const url = chat.type === "direct" ? `/messages/${chat.data._id}` : `/groups/${chat.data._id}/messages`;
+      const res = await axiosInstance.get(url, { params: { limit: PAGE_SIZE } });
+      // The person may have switched chats while this was loading — never let a
+      // slow response paint over the chat they're looking at now.
+      if (!isSame()) return;
+
+      // Keep any older pages already scrolled into view (reconnect resync).
+      const fresh = res.data;
+      const firstFresh = fresh[0]?.createdAt;
+      const older = firstFresh ? get().messages.filter((m) => m.createdAt < firstFresh) : [];
+      const merged = older.length ? [...older, ...fresh] : fresh;
+      set((state) => ({
+        messages: merged,
+        hasMoreMessages: older.length ? state.hasMoreMessages : fresh.length >= PAGE_SIZE,
+      }));
+
+      const key = chatKeyOf(chat);
+      msgCache.set(key, fresh);
+      const userId = useAuthStore.getState().authUser?._id;
+      setTimeout(() => writeChatCache(userId, `msgs-${key}`, fresh.slice(-40)), 0);
+
+      if (chat.type === "direct") {
         // Mark as seen + clear unread badge locally
-        axiosInstance.put(`/messages/seen/${selectedChat.data._id}`).catch(() => {});
+        axiosInstance.put(`/messages/seen/${chat.data._id}`).catch(() => {});
         set((state) => ({
-          users: state.users.map((u) =>
-            u._id === selectedChat.data._id ? { ...u, unreadCount: 0 } : u
-          ),
+          users: state.users.map((u) => (u._id === chat.data._id ? { ...u, unreadCount: 0 } : u)),
         }));
       } else {
-        const res = await axiosInstance.get(`/groups/${selectedChat.data._id}/messages`);
-        set({ messages: res.data });
         set((state) => ({
-          groups: state.groups.map((g) =>
-            g._id === selectedChat.data._id ? { ...g, unreadCount: 0 } : g
-          ),
+          groups: state.groups.map((g) => (g._id === chat.data._id ? { ...g, unreadCount: 0 } : g)),
         }));
       }
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to load messages");
+      if (isSame()) toast.error(error.response?.data?.error || "Failed to load messages");
     } finally {
-      set({ isMessagesLoading: false });
+      if (isSame()) set({ isMessagesLoading: false });
+    }
+  },
+
+  // "Load older messages": fetch the page before the oldest one we have.
+  loadOlderMessages: async () => {
+    const { selectedChat: chat, messages, isLoadingOlder, hasMoreMessages } = get();
+    if (!chat || isLoadingOlder || !hasMoreMessages || messages.length === 0) return false;
+    set({ isLoadingOlder: true });
+    try {
+      const url = chat.type === "direct" ? `/messages/${chat.data._id}` : `/groups/${chat.data._id}/messages`;
+      const res = await axiosInstance.get(url, { params: { before: messages[0].createdAt, limit: PAGE_SIZE } });
+      const cur = get().selectedChat;
+      if (!cur || cur.type !== chat.type || cur.data._id !== chat.data._id) return false;
+      set((state) => ({
+        messages: [...res.data, ...state.messages],
+        hasMoreMessages: res.data.length >= PAGE_SIZE,
+      }));
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Failed to load older messages");
+      return false;
+    } finally {
+      set({ isLoadingOlder: false });
     }
   },
 

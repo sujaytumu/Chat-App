@@ -22,10 +22,24 @@ export function configureWebPush() {
 // Calls use urgency "high" + a short TTL so phones wake up for them right away
 // and a stale "ringing" push is never delivered long after the call is over.
 export async function sendPushToUser(userId, payload, options = {}) {
-  if (!configured) return;
+  return sendPushToUsers([userId], payload, options);
+}
+
+// Same, for several users with ONE database query (group chats).
+export async function sendPushToUsers(userIds, payload, options = {}) {
+  if (!configured || !userIds?.length) return;
   try {
-    const user = await User.findById(userId).select("pushSubscriptions");
-    if (!user || user.pushSubscriptions.length === 0) return;
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions").lean();
+    await Promise.all(users.map((u) => pushToSubscriptions(u, payload, options)));
+  } catch (error) {
+    console.log("Error in sendPushToUsers:", error.message);
+  }
+}
+
+async function pushToSubscriptions(user, payload, options) {
+  const userId = user._id;
+  try {
+    if (!user.pushSubscriptions?.length) return;
 
     const staleEndpoints = [];
     await Promise.all(

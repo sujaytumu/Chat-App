@@ -16,6 +16,7 @@ import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import Avatar from "./Avatar";
+import { optimizeImage } from "../lib/cdn";
 
 // WhatsApp tints each person's name in a group differently.
 const SENDER_COLORS = ["#25D366", "#53BDEB", "#E8A33D", "#B794F6", "#F472B6", "#A3E635"];
@@ -32,6 +33,9 @@ const ChatContainer = () => {
     deleteMessage,
     setReplyingTo,
     toggleStarMessage,
+    hasMoreMessages,
+    isLoadingOlder,
+    loadOlderMessages,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
@@ -46,6 +50,7 @@ const ChatContainer = () => {
   const nearBottomRef = useRef(true); // is the reader at (or close to) the latest message?
   const [showJump, setShowJump] = useState(false);
   const [newWhileAway, setNewWhileAway] = useState(0);
+  const prependRef = useRef(null); // scroll position to restore after older messages are added on top
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -64,6 +69,14 @@ const ChatContainer = () => {
   }, [messages]);
 
   useEffect(() => {
+    // Older messages were just added above: keep the reader exactly where they
+    // were instead of jumping (and don't count them as "new messages").
+    if (prependRef.current && scrollRef.current) {
+      const { height, top } = prependRef.current;
+      prependRef.current = null;
+      scrollRef.current.scrollTop = top + (scrollRef.current.scrollHeight - height);
+      return;
+    }
     if (!messageEndRef.current) return;
 
     // Jump straight to the bottom instantly when a chat is first opened —
@@ -100,6 +113,13 @@ const ChatContainer = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, isOtherTyping, selectedChat, data._id]);
+
+  const handleLoadOlder = async () => {
+    const el = scrollRef.current;
+    if (el) prependRef.current = { height: el.scrollHeight, top: el.scrollTop };
+    const loaded = await loadOlderMessages();
+    if (!loaded) prependRef.current = null;
+  };
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -175,8 +195,20 @@ const ChatContainer = () => {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        style={{ overflowAnchor: "none" }}
         className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[6%] lg:px-[8%] py-3"
       >
+        {hasMoreMessages && (
+          <div className="flex justify-center pb-3">
+            <button
+              onClick={handleLoadOlder}
+              disabled={isLoadingOlder}
+              className="bg-[#1F2C34]/95 text-[#8696A0] hover:text-white text-[13px] px-4 py-1.5 rounded-full shadow-sm disabled:opacity-60"
+            >
+              {isLoadingOlder ? "Loading…" : "Load older messages"}
+            </button>
+          </div>
+        )}
         {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
@@ -294,8 +326,10 @@ const ChatContainer = () => {
                   )}
                   {message.image && (
                     <img
-                      src={message.image}
+                      src={optimizeImage(message.image, 260)}
                       alt="Attachment"
+                      loading="lazy"
+                      decoding="async"
                       onLoad={handleMediaLoaded}
                       onClick={() => setLightboxSrc(message.image)}
                       className="max-w-full w-[260px] max-h-[320px] h-auto object-cover rounded-lg mb-1 cursor-pointer hover:opacity-90 transition-opacity"
