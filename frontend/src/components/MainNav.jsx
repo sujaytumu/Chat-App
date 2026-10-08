@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { MessageCircle, Phone, CircleDot } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
@@ -14,9 +15,18 @@ const items = [
 // on desktop, a bottom tab bar (with a pill behind the active icon) on phones.
 const MainNav = () => {
   const { authUser } = useAuthStore();
-  const unread = useChatStore((s) =>
-    [...s.users, ...s.groups].reduce((sum, c) => sum + (c.unreadCount || 0), 0)
-  );
+  const archived = authUser?.archivedChats;
+  // Archived chats don't count towards the badge (like WhatsApp). Select the
+  // raw lists and total below so the selector stays stable between renders.
+  const users = useChatStore((s) => s.users);
+  const groups = useChatStore((s) => s.groups);
+  const unread = useMemo(() => {
+    const hidden = new Set(archived || []);
+    return (
+      users.reduce((sum, c) => sum + (hidden.has(`d:${c._id}`) ? 0 : c.unreadCount || 0), 0) +
+      groups.reduce((sum, c) => sum + (hidden.has(`g:${c._id}`) ? 0 : c.unreadCount || 0), 0)
+    );
+  }, [users, groups, archived]);
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
 

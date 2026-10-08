@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { startNotificationActionListener } from "../lib/notificationActions";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import { requestNotificationPermission, registerPushSubscription, primeAudio } from "../lib/notificationSound";
 import { loadCustomTone } from "../lib/soundSettings";
 import { axiosInstance } from "../lib/axios";
@@ -15,6 +16,7 @@ const BASE_TITLE = "Talkies";
 const NotificationManager = () => {
   const users = useChatStore((s) => s.users);
   const groups = useChatStore((s) => s.groups);
+  const archivedChats = useAuthStore((s) => s.authUser?.archivedChats);
   const navigate = useNavigate();
 
   // Taps on message / call notifications (Answer, open chat).
@@ -67,9 +69,11 @@ const NotificationManager = () => {
   }, []);
 
   useEffect(() => {
+    // Archived chats are left out of the count (like WhatsApp).
+    const hidden = new Set(archivedChats || []);
     const totalUnread =
-      users.reduce((sum, u) => sum + (u.unreadCount || 0), 0) +
-      groups.reduce((sum, g) => sum + (g.unreadCount || 0), 0);
+      users.reduce((sum, u) => sum + (hidden.has(`d:${u._id}`) ? 0 : u.unreadCount || 0), 0) +
+      groups.reduce((sum, g) => sum + (hidden.has(`g:${g._id}`) ? 0 : g.unreadCount || 0), 0);
 
     document.title = totalUnread > 0 ? `(${totalUnread > 99 ? "99+" : totalUnread}) ${BASE_TITLE}` : BASE_TITLE;
 
@@ -81,7 +85,7 @@ const NotificationManager = () => {
     return () => {
       document.title = BASE_TITLE;
     };
-  }, [users, groups]);
+  }, [users, groups, archivedChats]);
 
   return null;
 };
