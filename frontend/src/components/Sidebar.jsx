@@ -6,7 +6,7 @@ import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import Avatar from "./Avatar";
 import MessageTicks from "./MessageTicks";
 import { formatChatListTime } from "../lib/utils";
-import { UserRoundPlus, Search, Settings, LogOut, MoreVertical, X, UserRound, UsersRound } from "lucide-react";
+import { UserRoundPlus, Search, Settings, LogOut, MoreVertical, X, UserRound, UsersRound, Archive, ArchiveRestore, ArrowLeft } from "lucide-react";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 
@@ -28,14 +28,24 @@ const menuItem =
   "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
 
 const Sidebar = () => {
-  const { getUsers, getGroups, users, groups, selectedChat, setSelectedChat, isUsersLoading, typingUsers } =
-    useChatStore();
+  const {
+    getUsers,
+    getGroups,
+    users,
+    groups,
+    selectedChat,
+    setSelectedChat,
+    isUsersLoading,
+    typingUsers,
+    setChatArchived,
+  } = useChatStore();
 
   const { onlineUsers, authUser, logout } = useAuthStore();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -52,6 +62,9 @@ const Sidebar = () => {
     return () => document.removeEventListener("mousedown", onDown);
   }, [showMenu]);
 
+  const archivedKeys = authUser?.archivedChats;
+  const archivedSet = useMemo(() => new Set(archivedKeys || []), [archivedKeys]);
+
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
 
@@ -61,6 +74,7 @@ const Sidebar = () => {
         type: "direct",
         data: u,
         key: `d-${u._id}`,
+        archived: archivedSet.has(`d:${u._id}`),
         name: u.fullName,
         avatar: u.profilePic,
         online: onlineUsers.includes(u._id),
@@ -75,6 +89,7 @@ const Sidebar = () => {
         type: "group",
         data: g,
         key: `g-${g._id}`,
+        archived: archivedSet.has(`g:${g._id}`),
         name: g.name,
         avatar: g.groupPic,
         online: false,
@@ -86,6 +101,7 @@ const Sidebar = () => {
       }));
 
     return [...directItems, ...groupItems]
+      .filter((item) => item.archived === showArchived)
       .filter((item) => {
         if (filter === "unread") return item.unreadCount > 0;
         if (filter === "groups") return item.type === "group";
@@ -93,12 +109,23 @@ const Sidebar = () => {
         return true;
       })
       .sort((a, b) => b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers]);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, showArchived]);
 
   const totalUnread = useMemo(
-    () => [...users, ...groups].reduce((sum, c) => sum + (c.unreadCount || 0), 0),
-    [users, groups]
+    () =>
+      users.reduce((sum, c) => sum + (archivedSet.has(`d:${c._id}`) ? 0 : c.unreadCount || 0), 0) +
+      groups.reduce((sum, c) => sum + (archivedSet.has(`g:${c._id}`) ? 0 : c.unreadCount || 0), 0),
+    [users, groups, archivedSet]
   );
+
+  // Archived chats: how many, and how many have unread messages
+  const archivedInfo = useMemo(() => {
+    const all = [
+      ...users.map((u) => ({ k: `d:${u._id}`, unread: u.unreadCount || 0 })),
+      ...groups.map((g) => ({ k: `g:${g._id}`, unread: g.unreadCount || 0 })),
+    ].filter((c) => archivedSet.has(c.k));
+    return { count: all.length, unread: all.filter((c) => c.unread > 0).length };
+  }, [users, groups, archivedSet]);
 
   if (isUsersLoading) return <SidebarSkeleton />;
 
@@ -106,7 +133,20 @@ const Sidebar = () => {
     <aside className="relative flex flex-col w-full lg:w-[400px] xl:w-[420px] shrink-0 h-full bg-[#0B141A] lg:border-r lg:border-white/5">
       {/* Title + menu */}
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Talkies</h1>
+        {showArchived ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowArchived(false)}
+              className="size-11 -ml-2 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
+              aria-label="Back to chats"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-[22px] leading-none font-semibold text-[#E9EDEF]">Archived</h1>
+          </div>
+        ) : (
+          <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Talkies</h1>
+        )}
 
         <div className="relative" ref={menuRef}>
           <button
@@ -183,6 +223,21 @@ const Sidebar = () => {
 
       {/* Chat list */}
       <div className="overflow-y-auto flex-1 pb-24">
+        {!showArchived && archivedInfo.count > 0 && !search && filter === "all" && (
+          <button
+            onClick={() => setShowArchived(true)}
+            className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] transition-colors"
+          >
+            <span className="size-14 flex items-center justify-center text-[#25D366]">
+              <Archive size={22} />
+            </span>
+            <span className="flex-1 text-[17px] text-[#E9EDEF]">Archived</span>
+            <span className={`text-sm ${archivedInfo.unread > 0 ? "text-[#25D366] font-medium" : "text-[#8696A0]"}`}>
+              {archivedInfo.unread > 0 ? archivedInfo.unread : archivedInfo.count}
+            </span>
+          </button>
+        )}
+
         {items.map((item) => {
           const isSelected = selectedChat?.type === item.type && selectedChat.data._id === item.data._id;
           const hasUnread = item.unreadCount > 0;
@@ -191,8 +246,8 @@ const Sidebar = () => {
             (typingUsers[item.type === "group" ? `group:${item.data._id}` : item.data._id]?.size ?? 0) > 0;
 
           return (
+            <div key={item.key} className="group relative">
             <button
-              key={item.key}
               onClick={() => setSelectedChat({ type: item.type, data: item.data })}
               className={`w-full px-4 py-3 flex items-center gap-4 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
                 isSelected ? "lg:bg-[#2A3942]" : ""
@@ -244,12 +299,27 @@ const Sidebar = () => {
                 </div>
               </div>
             </button>
+            <button
+              onClick={() => setChatArchived({ type: item.type, data: item.data }, !item.archived)}
+              className="hidden lg:group-hover:flex absolute right-3 top-3 size-8 rounded-full items-center justify-center bg-[#233138] text-[#AEBAC1] hover:text-white shadow-md"
+              title={item.archived ? "Unarchive" : "Archive"}
+              aria-label={item.archived ? "Unarchive chat" : "Archive chat"}
+            >
+              {item.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+            </button>
+            </div>
           );
         })}
 
         {items.length === 0 && (
           <div className="text-center text-[#8696A0] py-10 px-6 text-[15px]">
-            {search ? `No chats matching “${search}”` : filter === "all" ? "No chats yet" : "Nothing here"}
+            {search
+              ? `No chats matching “${search}”`
+              : showArchived
+              ? "No archived chats"
+              : filter === "all"
+              ? "No chats yet"
+              : "Nothing here"}
           </div>
         )}
       </div>

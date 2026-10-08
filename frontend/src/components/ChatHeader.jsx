@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { ArrowLeft, Info, Phone, Video, MoreVertical, X } from "lucide-react";
+import { ArrowLeft, Info, Phone, Video, MoreVertical, X, Archive, ArchiveRestore } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
@@ -13,8 +13,8 @@ const iconBtn =
 const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
 
 const ChatHeader = () => {
-  const { selectedChat, setSelectedChat, typingUsers } = useChatStore();
-  const { onlineUsers } = useAuthStore();
+  const { selectedChat, setSelectedChat, typingUsers, setChatArchived } = useChatStore();
+  const { onlineUsers, authUser } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -47,6 +47,7 @@ const ChatHeader = () => {
     ? "online"
     : "offline";
   const isOnline = !isGroup && status === "online";
+  const isArchived = (authUser?.archivedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
 
   return (
     <div className="relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-[#0B141A] lg:bg-[#111B21] border-b border-white/5">
@@ -110,6 +111,22 @@ const ChatHeader = () => {
                   <Info size={18} className="text-[#AEBAC1]" /> Group info
                 </button>
               )}
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setChatArchived(selectedChat, !isArchived);
+                  // Archiving closes the chat, like WhatsApp
+                  if (!isArchived) setSelectedChat(null);
+                }}
+              >
+                {isArchived ? (
+                  <ArchiveRestore size={18} className="text-[#AEBAC1]" />
+                ) : (
+                  <Archive size={18} className="text-[#AEBAC1]" />
+                )}
+                {isArchived ? "Unarchive chat" : "Archive chat"}
+              </button>
               <button
                 className={menuItem}
                 onClick={() => {
