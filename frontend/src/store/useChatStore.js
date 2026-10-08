@@ -564,6 +564,27 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
+    // A group member's device received / read messages: update the ticks and
+    // the "Message info" lists live.
+    socket.on("groupReceipts", ({ groupId, userId, at, kind, messageIds }) => {
+      const { selectedChat } = get();
+      if (selectedChat?.type !== "group" || selectedChat.data._id !== groupId) return;
+      const ids = new Set(messageIds);
+      set((state) => ({
+        messages: state.messages.map((m) => {
+          if (!ids.has(m._id)) return m;
+          const has = (list) => (list || []).some((e) => String(e.user) === String(userId));
+          const next = { ...m };
+          if (!has(m.deliveredTo)) next.deliveredTo = [...(m.deliveredTo || []), { user: userId, at }];
+          if (kind === "seen") {
+            if (!has(m.seenLog)) next.seenLog = [...(m.seenLog || []), { user: userId, at }];
+            if (!(m.seenBy || []).map(String).includes(String(userId))) next.seenBy = [...(m.seenBy || []), userId];
+          }
+          return next;
+        }),
+      }));
+    });
+
     // Archive list changed on another device (or this one) — keep in sync.
     socket.on("archivedChats", (archivedChats) => {
       useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, archivedChats } } : {}));
@@ -618,6 +639,7 @@ export const useChatStore = create((set, get) => ({
       "groupUpdated",
       "removedFromGroup",
       "archivedChats",
+      "groupReceipts",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });
   },
