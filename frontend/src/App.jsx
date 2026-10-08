@@ -15,6 +15,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { useEffect } from "react";
+import { startVersionWatcher } from "./lib/versionCheck";
 
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
@@ -29,10 +30,13 @@ const App = () => {
     checkAuth();
   }, [checkAuth]);
 
+  // Move to the newest build whenever a newer one is deployed (no stale UI).
+  useEffect(() => startVersionWatcher(), []);
+
   if (isCheckingAuth && !authUser)
     return (
-      <div className="flex items-center justify-center h-screen bg-[#D9E5D8]">
-        <Loader className="size-10 animate-spin text-[#128C7E]" />
+      <div className="flex items-center justify-center h-[100dvh] bg-[#0B141A]">
+        <Loader className="size-10 animate-spin text-[#25D366]" />
       </div>
     );
 
