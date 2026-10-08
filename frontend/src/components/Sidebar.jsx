@@ -12,23 +12,25 @@ import {
   Search,
   Settings,
   LogOut,
-  MoreVertical,
   X,
   UserRound,
   UsersRound,
-  Archive,
-  ArchiveRestore,
-  ArrowLeft,
-  Pin,
-  PinOff,
-  Trash2,
-  Bell,
-  BellOff,
-  Check,
-  MessageSquarePlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
+import {
+  WaBack,
+  WaKebab,
+  WaPinAction,
+  WaUnpinAction,
+  WaPinSolid,
+  WaTrash,
+  WaBell,
+  WaBellOff,
+  WaArchive,
+  WaCheck,
+  WaNewChat,
+} from "./icons/WaIcons";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 
@@ -89,6 +91,7 @@ const Sidebar = () => {
   const [search, setSearch] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showSelMenu, setShowSelMenu] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   // Phone Back leaves the Archived folder (back to the main list).
   useBackToClose(showArchived, () => setShowArchived(false));
@@ -136,7 +139,10 @@ const Sidebar = () => {
       else next.add(key);
       return next;
     });
-  const clearSelected = () => setSelected(new Set());
+  const clearSelected = () => {
+    setSelected(new Set());
+    setShowSelMenu(false);
+  };
   const cancelPress = () => clearTimeout(pressTimer.current);
   const startPress = (key, e) => {
     longPressed.current = false;
@@ -287,23 +293,41 @@ const Sidebar = () => {
   return (
     <aside className="relative flex flex-col w-full lg:w-[400px] xl:w-[420px] shrink-0 h-full bg-[#0B141A] lg:border-r lg:border-white/5">
       {selecting && (
-        <div className="flex items-center gap-1 px-2 pt-3 pb-3 bg-[#0B141A]">
-          <button onClick={clearSelected} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label="Cancel selection">
-            <X size={24} />
+        <div className="flex items-center h-14 pl-1 pr-0 bg-[#0B141A]">
+          <button onClick={clearSelected} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Cancel selection">
+            <WaBack size={24} />
           </button>
-          <span className="flex-1 text-[20px] font-medium text-[#E9EDEF] pl-1">{selected.size}</span>
-          <button onClick={onPin} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
-            {allPinned ? <PinOff size={22} /> : <Pin size={22} />}
+          <span className="flex-1 text-[22px] leading-none font-normal text-[#E9EDEF] pl-5">{selected.size}</span>
+          <button onClick={onPin} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
+            {allPinned ? <WaUnpinAction /> : <WaPinAction />}
           </button>
-          <button onClick={() => setConfirmDelete(true)} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label="Delete" title="Delete">
-            <Trash2 size={22} />
+          <button onClick={() => setConfirmDelete(true)} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Delete" title="Delete">
+            <WaTrash />
           </button>
-          <button onClick={onMute} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
-            {allMuted ? <Bell size={22} /> : <BellOff size={22} />}
+          <button onClick={onMute} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
+            {allMuted ? <WaBell /> : <WaBellOff />}
           </button>
-          <button onClick={onArchive} className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
-            {showArchived ? <ArchiveRestore size={22} /> : <Archive size={22} />}
+          <button onClick={onArchive} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
+            <WaArchive up={showArchived} />
           </button>
+          <div className="relative">
+            <button onClick={() => setShowSelMenu((v) => !v)} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="More options">
+              <WaKebab />
+            </button>
+            {showSelMenu && (
+              <div className="absolute right-2 top-full mt-1 w-52 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+                <button
+                  className={menuItem}
+                  onClick={() => {
+                    setSelected(new Set(items.map((i) => i.key)));
+                    setShowSelMenu(false);
+                  }}
+                >
+                  Select all
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -316,7 +340,7 @@ const Sidebar = () => {
               className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
               aria-label="Back to chats"
             >
-              <ArrowLeft size={24} />
+              <WaBack size={24} />
             </button>
             <h1 className="text-[22px] leading-none font-normal text-[#E9EDEF]">Archived</h1>
           </div>
@@ -330,7 +354,7 @@ const Sidebar = () => {
             className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
             aria-label="Menu"
           >
-            <MoreVertical size={22} />
+            <WaKebab size={24} />
           </button>
           {showMenu && (
             <div className="absolute right-0 top-full mt-1 w-56 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
@@ -366,7 +390,7 @@ const Sidebar = () => {
 
       {/* Search pill */}
       {!showArchived && (
-      <div className="px-4 pb-3">
+      <div className={`px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         <div className="flex items-center gap-3 h-12 rounded-full bg-[#1F2C34] px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
           <Search size={20} className="text-[#8696A0] shrink-0" />
           <input
@@ -387,7 +411,7 @@ const Sidebar = () => {
 
       {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
       {!showArchived && (
-      <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 pb-3">
+      <div className={`flex gap-2 overflow-x-auto no-scrollbar px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         {FILTERS.map(({ id, label }) => {
           const active = filter === id;
           return (
@@ -416,15 +440,15 @@ const Sidebar = () => {
               setFilter("all");
               setShowArchived(true);
             }}
-            className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] transition-colors"
+            className="w-full pl-3 pr-4 py-2.5 flex items-center gap-3 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] transition-colors"
           >
-            <span className="size-14 flex items-center justify-center text-[#8696A0]">
-              <Archive size={22} />
+            <span className="size-12 flex items-center justify-center text-[#8696A0]">
+              <WaArchive size={26} />
             </span>
             <span className="flex-1 text-[17px] text-[#8696A0]">Archived</span>
-            <span className={`text-sm ${archivedInfo.unread > 0 ? "text-[#25D366] font-medium" : "text-[#8696A0]"}`}>
-              {archivedInfo.unread > 0 ? archivedInfo.unread : archivedInfo.count}
-            </span>
+            {archivedInfo.unread > 0 && (
+              <span className="text-[13px] font-medium text-[#25D366]">{archivedInfo.unread}</span>
+            )}
           </button>
         )}
 
@@ -455,15 +479,15 @@ const Sidebar = () => {
                 addSelected(item.key);
               }}
               style={{ WebkitTouchCallout: "none" }}
-              className={`w-full select-none px-4 py-3 flex items-center gap-4 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
-                selected.has(item.key) ? "bg-[#1F3A33]" : isSelected ? "lg:bg-[#2A3942]" : ""
+              className={`w-full select-none pl-3 pr-4 py-[14px] flex items-center gap-3 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
+                selected.has(item.key) ? "bg-[#0C3B2C]" : isSelected ? "lg:bg-[#2A3942]" : ""
               }`}
             >
               <div className="relative shrink-0">
-                <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-14" />
+                <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-12" />
                 {selected.has(item.key) && (
-                  <span className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#25D366] text-[#0B141A] ring-2 ring-[#0B141A] flex items-center justify-center">
-                    <Check size={14} strokeWidth={3} />
+                  <span className="absolute -bottom-1 -right-1 size-[22px] rounded-full bg-[#21C063] text-[#0B141A] ring-2 ring-[#0B141A] flex items-center justify-center">
+                    <WaCheck size={14} />
                   </span>
                 )}
                 {item.online && (
@@ -473,7 +497,7 @@ const Sidebar = () => {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[17px] text-[#E9EDEF] truncate">{item.name}</span>
+                  <span className="text-[17px] leading-[22px] text-[#E9EDEF] truncate">{item.name}</span>
                   {item.lastMessage && (
                     <span
                       className={`text-xs shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-[#8696A0]"}`}
@@ -482,12 +506,12 @@ const Sidebar = () => {
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-3 mt-0.5">
+                <div className="flex items-center justify-between gap-3 mt-px">
                   {isTyping ? (
                     <span className="min-w-0 truncate text-[15px] text-[#25D366]">typing…</span>
                   ) : (
                   <span
-                    className={`flex items-center gap-1 min-w-0 text-[15px] ${
+                    className={`flex items-center gap-1 min-w-0 text-[14.5px] leading-5 ${
                       hasUnread ? "text-[#E9EDEF]" : "text-[#8696A0]"
                     }`}
                   >
@@ -503,17 +527,17 @@ const Sidebar = () => {
                   </span>
                   )}
                   <span className="flex items-center gap-1.5 shrink-0 text-[#8696A0]">
-                    {item.muted && <BellOff size={15} />}
+                    {item.muted && <WaBellOff size={16} />}
                     {hasUnread ? (
                       <span
-                        className={`min-w-[22px] h-[22px] px-1.5 rounded-full text-xs font-semibold flex items-center justify-center ${
+                        className={`min-w-[20px] h-5 px-1.5 rounded-full text-[12.5px] font-medium flex items-center justify-center ${
                           item.muted ? "bg-[#3B4A54] text-[#E9EDEF]" : "bg-[#25D366] text-[#0B141A]"
                         }`}
                       >
                         {item.unreadCount > 99 ? "99+" : item.unreadCount}
                       </span>
                     ) : (
-                      item.pinned && <Pin size={16} className="rotate-45" fill="currentColor" />
+                      item.pinned && <WaPinSolid size={18} />
                     )}
                   </span>
                 </div>
@@ -525,7 +549,7 @@ const Sidebar = () => {
               title={item.archived ? "Unarchive" : "Archive"}
               aria-label={item.archived ? "Unarchive chat" : "Archive chat"}
             >
-              {item.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+              <WaArchive size={18} up={item.archived} />
             </button>
             </div>
           );
@@ -584,11 +608,11 @@ const Sidebar = () => {
       {/* Floating action button */}
       <button
         onClick={() => setShowCreateGroup(true)}
-        className="absolute bottom-5 right-5 size-[64px] rounded-[22px] bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+        className="absolute bottom-4 right-4 size-14 rounded-2xl bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
         aria-label="New chat"
         title="New chat"
       >
-        <MessageSquarePlus size={28} />
+        <WaNewChat size={28} />
       </button>
 
       {confirmDelete && (

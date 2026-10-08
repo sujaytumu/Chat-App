@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { ArrowLeft, Info, Phone, Video, MoreVertical, X, Archive, ArchiveRestore, Search } from "lucide-react";
+import { Info, Phone, Video, X, Search } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import Avatar from "./Avatar";
+import { WaBack, WaKebab, WaArchive } from "./icons/WaIcons";
 
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 
@@ -53,7 +54,7 @@ const ChatHeader = () => {
     <div className="relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-[#0B141A] lg:bg-[#111B21] border-b border-white/5">
       {/* Back to the chat list (phone) */}
       <button onClick={() => setSelectedChat(null)} className={`${iconBtn} lg:hidden shrink-0`} aria-label="Back">
-        <ArrowLeft size={24} />
+        <WaBack size={24} />
       </button>
 
       <button
@@ -96,7 +97,7 @@ const ChatHeader = () => {
 
         <div className="relative" ref={menuRef}>
           <button onClick={() => setShowMenu((s) => !s)} className={iconBtn} aria-label="More options" title="More">
-            <MoreVertical size={22} />
+            <WaKebab size={24} />
           </button>
           {showMenu && (
             <div className="absolute right-0 top-full mt-1 w-52 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
@@ -129,11 +130,7 @@ const ChatHeader = () => {
                   if (!isArchived) setSelectedChat(null);
                 }}
               >
-                {isArchived ? (
-                  <ArchiveRestore size={18} className="text-[#AEBAC1]" />
-                ) : (
-                  <Archive size={18} className="text-[#AEBAC1]" />
-                )}
+                <WaArchive size={20} up={isArchived} className="text-[#AEBAC1]" />
                 {isArchived ? "Unarchive chat" : "Archive chat"}
               </button>
               <button
