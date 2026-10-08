@@ -45,7 +45,7 @@ const App = () => {
   const navigate = useNavigate();
   const pathRef = useRef(location.pathname);
   pathRef.current = location.pathname;
-  const isChatScreen = ["/", "/calls", "/status"].includes(location.pathname) && authUser;
+  const isChatScreen = ["/", "/calls", "/status", "/profile", "/settings"].includes(location.pathname) && authUser;
 
   useEffect(() => {
     checkAuth();
@@ -165,10 +165,29 @@ const App = () => {
             path="/login"
             element={!authUser ? <LoginPage /> : <Navigate to="/" />}
           />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/settings"
+            element={
+              authUser ? (
+                <MainLayout>
+                  <SettingsPage />
+                </MainLayout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
           <Route
             path="/profile"
-            element={authUser ? <ProfilePage /> : <Navigate to="/login" />}
+            element={
+              authUser ? (
+                <MainLayout>
+                  <ProfilePage />
+                </MainLayout>
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
           />
         </Routes>
         </Suspense>

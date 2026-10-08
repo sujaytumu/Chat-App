@@ -29,6 +29,7 @@ const MainNav = () => {
   }, [users, groups, archived]);
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
+  const youActive = pathname === "/profile" || pathname === "/settings";
 
   // On a phone an open chat takes the whole screen, like WhatsApp.
   const hideOnPhone = hasOpenChat && pathname === "/";
@@ -61,11 +62,9 @@ const MainNav = () => {
         <NavLink
           to="/profile"
           title="You"
-          className={({ isActive }) =>
-            `size-11 rounded-xl flex items-center justify-center transition-colors ${
-              isActive ? "bg-[#2A3942]" : "hover:bg-white/5"
-            }`
-          }
+          className={`size-11 rounded-xl flex items-center justify-center transition-colors ${
+            youActive ? "bg-[#2A3942]" : "hover:bg-white/5"
+          }`}
         >
           <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-8" textSize="text-sm" />
         </NavLink>
@@ -99,14 +98,12 @@ const MainNav = () => {
           </NavLink>
         ))}
         <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center gap-1">
-          {({ isActive }) => (
-            <>
-              <span className={`h-8 w-16 rounded-full flex items-center justify-center transition-colors ${isActive ? "bg-[#103629]" : ""}`}>
-                <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
-              </span>
-              <span className={`text-[13px] leading-none text-[#E9EDEF] ${isActive ? "font-semibold" : ""}`}>You</span>
-            </>
-          )}
+          <span className={`h-8 w-16 rounded-full flex items-center justify-center`}>
+            <span className={`rounded-full p-[3px] ${youActive ? "bg-[#103629] ring-0" : ""}`}>
+              <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
+            </span>
+          </span>
+          <span className={`text-[13px] leading-none text-[#E9EDEF] ${youActive ? "font-semibold" : ""}`}>You</span>
         </NavLink>
       </nav>
     </>

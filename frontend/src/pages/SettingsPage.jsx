@@ -15,6 +15,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { WaBack } from "../components/icons/WaIcons";
 import { registerPushSubscription, previewCallTone, previewMessageTone, stopTonePreview } from "../lib/notificationSound";
 import {
   isMessageSoundEnabled,
@@ -311,9 +313,15 @@ const SettingsPage = () => {
   const { theme, setTheme } = useThemeStore();
 
   return (
-    <div className="min-h-[100dvh] pt-20 pb-8 bg-[#0B141A] text-[#E9EDEF]">
+    <div className="flex-1 min-w-0 flex flex-col bg-[#0B141A] text-[#E9EDEF] overflow-hidden">
+      <div className="flex items-center h-14 pl-1 pr-4 shrink-0">
+        <Link to="/profile" className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
+          <WaBack size={24} />
+        </Link>
+        <h1 className="text-[22px] font-normal pl-3">Settings</h1>
+      </div>
+      <div className="flex-1 overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-8">
       <div className="container mx-auto px-4 max-w-5xl">
-        <h1 className="text-2xl font-bold mb-4">Settings</h1>
         <div className="space-y-4 bg-[#111B21] p-3 sm:p-5 rounded-2xl">
           <NotificationSettings />
           <SoundSettings />
@@ -351,6 +359,7 @@ const SettingsPage = () => {
             ))}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
