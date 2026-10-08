@@ -8,6 +8,7 @@ import CallsPage from "./pages/CallsPage";
 import StatusPage from "./pages/StatusPage";
 import MainLayout from "./components/MainLayout";
 import NotificationManager from "./components/NotificationManager";
+import ErrorBoundary from "./components/ErrorBoundary";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
@@ -46,11 +47,14 @@ const App = () => {
 
       {authUser && <NotificationManager />}
       {authUser && (
-        <CallManager />
+        <ErrorBoundary silent>
+          <CallManager />
+        </ErrorBoundary>
       )}
 
       {/* Main routes */}
       <main className="flex-1">
+        <ErrorBoundary key={location.pathname}>
         <Routes>
           <Route
             path="/"
@@ -102,6 +106,7 @@ const App = () => {
             element={authUser ? <ProfilePage /> : <Navigate to="/login" />}
           />
         </Routes>
+        </ErrorBoundary>
       </main>
 
       {/* Toast notifications */}

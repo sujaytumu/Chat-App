@@ -21,10 +21,25 @@ const CallsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     axiosInstance
       .get("/calls")
-      .then((res) => setCalls(res.data))
-      .finally(() => setIsLoading(false));
+      .then((res) => {
+        if (cancelled) return;
+        const list = Array.isArray(res.data) ? res.data : [];
+        // A call log can reference a user that no longer exists (populate gives
+        // null) — rendering such an entry used to throw and blank the whole app.
+        setCalls(list.filter((c) => c && c.callerId && c.calleeId));
+      })
+      .catch(() => {
+        if (!cancelled) setCalls([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleCallBack = (otherUser, callType) => {
@@ -47,7 +62,7 @@ const CallsPage = () => {
           <p className="text-center text-[#8696A0] py-10 text-sm">No calls yet</p>
         ) : (
           calls.map((call) => {
-            const isOutgoing = call.callerId._id === authUser._id;
+            const isOutgoing = call.callerId._id === authUser?._id;
             const otherUser = isOutgoing ? call.calleeId : call.callerId;
             const isMissed = call.status === "missed" || call.status === "declined";
 
