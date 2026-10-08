@@ -19,7 +19,7 @@ export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
-      .select("-password -pushSubscriptions -archivedChats")
+      .select("-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -27,6 +27,7 @@ export const getUsersForSidebar = async (req, res) => {
         {
           $match: {
             groupId: null,
+            deletedFor: { $ne: loggedInUserId },
             $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
           },
         },
@@ -47,7 +48,7 @@ export const getUsersForSidebar = async (req, res) => {
         },
       ]),
       Message.aggregate([
-        { $match: { receiverId: loggedInUserId, groupId: null, seen: false } },
+        { $match: { receiverId: loggedInUserId, groupId: null, seen: false, deletedFor: { $ne: loggedInUserId } } },
         { $group: { _id: "$senderId", count: { $sum: 1 } } },
       ]),
     ]);
@@ -185,7 +186,7 @@ export const sendMessage = async (req, res) => {
         chatId: senderId.toString(),
         messageId: newMessage._id.toString(),
       },
-    });
+    }, {}, `d:${senderId}`);
 
     res.status(201).json(newMessage);
   } catch (error) {
@@ -411,6 +412,66 @@ export const ackDelivered = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.log("Error in ackDelivered controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Pin (max 3) / mute a chat for the logged-in user. Same shape as archive.
+const makeChatListToggle = (field, event, max) => async (req, res) => {
+  try {
+    const { chatType, chatId, value } = req.body || {};
+    if (!["direct", "group"].includes(chatType) || !mongoose.isValidObjectId(chatId)) {
+      return res.status(400).json({ error: "Invalid chat" });
+    }
+    const key = `${chatType === "group" ? "g" : "d"}:${chatId}`;
+    if (value && max) {
+      const me = await User.findById(req.user._id).select(field).lean();
+      const list = me?.[field] || [];
+      if (!list.includes(key) && list.length >= max) {
+        return res.status(400).json({ error: `You can only pin ${max} chats` });
+      }
+    }
+    const update = value ? { $addToSet: { [field]: key } } : { $pull: { [field]: key } };
+    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select(field);
+    const list = user?.[field] || [];
+    io.to(req.user._id.toString()).emit(event, list);
+    res.status(200).json({ [field]: list });
+  } catch (error) {
+    console.log(`Error updating ${field}: `, error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+export const setChatPinned = makeChatListToggle("pinnedChats", "pinnedChats", 3);
+export const setChatMuted = makeChatListToggle("mutedChats", "mutedChats", 0);
+
+// Delete a chat for me: every message in it is hidden from my side only (the
+// other person / group members keep theirs), like WhatsApp's "Delete chat".
+export const deleteChatForMe = async (req, res) => {
+  try {
+    const { chatType, chatId } = req.params;
+    const myId = req.user._id;
+    if (!["direct", "group"].includes(chatType) || !mongoose.isValidObjectId(chatId)) {
+      return res.status(400).json({ error: "Invalid chat" });
+    }
+    if (chatType === "group") {
+      const isMember = await Group.exists({ _id: chatId, members: myId });
+      if (!isMember) return res.status(403).json({ error: "You are not a member of this group" });
+      await Message.updateMany({ groupId: chatId }, { $addToSet: { deletedFor: myId } });
+    } else {
+      await Message.updateMany(
+        {
+          groupId: null,
+          $or: [
+            { senderId: myId, receiverId: chatId },
+            { senderId: chatId, receiverId: myId },
+          ],
+        },
+        { $addToSet: { deletedFor: myId } }
+      );
+    }
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in deleteChatForMe controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

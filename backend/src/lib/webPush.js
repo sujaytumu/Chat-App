@@ -21,16 +21,21 @@ export function configureWebPush() {
 // options: { urgency: "very-low"|"low"|"normal"|"high", TTL: seconds }.
 // Calls use urgency "high" + a short TTL so phones wake up for them right away
 // and a stale "ringing" push is never delivered long after the call is over.
-export async function sendPushToUser(userId, payload, options = {}) {
-  return sendPushToUsers([userId], payload, options);
+export async function sendPushToUser(userId, payload, options = {}, muteKey) {
+  return sendPushToUsers([userId], payload, options, muteKey);
 }
 
 // Same, for several users with ONE database query (group chats).
-export async function sendPushToUsers(userIds, payload, options = {}) {
+// muteKey ("d:<senderId>" / "g:<groupId>"): members who muted that chat get no push.
+export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
   if (!configured || !userIds?.length) return;
   try {
-    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions").lean();
-    await Promise.all(users.map((u) => pushToSubscriptions(u, payload, options)));
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions mutedChats").lean();
+    await Promise.all(
+      users
+        .filter((u) => !(muteKey && (u.mutedChats || []).includes(muteKey)))
+        .map((u) => pushToSubscriptions(u, payload, options))
+    );
   } catch (error) {
     console.log("Error in sendPushToUsers:", error.message);
   }
