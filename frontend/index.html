@@ -5,9 +5,18 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" />
     <link rel="apple-touch-icon" href="/icon-v2-192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#202C33" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0B141A" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Talkies" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Talkies</title>
+    <!-- Dark from the very first paint, so the old light screen never flashes before the app loads. -->
+    <style>
+      html, body, #root { margin: 0; min-height: 100%; background: #0B141A; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
