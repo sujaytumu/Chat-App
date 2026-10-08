@@ -58,6 +58,13 @@ async function getIceConfig() {
 function attachConnectionWatchdog(peerConnection, get) {
   let disconnectTimer = null;
   let restartAttempted = false;
+  // Surfaced in the call UI as a "Reconnecting…" state while the media path is
+  // down but we're still trying to recover it.
+  const setReconnecting = (isReconnecting) => {
+    if (useCallStore.getState().isReconnecting !== isReconnecting) {
+      useCallStore.setState({ isReconnecting });
+    }
+  };
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
     if (state === "failed") {
@@ -65,6 +72,7 @@ function attachConnectionWatchdog(peerConnection, get) {
         restartAttempted = true;
         try {
           peerConnection.restartIce();
+          setReconnecting(true);
           return; // give the restart a chance before giving up
         } catch {
           // fall through to hanging up
@@ -73,6 +81,7 @@ function attachConnectionWatchdog(peerConnection, get) {
       toast.error("Call couldn't connect — network issue");
       get().endCall();
     } else if (state === "disconnected") {
+      setReconnecting(true);
       clearTimeout(disconnectTimer);
       disconnectTimer = setTimeout(() => {
         if (peerConnection.iceConnectionState === "disconnected") {
@@ -83,6 +92,7 @@ function attachConnectionWatchdog(peerConnection, get) {
     } else if (state === "connected" || state === "completed") {
       clearTimeout(disconnectTimer);
       restartAttempted = false;
+      setReconnecting(false);
     }
   };
 }
@@ -144,6 +154,7 @@ export const useCallStore = create((set, get) => ({
   isRemoteRinging: false, // true once the callee's device has actually started ringing
   isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
   isScreenSharing: false,
+  isReconnecting: false, // media path dropped; ICE is trying to recover it
   callStartedAt: null, // epoch ms when the call actually connected (drives the on-screen timer)
   audioOutputDevices: [],
   callSubscribed: false,
@@ -412,6 +423,7 @@ export const useCallStore = create((set, get) => ({
       isRemoteRinging: false,
       isScreenSharing: false,
       isSpeakerOn: false,
+      isReconnecting: false,
       callStartedAt: null,
       callCooldownUntil: Date.now() + 2000, // brief guard against accidental rapid re-tapping
     });
