@@ -9,6 +9,7 @@ import {
   deleteMessage,
   toggleStarMessage,
   getStarredMessages,
+  setChatArchived,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get("/starred/all", protectRoute, getStarredMessages);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);
+router.put("/archive", protectRoute, setChatArchived);
 router.put("/seen/:id", protectRoute, markMessagesAsSeen);
 router.put("/pin/:id", protectRoute, togglePinMessage);
 router.put("/star/:id", protectRoute, toggleStarMessage);

@@ -20,6 +20,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Chats this user has archived, as "d:<userId>" (direct) / "g:<groupId>"
+    // (group) keys. Per-user, so it follows them across devices.
+    archivedChats: {
+      type: [String],
+      default: [],
+    },
     // Web Push subscriptions (one per browser/device the user has granted
     // notification permission on)
     pushSubscriptions: [
