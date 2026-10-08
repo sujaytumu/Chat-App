@@ -584,7 +584,7 @@ const Sidebar = () => {
       {/* Floating action button */}
       <button
         onClick={() => setShowCreateGroup(true)}
-        className="absolute bottom-[calc(88px+env(safe-area-inset-bottom))] lg:bottom-6 right-5 size-[68px] rounded-[22px] bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+        className="absolute bottom-5 right-5 size-[64px] rounded-[22px] bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
         aria-label="New chat"
         title="New chat"
       >
