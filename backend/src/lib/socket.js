@@ -4,6 +4,7 @@ import express from "express";
 import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
 import CallLog from "../models/callLog.model.js";
+import User from "../models/user.model.js";
 import { sendPushToUser } from "./webPush.js";
 
 const app = express();
@@ -39,6 +40,15 @@ const isOnline = (id) => (userSockets.get(id)?.size || 0) > 0;
 const onlineIds = () => [...userSockets.keys()];
 const roomFor = (id) => (isOnline(id) ? id : undefined);
 const DISCONNECT_CALL_GRACE_MS = 8000;
+
+// Incoming-call push: Answer / Decline buttons on the notification, delivered
+// at high priority with a short lifetime (a ringing call that nobody saw within
+// a minute is stale).
+const CALL_PUSH_ACTIONS = [
+  { action: "answer", title: "Answer" },
+  { action: "decline", title: "Decline" },
+];
+const CALL_PUSH_OPTIONS = { urgency: "high", TTL: 60 };
 
 // Calls placed to someone who isn't currently connected are held here for a
 // short grace period. If they open the app (e.g. from the missed-call push
@@ -134,9 +144,10 @@ io.on("connection", (socket) => {
         body: callType === "video" ? "Incoming video call" : "Incoming voice call",
         icon: fromUser?.profilePic || "/icon-v2-192.png",
         isCall: true,
+        actions: CALL_PUSH_ACTIONS,
         tag: `incoming-call-${userId}`,
-        data: { url: "/", chatType: "direct", chatId: userId },
-      });
+        data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true },
+      }, CALL_PUSH_OPTIONS);
       return;
     }
 
@@ -150,9 +161,10 @@ io.on("connection", (socket) => {
       body: `Incoming ${callType === "video" ? "video" : "voice"} call`,
       icon: fromUser?.profilePic || "/icon-v2-192.png",
       isCall: true,
-      tag: `call-${userId}`,
-      data: { url: "/", chatType: "direct", chatId: userId },
-    });
+      actions: CALL_PUSH_ACTIONS,
+      tag: `incoming-call-${userId}`,
+      data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true },
+    }, CALL_PUSH_OPTIONS);
 
     const timeout = setTimeout(() => {
       pendingCalls.delete(toUserId);
@@ -161,7 +173,7 @@ io.on("connection", (socket) => {
         title: fromUser?.fullName || "Someone",
         body: `Missed ${callType === "video" ? "video" : "voice"} call`,
         icon: fromUser?.profilePic || "/icon-v2-192.png",
-        tag: `call-${userId}`,
+        tag: `incoming-call-${userId}`,
         data: { url: "/", chatType: "direct", chatId: userId },
       });
       const logId = activeCallLogs.get(pairKey(userId, toUserId));
@@ -268,6 +280,22 @@ io.on("connection", (socket) => {
         if (log) {
           const endedAt = new Date();
           const wasAnswered = log.status === "answered";
+          if (!wasAnswered && String(log.callerId) === String(userId)) {
+            // The caller gave up before it was answered — turn the callee's
+            // ringing notification into a "Missed call" one (same tag).
+            User.findById(userId)
+              .select("fullName profilePic")
+              .then((caller) => {
+                sendPushToUser(toUserId, {
+                  title: caller?.fullName || "Someone",
+                  body: `Missed ${log.callType === "video" ? "video" : "voice"} call`,
+                  icon: caller?.profilePic || "/icon-v2-192.png",
+                  tag: `incoming-call-${userId}`,
+                  data: { url: "/", chatType: "direct", chatId: String(userId) },
+                }, { urgency: "high", TTL: 60 * 60 * 24 });
+              })
+              .catch(() => {});
+          }
           const durationSeconds = wasAnswered ? Math.round((endedAt - log.startedAt) / 1000) : 0;
           await CallLog.findByIdAndUpdate(logId, {
             status: wasAnswered ? "answered" : "missed",
@@ -383,5 +411,24 @@ io.on("connection", (socket) => {
     })();
   }
 });
+
+// "Decline" pressed on an incoming-call notification while the app is closed
+// (so there is no socket to emit rejectCall on). Same effect as rejectCall.
+export function declineCallFor(userId, callerId) {
+  const pending = pendingCalls.get(userId);
+  if (pending && pending.fromUserId === callerId) {
+    clearTimeout(pending.timeout);
+    pendingCalls.delete(userId);
+  }
+  const callerRoom = roomFor(callerId);
+  if (callerRoom) io.to(callerRoom).emit("callRejected");
+  if (isOnline(userId)) io.to(userId).emit("callEnded"); // stop ringing on their open devices
+  const key = pairKey(userId, callerId);
+  const logId = activeCallLogs.get(key);
+  if (logId) {
+    CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
+  }
+  activeCallLogs.delete(key);
+}
 
 export { io, app, server };

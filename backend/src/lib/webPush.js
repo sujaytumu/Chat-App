@@ -18,7 +18,10 @@ export function configureWebPush() {
 // subscribed on. Works even if the site/tab is fully closed, as long as the
 // browser itself is running. Prunes subscriptions the push service reports
 // as gone (410) or not found (404).
-export async function sendPushToUser(userId, payload) {
+// options: { urgency: "very-low"|"low"|"normal"|"high", TTL: seconds }.
+// Calls use urgency "high" + a short TTL so phones wake up for them right away
+// and a stale "ringing" push is never delivered long after the call is over.
+export async function sendPushToUser(userId, payload, options = {}) {
   if (!configured) return;
   try {
     const user = await User.findById(userId).select("pushSubscriptions");
@@ -30,7 +33,8 @@ export async function sendPushToUser(userId, payload) {
         try {
           await webpush.sendNotification(
             { endpoint: sub.endpoint, keys: sub.keys },
-            JSON.stringify(payload)
+            JSON.stringify(payload),
+            { urgency: "high", TTL: 60 * 60 * 24, ...options }
           );
         } catch (err) {
           if (err.statusCode === 404 || err.statusCode === 410) {
