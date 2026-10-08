@@ -1,4 +1,5 @@
 import { UsersRound } from "lucide-react";
+import { optimizeImage } from "../lib/cdn";
 
 // WhatsApp-style fallback: a dark tinted circle with the person's initial in a
 // matching bright colour, instead of one generic silhouette for everyone.
@@ -22,7 +23,15 @@ const Avatar = ({ src, name = "", isGroup = false, size = "size-14", textSize = 
   const base = `${size} rounded-full shrink-0 ${className}`;
 
   if (src) {
-    return <img src={src} alt={name} className={`${base} object-cover`} />;
+    return (
+      <img
+        src={optimizeImage(src, 120)}
+        alt={name}
+        loading="lazy"
+        decoding="async"
+        className={`${base} object-cover`}
+      />
+    );
   }
 
   if (isGroup) {

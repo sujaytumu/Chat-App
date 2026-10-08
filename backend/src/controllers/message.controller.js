@@ -18,7 +18,7 @@ export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
-      .select("-password")
+      .select("-password -pushSubscriptions -archivedChats")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -91,16 +91,25 @@ export const getMessages = async (req, res) => {
     const { id: userToChatId } = req.params;
     const myId = req.user._id;
 
-    const messages = await Message.find({
+    // Newest page first (fast even in very long chats); `before` loads older ones.
+    const limit = Math.min(parseInt(req.query.limit, 10) || 80, 200);
+    const query = {
       groupId: null,
       deletedFor: { $ne: myId },
       $or: [
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
-    })
-      .sort({ createdAt: 1 })
-      .populate("replyTo", "text image file senderId");
+    };
+    if (req.query.before && !Number.isNaN(Date.parse(req.query.before))) {
+      query.createdAt = { $lt: new Date(req.query.before) };
+    }
+    const page = await Message.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate("replyTo", "text image file senderId")
+      .lean();
+    const messages = page.reverse();
 
     res.status(200).json(messages);
   } catch (error) {
@@ -169,7 +178,12 @@ export const sendMessage = async (req, res) => {
       body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
       icon: req.user.profilePic || "/icon-v2-192.png",
       tag: `dm-${senderId}`,
-      data: { url: "/", chatType: "direct", chatId: senderId.toString() },
+      data: {
+        url: "/",
+        chatType: "direct",
+        chatId: senderId.toString(),
+        messageId: newMessage._id.toString(),
+      },
     });
 
     res.status(201).json(newMessage);
@@ -367,6 +381,29 @@ export const setChatArchived = async (req, res) => {
     res.status(200).json({ archivedChats });
   } catch (error) {
     console.log("Error in setChatArchived controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Called by the service worker the moment a push reaches a device whose app is
+// closed — so the sender sees the double tick ("delivered") just like WhatsApp,
+// even though the recipient never opened the app.
+export const ackDelivered = async (req, res) => {
+  try {
+    const { messageId } = req.body || {};
+    if (!mongoose.isValidObjectId(messageId)) return res.status(400).json({ error: "Invalid message" });
+    const msg = await Message.findOneAndUpdate(
+      { _id: messageId, receiverId: req.user._id, delivered: false },
+      { $set: { delivered: true, deliveredAt: new Date() } },
+      { new: true }
+    ).select("senderId");
+    if (msg) {
+      const senderRoom = getReceiverSocketId(msg.senderId.toString());
+      if (senderRoom) io.to(senderRoom).emit("messagesDelivered", { by: req.user._id.toString() });
+    }
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in ackDelivered controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

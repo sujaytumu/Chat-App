@@ -391,28 +391,41 @@ function urlBase64ToUint8Array(base64String) {
 // this device keeps getting notified even when the site/tab is fully closed
 // (as long as the browser/OS is running). Safe to call repeatedly.
 export async function registerPushSubscription(axiosInstance) {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-  if (Notification.permission !== "granted") return;
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return false;
+  if (Notification.permission !== "granted") return false;
 
   try {
     const registration = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
 
     const { data } = await axiosInstance.get("/push/vapid-public-key");
-    if (!data.publicKey) return; // backend not configured with VAPID keys yet
+    if (!data.publicKey) return false; // backend not configured with VAPID keys yet
+    const applicationServerKey = urlBase64ToUint8Array(data.publicKey);
+
+    const subscribe = () => registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
 
     let subscription = await registration.pushManager.getSubscription();
     if (!subscription) {
-      subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(data.publicKey),
-      });
+      subscription = await subscribe();
+    } else {
+      // A subscription made with a different server key (keys were rotated)
+      // silently never receives anything — replace it.
+      const current = subscription.options?.applicationServerKey;
+      if (current && current.byteLength === applicationServerKey.byteLength) {
+        const a = new Uint8Array(current);
+        if (a.some((byte, i) => byte !== applicationServerKey[i])) {
+          await subscription.unsubscribe();
+          subscription = await subscribe();
+        }
+      }
     }
 
     await axiosInstance.post("/push/subscribe", subscription.toJSON());
     setPushActive(true);
+    return true;
   } catch (err) {
     console.log("Push subscription failed:", err.message);
+    return false;
   }
 }
 

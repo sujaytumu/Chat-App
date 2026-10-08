@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
+import { useShallow } from "zustand/react/shallow";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
@@ -38,7 +39,19 @@ const Sidebar = () => {
     isUsersLoading,
     typingUsers,
     setChatArchived,
-  } = useChatStore();
+  } = useChatStore(
+    useShallow((st) => ({
+      getUsers: st.getUsers,
+      getGroups: st.getGroups,
+      users: st.users,
+      groups: st.groups,
+      selectedChat: st.selectedChat,
+      setSelectedChat: st.setSelectedChat,
+      isUsersLoading: st.isUsersLoading,
+      typingUsers: st.typingUsers,
+      setChatArchived: st.setChatArchived,
+    }))
+  );
 
   const { onlineUsers, authUser, logout } = useAuthStore();
   const [filter, setFilter] = useState("all");

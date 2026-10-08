@@ -3,7 +3,7 @@ import Message from "../models/message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
-import { sendPushToUser } from "../lib/webPush.js";
+import { sendPushToUsers } from "../lib/webPush.js";
 
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
@@ -38,7 +38,7 @@ export const createGroup = async (req, res) => {
       createdBy: myId,
     });
 
-    const populatedGroup = await Group.findById(group._id).populate("members", "-password");
+    const populatedGroup = await Group.findById(group._id).populate("members", "-password -pushSubscriptions -archivedChats");
 
     // Notify every member in real time so the group shows up instantly
     uniqueMembers.forEach((memberId) => {
@@ -62,7 +62,7 @@ export const createGroup = async (req, res) => {
 export const getUserGroups = async (req, res) => {
   try {
     const myId = req.user._id;
-    const groups = await Group.find({ members: myId }).populate("members", "-password").lean();
+    const groups = await Group.find({ members: myId }).populate("members", "-password -pushSubscriptions -archivedChats").lean();
     const groupIds = groups.map((g) => g._id);
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -121,9 +121,17 @@ export const getGroupMessages = async (req, res) => {
       return res.status(403).json({ error: "You are not a member of this group" });
     }
 
-    const messages = await Message.find({ groupId, deletedFor: { $ne: myId } })
-      .sort({ createdAt: 1 })
-      .populate("replyTo", "text image file senderId");
+    const limit = Math.min(parseInt(req.query.limit, 10) || 80, 200);
+    const query = { groupId, deletedFor: { $ne: myId } };
+    if (req.query.before && !Number.isNaN(Date.parse(req.query.before))) {
+      query.createdAt = { $lt: new Date(req.query.before) };
+    }
+    const page = await Message.find(query)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .populate("replyTo", "text image file senderId")
+      .lean();
+    const messages = page.reverse();
 
     // Mark unseen messages as seen by me
     await Message.updateMany(
@@ -186,18 +194,18 @@ export const sendGroupMessage = async (req, res) => {
 
     io.to(groupId.toString()).emit("newGroupMessage", newMessage);
 
-    // Push to every other member so they're notified even with the app closed
-    group.members
-      .filter((memberId) => !memberId.equals(senderId))
-      .forEach((memberId) => {
-        sendPushToUser(memberId, {
-          title: `${req.user.fullName} in ${group.name}`,
-          body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
-          icon: group.groupPic || "/icon-v2-192.png",
-          tag: `group-${groupId}`,
-          data: { url: "/", chatType: "group", chatId: groupId.toString() },
-        });
-      });
+    // Push to every other member (one DB query for all of them) so they're
+    // notified even with the app closed
+    sendPushToUsers(
+      group.members.filter((memberId) => !memberId.equals(senderId)),
+      {
+        title: `${req.user.fullName} in ${group.name}`,
+        body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
+        icon: group.groupPic || "/icon-v2-192.png",
+        tag: `group-${groupId}`,
+        data: { url: "/", chatType: "group", chatId: groupId.toString() },
+      }
+    );
 
     res.status(201).json(newMessage);
   } catch (error) {
@@ -222,7 +230,7 @@ export const addMembers = async (req, res) => {
     group.members.push(...newMembers);
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
 
     newMembers.forEach((memberId) => {
       const socketId = getReceiverSocketId(memberId);
@@ -255,7 +263,7 @@ export const removeMember = async (req, res) => {
     group.admins = group.admins.filter((a) => !a.equals(memberId));
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
 
     const removedSocketId = getReceiverSocketId(memberId);
@@ -291,7 +299,7 @@ export const leaveGroup = async (req, res) => {
       await Group.findByIdAndDelete(groupId);
     } else {
       await group.save();
-      const populatedGroup = await Group.findById(groupId).populate("members", "-password");
+      const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
       io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
     }
 
@@ -328,7 +336,7 @@ export const updateGroupInfo = async (req, res) => {
     }
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
 
     res.status(200).json(populatedGroup);
