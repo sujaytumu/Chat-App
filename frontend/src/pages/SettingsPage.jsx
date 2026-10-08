@@ -1,7 +1,6 @@
 import { THEMES } from "../constants";
 import { useThemeStore } from "../store/useThemeStore";
 import {
-  Send,
   Bell,
   BellOff,
   BellRing,
@@ -37,11 +36,6 @@ import { useInstallPrompt } from "../lib/useInstallPrompt";
 import { axiosInstance } from "../lib/axios";
 import toast from "react-hot-toast";
 
-const PREVIEW_MESSAGES = [
-  { id: 1, content: "Hey! How's it going?", isSent: false },
-  { id: 2, content: "I'm doing great! Just working on some new features.", isSent: true },
-];
-
 const NotificationSettings = () => {
   const [permission, setPermission] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
@@ -73,18 +67,18 @@ const NotificationSettings = () => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#DCF8C6]">
+    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#1F2C34]">
       <div className="flex items-center gap-3">
         {permission === "granted" ? (
-          <BellRing className="text-green-700 shrink-0" size={22} />
+          <BellRing className="text-[#25D366] shrink-0" size={22} />
         ) : permission === "denied" ? (
-          <BellOff className="text-red-600 shrink-0" size={22} />
+          <BellOff className="text-red-400 shrink-0" size={22} />
         ) : (
-          <Bell className="text-zinc-600 shrink-0" size={22} />
+          <Bell className="text-[#8696A0] shrink-0" size={22} />
         )}
         <div>
           <h3 className="font-semibold text-sm">Notifications</h3>
-          <p className="text-xs text-zinc-600">
+          <p className="text-xs text-[#8696A0]">
             {permission === "granted" && "Enabled — you'll get sound + popup alerts, even with the app closed."}
             {permission === "denied" &&
               "Blocked. Click the lock/info icon in your browser's address bar → Notifications → Allow, then reload."}
@@ -97,7 +91,7 @@ const NotificationSettings = () => {
         <button
           onClick={handleEnable}
           disabled={isEnabling}
-          className="btn btn-sm bg-green-600 hover:bg-green-700 text-white border-none shrink-0"
+          className="btn btn-sm bg-[#00A884] hover:bg-[#02906f] text-white border-none shrink-0"
         >
           {isEnabling ? "Enabling…" : "Enable"}
         </button>
@@ -121,16 +115,16 @@ const InstallAppControl = () => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#DCF8C6]">
+    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#1F2C34]">
       <div className="flex items-center gap-3">
         {isInstalled ? (
-          <CheckCircle2 className="text-green-700 shrink-0" size={22} />
+          <CheckCircle2 className="text-[#25D366] shrink-0" size={22} />
         ) : (
-          <Download className="text-zinc-600 shrink-0" size={22} />
+          <Download className="text-[#8696A0] shrink-0" size={22} />
         )}
         <div>
           <h3 className="font-semibold text-sm">Install app</h3>
-          <p className="text-xs text-zinc-600">
+          <p className="text-xs text-[#8696A0]">
             {isInstalled
               ? "Already installed — opens like a native app from your home screen."
               : isIOS
@@ -142,7 +136,7 @@ const InstallAppControl = () => {
       {!isInstalled && !isIOS && (
         <button
           onClick={handleInstall}
-          className="btn btn-sm bg-green-600 hover:bg-green-700 text-white border-none shrink-0"
+          className="btn btn-sm bg-[#00A884] hover:bg-[#02906f] text-white border-none shrink-0"
         >
           Install
         </button>
@@ -197,7 +191,7 @@ const TonePicker = ({ kind, label, Icon, IconOff, enabled, onToggle, tones, getT
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          {enabled ? <Icon size={18} className="text-green-700" /> : <IconOff size={18} className="text-zinc-500" />}
+          {enabled ? <Icon size={18} className="text-[#25D366]" /> : <IconOff size={18} className="text-zinc-500" />}
           <span className="text-sm">{label}</span>
         </div>
         <input type="checkbox" className="toggle toggle-success toggle-sm" checked={enabled} onChange={onToggle} />
@@ -207,7 +201,7 @@ const TonePicker = ({ kind, label, Icon, IconOff, enabled, onToggle, tones, getT
         <div className="pl-7 space-y-2">
           <div className="flex items-center gap-2">
             <select
-              className="select select-sm select-bordered flex-1 min-w-0 bg-white"
+              className="select select-sm select-bordered flex-1 min-w-0 bg-[#2A3942] text-[#E9EDEF] border-[#2A3942]"
               value={tone}
               onChange={(e) => choose(e.target.value)}
             >
@@ -221,7 +215,7 @@ const TonePicker = ({ kind, label, Icon, IconOff, enabled, onToggle, tones, getT
             <button
               type="button"
               onClick={() => preview(tone)}
-              className="btn btn-sm btn-circle bg-green-600 hover:bg-green-700 text-white border-none shrink-0"
+              className="btn btn-sm btn-circle bg-[#00A884] hover:bg-[#02906f] text-white border-none shrink-0"
               aria-label="Play this sound"
             >
               <Play size={14} />
@@ -232,7 +226,7 @@ const TonePicker = ({ kind, label, Icon, IconOff, enabled, onToggle, tones, getT
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="btn btn-xs btn-outline gap-1.5"
+              className="btn btn-xs btn-outline gap-1.5 border-[#3B4A54] text-[#E9EDEF] hover:bg-white/10 hover:border-[#3B4A54]"
             >
               <Music size={12} /> {customName ? "Choose a different sound" : "Choose a sound from this device"}
             </button>
@@ -240,7 +234,7 @@ const TonePicker = ({ kind, label, Icon, IconOff, enabled, onToggle, tones, getT
               <button
                 type="button"
                 onClick={handleRemoveCustom}
-                className="btn btn-xs btn-ghost text-red-600 gap-1"
+                className="btn btn-xs btn-ghost text-red-400 gap-1"
                 aria-label="Remove my sound"
               >
                 <Trash2 size={12} /> Remove
@@ -276,10 +270,10 @@ const SoundSettings = () => {
   };
 
   return (
-    <div className="p-4 rounded-xl bg-[#DCF8C6] space-y-4">
+    <div className="p-4 rounded-xl bg-[#1F2C34] space-y-4">
       <div>
         <h3 className="font-semibold text-sm">Sounds</h3>
-        <p className="text-xs text-base-content/60">
+        <p className="text-xs text-[#8696A0]">
           Saved on this device — set it on your phone and laptop separately.
         </p>
       </div>
@@ -317,16 +311,17 @@ const SettingsPage = () => {
   const { theme, setTheme } = useThemeStore();
 
   return (
-    <div className="min-h-screen pt-20 bg-[#ECE5DD]"> {/* ✅ full page bg */}
+    <div className="min-h-[100dvh] pt-20 pb-8 bg-[#0B141A] text-[#E9EDEF]">
       <div className="container mx-auto px-4 max-w-5xl">
-        <div className="space-y-6 bg-[#DCF8C6] p-6 rounded-xl shadow-lg"> {/* ✅ inner card bg */}
+        <h1 className="text-2xl font-bold mb-4">Settings</h1>
+        <div className="space-y-4 bg-[#111B21] p-3 sm:p-5 rounded-2xl">
           <NotificationSettings />
           <SoundSettings />
           <InstallAppControl />
 
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-semibold">Theme</h2>
-            <p className="text-sm text-base-content/70">Choose a theme for your chat interface</p>
+            <p className="text-sm text-[#8696A0]">Choose a theme for your chat interface</p>
           </div>
 
           {/* Theme Selection */}
@@ -336,7 +331,7 @@ const SettingsPage = () => {
                 key={t}
                 className={`
                   group flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors
-                  ${theme === t ? "ring-2 ring-offset-2 ring-green-600" : "hover:bg-[#ECE5DD]"}
+                  ${theme === t ? "ring-2 ring-offset-2 ring-offset-[#111B21] ring-[#25D366]" : "hover:bg-white/5"}
                 `}
                 onClick={() => setTheme(t)}
                 data-theme={t}
@@ -354,70 +349,6 @@ const SettingsPage = () => {
                 </span>
               </button>
             ))}
-          </div>
-
-          {/* Preview Section */}
-          <h3 className="text-lg font-semibold mb-3">Preview</h3>
-          <div className="rounded-xl border border-green-300 overflow-hidden bg-[#ECE5DD] shadow-md">
-            <div className="p-4 bg-[#DCF8C6]">
-              <div className="max-w-lg mx-auto">
-                {/* Mock Chat UI */}
-                <div className="bg-[#ECE5DD] rounded-xl shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-green-300 bg-[#DCF8C6]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-content font-medium">
-                        J
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-sm">John Doe</h3>
-                        <p className="text-xs text-green-700">Online</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="p-4 space-y-4 min-h-[200px] max-h-[200px] overflow-y-auto bg-[#ECE5DD]">
-                    {PREVIEW_MESSAGES.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`flex ${message.isSent ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`
-                            max-w-[80%] rounded-xl p-3 shadow-sm
-                            ${message.isSent ? "bg-green-500 text-white" : "bg-[#DCF8C6]"}
-                          `}
-                        >
-                          <p className="text-sm">{message.content}</p>
-                          <p
-                            className={`
-                              text-[10px] mt-1.5
-                              ${message.isSent ? "text-white/70" : "text-green-700/70"}
-                            `}
-                          >
-                            12:00 PM
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="p-4 border-t border-green-300 bg-[#DCF8C6]">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        className="input input-bordered flex-1 text-sm h-10 bg-[#ECE5DD]"
-                        placeholder="Type a message..."
-                        value="This is a preview"
-                        readOnly
-                      />
-                      <button className="btn bg-green-500 hover:bg-green-600 text-white h-10 min-h-0">
-                        <Send size={18} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
