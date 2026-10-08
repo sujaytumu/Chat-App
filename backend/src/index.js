@@ -46,12 +46,25 @@ app.use("/api/status", statusRoutes);
 if (process.env.NODE_ENV === "production") {
   app.use(
     express.static(path.join(__dirname, "../frontend/dist"), {
-      maxAge: "1y", // vite output filenames are content-hashed, safe to cache hard
+      maxAge: "1d",
       index: false,
+      setHeaders(res, filePath) {
+        const name = path.basename(filePath);
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          // vite output filenames are content-hashed, safe to cache hard
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (name === "sw.js" || name === "manifest.json" || name.endsWith(".html")) {
+          // Not content-hashed: must always be revalidated, otherwise phones and
+          // installed home-screen apps keep running an old build (and an old
+          // service worker) for as long as the cache lifetime.
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
     })
   );
 
   app.get("*", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
     res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
   });
 }
