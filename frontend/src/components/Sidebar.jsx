@@ -9,7 +9,6 @@ import Avatar from "./Avatar";
 import MessageTicks from "./MessageTicks";
 import { formatChatListTime } from "../lib/utils";
 import {
-  UserRoundPlus,
   Search,
   Settings,
   LogOut,
@@ -26,6 +25,7 @@ import {
   Bell,
   BellOff,
   Check,
+  MessageSquarePlus,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
@@ -308,17 +308,17 @@ const Sidebar = () => {
       )}
 
       {/* Title + menu */}
-      <div className={`${selecting ? "hidden" : "flex"} items-center justify-between px-4 pt-4 pb-3`}>
+      <div className={`${selecting ? "hidden" : "flex"} items-center justify-between ${showArchived ? "px-2 pt-3 pb-2 border-b border-white/5" : "px-4 pt-4 pb-3"}`}>
         {showArchived ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setShowArchived(false)}
-              className="size-11 -ml-2 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
+              className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
               aria-label="Back to chats"
             >
               <ArrowLeft size={24} />
             </button>
-            <h1 className="text-[22px] leading-none font-semibold text-[#E9EDEF]">Archived</h1>
+            <h1 className="text-[22px] leading-none font-normal text-[#E9EDEF]">Archived</h1>
           </div>
         ) : (
           <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Talkies</h1>
@@ -357,7 +357,15 @@ const Sidebar = () => {
         </div>
       </div>
 
+      {/* Archived: WhatsApp's info banner instead of search + chips */}
+      {showArchived && !selecting && (
+        <p className="px-6 py-4 text-center text-[15px] leading-snug text-[#8696A0] border-b border-white/5">
+          These chats stay archived when new messages are received.
+        </p>
+      )}
+
       {/* Search pill */}
+      {!showArchived && (
       <div className="px-4 pb-3">
         <div className="flex items-center gap-3 h-12 rounded-full bg-[#1F2C34] px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
           <Search size={20} className="text-[#8696A0] shrink-0" />
@@ -365,7 +373,7 @@ const Sidebar = () => {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats"
+            placeholder="Search"
             className="flex-1 min-w-0 bg-transparent text-[16px] text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none"
           />
           {search && (
@@ -375,6 +383,7 @@ const Sidebar = () => {
           )}
         </div>
       </div>
+      )}
 
       {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
       {!showArchived && (
@@ -385,10 +394,10 @@ const Sidebar = () => {
             <button
               key={id}
               onClick={() => setFilter(id)}
-              className={`h-9 px-4 rounded-full text-[15px] whitespace-nowrap border transition-colors ${
+              className={`h-10 px-4 rounded-full text-[16px] whitespace-nowrap border transition-colors ${
                 active
                   ? "bg-[#103629] border-transparent text-[#D9FDD3] font-medium"
-                  : "border-[#2A3942] text-[#8696A0] hover:bg-white/5"
+                  : "border-[#2A3942] text-[#AEBAC1] hover:bg-white/5"
               }`}
             >
               {label}
@@ -409,10 +418,10 @@ const Sidebar = () => {
             }}
             className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] transition-colors"
           >
-            <span className="size-14 flex items-center justify-center text-[#25D366]">
+            <span className="size-14 flex items-center justify-center text-[#8696A0]">
               <Archive size={22} />
             </span>
-            <span className="flex-1 text-[17px] text-[#E9EDEF]">Archived</span>
+            <span className="flex-1 text-[17px] text-[#8696A0]">Archived</span>
             <span className={`text-sm ${archivedInfo.unread > 0 ? "text-[#25D366] font-medium" : "text-[#8696A0]"}`}>
               {archivedInfo.unread > 0 ? archivedInfo.unread : archivedInfo.count}
             </span>
@@ -504,7 +513,7 @@ const Sidebar = () => {
                         {item.unreadCount > 99 ? "99+" : item.unreadCount}
                       </span>
                     ) : (
-                      item.pinned && <Pin size={15} className="rotate-45" />
+                      item.pinned && <Pin size={16} className="rotate-45" fill="currentColor" />
                     )}
                   </span>
                 </div>
@@ -575,11 +584,11 @@ const Sidebar = () => {
       {/* Floating action button */}
       <button
         onClick={() => setShowCreateGroup(true)}
-        className="absolute bottom-5 right-5 size-14 rounded-2xl bg-[#25D366] hover:bg-[#21c05e] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
-        aria-label="New group"
-        title="New group"
+        className="absolute bottom-[calc(88px+env(safe-area-inset-bottom))] lg:bottom-6 right-5 size-[68px] rounded-[22px] bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+        aria-label="New chat"
+        title="New chat"
       >
-        <UserRoundPlus size={24} />
+        <MessageSquarePlus size={28} />
       </button>
 
       {confirmDelete && (

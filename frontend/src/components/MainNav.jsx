@@ -78,40 +78,36 @@ const MainNav = () => {
         } lg:hidden fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-[#0B141A] border-t border-white/5 items-stretch justify-around z-30`}
       >
         {items.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className="flex-1 flex flex-col items-center justify-center gap-1">
+          <NavLink key={to} to={to} end={end} className="flex-1 flex items-center justify-center px-1">
             {({ isActive }) => (
-              <>
-                <span
-                  className={`relative h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
-                    isActive ? "bg-[#103629] text-[#E9EDEF]" : "text-[#AEBAC1]"
-                  }`}
-                >
-                  <Icon size={24} strokeWidth={isActive ? 2.4 : 2} />
+              <span
+                className={`relative flex flex-col items-center justify-center gap-1 w-full h-[60px] rounded-full transition-colors ${
+                  isActive ? "bg-[#103629] text-[#E9EDEF]" : "text-[#AEBAC1] active:bg-white/5"
+                }`}
+              >
+                <span className="relative">
+                  <Icon size={26} strokeWidth={isActive ? 2.4 : 1.9} />
                   {to === "/" && unread > 0 && (
-                    <span className="absolute top-0 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}
                 </span>
-                <span className={`text-xs ${isActive ? "text-[#E9EDEF] font-semibold" : "text-[#AEBAC1]"}`}>
-                  {label}
-                </span>
-              </>
+                <span className={`text-[13px] leading-none ${isActive ? "font-semibold" : ""}`}>{label}</span>
+              </span>
             )}
           </NavLink>
         ))}
-        <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center gap-1">
+        <NavLink to="/profile" className="flex-1 flex items-center justify-center px-1">
           {({ isActive }) => (
-            <>
-              <span
-                className={`h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
-                  isActive ? "bg-[#103629]" : ""
-                }`}
-              >
-                <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
-              </span>
-              <span className={`text-xs ${isActive ? "text-[#E9EDEF] font-semibold" : "text-[#AEBAC1]"}`}>You</span>
-            </>
+            <span
+              className={`flex flex-col items-center justify-center gap-1 w-full h-[60px] rounded-full transition-colors ${
+                isActive ? "bg-[#103629] text-[#E9EDEF]" : "text-[#AEBAC1] active:bg-white/5"
+              }`}
+            >
+              <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
+              <span className={`text-[13px] leading-none ${isActive ? "font-semibold" : ""}`}>You</span>
+            </span>
           )}
         </NavLink>
       </nav>
