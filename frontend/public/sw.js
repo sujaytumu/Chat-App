@@ -108,6 +108,18 @@ self.addEventListener("pushsubscriptionchange", (event) => {
   );
 });
 
+// Notification preferences mirrored from Settings → Notifications (vibration
+// patterns, silent groups). Stored in a cache the page can write to.
+async function readPrefs() {
+  try {
+    const cache = await caches.open("prefs-v1");
+    const res = await cache.match("/__prefs");
+    return res ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   let payload;
@@ -133,6 +145,13 @@ self.addEventListener("push", (event) => {
       // avoid two sounds. Phones freeze background pages, so there the system
       // notification must carry the sound (and vibration).
       const pageHandlesSound = !IS_MOBILE && windows.length > 0;
+      const prefs = await readPrefs();
+      const isGroupMsg = !isCall && data && data.chatType === "group";
+      let vibrate = isCall ? [700, 400, 700, 400, 700, 400, 700] : [200, 100, 200];
+      if (prefs) {
+        const chosen = isCall ? prefs.call : isGroupMsg ? prefs.group : prefs.message;
+        vibrate = chosen === null || chosen === undefined ? [] : chosen;
+      }
 
       await self.registration.showNotification(title || "Talkies", {
         body,
@@ -141,11 +160,11 @@ self.addEventListener("push", (event) => {
         tag,
         data,
         renotify: true,
-        silent: pageHandlesSound,
+        silent: pageHandlesSound || (isGroupMsg && !!(prefs && prefs.groupSilent)),
         // Incoming calls: stay on screen until acted on, buzz, and offer
         // Answer / Decline right on the notification.
         requireInteraction: !!isCall,
-        vibrate: isCall ? [700, 400, 700, 400, 700, 400, 700] : [200, 100, 200],
+        vibrate,
         actions: isCall && Array.isArray(actions) ? actions : undefined,
       });
 

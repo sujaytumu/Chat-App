@@ -262,7 +262,7 @@ export const StoragePage = () => {
     setClearing(true);
     try {
       clearChatCache();
-      if (window.caches) await Promise.all((await caches.keys()).map((k) => caches.delete(k)));
+      if (window.caches) await Promise.all((await caches.keys()).filter((k) => k !== "prefs-v1").map((k) => caches.delete(k)));
       toast.success("Cache cleared");
     } catch {
       toast.error("Could not clear the cache");

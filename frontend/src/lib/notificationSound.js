@@ -6,6 +6,8 @@ import {
   isCallRingtoneEnabled,
   getCallTone,
   getMessageTone,
+  getGroupTone,
+  vibrationPattern,
   loadCustomTone,
 } from "./soundSettings";
 
@@ -117,11 +119,10 @@ export function shouldLeaveToSystemAlert() {
   return pushActive && document.visibilityState !== "visible" && isMobileDevice();
 }
 
-// Android phones can vibrate with the ring (iOS Safari has no vibration API).
-const RING_VIBRATION = [700, 400, 700, 400];
 export function vibrateForCall() {
   try {
-    navigator.vibrate?.(RING_VIBRATION);
+    const pattern = vibrationPattern("call");
+    if (pattern) navigator.vibrate?.(pattern);
   } catch {
     // ignore
   }
@@ -254,14 +255,22 @@ function playPresetOnce(table, id, fallbackId) {
 }
 
 // Message sound (respects the on/off setting).
-export function playNotificationSound() {
+export function playNotificationSound(isGroup = false) {
   if (!isMessageSoundEnabled()) return;
+  if (isGroup) {
+    const g = getGroupTone();
+    if (g === "none") return; // groups set to Silent
+    if (g !== "same") {
+      playMessageTone(g, "group");
+      return;
+    }
+  }
   playMessageTone(getMessageTone());
 }
 
-async function playMessageTone(id) {
+async function playMessageTone(id, kind = "message") {
   if (id === "custom") {
-    const url = await loadCustomTone("message");
+    const url = await loadCustomTone(kind);
     if (url) {
       try {
         ensureElements();
@@ -353,11 +362,11 @@ export async function previewCallTone(id) {
   return true;
 }
 
-export async function previewMessageTone(id) {
+export async function previewMessageTone(id, kind = "message") {
   primeAudio();
   stopTonePreview();
   if (id === "custom") {
-    const url = await loadCustomTone("message");
+    const url = await loadCustomTone(kind);
     if (!url) return false;
     try {
       ensureElements();
