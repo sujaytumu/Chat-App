@@ -191,3 +191,9 @@ html.reduce-motion *::after {
 html.no-wallpaper .chat-wallpaper {
   background-image: none;
 }
+
+/* Tab swipe: the new tab slides in from the side you swiped towards. */
+@keyframes tab-in-right { from { transform: translateX(28%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes tab-in-left { from { transform: translateX(-28%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+.tab-slide-from-right { animation: tab-in-right 0.22s ease-out; }
+.tab-slide-from-left { animation: tab-in-left 0.22s ease-out; }
