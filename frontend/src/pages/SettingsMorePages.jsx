@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Loader2, Camera, ExternalLink, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
@@ -99,6 +99,16 @@ export const AccountPage = () => {
         </p>
       </div>
 
+      <Link to="/settings/two-step" className={`${card} flex items-center gap-3 hover:bg-wa-pop`}>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[16px] text-wa-text">Two-step verification</span>
+          <span className="block text-[13.5px] text-wa-muted mt-0.5">
+            {authUser?.twoFactor?.enabled ? "On · extra code when you sign in" : "Add a code from an authenticator app"}
+          </span>
+        </span>
+        <span className="text-wa-muted">›</span>
+      </Link>
+
       <form onSubmit={changePw} className={card}>
         <p className="text-[16px] text-wa-text mb-3">Change password</p>
         <input className={`${field} mb-3`} type="password" autoComplete="current-password" placeholder="Current password" value={cur} onChange={(e) => setCur(e.target.value)} />
@@ -109,6 +119,222 @@ export const AccountPage = () => {
           </button>
         </div>
       </form>
+    </SettingsShell>
+  );
+};
+
+/* ---------------- Two-step verification ---------------- */
+const BackupCodes = ({ codes }) => {
+  const text = codes.join("\n");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied");
+    } catch {
+      toast.error("Couldn't copy");
+    }
+  };
+  const save = () => {
+    const url = URL.createObjectURL(new Blob([`Talkies backup codes\nEach code works once.\n\n${text}\n`], { type: "text/plain" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "talkies-backup-codes.txt";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+  return (
+    <div className={card}>
+      <p className="text-[16px] text-wa-text">Your backup codes</p>
+      <p className="text-[13.5px] text-wa-muted mt-0.5">
+        Save these somewhere safe. If you lose your phone, each code lets you sign in once. They won&apos;t be shown again.
+      </p>
+      <div className="grid grid-cols-2 gap-2 mt-3 font-mono text-[16px] text-wa-text">
+        {codes.map((c) => (
+          <span key={c} className="rounded-lg bg-wa-bg px-3 py-2 text-center">{c}</span>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2 mt-3">
+        <button className={ghostBtn} onClick={copy}>Copy</button>
+        <button className={ghostBtn} onClick={save}>Download</button>
+      </div>
+    </div>
+  );
+};
+
+export const TwoStepPage = () => {
+  const [status, setStatus] = useState(null); // { enabled, backupCodesLeft }
+  const [setup, setSetup] = useState(null); // { secret, otpauthUrl, qr }
+  const [code, setCode] = useState("");
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [codes, setCodes] = useState(null);
+  const [mode, setMode] = useState(null); // null | "disable" | "regen"
+
+  const load = () =>
+    axiosInstance
+      .get("/auth/2fa/status")
+      .then((r) => setStatus(r.data))
+      .catch(() => setStatus({ enabled: false, backupCodesLeft: 0 }));
+  useEffect(() => {
+    load();
+  }, []);
+
+  const err = (e, fallback) => toast.error(e?.response?.data?.message || fallback);
+
+  const start = async () => {
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.post("/auth/2fa/setup");
+      const QR = await import("qrcode");
+      const qr = await QR.toDataURL(data.otpauthUrl, { margin: 1, width: 220 });
+      setSetup({ ...data, qr });
+      setCode("");
+    } catch (e) {
+      err(e, "Couldn't start setup");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.post("/auth/2fa/enable", { code });
+      setCodes(data.backupCodes);
+      setSetup(null);
+      setCode("");
+      toast.success("Two-step verification is on");
+      load();
+    } catch (e) {
+      err(e, "Couldn't turn it on");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disable = async () => {
+    setBusy(true);
+    try {
+      await axiosInstance.post("/auth/2fa/disable", { password: pw, code });
+      toast("Two-step verification is off");
+      setMode(null);
+      setPw("");
+      setCode("");
+      setCodes(null);
+      load();
+    } catch (e) {
+      err(e, "Couldn't turn it off");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const regen = async () => {
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.post("/auth/2fa/backup-codes", { code });
+      setCodes(data.backupCodes);
+      setMode(null);
+      setCode("");
+      load();
+    } catch (e) {
+      err(e, "Couldn't make new codes");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const codeInput = (
+    <input
+      className={`${field} text-center tracking-[0.3em] text-[20px]`}
+      inputMode="numeric"
+      autoComplete="one-time-code"
+      maxLength={mode === "disable" ? 11 : 7}
+      placeholder="000000"
+      value={code}
+      onChange={(e) => setCode(e.target.value)}
+    />
+  );
+
+  return (
+    <SettingsShell title="Two-step verification" back="/settings/account">
+      {status === null ? (
+        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#25D366]" size={28} /></div>
+      ) : (
+        <>
+          <div className={card}>
+            <p className="text-[16px] text-wa-text">{status.enabled ? "Two-step verification is on" : "Add extra security to your account"}</p>
+            <p className="text-[13.5px] text-wa-muted mt-1">
+              {status.enabled
+                ? `When you sign in, you'll enter a 6-digit code from your authenticator app after your password. ${status.backupCodesLeft} backup code${status.backupCodesLeft === 1 ? "" : "s"} left.`
+                : "After your password, you'll also enter a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password…). Even if someone learns your password, they can't sign in."}
+            </p>
+            {!status.enabled && !setup && (
+              <div className="flex justify-end mt-3">
+                <button className={primaryBtn} onClick={start} disabled={busy}>
+                  {busy ? <Loader2 className="animate-spin" size={18} /> : "Turn on"}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {setup && (
+            <div className={card}>
+              <p className="text-[16px] text-wa-text">1. Scan this in your authenticator app</p>
+              <div className="flex justify-center my-3">
+                <img src={setup.qr} alt="Authenticator QR code" className="rounded-lg bg-white p-2" width={220} height={220} />
+              </div>
+              <p className="text-[13.5px] text-wa-muted">Can&apos;t scan? Enter this key instead:</p>
+              <p className="font-mono text-[15px] text-wa-text break-all select-all mt-1">{setup.secret}</p>
+              <a className="inline-block mt-2 text-[14px] text-[#25D366]" href={setup.otpauthUrl}>Open in authenticator app</a>
+              <p className="text-[16px] text-wa-text mt-5 mb-2">2. Enter the 6-digit code it shows</p>
+              {codeInput}
+              <div className="flex justify-end gap-2 mt-3">
+                <button className={ghostBtn} onClick={() => { setSetup(null); setCode(""); }}>Cancel</button>
+                <button className={primaryBtn} onClick={enable} disabled={busy || code.replace(/\s/g, "").length !== 6}>
+                  {busy ? <Loader2 className="animate-spin" size={18} /> : "Turn on"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {codes && <BackupCodes codes={codes} />}
+
+          {status.enabled && !mode && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button className={ghostBtn} onClick={() => { setMode("regen"); setCode(""); }}>New backup codes</button>
+              <button className={`${ghostBtn} !text-[#F15C6D]`} onClick={() => { setMode("disable"); setCode(""); setPw(""); }}>Turn off</button>
+            </div>
+          )}
+
+          {status.enabled && mode === "regen" && (
+            <div className={card}>
+              <p className="text-[16px] text-wa-text mb-2">Enter a code from your authenticator app</p>
+              {codeInput}
+              <p className="text-[12.5px] text-wa-muted2 mt-2">Your old backup codes stop working.</p>
+              <div className="flex justify-end gap-2 mt-3">
+                <button className={ghostBtn} onClick={() => setMode(null)}>Cancel</button>
+                <button className={primaryBtn} onClick={regen} disabled={busy || code.replace(/\s/g, "").length !== 6}>Create</button>
+              </div>
+            </div>
+          )}
+
+          {status.enabled && mode === "disable" && (
+            <div className={card}>
+              <p className="text-[16px] text-wa-text mb-2">Confirm it&apos;s you</p>
+              <input className={`${field} mb-3`} type="password" autoComplete="current-password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
+              {codeInput}
+              <p className="text-[12.5px] text-wa-muted2 mt-2">Use your authenticator code or a backup code.</p>
+              <div className="flex justify-end gap-2 mt-3">
+                <button className={ghostBtn} onClick={() => setMode(null)}>Cancel</button>
+                <button className={primaryBtn} onClick={disable} disabled={busy || !pw || code.trim().length < 6}>Turn off</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </SettingsShell>
   );
 };
@@ -229,6 +455,14 @@ export const PrivacyPage = () => {
         checked={pv.online !== false}
         onChange={(v) => updatePrivacy({ online: v })}
       />
+
+      <Link to="/settings/two-step" className={`${card} flex items-center gap-3 hover:bg-wa-pop`}>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[16px] text-wa-text">Two-step verification</span>
+          <span className="block text-[13.5px] text-wa-muted mt-0.5">Add a code from an authenticator app when you sign in</span>
+        </span>
+        <span className="text-wa-muted">›</span>
+      </Link>
 
       <div className={card}>
         <div className="flex items-center justify-between">

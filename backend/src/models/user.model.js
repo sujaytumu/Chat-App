@@ -36,6 +36,15 @@ const userSchema = new mongoose.Schema(
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
+    // Two-step verification (authenticator app). Secrets are never returned by
+    // default queries (select:false) — only the 2FA endpoints ask for them.
+    twoFactor: {
+      enabled: { type: Boolean, default: false },
+      secret: { type: String, select: false },
+      pendingSecret: { type: String, select: false },
+      backupCodes: { type: [String], select: false, default: undefined }, // sha256 hashes
+      lastStep: { type: Number, select: false, default: 0 },
+    },
     // Privacy: what other people can see about me. Defaults are all on.
     privacy: {
       readReceipts: { type: Boolean, default: true },

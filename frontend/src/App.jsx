@@ -38,6 +38,7 @@ const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default:
 const AccountPage = more("AccountPage");
 const StarredPage = more("StarredPage");
 const PrivacyPage = more("PrivacyPage");
+const TwoStepPage = more("TwoStepPage");
 const ChatsSettingsPage = more("ChatsSettingsPage");
 const StoragePage = more("StoragePage");
 const AccessibilityPage = more("AccessibilityPage");
@@ -200,6 +201,10 @@ const App = () => {
           <Route
             path="/settings/account"
             element={authUser ? <MainLayout><AccountPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/two-step"
+            element={authUser ? <MainLayout><TwoStepPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/settings/privacy"

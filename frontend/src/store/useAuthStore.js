@@ -28,6 +28,7 @@ export const useAuthStore = create((set, get) => ({
   authUser: cachedAuthUser,
   isSigningUp: false,
   isLoggingIn: false,
+  pendingTwoFactor: null, // { ticket } while waiting for the 6-digit code
   isUpdatingProfile: false,
   isCheckingAuth: !cachedAuthUser,
   onlineUsers: [],
@@ -74,16 +75,43 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoggingIn: true });
     try {
       const res = await axiosInstance.post("/auth/login", data);
+      if (res.data?.twoFactorRequired) {
+        // Password was right — now ask for the authenticator code.
+        set({ pendingTwoFactor: { ticket: res.data.ticket } });
+        return;
+      }
       set({ authUser: res.data });
       toast.success("Logged in successfully");
 
       get().connectSocket();
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Couldn't sign in");
     } finally {
       set({ isLoggingIn: false });
     }
   },
+
+  // Step 2 of sign-in when two-step verification is on.
+  verifyTwoFactor: async (code) => {
+    const pending = get().pendingTwoFactor;
+    if (!pending) return false;
+    set({ isLoggingIn: true });
+    try {
+      const res = await axiosInstance.post("/auth/login/2fa", { ticket: pending.ticket, code });
+      set({ authUser: res.data, pendingTwoFactor: null });
+      toast.success("Logged in successfully");
+      get().connectSocket();
+      return true;
+    } catch (error) {
+      const msg = error.response?.data?.message || "Couldn't verify the code";
+      toast.error(msg);
+      if (error.response?.status === 400 && /timed out/i.test(msg)) set({ pendingTwoFactor: null });
+      return false;
+    } finally {
+      set({ isLoggingIn: false });
+    }
+  },
+  cancelTwoFactor: () => set({ pendingTwoFactor: null }),
 
   logout: async () => {
     try {
