@@ -350,7 +350,22 @@ export const toggleStarMessage = async (req, res) => {
 export const getStarredMessages = async (req, res) => {
   try {
     const myId = req.user._id;
-    const messages = await Message.find({ starredBy: myId })
+    const query = { starredBy: myId, deletedFor: { $ne: myId }, deletedForEveryone: { $ne: true } };
+    // Optional: only one chat (?chatType=group&chatId=...) for the info screen.
+    const { chatType, chatId } = req.query;
+    if (chatType === "group" && mongoose.isValidObjectId(chatId)) {
+      if (!(await Group.exists({ _id: chatId, members: myId }))) {
+        return res.status(403).json({ error: "You are not a member of this group" });
+      }
+      query.groupId = chatId;
+    } else if (chatType === "direct" && mongoose.isValidObjectId(chatId)) {
+      query.groupId = null;
+      query.$or = [
+        { senderId: myId, receiverId: chatId },
+        { senderId: chatId, receiverId: myId },
+      ];
+    }
+    const messages = await Message.find(query)
       .sort({ createdAt: -1 })
       .populate("senderId", "fullName profilePic")
       .populate("receiverId", "fullName profilePic")

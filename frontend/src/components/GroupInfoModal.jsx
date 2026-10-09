@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -8,6 +8,7 @@ import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
+import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const GroupEmojiPhoto = lazy(() => import("./GroupEmojiPhoto"));
@@ -27,6 +28,8 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [viewPhoto, setViewPhoto] = useState(false);
   const [emojiPhoto, setEmojiPhoto] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
+  const [showStarred, setShowStarred] = useState(false);
+  const starred = useStarredCount("group", group._id);
   const mediaData = useChatMedia("group", group._id);
   const mediaCount = mediaData ? mediaData.media.length + mediaData.docs.length + mediaData.links.length : 0;
   const [savingPhoto, setSavingPhoto] = useState(false);
@@ -265,6 +268,15 @@ const GroupInfoModal = ({ group, onClose }) => {
             </div>
           )}
 
+          <button
+            onClick={() => setShowStarred(true)}
+            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
+          >
+            <Star size={22} className="text-[#8696A0]" />
+            <span className="flex-1 text-[16px]">Starred messages</span>
+            <span className="text-[#8696A0]">{starred?.length || ""}</span>
+            <ChevronRight size={18} className="text-[#8696A0]" />
+          </button>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <span className="text-sm font-medium text-[#8696A0]">Members</span>
             {isAdmin && (
@@ -343,6 +355,18 @@ const GroupInfoModal = ({ group, onClose }) => {
           </button>
         </div>
       </div>
+      {showStarred && (
+        <ChatStarredPanel
+          list={starred}
+          chat={{ type: "group", data: group }}
+          title={group.name}
+          onClose={() => setShowStarred(false)}
+          onJump={() => {
+            setShowStarred(false);
+            onClose();
+          }}
+        />
+      )}
       {showMedia && (
         <ChatMediaPanel data={mediaData} title={group.name} onClose={() => setShowMedia(false)} />
       )}
