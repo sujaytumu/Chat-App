@@ -14,14 +14,14 @@ const GroupPermissionsPanel = ({ group, isAdmin, onClose }) => {
   const perms = { editInfo: "admins", addMembers: "admins", sendMessages: "all", ...(group.permissions || {}) };
 
   return (
-    <div className="fixed inset-0 z-[96] bg-[#0B141A] text-[#E9EDEF] flex flex-col sm:max-w-md sm:mx-auto">
-      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-[#111B21]">
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
         <h3 className="text-[19px]">Group permissions</h3>
       </div>
-      <p className="px-5 py-3 text-[14px] text-[#8696A0]">
+      <p className="px-5 py-3 text-[14px] text-wa-muted">
         {isAdmin ? "Choose what members can do in this group. Admins can always do everything." : "Only admins can change these."}
       </p>
       <div className="flex-1 overflow-y-auto">
@@ -29,13 +29,13 @@ const GroupPermissionsPanel = ({ group, isAdmin, onClose }) => {
           <div key={r.key} className="flex items-center gap-4 px-5 py-3.5 border-b border-white/5">
             <span className="min-w-0 flex-1">
               <span className="block text-[16px]">{r.title}</span>
-              <span className="block text-[13.5px] text-[#8696A0]">{r.sub}</span>
+              <span className="block text-[13.5px] text-wa-muted">{r.sub}</span>
             </span>
             <select
               disabled={!isAdmin}
               value={perms[r.key]}
               onChange={(e) => setPerm(group._id, r.key, e.target.value)}
-              className="bg-[#2A3942] text-[#E9EDEF] rounded-lg px-3 py-2 text-[14.5px] disabled:opacity-60"
+              className="bg-wa-field text-wa-text rounded-lg px-3 py-2 text-[14.5px] disabled:opacity-60"
             >
               <option value="all">All members</option>
               <option value="admins">Only admins</option>

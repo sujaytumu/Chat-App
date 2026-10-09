@@ -59,18 +59,18 @@ const NotificationSettings = () => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#1F2C34]">
+    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-wa-surface">
       <div className="flex items-center gap-3">
         {permission === "granted" ? (
           <BellRing className="text-[#25D366] shrink-0" size={22} />
         ) : permission === "denied" ? (
           <BellOff className="text-red-400 shrink-0" size={22} />
         ) : (
-          <Bell className="text-[#8696A0] shrink-0" size={22} />
+          <Bell className="text-wa-muted shrink-0" size={22} />
         )}
         <div>
           <h3 className="font-semibold text-sm">Notifications</h3>
-          <p className="text-xs text-[#8696A0]">
+          <p className="text-xs text-wa-muted">
             {permission === "granted" && "Enabled — you'll get sound + popup alerts, even with the app closed."}
             {permission === "denied" &&
               "Blocked. Click the lock/info icon in your browser's address bar → Notifications → Allow, then reload."}
@@ -94,18 +94,18 @@ const NotificationSettings = () => {
 
 
 // ---------- WhatsApp-style rows and dialog ----------
-const Section = ({ children }) => <p className="px-4 pt-5 pb-1 text-[15px] text-[#8696A0]">{children}</p>;
+const Section = ({ children }) => <p className="px-4 pt-5 pb-1 text-[15px] text-wa-muted">{children}</p>;
 const Divider = () => <div className="h-px bg-white/5 mt-2" />;
 
 const Row = ({ title, sub, onClick }) => (
-  <button type="button" onClick={onClick} className="w-full px-4 py-4 text-left hover:bg-white/5 active:bg-[#1F2C34] transition-colors">
-    <span className="block text-[17px] leading-[22px] text-[#E9EDEF]">{title}</span>
-    <span className="block text-[14.5px] leading-5 text-[#8696A0] mt-0.5">{sub}</span>
+  <button type="button" onClick={onClick} className="w-full px-4 py-4 text-left hover:bg-white/5 active:bg-wa-surface transition-colors">
+    <span className="block text-[17px] leading-[22px] text-wa-text">{title}</span>
+    <span className="block text-[14.5px] leading-5 text-wa-muted mt-0.5">{sub}</span>
   </button>
 );
 
 const Radio = ({ on }) => (
-  <span className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${on ? "border-[#21C063]" : "border-[#8696A0]"}`}>
+  <span className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${on ? "border-[#21C063]" : "border-wa-muted"}`}>
     {on && <span className="size-2.5 rounded-full bg-[#21C063]" />}
   </span>
 );
@@ -150,13 +150,13 @@ const ChoiceDialog = ({ title, options, value, onPreview, onSave, onClose, kind,
 
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="w-full max-w-sm bg-[#233138] rounded-3xl pt-6 pb-3 shadow-2xl max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <h3 className="px-6 text-[20px] text-[#E9EDEF] mb-3">{title}</h3>
+      <div className="w-full max-w-sm bg-wa-pop rounded-3xl pt-6 pb-3 shadow-2xl max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <h3 className="px-6 text-[20px] text-wa-text mb-3">{title}</h3>
         <div className="overflow-y-auto flex-1">
           {all.map((o) => (
             <button key={o.id} type="button" onClick={() => pick(o.id)} className="w-full flex items-center gap-4 px-6 py-3 text-left hover:bg-white/5">
               <Radio on={sel === o.id} />
-              <span className="text-[16px] text-[#E9EDEF] truncate">{o.label}</span>
+              <span className="text-[16px] text-wa-text truncate">{o.label}</span>
             </button>
           ))}
           {allowCustom && (
@@ -232,13 +232,13 @@ export const NotificationsPage = () => {
       flush
       right={
         <div className="relative">
-          <button onClick={() => setMenu((v) => !v)} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="More options">
+          <button onClick={() => setMenu((v) => !v)} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="More options">
             <MoreVertical size={24} />
           </button>
           {menu && (
-            <div className="absolute right-2 top-full mt-1 w-64 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30">
+            <div className="absolute right-2 top-full mt-1 w-64 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30">
               <button
-                className="w-full px-4 py-3 text-[15px] text-[#E9EDEF] text-left hover:bg-white/5"
+                className="w-full px-4 py-3 text-[15px] text-wa-text text-left hover:bg-white/5"
                 onClick={async () => {
                   setMenu(false);
                   await resetNotificationSettings();
@@ -269,8 +269,8 @@ export const NotificationsPage = () => {
           className="w-full flex items-center gap-4 px-4 py-4 text-left hover:bg-white/5"
         >
           <span className="flex-1 min-w-0">
-            <span className="block text-[17px] leading-[22px] text-[#E9EDEF]">Conversation tones</span>
-            <span className="block text-[14.5px] leading-5 text-[#8696A0] mt-0.5">Play sounds for incoming messages.</span>
+            <span className="block text-[17px] leading-[22px] text-wa-text">Conversation tones</span>
+            <span className="block text-[14.5px] leading-5 text-wa-muted mt-0.5">Play sounds for incoming messages.</span>
           </span>
           <Switch checked={convTones} />
         </button>

@@ -29,8 +29,8 @@ const ChatStarredPanel = ({ list, chat, title, onClose, onJump }) => {
   useBackToClose(true, onClose);
 
   return (
-    <div className="fixed inset-0 z-[96] bg-[#0B141A] text-[#E9EDEF] flex flex-col sm:max-w-md sm:mx-auto">
-      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-[#111B21]">
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
@@ -38,9 +38,9 @@ const ChatStarredPanel = ({ list, chat, title, onClose, onJump }) => {
       </div>
       <div className="flex-1 overflow-y-auto">
         {!list ? (
-          <p className="text-center text-[#8696A0] py-16">Loading…</p>
+          <p className="text-center text-wa-muted py-16">Loading…</p>
         ) : list.length === 0 ? (
-          <div className="text-center text-[#8696A0] py-16 px-8">
+          <div className="text-center text-wa-muted py-16 px-8">
             <Star size={36} className="mx-auto mb-3" />
             No starred messages in this chat yet.
           </div>
@@ -57,7 +57,7 @@ const ChatStarredPanel = ({ list, chat, title, onClose, onJump }) => {
                 }}
                 className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5"
               >
-                <span className="flex justify-between text-[13px] text-[#8696A0] mb-1">
+                <span className="flex justify-between text-[13px] text-wa-muted mb-1">
                   <span>{mine ? "You" : m.senderId?.fullName || "Member"}</span>
                   <span>{fmt(m.createdAt)}</span>
                 </span>

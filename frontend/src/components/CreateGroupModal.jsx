@@ -57,16 +57,16 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
       onClick={onClose}
     >
       <div
-        className="bg-[#111B21] text-[#E9EDEF] rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
+        className="bg-wa-panel text-wa-text rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92dvh] sm:max-h-[85vh] flex flex-col shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 h-16 shrink-0">
           <h3 className="text-[20px] font-medium flex items-center gap-3">
-            <Users size={22} className="text-[#8696A0]" /> New group
+            <Users size={22} className="text-wa-muted" /> New group
           </h3>
           <button
             onClick={onClose}
-            className="size-11 rounded-full flex items-center justify-center text-[#AEBAC1] hover:bg-white/10 active:bg-white/15"
+            className="size-11 rounded-full flex items-center justify-center text-wa-icon hover:bg-white/10 active:bg-white/15"
             aria-label="Close"
           >
             <X size={22} />
@@ -79,13 +79,13 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="relative size-16 rounded-full bg-[#233138] hover:bg-[#2A3942] flex items-center justify-center overflow-hidden shrink-0"
+                className="relative size-16 rounded-full bg-wa-pop hover:bg-wa-field flex items-center justify-center overflow-hidden shrink-0"
                 aria-label="Group photo"
               >
                 {groupPic ? (
                   <img src={groupPic} alt="Group" className="w-full h-full object-cover" />
                 ) : (
-                  <Camera size={24} className="text-[#8696A0]" />
+                  <Camera size={24} className="text-wa-muted" />
                 )}
               </button>
               <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handlePicChange} />
@@ -94,7 +94,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Group name"
-                className="flex-1 min-w-0 bg-transparent border-0 border-b-2 border-[#2A3942] focus:border-[#25D366] focus:outline-none focus:ring-0 text-[18px] text-[#E9EDEF] placeholder:text-[#8696A0] py-2 transition-colors"
+                className="flex-1 min-w-0 bg-transparent border-0 border-b-2 border-wa-field focus:border-[#25D366] focus:outline-none focus:ring-0 text-[18px] text-wa-text placeholder:text-wa-muted py-2 transition-colors"
                 maxLength={50}
                 autoFocus
               />
@@ -114,13 +114,13 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
                   type="button"
                   key={user._id}
                   onClick={() => toggleMember(user._id)}
-                  className="w-full flex items-center gap-4 px-4 py-2.5 hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] text-left transition-colors"
+                  className="w-full flex items-center gap-4 px-4 py-2.5 hover:bg-wa-surface/70 active:bg-wa-surface text-left transition-colors"
                 >
                   <Avatar src={user.profilePic} name={user.fullName} size="size-12" />
                   <span className="flex-1 min-w-0 text-[17px] truncate">{user.fullName}</span>
                   <span
                     className={`size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                      checked ? "bg-[#25D366] border-[#25D366] text-[#0B141A]" : "border-[#55646D]"
+                      checked ? "bg-[#25D366] border-[#25D366] text-wa-bg" : "border-wa-icon"
                     }`}
                   >
                     {checked && <Check size={14} strokeWidth={3} />}
@@ -129,7 +129,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
               );
             })}
             {users.length === 0 && (
-              <p className="text-center text-[#8696A0] py-8 text-[15px]">No contacts to add yet</p>
+              <p className="text-center text-wa-muted py-8 text-[15px]">No contacts to add yet</p>
             )}
           </div>
 
@@ -137,7 +137,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
             <button
               type="submit"
               disabled={!canCreate}
-              className="w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] text-[16px] font-semibold flex items-center justify-center hover:bg-[#21c05e] active:scale-[.99] disabled:bg-[#1F2C34] disabled:text-[#667781] transition-colors"
+              className="w-full h-12 rounded-full bg-[#25D366] text-wa-bg text-[16px] font-semibold flex items-center justify-center hover:bg-[#21c05e] active:scale-[.99] disabled:bg-wa-surface disabled:text-wa-muted2 transition-colors"
             >
               {isCreating ? <Loader2 className="animate-spin" size={20} /> : "Create group"}
             </button>

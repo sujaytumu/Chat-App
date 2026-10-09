@@ -48,9 +48,9 @@ const CallsPage = () => {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0B141A] overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
+    <div className="flex-1 flex flex-col bg-wa-bg overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Calls</h1>
+        <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Calls</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -59,7 +59,7 @@ const CallsPage = () => {
             <Loader2 className="animate-spin text-[#25D366]" size={28} />
           </div>
         ) : calls.length === 0 ? (
-          <p className="text-center text-[#8696A0] py-10 text-sm">No calls yet</p>
+          <p className="text-center text-wa-muted py-10 text-sm">No calls yet</p>
         ) : (
           calls.map((call) => {
             const isOutgoing = call.callerId._id === authUser?._id;
@@ -70,7 +70,7 @@ const CallsPage = () => {
               <button
                 key={call._id}
                 onClick={() => handleCallBack(otherUser, call.callType)}
-                className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-[#1F2C34] transition-colors"
+                className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface transition-colors"
               >
                 <img
                   src={otherUser.profilePic || "/avatar.png"}
@@ -78,13 +78,13 @@ const CallsPage = () => {
                   className="size-14 rounded-full object-cover shrink-0"
                 />
                 <div className="flex-1 min-w-0 text-left">
-                  <p className={`text-[17px] truncate ${isMissed ? "text-red-400" : "text-[#E9EDEF]"}`}>{otherUser.fullName}</p>
-                  <div className={`flex items-center gap-1 text-sm ${isMissed ? "text-red-400" : "text-[#8696A0]"}`}>
+                  <p className={`text-[17px] truncate ${isMissed ? "text-red-400" : "text-wa-text"}`}>{otherUser.fullName}</p>
+                  <div className={`flex items-center gap-1 text-sm ${isMissed ? "text-red-400" : "text-wa-muted"}`}>
                     {isOutgoing ? <PhoneOutgoing size={13} /> : isMissed ? <PhoneMissed size={13} /> : <PhoneIncoming size={13} />}
                     <span>{formatCallTime(call.createdAt)}</span>
                   </div>
                 </div>
-                <div className="text-[#AEBAC1] hover:text-[#25D366] shrink-0 size-10 flex items-center justify-center">
+                <div className="text-wa-icon hover:text-[#25D366] shrink-0 size-10 flex items-center justify-center">
                   {call.callType === "video" ? <Video size={22} /> : <Phone size={22} />}
                 </div>
               </button>

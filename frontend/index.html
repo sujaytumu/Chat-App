@@ -5,18 +5,28 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" />
     <link rel="apple-touch-icon" href="/icon-v2-192.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#0B141A" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="color-scheme" content="light" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Talkies" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
     <title>Talkies</title>
-    <!-- Dark from the very first paint, so the old light screen never flashes before the app loads. -->
+    <!-- Right colours from the very first paint (white by default), so nothing flashes before the app loads. -->
+    <script>
+      try {
+        var t = localStorage.getItem("chat-theme") || "light";
+        var d = ["dark","night","dracula","forest","business","luxury","black","synthwave"].indexOf(t) > -1;
+        if (d) document.documentElement.classList.add("wa-dark");
+        document.documentElement.setAttribute("data-theme", t);
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", d ? "#111B21" : "#FFFFFF");
+      } catch (e) {}
+    </script>
     <style>
-      html, body, #root { margin: 0; min-height: 100%; background: #0B141A; }
+      html, body, #root { margin: 0; min-height: 100%; background: #FFFFFF; }
+      html.wa-dark, html.wa-dark body, html.wa-dark #root { background: #0B141A; }
     </style>
   </head>
   <body>

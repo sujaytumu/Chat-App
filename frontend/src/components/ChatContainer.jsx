@@ -233,12 +233,12 @@ const ChatContainer = () => {
       {pinnedMessage && (
         <button
           onClick={scrollToPinned}
-          className="flex items-center gap-2 px-4 py-2 bg-[#1F2C34] border-b border-white/5 text-left hover:bg-[#26333c] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-wa-surface border-b border-white/5 text-left hover:bg-wa-hover transition-colors"
         >
           <Pin size={14} className="text-[#00A884] shrink-0" />
           <div className="min-w-0 flex-1">
             <p className="text-xs font-medium text-[#00A884]">Pinned message</p>
-            <p className="text-sm truncate text-[#D1D7DB]">
+            <p className="text-sm truncate text-wa-text2">
               {pinnedMessage.image ? "📷 Photo" : pinnedMessage.file ? `📎 ${pinnedMessage.file.name}` : pinnedMessage.text}
             </p>
           </div>
@@ -248,7 +248,7 @@ const ChatContainer = () => {
               e.stopPropagation();
               togglePinMessage(pinnedMessage._id);
             }}
-            className="size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 shrink-0"
+            className="size-6 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 shrink-0"
             title="Unpin"
           >
             <X size={13} />
@@ -268,7 +268,7 @@ const ChatContainer = () => {
             <button
               onClick={handleLoadOlder}
               disabled={isLoadingOlder}
-              className="bg-[#1F2C34]/95 text-[#8696A0] hover:text-white text-[13px] px-4 py-1.5 rounded-full shadow-sm disabled:opacity-60"
+              className="bg-wa-surface/95 text-wa-muted hover:text-wa-text text-[13px] px-4 py-1.5 rounded-full shadow-sm disabled:opacity-60"
             >
               {isLoadingOlder ? "Loading…" : "Load older messages"}
             </button>
@@ -314,7 +314,7 @@ const ChatContainer = () => {
             <div key={message._id} className={isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}>
             {showDateDivider && (
               <div className="flex justify-center my-3">
-                <span className="bg-[#1F2C34]/95 text-[#8696A0] text-[12.5px] px-3 py-1 rounded-lg shadow-sm">
+                <span className="bg-wa-surface/95 text-wa-muted text-[12.5px] px-3 py-1 rounded-lg shadow-sm">
                   {formatDateDivider(message.createdAt)}
                 </span>
               </div>
@@ -344,8 +344,8 @@ const ChatContainer = () => {
 
               {message.deletedForEveryone ? (
                 <div
-                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-xl italic text-[#8696A0] text-[14.5px] flex items-center gap-1.5 ${
-                    isMe ? "bg-[#144D37]/70" : "bg-[#1F2C34]/80"
+                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-xl italic text-wa-muted text-[14.5px] flex items-center gap-1.5 ${
+                    isMe ? "bg-wa-out/70" : "bg-wa-surface/80"
                   } ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                 >
                   🚫 This message was deleted
@@ -353,7 +353,7 @@ const ChatContainer = () => {
               ) : isSticker ? (
                 <div className="flex flex-col items-center px-1">
                   <span className="text-6xl leading-none">{message.text.trim()}</span>
-                  <span className="text-[11px] text-[#8696A0] mt-1 flex items-center gap-1">
+                  <span className="text-[11px] text-wa-muted mt-1 flex items-center gap-1">
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
                     {isMe && isGroup && (
@@ -363,8 +363,8 @@ const ChatContainer = () => {
                 </div>
               ) : (
                 <div
-                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[60%] px-2.5 pt-1.5 pb-1.5 rounded-xl break-words shadow-sm flex flex-col text-[#E9EDEF] ${
-                    isMe ? "bg-[#144D37]" : "bg-[#1F2C34]"
+                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[60%] px-2.5 pt-1.5 pb-1.5 rounded-xl break-words shadow-sm flex flex-col text-wa-text ${
+                    isMe ? "bg-wa-out" : "bg-wa-surface"
                   } ${
                     isFirstInGroup ? (isMe ? "rounded-tr-none bubble-tail-out" : "rounded-tl-none bubble-tail-in") : ""
                   }`}
@@ -378,7 +378,7 @@ const ChatContainer = () => {
                     </span>
                   )}
                   {message.pinned && (
-                    <span className="flex items-center gap-1 text-[11px] mb-0.5 text-[#8696A0]">
+                    <span className="flex items-center gap-1 text-[11px] mb-0.5 text-wa-muted">
                       <Pin size={10} /> Pinned
                     </span>
                   )}
@@ -390,7 +390,7 @@ const ChatContainer = () => {
                       <span className="text-[13px] font-medium text-[#25D366]">
                         {replyFromMe ? "You" : replySender?.fullName || "Message"}
                       </span>
-                      <span className="text-[13.5px] text-[#AEBAC1] line-clamp-2 break-all">
+                      <span className="text-[13.5px] text-wa-icon line-clamp-2 break-all">
                         {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.text}
                       </span>
                     </button>
@@ -424,7 +424,7 @@ const ChatContainer = () => {
                   <span
                     className={`${
                       hasText ? "absolute bottom-1 right-2" : "self-end mt-0.5"
-                    } text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-[#E9EDEF]/60`}
+                    } text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
                   >
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
@@ -439,7 +439,7 @@ const ChatContainer = () => {
             </div>
             {message.reactions?.length > 0 && !message.deletedForEveryone && (
               <div className={`flex -mt-1.5 px-2 ${isMe ? "justify-end" : isGroup ? "justify-start pl-10" : "justify-start"}`}>
-                <div className="flex items-center gap-1 bg-[#1F2C34] border border-[#0B141A] rounded-full px-1.5 py-0.5 shadow-sm">
+                <div className="flex items-center gap-1 bg-wa-surface border border-wa-bg rounded-full px-1.5 py-0.5 shadow-sm">
                   {Object.entries(
                     message.reactions.reduce((acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] || 0) + 1 }), {})
                   ).map(([emoji, count]) => (
@@ -449,7 +449,7 @@ const ChatContainer = () => {
                       className="text-[14px] leading-none flex items-center gap-0.5"
                     >
                       {emoji}
-                      {count > 1 && <span className="text-[11px] text-[#8696A0]">{count}</span>}
+                      {count > 1 && <span className="text-[11px] text-wa-muted">{count}</span>}
                     </button>
                   ))}
                 </div>
@@ -460,10 +460,10 @@ const ChatContainer = () => {
         })}
 
         {isOtherTyping && (
-          <div className="mt-2 inline-flex items-center gap-1 px-3.5 py-3 rounded-xl rounded-tl-none bg-[#1F2C34]">
-            <span className="size-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:-0.3s]" />
-            <span className="size-2 rounded-full bg-[#8696A0] animate-bounce [animation-delay:-0.15s]" />
-            <span className="size-2 rounded-full bg-[#8696A0] animate-bounce" />
+          <div className="mt-2 inline-flex items-center gap-1 px-3.5 py-3 rounded-xl rounded-tl-none bg-wa-surface">
+            <span className="size-2 rounded-full bg-wa-muted animate-bounce [animation-delay:-0.3s]" />
+            <span className="size-2 rounded-full bg-wa-muted animate-bounce [animation-delay:-0.15s]" />
+            <span className="size-2 rounded-full bg-wa-muted animate-bounce" />
           </div>
         )}
         <div ref={messageEndRef} />
@@ -472,12 +472,12 @@ const ChatContainer = () => {
       {showJump && (
         <button
           onClick={jumpToLatest}
-          className="absolute bottom-3 right-4 z-10 size-11 rounded-full bg-[#1F2C34] text-[#AEBAC1] hover:bg-[#2A3942] shadow-lg shadow-black/40 flex items-center justify-center transition-colors"
+          className="absolute bottom-3 right-4 z-10 size-11 rounded-full bg-wa-surface text-wa-icon hover:bg-wa-field shadow-lg shadow-black/40 flex items-center justify-center transition-colors"
           aria-label="Jump to latest message"
         >
           <ChevronDown size={26} />
           {newWhileAway > 0 && (
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 rounded-full bg-[#25D366] text-[#0B141A] text-[11px] font-bold flex items-center justify-center">
+            <span className="absolute -top-2 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 rounded-full bg-[#25D366] text-wa-bg text-[11px] font-bold flex items-center justify-center">
               {newWhileAway > 99 ? "99+" : newWhileAway}
             </span>
           )}
@@ -486,7 +486,7 @@ const ChatContainer = () => {
       </div>
 
       {isGroup && data.permissions?.sendMessages === "admins" && !data.admins.some((a) => (a._id || a) === authUser._id) ? (
-        <div className="shrink-0 px-4 py-3.5 text-center text-[14px] text-[#8696A0] bg-[#111B21] border-t border-white/5">
+        <div className="shrink-0 px-4 py-3.5 text-center text-[14px] text-wa-muted bg-wa-panel border-t border-white/5">
           Only admins can send messages
         </div>
       ) : (

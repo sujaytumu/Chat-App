@@ -22,10 +22,10 @@ const ForwardMessageModal = ({ message, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4">
-      <div className="bg-[#1F2C34] rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-wa-surface rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h3 className="font-semibold text-white">Forward to</h3>
-          <button onClick={onClose} className="text-[#8696A0] hover:text-white">
+          <h3 className="font-semibold text-wa-text">Forward to</h3>
+          <button onClick={onClose} className="text-wa-muted hover:text-wa-text">
             <X size={20} />
           </button>
         </div>
@@ -40,7 +40,7 @@ const ForwardMessageModal = ({ message, onClose }) => {
               }`}
             >
               <img src={item.avatar || "/avatar.png"} alt={item.name} className="size-10 rounded-full object-cover" />
-              <span className="text-[#D1D7DB] truncate">{item.name}</span>
+              <span className="text-wa-text2 truncate">{item.name}</span>
             </button>
           ))}
         </div>

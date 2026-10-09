@@ -4,7 +4,7 @@ import { WaBack } from "./icons/WaIcons";
 // Common frame for every Settings screen: back arrow + title on top, scrolling
 // content below (the bottom bar stays visible, like WhatsApp).
 const SettingsShell = ({ title, children, back = "/profile", right = null, flush = false }) => (
-  <div className="flex-1 min-w-0 flex flex-col bg-[#0B141A] text-[#E9EDEF] overflow-hidden">
+  <div className="flex-1 min-w-0 flex flex-col bg-wa-bg text-wa-text overflow-hidden">
     <div className="flex items-center h-14 pl-1 pr-4 shrink-0">
       <Link to={back} className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
         <WaBack size={24} />
@@ -25,7 +25,7 @@ export const Switch = ({ checked }) => (
   <span className={`relative w-[52px] h-8 rounded-full shrink-0 transition-colors ${checked ? "bg-[#21C063]" : "bg-[#3B4A54]"}`}>
     <span
       className={`absolute top-1 size-6 rounded-full flex items-center justify-center transition-all ${
-        checked ? "left-[24px] bg-[#0B141A] text-[#21C063]" : "left-1 bg-[#8696A0]"
+        checked ? "left-[24px] bg-wa-bg text-[#21C063]" : "left-1 bg-wa-muted"
       }`}
     >
       {checked && (
@@ -41,13 +41,13 @@ export const ToggleRow = ({ title, sub, checked, onChange }) => (
   <button
     type="button"
     onClick={() => onChange(!checked)}
-    className="w-full flex items-center gap-4 p-4 rounded-xl bg-[#1F2C34] text-left"
+    className="w-full flex items-center gap-4 p-4 rounded-xl bg-wa-surface text-left"
     role="switch"
     aria-checked={checked}
   >
     <span className="flex-1 min-w-0">
-      <span className="block text-[16px] text-[#E9EDEF]">{title}</span>
-      {sub && <span className="block text-[13.5px] text-[#8696A0] mt-0.5">{sub}</span>}
+      <span className="block text-[16px] text-wa-text">{title}</span>
+      {sub && <span className="block text-[13.5px] text-wa-muted mt-0.5">{sub}</span>}
     </span>
     <Switch checked={checked} />
   </button>

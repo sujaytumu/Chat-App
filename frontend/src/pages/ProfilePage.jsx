@@ -6,7 +6,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import Avatar from "../components/Avatar";
 
-const iconCls = "text-[#AEBAC1]";
+const iconCls = "text-wa-icon";
 
 // WhatsApp's "You" tab: photo + name on top, then the settings list.
 const ProfilePage = () => {
@@ -58,7 +58,7 @@ const ProfilePage = () => {
   ].filter((r) => !query.trim() || `${r.title} ${r.sub || ""}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   const rowCls =
-    "w-full flex items-center gap-4 pl-4 pr-4 py-4 text-left hover:bg-white/5 active:bg-[#1F2C34] transition-colors";
+    "w-full flex items-center gap-4 pl-4 pr-4 py-4 text-left hover:bg-white/5 active:bg-wa-surface transition-colors";
 
   const body = (r) => (
     <>
@@ -66,16 +66,16 @@ const ProfilePage = () => {
         <r.icon size={26} strokeWidth={1.7} className={iconCls} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[17px] leading-[22px] text-[#E9EDEF]">{r.title}</span>
-        {r.sub && <span className="block text-[14.5px] leading-5 text-[#8696A0] mt-0.5">{r.sub}</span>}
+        <span className="block text-[17px] leading-[22px] text-wa-text">{r.title}</span>
+        {r.sub && <span className="block text-[14.5px] leading-5 text-wa-muted mt-0.5">{r.sub}</span>}
       </span>
     </>
   );
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-[#0B141A] overflow-hidden relative">
+    <div className="flex-1 min-w-0 flex flex-col bg-wa-bg overflow-hidden relative">
       {/* Top bar: the name slides in once you scroll past the big one */}
-      <div className="relative z-10 flex items-center h-14 pl-4 pr-1 shrink-0 bg-[#0B141A]/90 backdrop-blur-sm">
+      <div className="relative z-10 flex items-center h-14 pl-4 pr-1 shrink-0 bg-wa-bg/90 backdrop-blur-sm">
         {searching ? (
           <>
             <input
@@ -83,14 +83,14 @@ const ProfilePage = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search settings"
-              className="flex-1 min-w-0 bg-transparent text-[18px] text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none"
+              className="flex-1 min-w-0 bg-transparent text-[18px] text-wa-text placeholder:text-wa-muted focus:outline-none"
             />
             <button
               onClick={() => {
                 setSearching(false);
                 setQuery("");
               }}
-              className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10"
+              className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10"
               aria-label="Close search"
             >
               <X size={24} />
@@ -99,19 +99,19 @@ const ProfilePage = () => {
         ) : (
           <>
             <h1
-              className={`flex-1 min-w-0 truncate text-[28px] leading-none font-normal text-[#E9EDEF] transition-opacity ${
+              className={`flex-1 min-w-0 truncate text-[28px] leading-none font-normal text-wa-text transition-opacity ${
                 scrolled ? "opacity-100" : "opacity-0"
               }`}
             >
               {authUser?.fullName}
             </h1>
-            <button onClick={() => setSearching(true)} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Search">
+            <button onClick={() => setSearching(true)} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Search">
               <Search size={24} strokeWidth={2.2} />
             </button>
-            <button onClick={share} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Share">
+            <button onClick={share} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Share">
               <Share2 size={24} strokeWidth={2.2} />
             </button>
-            <button onClick={() => navigate("/settings/account")} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Edit profile">
+            <button onClick={() => navigate("/settings/account")} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Edit profile">
               <Pencil size={24} strokeWidth={2.2} />
             </button>
           </>
@@ -131,9 +131,9 @@ const ProfilePage = () => {
             />
             <div className="relative flex flex-col items-center pt-6 pb-6">
               {authUser?.about && (
-                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-[#1F2C34] px-5 py-3 text-[16px] text-[#E9EDEF] text-center">
+                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-wa-surface px-5 py-3 text-[16px] text-wa-text text-center">
                   <span className="line-clamp-2 break-words">{authUser.about}</span>
-                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-3 rotate-45 bg-[#1F2C34]" />
+                  <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-3 rotate-45 bg-wa-surface" />
                 </Link>
               )}
               <button
@@ -149,10 +149,10 @@ const ProfilePage = () => {
                 )}
               </button>
               <div className="mt-6 flex items-center gap-2 px-6 max-w-full">
-                <h2 className="text-[28px] leading-8 font-normal text-[#E9EDEF] truncate">{authUser?.fullName}</h2>
-                <ChevronDown size={22} className="text-[#8696A0] shrink-0" />
+                <h2 className="text-[28px] leading-8 font-normal text-wa-text truncate">{authUser?.fullName}</h2>
+                <ChevronDown size={22} className="text-wa-muted shrink-0" />
               </div>
-              <p className="mt-1 text-[17px] text-[#8696A0] truncate max-w-full px-6">{handle}</p>
+              <p className="mt-1 text-[17px] text-wa-muted truncate max-w-full px-6">{handle}</p>
             </div>
           </div>
         )}
@@ -169,7 +169,7 @@ const ProfilePage = () => {
           )
         )}
 
-        {rows.length === 0 && <p className="text-center text-[#8696A0] py-10 text-[15px]">No results</p>}
+        {rows.length === 0 && <p className="text-center text-wa-muted py-10 text-[15px]">No results</p>}
 
         {!query && (
           <>

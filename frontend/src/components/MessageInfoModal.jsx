@@ -15,12 +15,12 @@ const formatTime = (dateStr) =>
 const Shell = ({ onClose, children }) => (
   <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4" onClick={onClose}>
     <div
-      className="bg-[#1F2C34] rounded-2xl w-full max-w-sm max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden"
+      className="bg-wa-surface rounded-2xl w-full max-w-sm max-h-[85dvh] flex flex-col shadow-2xl overflow-hidden"
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
-        <h3 className="font-semibold text-white">Message info</h3>
-        <button onClick={onClose} className="text-[#8696A0] hover:text-white" aria-label="Close">
+        <h3 className="font-semibold text-wa-text">Message info</h3>
+        <button onClick={onClose} className="text-wa-muted hover:text-wa-text" aria-label="Close">
           <X size={20} />
         </button>
       </div>
@@ -32,7 +32,7 @@ const Shell = ({ onClose, children }) => (
 const Section = ({ icon, title, count, people }) =>
   people.length === 0 ? null : (
     <div className="py-2">
-      <div className="flex items-center gap-2 px-4 py-2 text-[13px] text-[#8696A0]">
+      <div className="flex items-center gap-2 px-4 py-2 text-[13px] text-wa-muted">
         {icon}
         <span>
           {title} <span className="opacity-70">({count})</span>
@@ -42,9 +42,9 @@ const Section = ({ icon, title, count, people }) =>
         <div key={member._id} className="flex items-center gap-3 px-4 py-2">
           <Avatar src={member.profilePic} name={member.fullName} size="size-10" textSize="text-base" />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] text-[#E9EDEF] truncate">{member.fullName}</p>
+            <p className="text-[15px] text-wa-text truncate">{member.fullName}</p>
           </div>
-          {at && <span className="text-xs text-[#8696A0] shrink-0">{formatTime(at)}</span>}
+          {at && <span className="text-xs text-wa-muted shrink-0">{formatTime(at)}</span>}
         </div>
       ))}
     </div>
@@ -67,8 +67,8 @@ const GroupInfo = ({ message, members, onClose }) => {
 
   return (
     <Shell onClose={onClose}>
-      <div className="px-4 py-3 border-b border-white/10 text-sm text-[#D1D7DB] flex items-center gap-2">
-        <Check size={16} className="text-[#8696A0]" /> Sent {formatTime(message.createdAt)}
+      <div className="px-4 py-3 border-b border-white/10 text-sm text-wa-text2 flex items-center gap-2">
+        <Check size={16} className="text-wa-muted" /> Sent {formatTime(message.createdAt)}
       </div>
       <Section
         icon={<CheckCheck size={16} className="text-[#53BDEB]" />}
@@ -77,18 +77,18 @@ const GroupInfo = ({ message, members, onClose }) => {
         people={readBy}
       />
       <Section
-        icon={<CheckCheck size={16} className="text-[#8696A0]" />}
+        icon={<CheckCheck size={16} className="text-wa-muted" />}
         title="Delivered to"
         count={`${deliveredOnly.length}`}
         people={deliveredOnly}
       />
       <Section
-        icon={<Check size={16} className="text-[#8696A0]" />}
+        icon={<Check size={16} className="text-wa-muted" />}
         title="Remaining"
         count={`${remaining.length}`}
         people={remaining}
       />
-      {others.length === 0 && <p className="p-4 text-xs text-[#8696A0]">No other members in this group.</p>}
+      {others.length === 0 && <p className="p-4 text-xs text-wa-muted">No other members in this group.</p>}
     </Shell>
   );
 };
@@ -107,28 +107,28 @@ const MessageInfoModal = ({ message, onClose, members }) => {
           <div className="flex items-center gap-3">
             <CheckCheck size={18} className="text-[#53BDEB]" />
             <div>
-              <p className="text-sm text-[#D1D7DB]">Read</p>
-              <p className="text-xs text-[#8696A0]">{readAt}</p>
+              <p className="text-sm text-wa-text2">Read</p>
+              <p className="text-xs text-wa-muted">{readAt}</p>
             </div>
           </div>
         )}
         {deliveredAt && (
           <div className="flex items-center gap-3">
-            <CheckCheck size={18} className="text-[#8696A0]" />
+            <CheckCheck size={18} className="text-wa-muted" />
             <div>
-              <p className="text-sm text-[#D1D7DB]">Delivered</p>
-              <p className="text-xs text-[#8696A0]">{deliveredAt}</p>
+              <p className="text-sm text-wa-text2">Delivered</p>
+              <p className="text-xs text-wa-muted">{deliveredAt}</p>
             </div>
           </div>
         )}
         <div className="flex items-center gap-3">
-          <Check size={18} className="text-[#8696A0]" />
+          <Check size={18} className="text-wa-muted" />
           <div>
-            <p className="text-sm text-[#D1D7DB]">Sent</p>
-            <p className="text-xs text-[#8696A0]">{sentAt}</p>
+            <p className="text-sm text-wa-text2">Sent</p>
+            <p className="text-xs text-wa-muted">{sentAt}</p>
           </div>
         </div>
-        {!readAt && !deliveredAt && <p className="text-xs text-[#8696A0]">Not yet delivered</p>}
+        {!readAt && !deliveredAt && <p className="text-xs text-wa-muted">Not yet delivered</p>}
       </div>
     </Shell>
   );

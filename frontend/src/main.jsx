@@ -3,10 +3,11 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
-import { useThemeStore } from "./store/useThemeStore";
+import { useThemeStore, applyTheme } from "./store/useThemeStore";
 import { applyUiSettings } from "./lib/uiSettings";
 
 applyUiSettings();
+applyTheme(useThemeStore.getState().theme);
 
 // Wrapper to provide global theme
 const RootWrapper = () => {

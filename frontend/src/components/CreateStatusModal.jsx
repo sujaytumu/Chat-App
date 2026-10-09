@@ -47,10 +47,10 @@ const CreateStatusModal = ({ onClose, onCreated }) => {
 
   return (
     <div className="fixed inset-0 z-[150] bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-[#1F2C34] rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+      <div className="bg-wa-surface rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h3 className="font-semibold text-white">Add status</h3>
-          <button onClick={onClose} className="text-[#8696A0] hover:text-white">
+          <h3 className="font-semibold text-wa-text">Add status</h3>
+          <button onClick={onClose} className="text-wa-muted hover:text-wa-text">
             <X size={20} />
           </button>
         </div>

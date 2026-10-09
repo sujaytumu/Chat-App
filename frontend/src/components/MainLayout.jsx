@@ -39,7 +39,7 @@ const MainLayout = ({ children }) => {
 
   return (
     <div
-      className="fixed inset-x-0 top-0 bg-[#0B141A] flex overflow-hidden"
+      className="fixed inset-x-0 top-0 bg-wa-bg flex overflow-hidden"
       style={{ height: "var(--app-height, 100dvh)" }}
     >
       <MainNav />

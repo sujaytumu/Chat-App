@@ -1,4 +1,5 @@
 export const THEMES = [
+  "light",
   "dark",
   "night",
   "dracula",
@@ -8,7 +9,6 @@ export const THEMES = [
   "black",
   "synthwave",
   "winter",
-  "light",
   "emerald",
   "corporate",
 ];

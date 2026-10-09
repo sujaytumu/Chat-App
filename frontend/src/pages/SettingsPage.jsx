@@ -22,16 +22,16 @@ export const InstallAppControl = () => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#1F2C34]">
+    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-wa-surface">
       <div className="flex items-center gap-3">
         {isInstalled ? (
           <CheckCircle2 className="text-[#25D366] shrink-0" size={22} />
         ) : (
-          <Download className="text-[#8696A0] shrink-0" size={22} />
+          <Download className="text-wa-muted shrink-0" size={22} />
         )}
         <div>
           <h3 className="font-semibold text-sm">Install app</h3>
-          <p className="text-xs text-[#8696A0]">
+          <p className="text-xs text-wa-muted">
             {isInstalled
               ? "Already installed — opens like a native app from your home screen."
               : isIOS
@@ -70,7 +70,7 @@ export const AppearancePage = () => {
 
       <div className="flex flex-col gap-1 pt-2">
         <h2 className="text-lg font-semibold">Theme</h2>
-        <p className="text-sm text-[#8696A0]">Choose a theme for your chat interface</p>
+        <p className="text-sm text-wa-muted">Choose a theme for your chat interface</p>
       </div>
 
       <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
@@ -79,7 +79,7 @@ export const AppearancePage = () => {
             key={t}
             className={`
               group flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors
-              ${theme === t ? "ring-2 ring-offset-2 ring-offset-[#0B141A] ring-[#25D366]" : "hover:bg-white/5"}
+              ${theme === t ? "ring-2 ring-offset-2 ring-offset-wa-bg ring-[#25D366]" : "hover:bg-white/5"}
             `}
             onClick={() => setTheme(t)}
             data-theme={t}

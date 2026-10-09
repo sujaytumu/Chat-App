@@ -9,7 +9,7 @@ import Avatar from "./Avatar";
 // Same control look as 1-to-1 calls: dark circle, solid white while "on".
 const btnBase = "size-16 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95";
 const btnOff = `${btnBase} bg-white/10 hover:bg-white/15 text-white`;
-const btnOn = `${btnBase} bg-white hover:bg-white/90 text-[#0B141A] shadow-lg shadow-white/10`;
+const btnOn = `${btnBase} bg-white hover:bg-white/90 text-wa-bg shadow-lg shadow-white/10`;
 const ctl = (on) => (on ? btnOn : btnOff);
 
 const fmt = (sec) => {
@@ -40,7 +40,7 @@ const Tile = ({ stream, name, label, pic, muted, videoOn, mirror, contain, self,
   }, [stream]);
 
   return (
-    <div className={`relative overflow-hidden bg-[#1F2C34] min-h-0 min-w-0 ${small ? "rounded-xl" : "rounded-2xl"}`}>
+    <div className={`relative overflow-hidden bg-wa-surface min-h-0 min-w-0 ${small ? "rounded-xl" : "rounded-2xl"}`}>
       {/* Always rendered: it also carries the person's voice, even with no picture */}
       <video
         ref={ref}
@@ -78,25 +78,25 @@ const Incoming = () => {
   const isVideo = incoming.callType === "video";
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col items-center justify-between py-16 px-6">
+    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col items-center justify-between py-16 px-6">
       <div className="flex flex-col items-center text-center">
-        <p className="text-[15px] text-[#8696A0] mb-6">Group {isVideo ? "video" : "voice"} call</p>
+        <p className="text-[15px] text-wa-muted mb-6">Group {isVideo ? "video" : "voice"} call</p>
         <Avatar src={incoming.groupPic} name={incoming.groupName} isGroup size="size-32" textSize="text-5xl" />
-        <h2 className="mt-6 text-[28px] text-[#E9EDEF] max-w-full truncate">{incoming.groupName}</h2>
-        <p className="mt-2 text-[16px] text-[#8696A0]">{incoming.from?.fullName || "Someone"} is calling…</p>
+        <h2 className="mt-6 text-[28px] text-wa-text max-w-full truncate">{incoming.groupName}</h2>
+        <p className="mt-2 text-[16px] text-wa-muted">{incoming.from?.fullName || "Someone"} is calling…</p>
       </div>
       <div className="flex items-center gap-16">
         <div className="flex flex-col items-center gap-2">
           <button onClick={decline} className="size-16 rounded-full bg-[#F15C6D] text-white flex items-center justify-center active:scale-95" aria-label="Decline">
             <PhoneOff size={28} />
           </button>
-          <span className="text-[13px] text-[#8696A0]">Decline</span>
+          <span className="text-[13px] text-wa-muted">Decline</span>
         </div>
         <div className="flex flex-col items-center gap-2">
-          <button onClick={accept} className="size-16 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center active:scale-95" aria-label="Join">
+          <button onClick={accept} className="size-16 rounded-full bg-[#21C063] text-wa-bg flex items-center justify-center active:scale-95" aria-label="Join">
             {isVideo ? <Video size={28} /> : <Phone size={28} />}
           </button>
-          <span className="text-[13px] text-[#8696A0]">Join</span>
+          <span className="text-[13px] text-wa-muted">Join</span>
         </div>
       </div>
     </div>
@@ -166,16 +166,16 @@ const Active = () => {
   );
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col">
+    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col">
       <div className="flex items-center gap-3 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shrink-0">
         <Avatar src={groupPic} name={groupName} isGroup size="size-10" textSize="text-lg" />
         <div className="min-w-0 flex-1">
-          <p className="text-[17px] text-[#E9EDEF] truncate">{groupName}</p>
-          <p className="text-[13px] text-[#8696A0] flex items-center gap-1.5">
+          <p className="text-[17px] text-wa-text truncate">{groupName}</p>
+          <p className="text-[13px] text-wa-muted flex items-center gap-1.5">
             <Users size={13} /> {status === "joining" ? "Connecting…" : `${count} in call · ${fmt(elapsed)}`}
           </p>
         </div>
-        <span className="text-[12px] text-[#667781]">max {MAX_GROUP_CALL}</span>
+        <span className="text-[12px] text-wa-muted2">max {MAX_GROUP_CALL}</span>
       </div>
 
       {spot ? (
@@ -195,7 +195,7 @@ const Active = () => {
         <div className={`flex-1 min-h-0 grid ${gridCls} auto-rows-fr gap-2 px-2 pb-2`}>{all.map((t) => renderTile(t))}</div>
       )}
 
-      <div className="shrink-0 flex items-center justify-center gap-4 px-4 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))] bg-[#111B21] rounded-t-3xl">
+      <div className="shrink-0 flex items-center justify-center gap-4 px-4 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))] bg-wa-panel rounded-t-3xl">
         <button onClick={toggleMute} className={ctl(isMuted)} aria-label={isMuted ? "Unmute" : "Mute"}>
           {isMuted ? <MicOff size={26} /> : <Mic size={26} />}
         </button>

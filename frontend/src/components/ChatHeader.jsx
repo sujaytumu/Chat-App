@@ -11,9 +11,9 @@ import { useGroupCallStore } from "../store/useGroupCallStore";
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 
 const iconBtn =
-  "size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
+  "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
 
-const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
+const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-wa-text hover:bg-white/5 text-left";
 
 const ChatHeader = () => {
   const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen } = useChatStore();
@@ -64,7 +64,7 @@ const ChatHeader = () => {
 
   return (
     <>
-    <div className="relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-[#0B141A] lg:bg-[#111B21] border-b border-white/5">
+    <div className="relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5">
       {/* Back to the chat list (phone) */}
       <button onClick={() => setSelectedChat(null)} className={`${iconBtn} lg:hidden shrink-0`} aria-label="Back">
         <WaBack size={24} />
@@ -77,8 +77,8 @@ const ChatHeader = () => {
       >
         <Avatar src={isGroup ? data.groupPic : data.profilePic} name={name} isGroup={isGroup} size="size-11" textSize="text-xl" />
         <div className="min-w-0">
-          <h3 className="text-[19px] leading-6 font-medium text-[#E9EDEF] truncate">{name}</h3>
-          <p className={`text-[13px] leading-4 truncate ${isOnline || status === "typing…" ? "text-[#25D366]" : "text-[#8696A0]"}`}>
+          <h3 className="text-[19px] leading-6 font-medium text-wa-text truncate">{name}</h3>
+          <p className={`text-[13px] leading-4 truncate ${isOnline || status === "typing…" ? "text-[#25D366]" : "text-wa-muted"}`}>
             {status}
           </p>
         </div>
@@ -123,7 +123,7 @@ const ChatHeader = () => {
             <WaKebab size={24} />
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-52 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-52 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
               {isGroup && (
                 <button
                   className={menuItem}
@@ -132,7 +132,7 @@ const ChatHeader = () => {
                     setShowGroupInfo(true);
                   }}
                 >
-                  <Info size={18} className="text-[#AEBAC1]" /> Group info
+                  <Info size={18} className="text-wa-icon" /> Group info
                 </button>
               )}
               <button
@@ -142,7 +142,7 @@ const ChatHeader = () => {
                   setChatSearchOpen(true);
                 }}
               >
-                <Search size={18} className="text-[#AEBAC1]" /> Search
+                <Search size={18} className="text-wa-icon" /> Search
               </button>
               <button
                 className={menuItem}
@@ -153,7 +153,7 @@ const ChatHeader = () => {
                   if (!isArchived) setSelectedChat(null);
                 }}
               >
-                <WaArchive size={20} up={isArchived} className="text-[#AEBAC1]" />
+                <WaArchive size={20} up={isArchived} className="text-wa-icon" />
                 {isArchived ? "Unarchive chat" : "Archive chat"}
               </button>
               <button
@@ -163,7 +163,7 @@ const ChatHeader = () => {
                   setSelectedChat(null);
                 }}
               >
-                <X size={18} className="text-[#AEBAC1]" /> Close chat
+                <X size={18} className="text-wa-icon" /> Close chat
               </button>
             </div>
           )}

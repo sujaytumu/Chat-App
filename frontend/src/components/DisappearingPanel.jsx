@@ -10,14 +10,14 @@ const DisappearingPanel = ({ group, isAdmin, onClose }) => {
   const current = group.disappearAfter || 0;
 
   return (
-    <div className="fixed inset-0 z-[96] bg-[#0B141A] text-[#E9EDEF] flex flex-col sm:max-w-md sm:mx-auto">
-      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-[#111B21]">
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
         <h3 className="text-[19px]">Disappearing messages</h3>
       </div>
-      <p className="px-5 py-4 text-[14px] text-[#8696A0]">
+      <p className="px-5 py-4 text-[14px] text-wa-muted">
         {isAdmin
           ? "New messages sent in this group will disappear after the time you choose. Messages already sent aren't affected."
           : "Only admins can change this."}

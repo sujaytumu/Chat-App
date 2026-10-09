@@ -45,13 +45,13 @@ const EmojiStickerPicker = ({ onEmojiSelect, onStickerSelect, onClose }) => {
   return (
     <div
       ref={containerRef}
-      className="absolute bottom-full left-0 mb-2 bg-[#233138] rounded-xl shadow-2xl z-20 overflow-hidden w-[320px] max-w-[calc(100vw-1rem)]"
+      className="absolute bottom-full left-0 mb-2 bg-wa-pop rounded-xl shadow-2xl z-20 overflow-hidden w-[320px] max-w-[calc(100vw-1rem)]"
     >
       <div className="flex border-b border-white/10">
         <button
           onClick={() => setTab("emoji")}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm ${
-            tab === "emoji" ? "text-[#00A884] border-b-2 border-[#00A884]" : "text-[#8696A0]"
+            tab === "emoji" ? "text-[#00A884] border-b-2 border-[#00A884]" : "text-wa-muted"
           }`}
         >
           <Smile size={16} /> Emoji
@@ -59,7 +59,7 @@ const EmojiStickerPicker = ({ onEmojiSelect, onStickerSelect, onClose }) => {
         <button
           onClick={() => setTab("stickers")}
           className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm ${
-            tab === "stickers" ? "text-[#00A884] border-b-2 border-[#00A884]" : "text-[#8696A0]"
+            tab === "stickers" ? "text-[#00A884] border-b-2 border-[#00A884]" : "text-wa-muted"
           }`}
         >
           <Sticker size={16} /> Stickers
@@ -80,7 +80,7 @@ const EmojiStickerPicker = ({ onEmojiSelect, onStickerSelect, onClose }) => {
         <div className="p-3 h-[360px] overflow-y-auto">
           {STICKER_CATEGORIES.map((category) => (
             <div key={category.label} className="mb-3">
-              <p className="text-xs font-medium text-[#8696A0] mb-1.5 px-1">{category.label}</p>
+              <p className="text-xs font-medium text-wa-muted mb-1.5 px-1">{category.label}</p>
               <div className="grid grid-cols-6 gap-1">
                 {category.stickers.map((sticker) => (
                   <button

@@ -32,9 +32,9 @@ const ReportGroupDialog = ({ group, onClose, onReportedAndExit }) => {
 
   return (
     <div className="fixed inset-0 z-[97] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl bg-[#233138] text-[#E9EDEF] p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm rounded-2xl bg-wa-pop text-wa-text p-5" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-[19px] mb-1">Report "{group.name}"?</h3>
-        <p className="text-[14px] text-[#8696A0] mb-3">The group won't be told. Pick the closest reason.</p>
+        <p className="text-[14px] text-wa-muted mb-3">The group won't be told. Pick the closest reason.</p>
         {REASONS.map(([id, label]) => (
           <label key={id} className="flex items-center gap-3 py-2 cursor-pointer">
             <input type="radio" className="radio radio-success radio-sm" checked={reason === id} onChange={() => setReason(id)} />

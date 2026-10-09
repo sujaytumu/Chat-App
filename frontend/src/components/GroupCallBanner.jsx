@@ -15,12 +15,12 @@ const GroupCallBanner = ({ group }) => {
   const Icon = st.callType === "video" ? Video : Phone;
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5 bg-[#103629] border-b border-white/5">
-      <span className="size-9 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
+    <div className="flex items-center gap-3 px-4 py-2.5 bg-wa-tint border-b border-white/5">
+      <span className="size-9 rounded-full bg-[#21C063] text-wa-bg flex items-center justify-center shrink-0">
         <Icon size={18} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] text-[#E9EDEF] truncate">
+        <p className="text-[15px] text-wa-text truncate">
           {st.callType === "video" ? "Video" : "Voice"} call in progress
         </p>
         <p className="text-[12.5px] text-[#8DB5A3]">{n} in call</p>
@@ -28,7 +28,7 @@ const GroupCallBanner = ({ group }) => {
       <button
         disabled={full || oneToOne !== "idle"}
         onClick={() => joinCall(group._id, { name: group.name, groupPic: group.groupPic })}
-        className="h-9 px-5 rounded-full bg-[#21C063] text-[#0B141A] text-[14px] font-semibold disabled:opacity-40"
+        className="h-9 px-5 rounded-full bg-[#21C063] text-wa-bg text-[14px] font-semibold disabled:opacity-40"
       >
         {full ? "Full" : "Join"}
       </button>

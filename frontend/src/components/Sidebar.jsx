@@ -50,7 +50,7 @@ const lastMessagePreview = (lastMessage) => {
 };
 
 const menuItem =
-  "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-[#E9EDEF] hover:bg-white/5 text-left";
+  "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-wa-text hover:bg-white/5 text-left";
 
 const Sidebar = () => {
   const {
@@ -292,31 +292,31 @@ const Sidebar = () => {
   if (isUsersLoading) return <SidebarSkeleton />;
 
   return (
-    <aside className="relative flex flex-col w-full lg:w-[400px] xl:w-[420px] shrink-0 h-full bg-[#0B141A] lg:border-r lg:border-white/5">
+    <aside className="relative flex flex-col w-full lg:w-[400px] xl:w-[420px] shrink-0 h-full bg-wa-bg lg:border-r lg:border-white/5">
       {selecting && (
-        <div className="flex items-center h-14 pl-1 pr-0 bg-[#0B141A]">
-          <button onClick={clearSelected} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Cancel selection">
+        <div className="flex items-center h-14 pl-1 pr-0 bg-wa-bg">
+          <button onClick={clearSelected} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Cancel selection">
             <WaBack size={24} />
           </button>
-          <span className="flex-1 text-[22px] leading-none font-normal text-[#E9EDEF] pl-5">{selected.size}</span>
-          <button onClick={onPin} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
+          <span className="flex-1 text-[22px] leading-none font-normal text-wa-text pl-5">{selected.size}</span>
+          <button onClick={onPin} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
             {allPinned ? <WaUnpinAction /> : <WaPinAction />}
           </button>
-          <button onClick={() => setConfirmDelete(true)} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="Delete" title="Delete">
+          <button onClick={() => setConfirmDelete(true)} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Delete" title="Delete">
             <WaTrash />
           </button>
-          <button onClick={onMute} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
+          <button onClick={onMute} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
             {allMuted ? <WaBell /> : <WaBellOff />}
           </button>
-          <button onClick={onArchive} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
+          <button onClick={onArchive} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
             <WaArchive up={showArchived} />
           </button>
           <div className="relative">
-            <button onClick={() => setShowSelMenu((v) => !v)} className="size-12 rounded-full flex items-center justify-center text-[#E9EDEF] active:bg-white/10" aria-label="More options">
+            <button onClick={() => setShowSelMenu((v) => !v)} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="More options">
               <WaKebab />
             </button>
             {showSelMenu && (
-              <div className="absolute right-2 top-full mt-1 w-52 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+              <div className="absolute right-2 top-full mt-1 w-52 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
                 <button
                   className={menuItem}
                   onClick={() => {
@@ -338,27 +338,27 @@ const Sidebar = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowArchived(false)}
-              className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
+              className="size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors"
               aria-label="Back to chats"
             >
               <WaBack size={24} />
             </button>
-            <h1 className="text-[22px] leading-none font-normal text-[#E9EDEF]">Archived</h1>
+            <h1 className="text-[22px] leading-none font-normal text-wa-text">Archived</h1>
           </div>
         ) : (
-          <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Talkies</h1>
+          <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
         )}
 
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setShowMenu((s) => !s)}
-            className="size-11 rounded-full flex items-center justify-center text-[#E9EDEF] hover:bg-white/10 active:bg-white/15 transition-colors"
+            className="size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors"
             aria-label="Menu"
           >
             <WaKebab size={24} />
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-56 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
               <button
                 className={menuItem}
                 onClick={() => {
@@ -366,13 +366,13 @@ const Sidebar = () => {
                   setShowCreateGroup(true);
                 }}
               >
-                <UsersRound size={18} className="text-[#AEBAC1]" /> New group
+                <UsersRound size={18} className="text-wa-icon" /> New group
               </button>
               <Link to="/profile" className={menuItem} onClick={() => setShowMenu(false)}>
-                <UserRound size={18} className="text-[#AEBAC1]" /> Profile
+                <UserRound size={18} className="text-wa-icon" /> Profile
               </Link>
               <Link to="/settings" className={menuItem} onClick={() => setShowMenu(false)}>
-                <Settings size={18} className="text-[#AEBAC1]" /> Settings
+                <Settings size={18} className="text-wa-icon" /> Settings
               </Link>
               <button className={`${menuItem} text-red-400`} onClick={logout}>
                 <LogOut size={18} /> Log out
@@ -384,7 +384,7 @@ const Sidebar = () => {
 
       {/* Archived: WhatsApp's info banner instead of search + chips */}
       {showArchived && !selecting && (
-        <p className="px-6 py-4 text-center text-[15px] leading-snug text-[#8696A0] border-b border-white/5">
+        <p className="px-6 py-4 text-center text-[15px] leading-snug text-wa-muted border-b border-white/5">
           These chats stay archived when new messages are received.
         </p>
       )}
@@ -392,17 +392,17 @@ const Sidebar = () => {
       {/* Search pill */}
       {!showArchived && (
       <div className={`px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
-        <div className="flex items-center gap-3 h-12 rounded-full bg-[#1F2C34] px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
-          <Search size={20} className="text-[#8696A0] shrink-0" />
+        <div className="flex items-center gap-3 h-12 rounded-full bg-wa-surface px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
+          <Search size={20} className="text-wa-muted shrink-0" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
-            className="flex-1 min-w-0 bg-transparent text-[16px] text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[16px] text-wa-text placeholder:text-wa-muted focus:outline-none"
           />
           {search && (
-            <button onClick={() => setSearch("")} className="text-[#8696A0] hover:text-white" aria-label="Clear search">
+            <button onClick={() => setSearch("")} className="text-wa-muted hover:text-wa-text" aria-label="Clear search">
               <X size={18} />
             </button>
           )}
@@ -421,8 +421,8 @@ const Sidebar = () => {
               onClick={() => setFilter(id)}
               className={`h-10 px-4 rounded-full text-[16px] whitespace-nowrap border transition-colors ${
                 active
-                  ? "bg-[#103629] border-transparent text-[#D9FDD3] font-medium"
-                  : "border-[#2A3942] text-[#AEBAC1] hover:bg-white/5"
+                  ? "bg-wa-tint border-transparent text-wa-tinttext font-medium"
+                  : "border-wa-field text-wa-icon hover:bg-white/5"
               }`}
             >
               {label}
@@ -441,12 +441,12 @@ const Sidebar = () => {
               setFilter("all");
               setShowArchived(true);
             }}
-            className="w-full pl-3 pr-4 py-2.5 flex items-center gap-3 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] transition-colors"
+            className="w-full pl-3 pr-4 py-2.5 flex items-center gap-3 text-left hover:bg-wa-surface/70 active:bg-wa-surface transition-colors"
           >
-            <span className="size-12 flex items-center justify-center text-[#8696A0]">
+            <span className="size-12 flex items-center justify-center text-wa-muted">
               <WaArchive size={26} />
             </span>
-            <span className="flex-1 text-[17px] text-[#8696A0]">Archived</span>
+            <span className="flex-1 text-[17px] text-wa-muted">Archived</span>
             {archivedInfo.unread > 0 && (
               <span className="text-[13px] font-medium text-[#25D366]">{archivedInfo.unread}</span>
             )}
@@ -480,28 +480,28 @@ const Sidebar = () => {
                 addSelected(item.key);
               }}
               style={{ WebkitTouchCallout: "none" }}
-              className={`w-full select-none pl-3 pr-4 py-[14px] flex items-center gap-3 text-left transition-colors hover:bg-[#1F2C34]/70 active:bg-[#1F2C34] ${
-                selected.has(item.key) ? "bg-[#0C3B2C]" : isSelected ? "lg:bg-[#2A3942]" : ""
+              className={`w-full select-none pl-3 pr-4 py-[14px] flex items-center gap-3 text-left transition-colors hover:bg-wa-surface/70 active:bg-wa-surface ${
+                selected.has(item.key) ? "bg-[#0C3B2C]" : isSelected ? "lg:bg-wa-field" : ""
               }`}
             >
               <div className="relative shrink-0">
                 <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-12" />
                 {selected.has(item.key) && (
-                  <span className="absolute -bottom-1 -right-1 size-[22px] rounded-full bg-[#21C063] text-[#0B141A] ring-2 ring-[#0B141A] flex items-center justify-center">
+                  <span className="absolute -bottom-1 -right-1 size-[22px] rounded-full bg-[#21C063] text-wa-bg ring-2 ring-wa-bg flex items-center justify-center">
                     <WaCheck size={14} />
                   </span>
                 )}
                 {item.online && (
-                  <span className="absolute bottom-0 right-0 size-3.5 bg-[#25D366] rounded-full ring-[3px] ring-[#0B141A]" />
+                  <span className="absolute bottom-0 right-0 size-3.5 bg-[#25D366] rounded-full ring-[3px] ring-wa-bg" />
                 )}
               </div>
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[17px] leading-[22px] text-[#E9EDEF] truncate">{item.name}</span>
+                  <span className="text-[17px] leading-[22px] text-wa-text truncate">{item.name}</span>
                   {item.lastMessage && (
                     <span
-                      className={`text-xs shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-[#8696A0]"}`}
+                      className={`text-xs shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
                     >
                       {formatChatListTime(item.lastMessage.createdAt)}
                     </span>
@@ -513,11 +513,11 @@ const Sidebar = () => {
                   ) : (
                   <span
                     className={`flex items-center gap-1 min-w-0 text-[14.5px] leading-5 ${
-                      hasUnread ? "text-[#E9EDEF]" : "text-[#8696A0]"
+                      hasUnread ? "text-wa-text" : "text-wa-muted"
                     }`}
                   >
                     {sentByMe && item.type === "direct" && (
-                      <span className="shrink-0 text-[#8696A0]">
+                      <span className="shrink-0 text-wa-muted">
                         <MessageTicks message={item.lastMessage} />
                       </span>
                     )}
@@ -527,12 +527,12 @@ const Sidebar = () => {
                     </span>
                   </span>
                   )}
-                  <span className="flex items-center gap-1.5 shrink-0 text-[#8696A0]">
+                  <span className="flex items-center gap-1.5 shrink-0 text-wa-muted">
                     {item.muted && <WaBellOff size={16} />}
                     {hasUnread ? (
                       <span
                         className={`min-w-[20px] h-5 px-1.5 rounded-full text-[12.5px] font-medium flex items-center justify-center ${
-                          item.muted ? "bg-[#3B4A54] text-[#E9EDEF]" : "bg-[#25D366] text-[#0B141A]"
+                          item.muted ? "bg-[#3B4A54] text-wa-text" : "bg-[#25D366] text-wa-bg"
                         }`}
                       >
                         {item.unreadCount > 99 ? "99+" : item.unreadCount}
@@ -546,7 +546,7 @@ const Sidebar = () => {
             </button>
             <button
               onClick={() => setChatArchived({ type: item.type, data: item.data }, !item.archived)}
-              className={`hidden ${selecting ? "" : "lg:group-hover:flex"} absolute right-3 top-3 size-8 rounded-full items-center justify-center bg-[#233138] text-[#AEBAC1] hover:text-white shadow-md`}
+              className={`hidden ${selecting ? "" : "lg:group-hover:flex"} absolute right-3 top-3 size-8 rounded-full items-center justify-center bg-wa-pop text-wa-icon hover:text-wa-text shadow-md`}
               title={item.archived ? "Unarchive" : "Archive"}
               aria-label={item.archived ? "Unarchive chat" : "Archive chat"}
             >
@@ -570,7 +570,7 @@ const Sidebar = () => {
                 <button
                   key={r._id}
                   onClick={() => jumpToMessage({ type: r.chatType, data: chat }, r._id)}
-                  className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-[#1F2C34]/70 active:bg-[#1F2C34]"
+                  className="w-full px-4 py-3 flex items-center gap-4 text-left hover:bg-wa-surface/70 active:bg-wa-surface"
                 >
                   <Avatar
                     src={r.chatType === "group" ? chat.groupPic : chat.profilePic}
@@ -580,12 +580,12 @@ const Sidebar = () => {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-[16px] text-[#E9EDEF] truncate">{name}</p>
-                      <span className="text-xs text-[#8696A0] shrink-0">
+                      <p className="text-[16px] text-wa-text truncate">{name}</p>
+                      <span className="text-xs text-wa-muted shrink-0">
                         {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
                     </div>
-                    <SearchSnippet text={r.text} query={search} className="text-[14px] text-[#8696A0] line-clamp-1" />
+                    <SearchSnippet text={r.text} query={search} className="text-[14px] text-wa-muted line-clamp-1" />
                   </div>
                 </button>
               );
@@ -594,7 +594,7 @@ const Sidebar = () => {
         )}
 
         {items.length === 0 && msgResults.length === 0 && !msgSearching && (
-          <div className="text-center text-[#8696A0] py-10 px-6 text-[15px]">
+          <div className="text-center text-wa-muted py-10 px-6 text-[15px]">
             {search
               ? `No chats matching “${search}”`
               : showArchived
@@ -609,7 +609,7 @@ const Sidebar = () => {
       {/* Floating action button */}
       <button
         onClick={() => setShowCreateGroup(true)}
-        className="absolute bottom-4 right-4 size-14 rounded-2xl bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-[#0B141A] flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+        className="absolute bottom-4 right-4 size-14 rounded-2xl bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-wa-bg flex items-center justify-center shadow-lg shadow-black/40 transition-all"
         aria-label="New chat"
         title="New chat"
       >
@@ -618,11 +618,11 @@ const Sidebar = () => {
 
       {confirmDelete && (
         <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>
-          <div className="bg-[#233138] rounded-2xl w-full max-w-xs p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[17px] font-medium text-[#E9EDEF]">
+          <div className="bg-wa-pop rounded-2xl w-full max-w-xs p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[17px] font-medium text-wa-text">
               Delete {selected.size > 1 ? `${selected.size} chats` : "this chat"}?
             </h3>
-            <p className="text-sm text-[#8696A0] mt-2">
+            <p className="text-sm text-wa-muted mt-2">
               Messages are removed from your account only. {selected.size > 1 ? "Others keep their copies." : "The other side keeps their copy."}
             </p>
             <div className="flex justify-end gap-2 mt-5">
