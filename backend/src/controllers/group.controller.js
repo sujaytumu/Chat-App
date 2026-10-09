@@ -22,7 +22,9 @@ export const createGroup = async (req, res) => {
     }
 
     let groupPicUrl = "";
-    if (groupPic) {
+    if (removeGroupPic === true) {
+      group.groupPic = "";
+    } else if (groupPic) {
       const uploadResponse = await cloudinary.uploader.upload(groupPic, {
         folder: "chat-app/groups",
       });
@@ -330,7 +332,7 @@ export const leaveGroup = async (req, res) => {
 export const updateGroupInfo = async (req, res) => {
   try {
     const { id: groupId } = req.params;
-    const { name, groupPic } = req.body;
+    const { name, groupPic, removeGroupPic } = req.body;
     const myId = req.user._id;
 
     const group = await Group.findById(groupId);
