@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { goTab } from "../lib/tabNav";
 import { WaChats, WaUpdates, WaCalls } from "./icons/WaIcons";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
@@ -29,6 +30,12 @@ const MainNav = () => {
   }, [users, groups, archived]);
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const tabClick = (to) => (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
+    e.preventDefault();
+    goTab(navigate, pathname, to);
+  };
   const youActive = pathname === "/profile" || pathname === "/starred" || pathname.startsWith("/settings");
 
   // On a phone an open chat takes the whole screen, like WhatsApp.
@@ -43,6 +50,7 @@ const MainNav = () => {
             key={to}
             to={to}
             end={end}
+            onClick={tabClick(to)}
             title={label}
             className={({ isActive }) =>
               `relative size-11 rounded-xl flex items-center justify-center transition-colors ${
@@ -61,6 +69,7 @@ const MainNav = () => {
         <div className="flex-1" />
         <NavLink
           to="/profile"
+          onClick={tabClick("/profile")}
           title="You"
           className={`size-11 rounded-xl flex items-center justify-center transition-colors ${
             youActive ? "bg-wa-field" : "hover:bg-white/5"
@@ -77,7 +86,7 @@ const MainNav = () => {
         } lg:hidden fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
       >
         {items.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} className="flex-1 flex flex-col items-center justify-center gap-1">
+          <NavLink key={to} to={to} end={end} onClick={tabClick(to)} className="flex-1 flex flex-col items-center justify-center gap-1">
             {({ isActive }) => (
               <>
                 <span
@@ -97,7 +106,7 @@ const MainNav = () => {
             )}
           </NavLink>
         ))}
-        <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center gap-1">
+        <NavLink to="/profile" onClick={tabClick("/profile")} className="flex-1 flex flex-col items-center justify-center gap-1">
           <span className={`h-8 w-16 rounded-full flex items-center justify-center`}>
             <span className={`rounded-full p-[3px] ${youActive ? "bg-wa-tint ring-0" : ""}`}>
               <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
