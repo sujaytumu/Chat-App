@@ -52,3 +52,9 @@ export function formatChatListTime(date) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
+
+// Android's WebView paints a grey "play" placeholder over any <video> that has no
+// picture yet (Chrome paints nothing). Live call videos use this blank poster so
+// the app's call screens look exactly like they do in the browser.
+export const TRANSPARENT_POSTER =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
