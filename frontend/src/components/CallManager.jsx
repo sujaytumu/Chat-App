@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { optimizeImage } from "../lib/cdn";
 import { useCallStore } from "../store/useCallStore";
 import {
   UploadCloud,
@@ -22,7 +23,7 @@ const colorForName = (name = "") => {
 // a contact has no photo) instead of a generic silhouette.
 const CallAvatar = ({ user, size = "size-28" }) => {
   if (user?.profilePic) {
-    return <img src={user.profilePic} alt={user.fullName} className={`${size} rounded-full object-cover`} />;
+    return <img src={optimizeImage(user.profilePic, 120)} loading="lazy" decoding="async" alt={user.fullName} className={`${size} rounded-full object-cover`} />;
   }
   return (
     <div
