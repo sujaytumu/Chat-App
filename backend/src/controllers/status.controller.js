@@ -53,12 +53,22 @@ export const getStatusFeed = async (req, res) => {
       byUser.get(uid).statuses.push(s);
     }
 
-    const myStatuses = byUser.get(myId.toString())?.statuses || [];
+    const myDocs = byUser.get(myId.toString())?.statuses || [];
     byUser.delete(myId.toString());
+    // Only the owner sees who viewed their status.
+    await Status.populate(myDocs, { path: "views.user", select: "fullName profilePic" });
+    const myStatuses = myDocs.map((d) => d.toObject());
 
     const others = Array.from(byUser.values()).map((entry) => ({
-      ...entry,
+      user: entry.user,
       hasUnseen: entry.statuses.some((s) => !s.viewedBy.some((v) => v.equals(myId))),
+      statuses: entry.statuses.map((s) => {
+        const o = s.toObject();
+        o.seen = s.viewedBy.some((v) => v.equals(myId));
+        delete o.viewedBy;
+        delete o.views;
+        return o;
+      }),
     }));
 
     res.status(200).json({ myStatuses, others });
@@ -73,7 +83,10 @@ export const markStatusViewed = async (req, res) => {
     const { id } = req.params;
     const myId = req.user._id;
 
-    await Status.updateOne({ _id: id, viewedBy: { $ne: myId } }, { $push: { viewedBy: myId } });
+    await Status.updateOne(
+      { _id: id, userId: { $ne: myId }, viewedBy: { $ne: myId } },
+      { $push: { viewedBy: myId, views: { user: myId, at: new Date() } } }
+    );
 
     res.status(200).json({ message: "Marked as viewed" });
   } catch (error) {
