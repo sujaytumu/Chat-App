@@ -471,7 +471,13 @@ const ChatContainer = () => {
       )}
       </div>
 
-      <MessageInput />
+      {isGroup && data.permissions?.sendMessages === "admins" && !data.admins.some((a) => (a._id || a) === authUser._id) ? (
+        <div className="shrink-0 px-4 py-3.5 text-center text-[14px] text-[#8696A0] bg-[#111B21] border-t border-white/5">
+          Only admins can send messages
+        </div>
+      ) : (
+        <MessageInput />
+      )}
 
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       {forwardingMessage && (

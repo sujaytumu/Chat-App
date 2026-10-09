@@ -26,6 +26,12 @@ const groupSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    // Who may do what. Defaults keep the original behaviour.
+    permissions: {
+      editInfo: { type: String, enum: ["admins", "all"], default: "admins" },
+      addMembers: { type: String, enum: ["admins", "all"], default: "admins" },
+      sendMessages: { type: String, enum: ["admins", "all"], default: "all" },
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

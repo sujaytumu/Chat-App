@@ -445,6 +445,21 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  setGroupPermission: async (groupId, key, value) => {
+    try {
+      const res = await axiosInstance.put(`/groups/${groupId}/permissions`, { [key]: value });
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? { ...g, ...res.data } : g)),
+        selectedChat:
+          state.selectedChat?.type === "group" && state.selectedChat.data._id === groupId
+            ? { type: "group", data: res.data }
+            : state.selectedChat,
+      }));
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't change that setting");
+    }
+  },
+
   addMembersToGroup: async (groupId, memberIds) => {
     try {
       const res = await axiosInstance.post(`/groups/${groupId}/members`, { memberIds });

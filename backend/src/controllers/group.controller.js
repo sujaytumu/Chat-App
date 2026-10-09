@@ -166,6 +166,9 @@ export const sendGroupMessage = async (req, res) => {
     if (!group || !group.members.some((m) => m.equals(senderId))) {
       return res.status(403).json({ error: "You are not a member of this group" });
     }
+    if (group.permissions?.sendMessages === "admins" && !group.admins.some((a) => a.equals(senderId))) {
+      return res.status(403).json({ error: "Only admins can send messages in this group" });
+    }
 
     let imageUrl;
     if (image) {
@@ -236,7 +239,7 @@ export const addMembers = async (req, res) => {
 
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ error: "Group not found" });
-    if (!group.admins.some((a) => a.equals(myId))) {
+    if (!group.admins.some((a) => a.equals(myId)) && !(group.permissions?.addMembers === "all" && group.members.some((m) => m.equals(myId)))) {
       return res.status(403).json({ error: "Only admins can add members" });
     }
 
@@ -329,6 +332,30 @@ export const leaveGroup = async (req, res) => {
   }
 };
 
+// Admins choose who can edit the group info / add members / send messages.
+export const updateGroupPermissions = async (req, res) => {
+  try {
+    const { id: groupId } = req.params;
+    const myId = req.user._id;
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ error: "Group not found" });
+    if (!group.admins.some((a) => a.equals(myId))) {
+      return res.status(403).json({ error: "Only admins can change group permissions" });
+    }
+    for (const key of ["editInfo", "addMembers", "sendMessages"]) {
+      const v = req.body?.[key];
+      if (v === "admins" || v === "all") group.set(`permissions.${key}`, v);
+    }
+    await group.save();
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
+    io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
+    res.status(200).json(populatedGroup);
+  } catch (error) {
+    console.log("Error in updateGroupPermissions controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const updateGroupInfo = async (req, res) => {
   try {
     const { id: groupId } = req.params;
@@ -337,7 +364,7 @@ export const updateGroupInfo = async (req, res) => {
 
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ error: "Group not found" });
-    if (!group.admins.some((a) => a.equals(myId))) {
+    if (!group.admins.some((a) => a.equals(myId)) && !(group.permissions?.editInfo === "all" && group.members.some((m) => m.equals(myId)))) {
       return res.status(403).json({ error: "Only admins can update group info" });
     }
 

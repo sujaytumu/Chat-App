@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -8,6 +8,7 @@ import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
+import GroupPermissionsPanel from "./GroupPermissionsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
@@ -42,6 +43,10 @@ const GroupInfoModal = ({ group, onClose }) => {
   useBackToClose(true, onClose);
 
   const isAdmin = group.admins.some((a) => (a._id || a) === authUser._id);
+  const perms = { editInfo: "admins", addMembers: "admins", sendMessages: "all", ...(group.permissions || {}) };
+  const canEdit = isAdmin || perms.editInfo === "all";
+  const canAddMembers = isAdmin || perms.addMembers === "all";
+  const [showPerms, setShowPerms] = useState(false);
   const memberIds = new Set(group.members.map((m) => m._id || m));
   const nonMembers = users.filter((u) => !memberIds.has(u._id));
 
@@ -100,7 +105,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   };
 
   const onAvatarClick = () => {
-    if (isAdmin) setPhotoMenu((o) => !o);
+    if (canEdit) setPhotoMenu((o) => !o);
     else if (group.groupPic) setViewPhoto(true);
   };
 
@@ -113,7 +118,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const actionBtns = [
     { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
     { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
-    isAdmin && { icon: UserPlus, label: "Add", run: () => setShowAddMembers(true) },
+    canAddMembers && { icon: UserPlus, label: "Add", run: () => setShowAddMembers(true) },
     { icon: Search, label: "Search", run: () => { onClose(); setTimeout(() => setChatSearchOpen(true), 50); } },
   ].filter(Boolean);
 
@@ -139,7 +144,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               type="button"
               onClick={onAvatarClick}
               className="relative block size-40 rounded-full overflow-hidden bg-[#2A3942] group"
-              aria-label={isAdmin ? "Change group photo" : "View group photo"}
+              aria-label={canEdit ? "Change group photo" : "View group photo"}
             >
               {group.groupPic ? (
                 <img src={group.groupPic} alt={group.name} className="size-full object-cover" />
@@ -148,7 +153,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                   {group.name?.[0]?.toUpperCase()}
                 </span>
               )}
-              {isAdmin && (
+              {canEdit && (
                 <span className="absolute inset-0 bg-black/40 flex items-center justify-center">
                   {savingPhoto ? (
                     <Loader2 size={36} className="animate-spin text-white" />
@@ -215,7 +220,7 @@ const GroupInfoModal = ({ group, onClose }) => {
             ) : (
               <>
                 <h4 className="text-[26px] leading-tight text-center break-words min-w-0">{group.name}</h4>
-                {isAdmin && (
+                {canEdit && (
                   <button
                     onClick={() => {
                       setNameDraft(group.name);
@@ -269,6 +274,14 @@ const GroupInfoModal = ({ group, onClose }) => {
           )}
 
           <button
+            onClick={() => setShowPerms(true)}
+            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
+          >
+            <Settings size={22} className="text-[#8696A0]" />
+            <span className="flex-1 text-[16px]">Group permissions</span>
+            <ChevronRight size={18} className="text-[#8696A0]" />
+          </button>
+          <button
             onClick={() => setShowStarred(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
@@ -279,7 +292,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           </button>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <span className="text-sm font-medium text-[#8696A0]">Members</span>
-            {isAdmin && (
+            {canAddMembers && (
               <button
                 onClick={() => setShowAddMembers((s) => !s)}
                 className="btn btn-xs gap-1"
@@ -355,6 +368,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           </button>
         </div>
       </div>
+      {showPerms && <GroupPermissionsPanel group={group} isAdmin={isAdmin} onClose={() => setShowPerms(false)} />}
       {showStarred && (
         <ChatStarredPanel
           list={starred}
