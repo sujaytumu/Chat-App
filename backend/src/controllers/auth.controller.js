@@ -176,3 +176,45 @@ export const checkAuth = (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+
+// ---- Look & sound settings that follow the account across devices ----
+const PREF_KEYS = new Set([
+  "chat-theme",
+  "talkies-wallpapers",
+  "talkies-wallpaper-off",
+  "talkies-reduce-motion",
+  "talkies-haptics-off",
+  "talkies-message-sound-enabled",
+  "talkies-call-ringtone-enabled",
+  "talkies-call-tone",
+  "talkies-message-tone",
+  "talkies-group-tone",
+  "talkies-vib-message",
+  "talkies-vib-group",
+  "talkies-vib-call",
+]);
+const MAX_PREF_VALUE = 450 * 1024;
+
+export const getPreferences = async (req, res) => {
+  res.status(200).json(req.user.preferences || {});
+};
+
+// Body: { prefs: { key: string | null } } — merged into what's saved; null removes a key.
+export const updatePreferences = async (req, res) => {
+  try {
+    const incoming = req.body?.prefs;
+    if (!incoming || typeof incoming !== "object") return res.status(400).json({ message: "Invalid settings" });
+    const merged = { ...(req.user.preferences || {}) };
+    for (const [key, value] of Object.entries(incoming)) {
+      if (!PREF_KEYS.has(key)) continue;
+      if (value === null) delete merged[key];
+      else if (typeof value === "string" && value.length <= MAX_PREF_VALUE) merged[key] = value;
+    }
+    await User.updateOne({ _id: req.user._id }, { $set: { preferences: merged } });
+    res.status(200).json(merged);
+  } catch (error) {
+    console.log("Error in updatePreferences controller: ", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};

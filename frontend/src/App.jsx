@@ -9,6 +9,7 @@ import CallManager from "./components/CallManager"; // NOT lazy: calls must be r
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
+import { syncPreferences } from "./lib/prefsSync";
 import { useEffect, useRef, lazy, Suspense } from "react";
 import { startVersionWatcher } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
@@ -62,6 +63,12 @@ const App = () => {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Same look & sounds on every device signed in to this account.
+  const userId = authUser?._id;
+  useEffect(() => {
+    if (userId) syncPreferences();
+  }, [userId]);
 
   // Like WhatsApp, the app always opens on Chats: if it is (re)opened on
   // Updates / Calls / Profile / Settings, or you come back to it after being

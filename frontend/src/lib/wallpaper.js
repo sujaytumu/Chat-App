@@ -57,6 +57,8 @@ export const useWallpaperStore = create((set, get) => ({
   },
 }));
 
+export const reloadWallpapers = () => useWallpaperStore.setState(load());
+
 export const cfgToStyle = (cfg) => {
   if (!cfg) return undefined;
   if (cfg.kind === "color") return { backgroundColor: cfg.value, backgroundImage: "none" };
