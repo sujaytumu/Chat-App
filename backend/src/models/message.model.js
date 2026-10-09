@@ -47,6 +47,14 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    // One emoji reaction per person per message (WhatsApp-style)
+    reactions: [
+      {
+        _id: false,
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        emoji: { type: String, maxlength: 16 },
+      },
+    ],
     // Group messages: per-member delivery / read receipts with times, for the
     // WhatsApp-style "Message info" (seenBy above stays the fast unread filter).
     deliveredTo: [

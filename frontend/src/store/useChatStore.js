@@ -340,6 +340,25 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // React with an emoji (same emoji again removes it). Optimistic; server is the truth.
+  reactToMessage: async (messageId, emoji) => {
+    const me = useAuthStore.getState().authUser?._id;
+    const before = get().messages.find((m) => m._id === messageId)?.reactions || [];
+    const mine = before.find((r) => String(r.user) === String(me));
+    const next = before.filter((r) => String(r.user) !== String(me));
+    if (emoji && mine?.emoji !== emoji) next.push({ user: me, emoji });
+    const setReactions = (reactions) =>
+      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, reactions } : m)) }));
+    setReactions(next);
+    try {
+      const res = await axiosInstance.put(`/messages/react/${messageId}`, { emoji });
+      setReactions(res.data.reactions);
+    } catch (error) {
+      setReactions(before);
+      toast.error(error.response?.data?.error || "Couldn't react");
+    }
+  },
+
   applyMessageUpdate: (updatedMessage) => {
     set((state) => ({
       messages: state.messages.map((m) => (m._id === updatedMessage._id ? updatedMessage : m)),
@@ -593,6 +612,10 @@ export const useChatStore = create((set, get) => ({
       }));
     });
 
+    socket.on("messageReacted", ({ _id, reactions }) => {
+      set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, reactions } : m)) }));
+    });
+
     socket.on("messagePinned", (message) => {
       get().applyMessageUpdate(message);
     });
@@ -715,6 +738,7 @@ export const useChatStore = create((set, get) => ({
       "pinnedChats",
       "mutedChats",
       "groupReceipts",
+      "messageReacted",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });
   },
