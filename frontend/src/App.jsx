@@ -10,6 +10,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { useEffect, useRef, lazy, Suspense } from "react";
 import { startVersionWatcher } from "./lib/versionCheck";
+import { syncPrefsToWorker } from "./lib/soundSettings";
 
 import { Loader } from "lucide-react";
 import { Toaster } from "react-hot-toast";
@@ -22,13 +23,14 @@ const loaders = {
   LoginPage: () => import("./pages/LoginPage"),
   SettingsPage: () => import("./pages/SettingsPage"),
   SettingsMore: () => import("./pages/SettingsMorePages"),
+  NotificationsPage: () => import("./pages/NotificationsPage"),
   ProfilePage: () => import("./pages/ProfilePage"),
   CallsPage: () => import("./pages/CallsPage"),
   StatusPage: () => import("./pages/StatusPage"),
 };
 const SignUpPage = lazy(loaders.SignUpPage);
 const LoginPage = lazy(loaders.LoginPage);
-const NotificationsPage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.NotificationsPage })));
+const NotificationsPage = lazy(loaders.NotificationsPage);
 const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.AppearancePage })));
 const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
 const AccountPage = more("AccountPage");
@@ -93,6 +95,11 @@ const App = () => {
     const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
     const id = idle(() => Object.values(loaders).forEach((load) => load().catch(() => {})));
     return () => (window.cancelIdleCallback || clearTimeout)(id);
+  }, [authUser]);
+
+  // Let the service worker know the vibration / silent-group choices.
+  useEffect(() => {
+    if (authUser) syncPrefsToWorker();
   }, [authUser]);
 
   // Move to the newest build whenever a newer one is deployed (no stale UI).
