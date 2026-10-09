@@ -16,12 +16,14 @@ import {
   deleteChatForMe,
   searchMessages,
   reactToMessage,
+  getChatMedia,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
 
 router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/starred/all", protectRoute, getStarredMessages);
+router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
 router.get("/search/all", protectRoute, searchMessages);
 router.put("/react/:id", protectRoute, reactToMessage);
 router.get("/:id", protectRoute, getMessages);
