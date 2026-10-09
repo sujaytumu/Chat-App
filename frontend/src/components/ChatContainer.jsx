@@ -1,4 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
+import { useChatWallpaperStyle } from "../lib/wallpaper";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useEffect, useRef, useState, useMemo } from "react";
 import ChatHeader from "./ChatHeader";
@@ -46,6 +47,7 @@ const ChatContainer = () => {
     reactToMessage,
   } = useChatStore();
   const { authUser } = useAuthStore();
+  const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
 
   // Disappearing messages: hide each one the moment it expires (the server
   // also deletes it for good a little later).
@@ -217,7 +219,7 @@ const ChatContainer = () => {
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper">
+      <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper" style={wallpaperStyle}>
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -226,7 +228,7 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0">
+    <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0" style={wallpaperStyle}>
       <ChatHeader />
       {chatSearchOpen && <ChatSearchBar />}
 

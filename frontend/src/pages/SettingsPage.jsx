@@ -4,6 +4,8 @@ import { Download, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import { getWallpaper, setWallpaper } from "../lib/uiSettings";
+import { useWallpaperStore } from "../lib/wallpaper";
+import WallpaperPicker from "../components/WallpaperPicker";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
 import toast from "react-hot-toast";
 
@@ -55,6 +57,9 @@ export const InstallAppControl = () => {
 export const AppearancePage = () => {
   const { theme, setTheme } = useThemeStore();
   const [wallpaper, setWall] = useState(getWallpaper());
+  const [picking, setPicking] = useState(false);
+  const chatCount = useWallpaperStore((s) => Object.keys(s.chats).length);
+  const clearAllChats = useWallpaperStore((s) => s.clearAllChatWallpapers);
 
   return (
     <SettingsShell title="Appearance">
@@ -67,6 +72,17 @@ export const AppearancePage = () => {
           setWallpaper(v);
         }}
       />
+
+      <button onClick={() => setPicking(true)} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field">
+        <span className="block text-[16px]">Default wallpaper</span>
+        <span className="block text-[13.5px] text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Wallpaper.</span>
+      </button>
+      {chatCount > 0 && (
+        <button onClick={clearAllChats} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[15px]">
+          Reset {chatCount} chat{chatCount > 1 ? "s" : ""} with their own wallpaper
+        </button>
+      )}
+      {picking && <WallpaperPicker scope="default" onClose={() => setPicking(false)} />}
 
       <div className="flex flex-col gap-1 pt-2">
         <h2 className="text-lg font-semibold">Theme</h2>
