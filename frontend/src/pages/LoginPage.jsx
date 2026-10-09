@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, UserPlus } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, UserPlus, ShieldCheck } from "lucide-react";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -10,7 +10,15 @@ const LoginPage = () => {
     email: "",
     password: "",
   });
-  const { login, isLoggingIn } = useAuthStore();
+  const { login, isLoggingIn, pendingTwoFactor, verifyTwoFactor, cancelTwoFactor } = useAuthStore();
+  const [code, setCode] = useState("");
+  const [useBackup, setUseBackup] = useState(false);
+
+  const submitCode = async (e) => {
+    e.preventDefault();
+    const ok = await verifyTwoFactor(code.trim());
+    if (!ok) setCode("");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +44,41 @@ const LoginPage = () => {
             </div>
           </div>
 
+          {pendingTwoFactor ? (
+            <form onSubmit={submitCode} className="space-y-6">
+              <div className="text-center space-y-2">
+                <ShieldCheck className="w-10 h-10 mx-auto text-primary" />
+                <h2 className="text-xl font-semibold">Two-step verification</h2>
+                <p className="text-sm text-base-content/60">
+                  {useBackup
+                    ? "Enter one of your backup codes."
+                    : "Enter the 6-digit code from your authenticator app."}
+                </p>
+              </div>
+              <input
+                autoFocus
+                inputMode={useBackup ? "text" : "numeric"}
+                autoComplete="one-time-code"
+                maxLength={useBackup ? 11 : 7}
+                className="input input-bordered w-full text-center text-2xl tracking-[0.35em]"
+                placeholder={useBackup ? "XXXXX-XXXXX" : "000000"}
+                value={code}
+                onChange={(e) => setCode(useBackup ? e.target.value.toUpperCase() : e.target.value.replace(/[^\d ]/g, ""))}
+              />
+              <button type="submit" className="btn btn-primary w-full" disabled={isLoggingIn || code.trim().length < (useBackup ? 10 : 6)}>
+                {isLoggingIn ? <Loader2 className="h-5 w-5 animate-spin" /> : "Verify"}
+              </button>
+              <div className="flex justify-between text-sm">
+                <button type="button" className="link" onClick={() => { setUseBackup((v) => !v); setCode(""); }}>
+                  {useBackup ? "Use authenticator code" : "Use a backup code"}
+                </button>
+                <button type="button" className="link" onClick={() => { cancelTwoFactor(); setCode(""); setUseBackup(false); }}>
+                  Back to sign in
+                </button>
+              </div>
+            </form>
+          ) : (
+          <>
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="form-control">
@@ -112,6 +155,8 @@ const LoginPage = () => {
               </p>
             </Link>
           </div>
+          </>
+          )}
         </div>
       </div>
 

@@ -46,7 +46,7 @@ const ProfilePage = () => {
   };
 
   const rows = [
-    { icon: KeyRound, title: "Account", sub: "Name, about, email, password", to: "/settings/account" },
+    { icon: KeyRound, title: "Account", sub: "Name, about, password, two-step verification", to: "/settings/account" },
     { icon: Lock, title: "Privacy", sub: "Read receipts, typing, blocked contacts", to: "/settings/privacy" },
     { icon: Star, title: "Starred messages", sub: "Messages you've saved", to: "/starred" },
     { icon: MessageSquareText, title: "Chats", sub: "Enter key, archive, chat history", to: "/settings/chats" },
