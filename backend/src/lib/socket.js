@@ -6,7 +6,7 @@ import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
 import CallLog from "../models/callLog.model.js";
 import User from "../models/user.model.js";
-import { sendPushToUser } from "./webPush.js";
+import { sendPushToUser, sendPushToUsers } from "./webPush.js";
 import { markGroupDelivered } from "./groupReceipts.js";
 
 const app = express();
@@ -63,6 +63,68 @@ const pendingCalls = new Map(); // toUserId -> { offer, callType, fromUser, from
 const CALL_GRACE_PERIOD_MS = 45_000;
 const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
 const pairKey = (a, b) => [a, b].sort().join("_");
+
+// ---- Group call state (see the "groupCall:*" handlers) ----
+const MAX_GROUP_CALL = 6;
+const groupCalls = new Map(); // groupId -> { callType, startedBy, startedAt, participants: Map<userId, profile> }
+
+const groupCallPublic = (groupId) => {
+  const c = groupCalls.get(groupId);
+  if (!c) return { groupId, active: false, participants: [] };
+  return {
+    groupId,
+    active: true,
+    callType: c.callType,
+    startedBy: c.startedBy,
+    startedAt: c.startedAt,
+    participants: [...c.participants.values()],
+  };
+};
+const broadcastGroupCall = (groupId) => io.to(groupId).emit("groupCall:state", groupCallPublic(groupId));
+
+async function isGroupMember(groupId, userId) {
+  try {
+    return !!(await Group.exists({ _id: groupId, members: userId }));
+  } catch {
+    return false;
+  }
+}
+
+// Adds the socket's user to the call and tells everyone already in it.
+function joinGroupCall(groupId, call, userId, profile) {
+  const already = call.participants.has(userId);
+  call.participants.set(userId, profile);
+  if (!already) {
+    for (const id of call.participants.keys()) {
+      if (id === userId) continue;
+      const room = roomFor(id);
+      if (room) io.to(room).emit("groupCall:joined", { groupId, user: profile });
+    }
+  }
+  broadcastGroupCall(groupId);
+  return {
+    ok: true,
+    callType: call.callType,
+    startedAt: call.startedAt,
+    participants: [...call.participants.values()].filter((p) => p._id !== userId),
+  };
+}
+
+function removeFromGroupCall(groupId, userId) {
+  const call = groupCalls.get(groupId);
+  if (!call || !call.participants.has(userId)) return;
+  call.participants.delete(userId);
+  for (const id of call.participants.keys()) {
+    const room = roomFor(id);
+    if (room) io.to(room).emit("groupCall:left", { groupId, userId });
+  }
+  if (call.participants.size === 0) groupCalls.delete(groupId);
+  broadcastGroupCall(groupId);
+}
+
+function leaveAllGroupCalls(userId) {
+  for (const groupId of [...groupCalls.keys()]) removeFromGroupCall(groupId, userId);
+}
 
 // Returns the user's personal room name when they're online (truthy), else
 // undefined. Callers do io.to(<return value>).emit(...), which reaches every
@@ -337,6 +399,117 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ---- Group calls ----
+  // Mesh WebRTC: every participant connects directly to every other one, so the
+  // server only relays signalling (offers / answers / ICE) and tracks who is in
+  // which call. Members only; at most MAX_GROUP_CALL people per call.
+  socket.on("groupCall:start", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const { groupId, callType } = payload || {};
+    if (typeof groupId !== "string") return reply({ ok: false, error: "Invalid group" });
+    const group = await Group.findOne({ _id: groupId, members: userId })
+      .select("name groupPic members")
+      .lean()
+      .catch(() => null);
+    if (!group) return reply({ ok: false, error: "You're not in this group" });
+
+    const existing = groupCalls.get(groupId);
+    if (existing) {
+      // Someone already started one — starting is just joining it.
+      if (!existing.participants.has(userId) && existing.participants.size >= MAX_GROUP_CALL) {
+        return reply({ ok: false, error: `This call is full (${MAX_GROUP_CALL} people)` });
+      }
+      return reply(joinGroupCall(groupId, existing, userId, socket.data.profile));
+    }
+
+    const type = callType === "video" ? "video" : "audio";
+    const call = { callType: type, startedBy: userId, startedAt: Date.now(), participants: new Map() };
+    groupCalls.set(groupId, call);
+    call.participants.set(userId, socket.data.profile);
+
+    const others = group.members.map(String).filter((m) => m !== userId);
+    others.forEach((memberId) => {
+      const room = roomFor(memberId);
+      if (room) {
+        io.to(room).emit("groupCall:incoming", {
+          groupId,
+          groupName: group.name,
+          groupPic: group.groupPic || "",
+          callType: type,
+          from: socket.data.profile,
+        });
+      }
+    });
+    sendPushToUsers(
+      others,
+      {
+        title: group.name,
+        body: `${socket.data.profile?.fullName || "Someone"} started a group ${type === "video" ? "video" : "voice"} call`,
+        icon: group.groupPic || "/icon-v2-192.png",
+        isCall: true,
+        tag: `group-call-${groupId}`,
+        data: { url: "/", chatType: "group", chatId: groupId },
+      },
+      CALL_PUSH_OPTIONS,
+      `g:${groupId}`
+    );
+    broadcastGroupCall(groupId);
+    reply({ ok: true, callType: type, participants: [] });
+  });
+
+  socket.on("groupCall:join", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const { groupId } = payload || {};
+    if (typeof groupId !== "string") return reply({ ok: false, error: "Invalid group" });
+    const call = groupCalls.get(groupId);
+    if (!call) return reply({ ok: false, error: "This call has ended" });
+    if (!(await isGroupMember(groupId, userId))) return reply({ ok: false, error: "You're not in this group" });
+    if (!groupCalls.has(groupId)) return reply({ ok: false, error: "This call has ended" });
+    if (!call.participants.has(userId) && call.participants.size >= MAX_GROUP_CALL) {
+      return reply({ ok: false, error: `This call is full (${MAX_GROUP_CALL} people)` });
+    }
+    reply(joinGroupCall(groupId, call, userId, socket.data.profile));
+  });
+
+  // Relay one signalling message to another participant of the same call.
+  socket.on("groupCall:signal", (payload) => {
+    const { groupId, toUserId, data } = payload || {};
+    const call = typeof groupId === "string" ? groupCalls.get(groupId) : null;
+    if (!call || typeof toUserId !== "string" || !data || typeof data !== "object") return;
+    if (!call.participants.has(userId) || !call.participants.has(toUserId)) return;
+    const room = roomFor(toUserId);
+    if (room) io.to(room).emit("groupCall:signal", { groupId, fromUserId: userId, data });
+  });
+
+  // Mic / camera / screen-share state, so everyone's tiles stay accurate.
+  socket.on("groupCall:media", (payload) => {
+    const { groupId, state } = payload || {};
+    const call = typeof groupId === "string" ? groupCalls.get(groupId) : null;
+    if (!call || !call.participants.has(userId) || !state) return;
+    const clean = { muted: !!state.muted, videoOff: !!state.videoOff, screen: !!state.screen };
+    for (const id of call.participants.keys()) {
+      if (id === userId) continue;
+      const room = roomFor(id);
+      if (room) io.to(room).emit("groupCall:media", { groupId, userId, state: clean });
+    }
+  });
+
+  socket.on("groupCall:leave", ({ groupId } = {}) => {
+    if (typeof groupId === "string") removeFromGroupCall(groupId, userId);
+  });
+
+  // Declined on this device: stop the ring on the person's other devices too.
+  socket.on("groupCall:decline", ({ groupId } = {}) => {
+    if (typeof groupId === "string") io.to(userId).emit("groupCall:dismiss", { groupId });
+  });
+
+  socket.on("groupCall:query", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const { groupId } = payload || {};
+    if (typeof groupId !== "string" || !(await isGroupMember(groupId, userId))) return reply({ active: false });
+    reply(groupCallPublic(groupId));
+  });
+
   socket.on("disconnect", () => {
     if (!userId) return;
 
@@ -355,6 +528,7 @@ io.on("connection", (socket) => {
     // or reconnect doesn't kill a perfectly good call.
     setTimeout(() => {
       if (isOnline(userId)) return; // they came back
+      leaveAllGroupCalls(userId);
 
       for (const [key, logId] of activeCallLogs.entries()) {
         const [a, b] = key.split("_");
@@ -393,6 +567,9 @@ io.on("connection", (socket) => {
       try {
         const groups = await Group.find({ members: userId }).select("_id");
         groups.forEach((group) => socket.join(group._id.toString()));
+        // Calls already running in their groups (shows the "Join" bar)
+        const running = groups.map((g) => g._id.toString()).filter((id) => groupCalls.has(id)).map(groupCallPublic);
+        if (running.length) socket.emit("groupCall:states", running);
         // Group messages sent while they were offline are now delivered
         if (groups.length) markGroupDelivered(io, userId, { groupIds: groups.map((g) => g._id) });
       } catch (err) {

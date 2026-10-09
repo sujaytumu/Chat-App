@@ -9,6 +9,7 @@ import {
   shouldLeaveToSystemAlert,
   isPushActive,
 } from "../lib/notificationSound";
+import { vibrationPattern } from "../lib/soundSettings";
 
 function notifyIncoming(senderName, message, isGroup = false) {
   // Muted chats stay silent (the unread badge still counts).
@@ -17,7 +18,9 @@ function notifyIncoming(senderName, message, isGroup = false) {
   // Phone with the app in the background: the system notification (from Web
   // Push) carries the sound — don't also try to play one from a frozen page.
   if (shouldLeaveToSystemAlert()) return;
-  playNotificationSound();
+  playNotificationSound(isGroup);
+  const buzz = vibrationPattern(isGroup ? "group" : "message");
+  if (buzz) navigator.vibrate?.(buzz);
   // With Web Push active the service worker shows the notification itself.
   if (isPushActive()) return;
   const body = message.image ? "📷 Photo" : message.text || "New message";

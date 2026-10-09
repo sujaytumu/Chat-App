@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { ArrowLeft, Info, Phone, Video, MoreVertical, X, Archive, ArchiveRestore, Search } from "lucide-react";
+import { Info, Phone, Video, X, Search } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import Avatar from "./Avatar";
+import { WaBack, WaKebab, WaArchive } from "./icons/WaIcons";
+import GroupCallBanner from "./GroupCallBanner";
+import { useGroupCallStore } from "../store/useGroupCallStore";
 
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 
@@ -16,6 +19,10 @@ const ChatHeader = () => {
   const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen } = useChatStore();
   const { onlineUsers, authUser } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
+  const groupCallStatus = useGroupCallStore((st) => st.status);
+  const groupCallState = useGroupCallStore((st) => (selectedChat?.type === "group" ? st.states[selectedChat.data._id] : null));
+  const startGroupCall = useGroupCallStore((st) => st.startCall);
+  const joinGroupCall = useGroupCallStore((st) => st.joinCall);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef(null);
@@ -49,11 +56,18 @@ const ChatHeader = () => {
   const isOnline = !isGroup && status === "online";
   const isArchived = (authUser?.archivedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
 
+  const callBusy = callStatus !== "idle" || groupCallStatus !== "idle";
+  const placeGroupCall = (type) =>
+    groupCallState?.active
+      ? joinGroupCall(data._id, { name: data.name, groupPic: data.groupPic })
+      : startGroupCall(data, type);
+
   return (
+    <>
     <div className="relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-[#0B141A] lg:bg-[#111B21] border-b border-white/5">
       {/* Back to the chat list (phone) */}
       <button onClick={() => setSelectedChat(null)} className={`${iconBtn} lg:hidden shrink-0`} aria-label="Back">
-        <ArrowLeft size={24} />
+        <WaBack size={24} />
       </button>
 
       <button
@@ -71,6 +85,16 @@ const ChatHeader = () => {
       </button>
 
       <div className="flex items-center shrink-0">
+        {isGroup && (
+          <>
+            <button onClick={() => placeGroupCall("video")} disabled={callBusy} className={iconBtn} title="Group video call" aria-label="Group video call">
+              <Video size={24} />
+            </button>
+            <button onClick={() => placeGroupCall("audio")} disabled={callBusy} className={iconBtn} title="Group voice call" aria-label="Group voice call">
+              <Phone size={22} />
+            </button>
+          </>
+        )}
         {!isGroup && (
           <>
             <button
@@ -96,7 +120,7 @@ const ChatHeader = () => {
 
         <div className="relative" ref={menuRef}>
           <button onClick={() => setShowMenu((s) => !s)} className={iconBtn} aria-label="More options" title="More">
-            <MoreVertical size={22} />
+            <WaKebab size={24} />
           </button>
           {showMenu && (
             <div className="absolute right-0 top-full mt-1 w-52 bg-[#233138] rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
@@ -129,11 +153,7 @@ const ChatHeader = () => {
                   if (!isArchived) setSelectedChat(null);
                 }}
               >
-                {isArchived ? (
-                  <ArchiveRestore size={18} className="text-[#AEBAC1]" />
-                ) : (
-                  <Archive size={18} className="text-[#AEBAC1]" />
-                )}
+                <WaArchive size={20} up={isArchived} className="text-[#AEBAC1]" />
                 {isArchived ? "Unarchive chat" : "Archive chat"}
               </button>
               <button
@@ -156,6 +176,8 @@ const ChatHeader = () => {
         </Suspense>
       )}
     </div>
+    {isGroup && <GroupCallBanner group={data} />}
+    </>
   );
 };
 export default ChatHeader;

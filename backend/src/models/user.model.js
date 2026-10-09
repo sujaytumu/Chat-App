@@ -20,6 +20,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Short "about" line shown on their profile (max 139 chars, like WhatsApp)
+    about: { type: String, default: "", maxlength: 139 },
     // Chats this user has archived, as "d:<userId>" (direct) / "g:<groupId>"
     // (group) keys. Per-user, so it follows them across devices.
     archivedChats: {

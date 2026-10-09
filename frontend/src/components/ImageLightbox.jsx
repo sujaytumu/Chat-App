@@ -1,7 +1,11 @@
 import { X, Download } from "lucide-react";
 import { useEffect } from "react";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const ImageLightbox = ({ src, onClose }) => {
+  // Phone Back closes the full-size picture.
+  useBackToClose(!!src, onClose);
+
   useEffect(() => {
     const handleKey = (e) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", handleKey);

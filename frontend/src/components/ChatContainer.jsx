@@ -1,4 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
+import { useBackToClose } from "../lib/useBackToClose";
 import { useEffect, useRef, useState, useMemo } from "react";
 import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
@@ -45,6 +46,8 @@ const ChatContainer = () => {
     reactToMessage,
   } = useChatStore();
   const { authUser } = useAuthStore();
+  // Phone Back closes the in-chat search bar first (before leaving the chat).
+  useBackToClose(chatSearchOpen, () => useChatStore.getState().setChatSearchOpen(false));
   const messageEndRef = useRef(null);
   const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
@@ -60,6 +63,14 @@ const ChatContainer = () => {
   const [highlightId, setHighlightId] = useState(null);
   const jumpTries = useRef(0);
   const prependRef = useRef(null); // scroll position to restore after older messages are added on top
+
+  // Scroll only the message list. scrollIntoView() also scrolls every ancestor —
+  // including the page itself on phone browsers — which pushed the header out
+  // of view.
+  const scrollToBottom = (behavior = "auto") => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior });
+  };
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -108,7 +119,7 @@ const ChatContainer = () => {
     const last = messages[messages.length - 1];
     const sentByMe = last?.senderId === authUser._id;
     if (isFreshOpen || nearBottomRef.current || sentByMe) {
-      messageEndRef.current.scrollIntoView({ behavior: isFreshOpen ? "auto" : "smooth" });
+      scrollToBottom(isFreshOpen ? "auto" : "smooth");
       setNewWhileAway(0);
     } else if (last) {
       setNewWhileAway((n) => n + 1);
@@ -170,13 +181,13 @@ const ChatContainer = () => {
   };
 
   const jumpToLatest = () => {
-    messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    scrollToBottom("smooth");
     setNewWhileAway(0);
   };
 
   const handleMediaLoaded = () => {
     if (justOpenedRef.current) {
-      messageEndRef.current?.scrollIntoView({ behavior: "auto" });
+      scrollToBottom("auto");
     }
   };
 

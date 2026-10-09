@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import { io } from "socket.io-client";
 import { useChatStore } from "./useChatStore";
 import { useCallStore } from "./useCallStore";
+import { useGroupCallStore } from "./useGroupCallStore";
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
 
@@ -172,6 +173,7 @@ export const useAuthStore = create((set, get) => ({
     // Wire up chat-related socket listeners (messages, typing, groups) once
     useChatStore.getState().subscribeToSocket();
     useCallStore.getState().subscribeToCallSocket();
+    useGroupCallStore.getState().subscribeToSocket();
 
     // Mobile browsers pause/throttle JS timers (including Socket.IO's own
     // reconnection backoff) while a tab is backgrounded, to save battery.
@@ -194,6 +196,7 @@ export const useAuthStore = create((set, get) => ({
     useChatStore.getState().unsubscribeFromSocket();
     useCallStore.getState().unsubscribeFromCallSocket();
     useCallStore.getState().resetCall();
+    useGroupCallStore.getState().unsubscribeFromSocket();
     get().socket?.disconnect();
     set({ socket: null });
   },
