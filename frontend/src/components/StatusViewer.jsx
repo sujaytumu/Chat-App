@@ -140,7 +140,28 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
         <img src={user.profilePic || "/avatar.png"} alt={user.fullName} className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="text-white text-[16px] font-medium truncate">{isOwn ? "My status" : user.fullName}</p>
-          <p className="text-white/80 text-[13px]">{ago(current.createdAt)}</p>
+          <p className="text-white/80 text-[13px] truncate">{ago(current.createdAt)}</p>
+          {current.song?.url && (
+            <p className="flex items-center gap-1.5 text-white text-[13px] leading-5 min-w-0">
+              <Music size={13} className="shrink-0" />
+              <span className="truncate">{current.song.name || "Song"}</span>
+            </p>
+          )}
+          {current.location?.name && (
+            <a
+              href={
+                current.location.lat != null
+                  ? `https://www.google.com/maps/search/?api=1&query=${current.location.lat},${current.location.lng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.location.name)}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-white/90 text-[13px] leading-5 min-w-0"
+            >
+              <MapPin size={13} className="shrink-0 text-[#F15C6D]" />
+              <span className="truncate">{current.location.name}</span>
+            </a>
+          )}
         </div>
         {isOwn && (
           <button onClick={() => setConfirmDelete(true)} className="size-10 flex items-center justify-center text-white" aria-label="Delete status">
@@ -213,33 +234,6 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
           </div>
         )}
         {current.song?.url && <audio ref={songEl} src={current.song.url} autoPlay loop />}
-
-        {/* Song + place tags */}
-        {(current.song?.url || current.location?.name) && (
-          <div className="absolute top-[calc(86px+env(safe-area-inset-top))] inset-x-0 z-20 flex flex-wrap justify-center gap-2 px-4 pointer-events-none">
-            {current.song?.url && (
-              <span className="flex items-center gap-1.5 rounded-full bg-black/55 text-white text-[13.5px] px-3 py-1.5 max-w-[80%]">
-                <Music size={14} className="shrink-0" /> <span className="truncate">{current.song.name || "Song"}</span>
-              </span>
-            )}
-            {current.location?.name && (
-              <a
-                href={
-                  current.location.lat != null
-                    ? `https://www.google.com/maps/search/?api=1&query=${current.location.lat},${current.location.lng}`
-                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.location.name)}`
-                }
-                target="_blank"
-                rel="noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/55 text-white text-[13.5px] px-3 py-1.5 max-w-[80%]"
-              >
-                <MapPin size={14} className="text-[#F15C6D] shrink-0" /> <span className="truncate">{current.location.name}</span>
-              </a>
-            )}
-          </div>
-        )}
 
         {/* Caption */}
         {current.caption && (
