@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    // Look & sound settings (theme, wallpapers, tones...) so every device —
+    // browser, installed app, Android app — shows the same thing. Whitelisted
+    // keys only; values are strings.
+    preferences: { type: Object, default: {} },
     // Same key format: chats pinned to the top (max 3) and chats whose
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
