@@ -26,6 +26,12 @@ export function applyTheme(theme) {
   } catch {
     /* not in the app */
   }
+  // Android app: bars + the strip behind them take the theme colour (dark theme -> dark bars)
+  try {
+    window.Capacitor?.Plugins?.AppChrome?.setTheme?.({ color: dark ? "#111B21" : "#FFFFFF", dark })?.catch?.(() => {});
+  } catch {
+    /* not in the app */
+  }
   const scheme = document.querySelector('meta[name="color-scheme"]');
   if (scheme) scheme.setAttribute("content", dark ? "dark" : "light");
 }
