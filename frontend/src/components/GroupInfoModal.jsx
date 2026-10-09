@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2 } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -8,6 +8,8 @@ import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
+
+const GroupEmojiPhoto = lazy(() => import("./GroupEmojiPhoto"));
 
 const GroupInfoModal = ({ group, onClose }) => {
   const { users, addMembersToGroup, removeMemberFromGroup, leaveGroup, updateGroupInfo, setChatSearchOpen } = useChatStore();
@@ -22,6 +24,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [toAdd, setToAdd] = useState([]);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [viewPhoto, setViewPhoto] = useState(false);
+  const [emojiPhoto, setEmojiPhoto] = useState(false);
   const [savingPhoto, setSavingPhoto] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(group.name);
@@ -64,6 +67,13 @@ const GroupInfoModal = ({ group, onClose }) => {
     } finally {
       setSavingPhoto(false);
     }
+  };
+
+  const saveEmojiPhoto = async (img) => {
+    setEmojiPhoto(false);
+    setSavingPhoto(true);
+    if (await updateGroupInfo(group._id, { groupPic: img })) toast.success("Group photo updated");
+    setSavingPhoto(false);
   };
 
   const removePhoto = async () => {
@@ -148,6 +158,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                   group.groupPic && { icon: Eye, label: "View photo", run: () => setViewPhoto(true) },
                   { icon: Camera, label: "Take photo", run: () => cameraRef.current?.click() },
                   { icon: FolderOpen, label: "Upload photo", run: () => uploadRef.current?.click() },
+                  { icon: Smile, label: "Emoji & sticker", run: () => setEmojiPhoto(true) },
                   group.groupPic && { icon: Trash2, label: "Remove photo", run: removePhoto, divider: true },
                 ]
                   .filter(Boolean)
@@ -311,6 +322,11 @@ const GroupInfoModal = ({ group, onClose }) => {
           </button>
         </div>
       </div>
+      {emojiPhoto && (
+        <Suspense fallback={null}>
+          <GroupEmojiPhoto onClose={() => setEmojiPhoto(false)} onSave={saveEmojiPhoto} />
+        </Suspense>
+      )}
       {viewPhoto && group.groupPic && <ImageLightbox src={group.groupPic} onClose={() => setViewPhoto(false)} />}
     </div>
   );
