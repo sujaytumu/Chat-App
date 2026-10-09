@@ -460,6 +460,21 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  setGroupDisappearing: async (groupId, seconds) => {
+    try {
+      const res = await axiosInstance.put(`/groups/${groupId}/disappearing`, { seconds });
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? { ...g, ...res.data } : g)),
+        selectedChat:
+          state.selectedChat?.type === "group" && state.selectedChat.data._id === groupId
+            ? { type: "group", data: res.data }
+            : state.selectedChat,
+      }));
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't change disappearing messages");
+    }
+  },
+
   addMembersToGroup: async (groupId, memberIds) => {
     try {
       const res = await axiosInstance.post(`/groups/${groupId}/members`, { memberIds });

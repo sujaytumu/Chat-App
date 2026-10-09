@@ -110,6 +110,8 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    // Disappearing messages: when set, MongoDB removes the message at this time.
+    expiresAt: { type: Date, default: null },
     deliveredAt: {
       type: Date,
       default: null,
@@ -118,6 +120,7 @@ const messageSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+messageSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 messageSchema.index({ senderId: 1, receiverId: 1, createdAt: -1 });
 messageSchema.index({ groupId: 1, createdAt: -1 });
 messageSchema.index({ senderId: 1, createdAt: -1 });
