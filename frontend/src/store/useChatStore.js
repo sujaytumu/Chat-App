@@ -244,8 +244,9 @@ export const useChatStore = create((set, get) => ({
   setChatSearchOpen: (open) => set({ chatSearchOpen: open }),
 
   // Search messages: everywhere, or inside one chat when `chat` is given.
-  searchMessages: async (q, chat) => {
+  searchMessages: async (q, chat, kind) => {
     const params = { q };
+    if (kind) params.kind = kind;
     if (chat) {
       params.chatType = chat.type;
       params.chatId = chat.data._id;
