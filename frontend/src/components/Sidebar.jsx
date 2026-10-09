@@ -412,7 +412,7 @@ const Sidebar = () => {
             <h1 className="text-[22px] leading-none font-normal text-wa-text">Archived</h1>
           </div>
         ) : (
-          <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
+          <h1 className="text-[28px] lg:text-[24px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
         )}
 
         <div className="relative" ref={menuRef}>
@@ -458,14 +458,14 @@ const Sidebar = () => {
       {/* Search pill */}
       {!showArchived && (
       <div className={`px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
-        <div className="flex items-center gap-3 h-12 rounded-full bg-wa-surface px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
+        <div className="flex items-center gap-3 h-12 lg:h-10 rounded-full bg-wa-surface px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
           <Search size={20} className="text-wa-muted shrink-0" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
-            className="flex-1 min-w-0 bg-transparent text-[16px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[16px] lg:text-[15px] text-wa-text placeholder:text-wa-muted focus:outline-none"
           />
           {search && (
             <button onClick={() => setSearch("")} className="text-wa-muted hover:text-wa-text" aria-label="Clear search">
@@ -478,18 +478,30 @@ const Sidebar = () => {
 
       {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
       {!showArchived && (
-      <div className={`flex gap-2 overflow-x-auto no-scrollbar px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
+      <div className={`flex gap-2 lg:gap-1.5 overflow-x-auto no-scrollbar px-4 lg:px-3 pb-3 lg:pb-2.5 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         {[
           ...FILTERS.slice(0, 3),
           ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name })),
+          { id: "__new" },
           ...FILTERS.slice(3),
         ].map(({ id, label }) => {
+          if (id === "__new") return (
+        <button key="__new"
+          onClick={() => setListModal({ id: "new" })}
+          className="h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[16px] lg:text-[14px] shrink-0 whitespace-nowrap border border-wa-field text-wa-icon hover:bg-white/5 flex items-center gap-1"
+          title="New list"
+          aria-label="New list"
+        >
+          <span className="text-[20px] lg:text-[18px] leading-none">+</span>
+          <span className="lg:hidden">New list</span>
+        </button>
+          );
           const active = filter === id;
           return (
             <button
               key={id}
               onClick={() => setFilter(id)}
-              className={`h-10 px-4 rounded-full text-[16px] whitespace-nowrap border transition-colors ${
+              className={`h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[16px] lg:text-[13.5px] shrink-0 whitespace-nowrap border transition-colors ${
                 active
                   ? "bg-wa-tint border-transparent text-wa-tinttext font-medium"
                   : "border-wa-field text-wa-icon hover:bg-white/5"
@@ -500,13 +512,6 @@ const Sidebar = () => {
             </button>
           );
         })}
-        <button
-          onClick={() => setListModal({ id: "new" })}
-          className="h-10 px-4 rounded-full text-[16px] whitespace-nowrap border border-wa-field text-wa-icon hover:bg-white/5 flex items-center gap-1"
-          aria-label="New list"
-        >
-          <span className="text-[20px] leading-none">+</span> New list
-        </button>
       </div>
       )}
 
@@ -570,7 +575,7 @@ const Sidebar = () => {
                 addSelected(item.key);
               }}
               style={{ WebkitTouchCallout: "none" }}
-              className={`w-full select-none pl-3 pr-4 py-[14px] flex items-center gap-3 text-left transition-colors hover:bg-wa-surface/70 active:bg-wa-surface ${
+              className={`w-full select-none pl-3 pr-4 py-[14px] lg:py-3 flex items-center gap-3 lg:gap-3.5 text-left transition-colors hover:bg-wa-surface/70 active:bg-wa-surface ${
                 selected.has(item.key) ? "bg-[#0C3B2C]" : isSelected ? "lg:bg-wa-field" : ""
               }`}
             >
@@ -588,21 +593,21 @@ const Sidebar = () => {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[17px] leading-[22px] text-wa-text truncate">{item.name}</span>
+                  <span className="text-[17px] lg:text-[16px] leading-[22px] text-wa-text truncate">{item.name}</span>
                   {item.lastMessage && (
                     <span
-                      className={`text-xs shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
+                      className={`text-[12px] lg:text-[12.5px] leading-none shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
                     >
                       {formatChatListTime(item.lastMessage.createdAt)}
                     </span>
                   )}
                 </div>
-                <div className="flex items-center justify-between gap-3 mt-px">
+                <div className="flex items-center justify-between gap-3 mt-[3px]">
                   {isTyping ? (
                     <span className="min-w-0 truncate text-[15px] text-[#25D366]">typing…</span>
                   ) : (
                   <span
-                    className={`flex items-center gap-1 min-w-0 text-[14.5px] leading-5 ${
+                    className={`flex items-center gap-1 min-w-0 text-[14.5px] lg:text-[14px] leading-5 ${
                       hasUnread ? "text-wa-text" : "text-wa-muted"
                     }`}
                   >
