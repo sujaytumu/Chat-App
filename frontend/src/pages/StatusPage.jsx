@@ -4,6 +4,7 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import CreateStatusModal from "../components/CreateStatusModal";
 import StatusViewer from "../components/StatusViewer";
+import { useScrollMemory } from "../lib/useScrollMemory";
 
 // "Today, 09:16" / "Yesterday, 21:40" like WhatsApp
 const statusTime = (iso) => {
@@ -14,6 +15,7 @@ const statusTime = (iso) => {
 };
 
 const StatusPage = () => {
+  const scrollRef = useScrollMemory("updates");
   const { authUser } = useAuthStore();
   const [feed, setFeed] = useState({ myStatuses: [], others: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +40,7 @@ const StatusPage = () => {
         <h1 className="text-[24px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="animate-spin text-[#25D366]" size={28} />

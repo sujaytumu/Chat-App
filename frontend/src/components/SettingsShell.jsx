@@ -1,22 +1,28 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useScrollMemory } from "../lib/useScrollMemory";
 import { WaBack } from "./icons/WaIcons";
 
 // Common frame for every Settings screen: back arrow + title on top, scrolling
 // content below (the bottom bar stays visible, like WhatsApp).
-const SettingsShell = ({ title, children, back = "/profile", right = null, flush = false }) => (
+const SettingsShell = ({ title, children, back = "/profile", right = null, flush = false }) => {
+  const navigate = useNavigate();
+  const scrollRef = useScrollMemory(`settings:${title}`);
+  const goBack = () => ((window.history.state?.idx ?? 0) > 0 ? navigate(-1) : navigate(back, { replace: true }));
+  return (
   <div className="flex-1 min-w-0 flex flex-col bg-wa-bg text-wa-text overflow-hidden">
     <div className="flex items-center h-14 pl-1 pr-4 shrink-0">
-      <Link to={back} className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
+      <button onClick={goBack} className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
         <WaBack size={24} />
-      </Link>
+      </button>
       <h1 className="text-[18.5px] font-normal pl-3 truncate flex-1">{title}</h1>
       {right}
     </div>
-    <div className="flex-1 overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-8">
+    <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-8">
       <div className={`mx-auto w-full max-w-2xl ${flush ? "" : "px-4 space-y-4"}`}>{children}</div>
     </div>
   </div>
-);
+  );
+};
 
 export default SettingsShell;
 

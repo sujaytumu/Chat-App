@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import SettingsShell, { Switch } from "../components/SettingsShell";
 import { axiosInstance } from "../lib/axios";
 import { registerPushSubscription, previewCallTone, previewMessageTone, stopTonePreview } from "../lib/notificationSound";
+import { useBackToClose } from "../lib/useBackToClose";
 import {
   isMessageSoundEnabled,
   setMessageSoundEnabled,
@@ -201,6 +202,7 @@ export const NotificationsPage = () => {
   const refresh = () => bump((n) => n + 1);
   const [dialog, setDialog] = useState(null); // "msgTone" | "msgVib" | "grpTone" | "grpVib" | "callTone" | "callVib"
   const [menu, setMenu] = useState(false);
+  useBackToClose(menu, () => setMenu(false));
   const [resetKey, setResetKey] = useState(0);
 
   const convTones = isMessageSoundEnabled();

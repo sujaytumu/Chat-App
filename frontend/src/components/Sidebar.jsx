@@ -20,6 +20,7 @@ import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
+import { useScrollMemory } from "../lib/useScrollMemory";
 import {
   WaBack,
   WaKebab,
@@ -96,6 +97,8 @@ const Sidebar = () => {
   const [search, setSearch] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const listRef = useScrollMemory("chats");
+  useBackToClose(showMenu, () => setShowMenu(false));
   const [showSelMenu, setShowSelMenu] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   // Phone Back leaves the Archived folder (back to the main list).
@@ -516,7 +519,7 @@ const Sidebar = () => {
       )}
 
       {/* Chat list */}
-      <div className="overflow-y-auto flex-1 pb-24">
+      <div ref={listRef} className="overflow-y-auto flex-1 pb-24">
         {!showArchived && activeKeys && !search && (
           <div className="px-4 pb-2 flex items-center justify-between">
             <span className="text-[12px] text-wa-muted">

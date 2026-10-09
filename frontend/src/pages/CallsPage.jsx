@@ -7,6 +7,8 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Phone, Video, Loader2, ArrowUpRight, ArrowDownLeft, CalendarDays, Grid3x3, Heart, X, PhoneCall } from "lucide-react";
 import { Search, MoreVertical, ArrowLeft } from "../components/icons/WaGlyphs";
+import { useBackToClose } from "../lib/useBackToClose";
+import { useScrollMemory } from "../lib/useScrollMemory";
 
 const pad = (n) => String(n).padStart(2, "0");
 const formatCallTime = (dateStr) => {
@@ -28,6 +30,7 @@ const QuickAction = ({ icon, label, onClick }) => (
 );
 
 const CallsPage = () => {
+  const scrollRef = useScrollMemory("calls");
   const { authUser } = useAuthStore();
   const { startCall } = useCallStore();
   const navigate = useNavigate();
@@ -36,7 +39,9 @@ const CallsPage = () => {
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  useBackToClose(menuOpen, () => setMenuOpen(false));
   const [picker, setPicker] = useState(false);
+  useBackToClose(picker, () => setPicker(false));
   const users = useChatStore((s) => s.users);
   const getUsers = useChatStore((s) => s.getUsers);
   useEffect(() => {
@@ -117,7 +122,7 @@ const CallsPage = () => {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {!searching && (
           <div className="flex items-start gap-3 px-4 pt-3 pb-4 overflow-x-auto">
             <QuickAction icon={<Phone size={24} />} label="Call" onClick={() => setPicker(true)} />

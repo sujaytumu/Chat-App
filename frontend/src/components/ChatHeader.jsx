@@ -8,6 +8,7 @@ import Avatar from "./Avatar";
 import { WaBack, WaKebab, WaArchive } from "./icons/WaIcons";
 import GroupCallBanner from "./GroupCallBanner";
 import { useGroupCallStore } from "../store/useGroupCallStore";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const WallpaperPicker = lazy(() => import("./WallpaperPicker"));
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
@@ -27,6 +28,7 @@ const ChatHeader = () => {
   const joinGroupCall = useGroupCallStore((st) => st.joinCall);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
   const menuRef = useRef(null);
 

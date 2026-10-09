@@ -5,11 +5,13 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import Avatar from "../components/Avatar";
+import { useScrollMemory } from "../lib/useScrollMemory";
 
 const iconCls = "text-wa-icon";
 
 // WhatsApp's "You" tab: photo + name on top, then the settings list.
 const ProfilePage = () => {
+  const scrollRef = useScrollMemory("profile");
   const { authUser, isUpdatingProfile, updateProfile, logout } = useAuthStore();
   const navigate = useNavigate();
   const fileRef = useRef(null);
@@ -121,6 +123,7 @@ const ProfilePage = () => {
       </div>
 
       <div
+        ref={scrollRef}
         className="flex-1 overflow-y-auto pb-[calc(84px+env(safe-area-inset-bottom))] lg:pb-6"
         onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 150)}
       >
