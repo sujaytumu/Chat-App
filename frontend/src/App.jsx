@@ -3,6 +3,7 @@ import HomePage from "./pages/HomePage";
 import MainLayout from "./components/MainLayout";
 import NotificationManager from "./components/NotificationManager";
 import ErrorBoundary from "./components/ErrorBoundary";
+import GroupCallManager from "./components/GroupCallManager";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -130,6 +131,11 @@ const App = () => {
       {authUser && (
         <ErrorBoundary silent>
           <CallManager />
+        </ErrorBoundary>
+      )}
+      {authUser && (
+        <ErrorBoundary silent>
+          <GroupCallManager />
         </ErrorBoundary>
       )}
 
