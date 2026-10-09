@@ -3,6 +3,19 @@ export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      // Every Tailwind text size is 15% smaller than the default scale.
+      fontSize: {
+        xs: ["0.6375rem", { lineHeight: "0.85rem" }],
+        sm: ["0.74375rem", { lineHeight: "0.85rem" }],
+        base: ["0.85rem", { lineHeight: "1.275rem" }],
+        lg: ["0.95625rem", { lineHeight: "1.5rem" }],
+        xl: ["1.0625rem", { lineHeight: "1.5rem" }],
+        "2xl": ["1.275rem", { lineHeight: "1.7rem" }],
+        "3xl": ["1.59375rem", { lineHeight: "1.9rem" }],
+        "4xl": ["1.9125rem", { lineHeight: "2.1rem" }],
+        "5xl": ["2.55rem", { lineHeight: "1" }],
+        "6xl": ["3.1875rem", { lineHeight: "1" }],
+      },
       colors: {
         "wa-bg": "rgb(var(--wa-bg) / <alpha-value>)",
         "wa-panel": "rgb(var(--wa-panel) / <alpha-value>)",

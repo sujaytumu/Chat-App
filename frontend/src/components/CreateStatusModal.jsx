@@ -72,24 +72,24 @@ const LocationSheet = ({ onPick, onClose }) => {
       <div className="w-full bg-wa-panel rounded-t-3xl pb-[env(safe-area-inset-bottom)] max-h-[75%] flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20" />
         <div className="flex items-center px-5 py-3">
-          <h3 className="flex-1 text-[18px] text-wa-text">Add location</h3>
+          <h3 className="flex-1 text-[15.5px] text-wa-text">Add location</h3>
           <button onClick={onClose} className="text-wa-muted" aria-label="Close">
             <X size={22} />
           </button>
         </div>
         <div className="overflow-y-auto pb-3">
           {!places && !error && (
-            <p className="flex items-center gap-2 px-5 py-4 text-wa-muted text-[15px]">
+            <p className="flex items-center gap-2 px-5 py-4 text-wa-muted text-[13px]">
               <Loader2 size={16} className="animate-spin" /> Finding places near you…
             </p>
           )}
-          {error && <p className="px-5 py-3 text-[14px] text-wa-muted">{error}</p>}
+          {error && <p className="px-5 py-3 text-[12px] text-wa-muted">{error}</p>}
           {places?.map((p) => (
             <button key={p.name} onClick={() => onPick(p)} className="w-full flex items-center gap-4 px-5 py-3 text-left hover:bg-white/5">
               <span className="size-10 rounded-full bg-wa-field flex items-center justify-center shrink-0">
                 <Navigation size={18} className="text-[#21C063]" />
               </span>
-              <span className="text-[16px] text-wa-text">{p.name}</span>
+              <span className="text-[13.5px] text-wa-text">{p.name}</span>
             </button>
           ))}
           <div className="px-5 pt-3 flex gap-2">
@@ -98,12 +98,12 @@ const LocationSheet = ({ onPick, onClose }) => {
               onChange={(e) => setCustom(e.target.value)}
               placeholder="Or type a place name"
               maxLength={100}
-              className="flex-1 min-w-0 rounded-full bg-wa-field text-wa-text placeholder:text-wa-muted px-4 py-2.5 text-[15px] focus:outline-none"
+              className="flex-1 min-w-0 rounded-full bg-wa-field text-wa-text placeholder:text-wa-muted px-4 py-2.5 text-[13px] focus:outline-none"
             />
             <button
               disabled={!custom.trim()}
               onClick={() => onPick({ name: custom.trim() })}
-              className="rounded-full bg-[#00A884] disabled:opacity-40 text-white px-5 text-[15px]"
+              className="rounded-full bg-[#00A884] disabled:opacity-40 text-white px-5 text-[13px]"
             >
               Add
             </button>
@@ -211,7 +211,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       <span className={`size-11 rounded-full flex items-center justify-center ${active ? "bg-[#103629]" : "bg-wa-field"}`}>
         <Icon size={20} />
       </span>
-      <span className="text-[11px]">{label}</span>
+      <span className="text-[9.4px]">{label}</span>
     </button>
   );
 
@@ -221,7 +221,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         <button onClick={onClose} aria-label="Close">
           <X size={24} />
         </button>
-        <h3 className="text-[19px] flex-1">Add status</h3>
+        <h3 className="text-[16px] flex-1">Add status</h3>
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3">
@@ -236,7 +236,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
                 autoFocus={startWith !== "image"}
                 maxLength={700}
                 rows={5}
-                className="bg-transparent text-white text-[24px] text-center placeholder:text-white/60 resize-none focus:outline-none w-full"
+                className="bg-transparent text-white text-[20.5px] text-center placeholder:text-white/60 resize-none focus:outline-none w-full"
               />
             </div>
             <div className="flex gap-2.5 justify-center mb-2">
@@ -259,7 +259,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
             <span className="size-16 rounded-full bg-[#ff8f4d] flex items-center justify-center">
               <Headphones size={28} className="text-white" />
             </span>
-            <p className="text-[15px] text-center break-all">{media.name}</p>
+            <p className="text-[13px] text-center break-all">{media.name}</p>
             <audio src={media.url} controls className="w-full" />
           </div>
         )}
@@ -269,8 +269,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               <FileText size={26} className="text-white" />
             </span>
             <div className="min-w-0">
-              <p className="text-[15.5px] break-all">{media.name}</p>
-              <p className="text-[13px] text-wa-muted">{formatFileSize(media.size)}</p>
+              <p className="text-[13px] break-all">{media.name}</p>
+              <p className="text-[11px] text-wa-muted">{formatFileSize(media.size)}</p>
             </div>
           </div>
         )}
@@ -281,7 +281,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
             onChange={(e) => setCaption(e.target.value)}
             placeholder="Add a caption…"
             maxLength={700}
-            className="mt-3 w-full rounded-full bg-wa-field text-wa-text placeholder:text-wa-muted px-4 py-3 text-[15px] focus:outline-none"
+            className="mt-3 w-full rounded-full bg-wa-field text-wa-text placeholder:text-wa-muted px-4 py-3 text-[13px] focus:outline-none"
           />
         )}
 
@@ -289,7 +289,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         {(song || place) && (
           <div className="flex flex-wrap gap-2 mt-3">
             {song && (
-              <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[13.5px] max-w-full">
+              <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[11.5px] max-w-full">
                 <Music size={14} className="text-[#21C063] shrink-0" />
                 <span className="truncate">{song.name}</span>
                 <button onClick={() => setSong(null)} className="size-5 rounded-full flex items-center justify-center text-wa-muted" aria-label="Remove song">
@@ -298,7 +298,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               </span>
             )}
             {place && (
-              <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[13.5px] max-w-full">
+              <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[11.5px] max-w-full">
                 <MapPin size={14} className="text-[#F15C6D] shrink-0" />
                 <span className="truncate">{place.name}</span>
                 <button onClick={() => setPlace(null)} className="size-5 rounded-full flex items-center justify-center text-wa-muted" aria-label="Remove location">

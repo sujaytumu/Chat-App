@@ -34,7 +34,7 @@ const ChatStarredPanel = ({ list, chat, title, onClose, onJump }) => {
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
-        <h3 className="text-[19px] truncate">Starred in {title}</h3>
+        <h3 className="text-[16px] truncate">Starred in {title}</h3>
       </div>
       <div className="flex-1 overflow-y-auto">
         {!list ? (
@@ -57,11 +57,11 @@ const ChatStarredPanel = ({ list, chat, title, onClose, onJump }) => {
                 }}
                 className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5"
               >
-                <span className="flex justify-between text-[13px] text-wa-muted mb-1">
+                <span className="flex justify-between text-[11px] text-wa-muted mb-1">
                   <span>{mine ? "You" : m.senderId?.fullName || "Member"}</span>
                   <span>{fmt(m.createdAt)}</span>
                 </span>
-                <span className="block text-[15px] line-clamp-3 break-words">{body}</span>
+                <span className="block text-[13px] line-clamp-3 break-words">{body}</span>
               </button>
             );
           })

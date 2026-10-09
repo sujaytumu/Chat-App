@@ -32,7 +32,7 @@ const Shell = ({ onClose, children }) => (
 const Section = ({ icon, title, count, people }) =>
   people.length === 0 ? null : (
     <div className="py-2">
-      <div className="flex items-center gap-2 px-4 py-2 text-[13px] text-wa-muted">
+      <div className="flex items-center gap-2 px-4 py-2 text-[11px] text-wa-muted">
         {icon}
         <span>
           {title} <span className="opacity-70">({count})</span>
@@ -42,7 +42,7 @@ const Section = ({ icon, title, count, people }) =>
         <div key={member._id} className="flex items-center gap-3 px-4 py-2">
           <Avatar src={member.profilePic} name={member.fullName} size="size-10" textSize="text-base" />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] text-wa-text truncate">{member.fullName}</p>
+            <p className="text-[13px] text-wa-text truncate">{member.fullName}</p>
           </div>
           {at && <span className="text-xs text-wa-muted shrink-0">{formatTime(at)}</span>}
         </div>

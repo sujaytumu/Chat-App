@@ -61,7 +61,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 h-16 shrink-0">
-          <h3 className="text-[20px] font-medium flex items-center gap-3">
+          <h3 className="text-[17px] font-medium flex items-center gap-3">
             <Users size={22} className="text-wa-muted" /> New group
           </h3>
           <button
@@ -94,12 +94,12 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Group name"
-                className="flex-1 min-w-0 bg-transparent border-0 border-b-2 border-wa-field focus:border-[#25D366] focus:outline-none focus:ring-0 text-[18px] text-wa-text placeholder:text-wa-muted py-2 transition-colors"
+                className="flex-1 min-w-0 bg-transparent border-0 border-b-2 border-wa-field focus:border-[#25D366] focus:outline-none focus:ring-0 text-[15.5px] text-wa-text placeholder:text-wa-muted py-2 transition-colors"
                 maxLength={50}
                 autoFocus
               />
             </div>
-            <p className="text-[13px] text-[#25D366] mt-3 font-medium">
+            <p className="text-[11px] text-[#25D366] mt-3 font-medium">
               {selectedIds.length === 0
                 ? "Add members"
                 : `${selectedIds.length} member${selectedIds.length !== 1 ? "s" : ""} selected`}
@@ -117,7 +117,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
                   className="w-full flex items-center gap-4 px-4 py-2.5 hover:bg-wa-surface/70 active:bg-wa-surface text-left transition-colors"
                 >
                   <Avatar src={user.profilePic} name={user.fullName} size="size-12" />
-                  <span className="flex-1 min-w-0 text-[17px] truncate">{user.fullName}</span>
+                  <span className="flex-1 min-w-0 text-[14.5px] truncate">{user.fullName}</span>
                   <span
                     className={`size-6 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
                       checked ? "bg-[#25D366] border-[#25D366] text-wa-bg" : "border-wa-icon"
@@ -129,7 +129,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
               );
             })}
             {users.length === 0 && (
-              <p className="text-center text-wa-muted py-8 text-[15px]">No contacts to add yet</p>
+              <p className="text-center text-wa-muted py-8 text-[13px]">No contacts to add yet</p>
             )}
           </div>
 
@@ -137,7 +137,7 @@ const CreateGroupModal = ({ onClose, onCreated }) => {
             <button
               type="submit"
               disabled={!canCreate}
-              className="w-full h-12 rounded-full bg-[#25D366] text-wa-bg text-[16px] font-semibold flex items-center justify-center hover:bg-[#21c05e] active:scale-[.99] disabled:bg-wa-surface disabled:text-wa-muted2 transition-colors"
+              className="w-full h-12 rounded-full bg-[#25D366] text-wa-bg text-[13.5px] font-semibold flex items-center justify-center hover:bg-[#21c05e] active:scale-[.99] disabled:bg-wa-surface disabled:text-wa-muted2 transition-colors"
             >
               {isCreating ? <Loader2 className="animate-spin" size={20} /> : "Create group"}
             </button>

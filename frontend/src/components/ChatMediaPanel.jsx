@@ -32,7 +32,7 @@ export const MediaThumb = ({ item, className = "", onClick }) => (
     ) : (
       <>
         <video src={item.url} preload="metadata" muted className="size-full object-cover" />
-        <span className="absolute left-1.5 bottom-1 flex items-center gap-1 text-[12px] text-white drop-shadow">
+        <span className="absolute left-1.5 bottom-1 flex items-center gap-1 text-[10px] text-white drop-shadow">
           <Play size={12} fill="white" /> {fmtDur(item.duration)}
         </span>
       </>
@@ -51,7 +51,7 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
     ["docs", "Docs", data?.docs.length],
     ["links", "Links", data?.links.length],
   ];
-  const empty = <p className="text-center text-wa-muted py-16 text-[15px]">Nothing here yet</p>;
+  const empty = <p className="text-center text-wa-muted py-16 text-[13px]">Nothing here yet</p>;
 
   return (
     <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
@@ -59,14 +59,14 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
-        <h3 className="text-[19px] truncate">{title}</h3>
+        <h3 className="text-[16px] truncate">{title}</h3>
       </div>
       <div className="flex shrink-0 bg-wa-panel border-b border-white/10">
         {tabs.map(([id, label, n]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex-1 py-3 text-[15px] border-b-2 ${tab === id ? "border-[#00A884] text-[#00A884]" : "border-transparent text-wa-muted"}`}
+            className={`flex-1 py-3 text-[13px] border-b-2 ${tab === id ? "border-[#00A884] text-[#00A884]" : "border-transparent text-wa-muted"}`}
           >
             {label}
             {n ? ` (${n})` : ""}
@@ -107,8 +107,8 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
                   <FileText size={22} className="text-wa-muted" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15.5px]">{d.name || "Document"}</span>
-                  <span className="block text-[13px] text-wa-muted">
+                  <span className="block truncate text-[13px]">{d.name || "Document"}</span>
+                  <span className="block text-[11px] text-wa-muted">
                     {[fmtSize(d.size), fmtDate(d.createdAt)].filter(Boolean).join(" · ")}
                   </span>
                 </span>
@@ -125,8 +125,8 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
                 <Link2 size={22} className="text-wa-muted" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] text-[#53BDEB]">{l.url}</span>
-                <span className="block text-[13px] text-wa-muted">{fmtDate(l.createdAt)}</span>
+                <span className="block truncate text-[13px] text-[#53BDEB]">{l.url}</span>
+                <span className="block text-[11px] text-wa-muted">{fmtDate(l.createdAt)}</span>
               </span>
             </a>
           ))

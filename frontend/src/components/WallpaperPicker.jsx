@@ -58,23 +58,23 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
           <button onClick={onClose} aria-label="Close">
             <X size={24} />
           </button>
-          <h3 className="text-[19px] truncate">{isChat ? `Wallpaper · ${chatName}` : "Default wallpaper"}</h3>
+          <h3 className="text-[16px] truncate">{isChat ? `Wallpaper · ${chatName}` : "Default wallpaper"}</h3>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           {/* Live preview with two sample bubbles */}
           <div className="chat-wallpaper rounded-2xl h-44 p-3 flex flex-col justify-end gap-2" style={preview}>
-            <div className={`self-start max-w-[70%] rounded-lg px-3 py-1.5 text-[14px] ${dark ? "bg-[#1F2C34] text-white" : "bg-wa-panel text-wa-text"}`}>
+            <div className={`self-start max-w-[70%] rounded-lg px-3 py-1.5 text-[12px] ${dark ? "bg-[#1F2C34] text-white" : "bg-wa-panel text-wa-text"}`}>
               Hey! How does this look?
             </div>
-            <div className="self-end max-w-[70%] rounded-lg px-3 py-1.5 text-[14px] bg-wa-out text-wa-text">Looks great 👍</div>
+            <div className="self-end max-w-[70%] rounded-lg px-3 py-1.5 text-[12px] bg-wa-out text-wa-text">Looks great 👍</div>
           </div>
 
-          <p className="text-[13px] text-wa-muted mt-4 mb-2">Choose</p>
+          <p className="text-[11px] text-wa-muted mt-4 mb-2">Choose</p>
           <div className="grid grid-cols-4 gap-2.5">
             <button
               onClick={() => setPick(null)}
-              className={`relative aspect-square rounded-xl chat-wallpaper border-2 text-[11px] flex items-end justify-center pb-1 ${
+              className={`relative aspect-square rounded-xl chat-wallpaper border-2 text-[9.4px] flex items-end justify-center pb-1 ${
                 !pick ? "border-[#21C063]" : "border-transparent"
               }`}
               style={{ backgroundImage: undefined }}
@@ -83,7 +83,7 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
             </button>
             <button
               onClick={() => fileRef.current?.click()}
-              className={`relative aspect-square rounded-xl bg-wa-field flex flex-col items-center justify-center gap-1 text-[11px] text-wa-muted border-2 overflow-hidden ${
+              className={`relative aspect-square rounded-xl bg-wa-field flex flex-col items-center justify-center gap-1 text-[9.4px] text-wa-muted border-2 overflow-hidden ${
                 pick?.kind === "image" ? "border-[#21C063]" : "border-transparent"
               }`}
               style={pick?.kind === "image" ? cfgToStyle(pick) : undefined}
@@ -120,7 +120,7 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
                 toast("This chat now uses your default wallpaper");
                 onClose();
               }}
-              className="mt-4 text-[14.5px] text-[#F15C6D]"
+              className="mt-4 text-[12.5px] text-[#F15C6D]"
             >
               Use default wallpaper for this chat
             </button>
@@ -128,7 +128,7 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
         </div>
 
         <div className="p-4 border-t border-white/10">
-          <button onClick={apply} disabled={same(pick, stored)} className="w-full rounded-full bg-[#00A884] disabled:opacity-40 text-white py-3 text-[16px]">
+          <button onClick={apply} disabled={same(pick, stored)} className="w-full rounded-full bg-[#00A884] disabled:opacity-40 text-white py-3 text-[13.5px]">
             {isChat ? "Set for this chat" : "Set for all chats"}
           </button>
         </div>

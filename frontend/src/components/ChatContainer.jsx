@@ -270,7 +270,7 @@ const ChatContainer = () => {
             <button
               onClick={handleLoadOlder}
               disabled={isLoadingOlder}
-              className="bg-wa-surface/95 text-wa-muted hover:text-wa-text text-[13px] px-4 py-1.5 rounded-full shadow-sm disabled:opacity-60"
+              className="bg-wa-surface/95 text-wa-muted hover:text-wa-text text-[11px] px-4 py-1.5 rounded-full shadow-sm disabled:opacity-60"
             >
               {isLoadingOlder ? "Loading…" : "Load older messages"}
             </button>
@@ -316,7 +316,7 @@ const ChatContainer = () => {
             <div key={message._id} className={isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}>
             {showDateDivider && (
               <div className="flex justify-center my-3">
-                <span className="bg-wa-surface/95 text-wa-muted text-[12.5px] px-3 py-1 rounded-lg shadow-sm">
+                <span className="bg-wa-surface/95 text-wa-muted text-[10.5px] px-3 py-1 rounded-lg shadow-sm">
                   {formatDateDivider(message.createdAt)}
                 </span>
               </div>
@@ -346,7 +346,7 @@ const ChatContainer = () => {
 
               {message.deletedForEveryone ? (
                 <div
-                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-xl italic text-wa-muted text-[14.5px] flex items-center gap-1.5 ${
+                  className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-xl italic text-wa-muted text-[12.5px] flex items-center gap-1.5 ${
                     isMe ? "bg-wa-out/70" : "bg-wa-surface/80"
                   } ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                 >
@@ -355,7 +355,7 @@ const ChatContainer = () => {
               ) : isSticker ? (
                 <div className="flex flex-col items-center px-1">
                   <span className="text-6xl leading-none">{message.text.trim()}</span>
-                  <span className="text-[11px] text-wa-muted mt-1 flex items-center gap-1">
+                  <span className="text-[9.4px] text-wa-muted mt-1 flex items-center gap-1">
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
                     {isMe && isGroup && (
@@ -373,14 +373,14 @@ const ChatContainer = () => {
                 >
                   {isGroup && !isMe && isFirstInGroup && (
                     <span
-                      className="text-[13px] font-medium mb-0.5"
+                      className="text-[11px] font-medium mb-0.5"
                       style={{ color: colorForId(message.senderId) }}
                     >
                       {sender?.fullName || "Unknown"}
                     </span>
                   )}
                   {message.pinned && (
-                    <span className="flex items-center gap-1 text-[11px] mb-0.5 text-wa-muted">
+                    <span className="flex items-center gap-1 text-[9.4px] mb-0.5 text-wa-muted">
                       <Pin size={10} /> Pinned
                     </span>
                   )}
@@ -389,10 +389,10 @@ const ChatContainer = () => {
                       onClick={() => scrollToMessage(message.replyTo._id)}
                       className="flex flex-col items-start text-left w-full mb-1.5 pl-2.5 pr-2 py-1.5 rounded-lg bg-black/25 border-l-4 border-[#25D366]"
                     >
-                      <span className="text-[13px] font-medium text-[#25D366]">
+                      <span className="text-[11px] font-medium text-[#25D366]">
                         {replyFromMe ? "You" : replySender?.fullName || "Message"}
                       </span>
-                      <span className="text-[13.5px] text-wa-icon line-clamp-2 break-all">
+                      <span className="text-[11.5px] text-wa-icon line-clamp-2 break-all">
                         {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.text}
                       </span>
                     </button>
@@ -413,7 +413,7 @@ const ChatContainer = () => {
                     <LocationCard location={location} />
                   ) : (
                     message.text && (
-                      <span className="text-[15px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
+                      <span className="text-[13px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
                         {message.text}
                         {/* reserves room so the last line never runs under the time */}
                         <span
@@ -426,7 +426,7 @@ const ChatContainer = () => {
                   <span
                     className={`${
                       hasText ? "absolute bottom-1 right-2" : "self-end mt-0.5"
-                    } text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
+                    } text-[9.4px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
                   >
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
@@ -448,10 +448,10 @@ const ChatContainer = () => {
                     <button
                       key={emoji}
                       onClick={() => reactToMessage(message._id, emoji)}
-                      className="text-[14px] leading-none flex items-center gap-0.5"
+                      className="text-[12px] leading-none flex items-center gap-0.5"
                     >
                       {emoji}
-                      {count > 1 && <span className="text-[11px] text-wa-muted">{count}</span>}
+                      {count > 1 && <span className="text-[9.4px] text-wa-muted">{count}</span>}
                     </button>
                   ))}
                 </div>
@@ -479,7 +479,7 @@ const ChatContainer = () => {
         >
           <ChevronDown size={26} />
           {newWhileAway > 0 && (
-            <span className="absolute -top-2 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 rounded-full bg-[#25D366] text-wa-bg text-[11px] font-bold flex items-center justify-center">
+            <span className="absolute -top-2 left-1/2 -translate-x-1/2 min-w-[20px] h-5 px-1.5 rounded-full bg-[#25D366] text-wa-bg text-[9.4px] font-bold flex items-center justify-center">
               {newWhileAway > 99 ? "99+" : newWhileAway}
             </span>
           )}
@@ -488,7 +488,7 @@ const ChatContainer = () => {
       </div>
 
       {isGroup && data.permissions?.sendMessages === "admins" && !data.admins.some((a) => (a._id || a) === authUser._id) ? (
-        <div className="shrink-0 px-4 py-3.5 text-center text-[14px] text-wa-muted bg-wa-panel border-t border-white/5">
+        <div className="shrink-0 px-4 py-3.5 text-center text-[12px] text-wa-muted bg-wa-panel border-t border-white/5">
           Only admins can send messages
         </div>
       ) : (

@@ -52,7 +52,7 @@ const MainNav = () => {
           >
             <Icon size={24} filled={false} />
             {to === "/" && unread > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-wa-bg text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-wa-bg text-[8.5px] font-bold flex items-center justify-center">
                 {unread > 99 ? "99+" : unread}
               </span>
             )}
@@ -87,12 +87,12 @@ const MainNav = () => {
                 >
                   <Icon size={26} filled={isActive} />
                   {to === "/" && unread > 0 && (
-                    <span className="absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-wa-bg text-[11px] font-semibold flex items-center justify-center">
+                    <span className="absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-wa-bg text-[9.4px] font-semibold flex items-center justify-center">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}
                 </span>
-                <span className={`text-[13px] leading-none text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
+                <span className={`text-[11px] leading-none text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
               </>
             )}
           </NavLink>
@@ -103,7 +103,7 @@ const MainNav = () => {
               <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
             </span>
           </span>
-          <span className={`text-[13px] leading-none text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
+          <span className={`text-[11px] leading-none text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
         </NavLink>
       </nav>
     </>

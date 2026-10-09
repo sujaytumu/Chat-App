@@ -41,11 +41,11 @@ const ChatListModal = ({ title, initialName = "", nameEditable = true, candidate
           <button onClick={onClose} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Back">
             <WaBack size={24} />
           </button>
-          <h2 className="flex-1 text-[20px] text-wa-text pl-3">{title}</h2>
+          <h2 className="flex-1 text-[17px] text-wa-text pl-3">{title}</h2>
           <button
             onClick={save}
             disabled={!canSave}
-            className="h-9 px-4 rounded-full bg-[#21C063] text-wa-bg text-[15px] font-medium disabled:opacity-40"
+            className="h-9 px-4 rounded-full bg-[#21C063] text-wa-bg text-[13px] font-medium disabled:opacity-40"
           >
             Save
           </button>
@@ -59,7 +59,7 @@ const ChatListModal = ({ title, initialName = "", nameEditable = true, candidate
               maxLength={30}
               onChange={(e) => setName(e.target.value)}
               placeholder="List name (e.g. Family, Work)"
-              className="w-full h-12 rounded-xl bg-wa-surface px-4 text-[16px] text-wa-text placeholder:text-wa-muted focus:outline-none focus:ring-2 focus:ring-[#25D366]/50"
+              className="w-full h-12 rounded-xl bg-wa-surface px-4 text-[13.5px] text-wa-text placeholder:text-wa-muted focus:outline-none focus:ring-2 focus:ring-[#25D366]/50"
             />
           </div>
         )}
@@ -71,22 +71,22 @@ const ChatListModal = ({ title, initialName = "", nameEditable = true, candidate
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search chats"
-              className="flex-1 min-w-0 bg-transparent text-[15px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+              className="flex-1 min-w-0 bg-transparent text-[13px] text-wa-text placeholder:text-wa-muted focus:outline-none"
             />
           </div>
         </div>
-        <p className="px-4 pb-1 text-[13px] text-wa-muted shrink-0">
+        <p className="px-4 pb-1 text-[11px] text-wa-muted shrink-0">
           {picked.size} chat{picked.size === 1 ? "" : "s"} selected
         </p>
 
         <div className="flex-1 overflow-y-auto pb-2">
-          {shown.length === 0 && <p className="text-center text-wa-muted py-8 text-[15px]">No chats found</p>}
+          {shown.length === 0 && <p className="text-center text-wa-muted py-8 text-[13px]">No chats found</p>}
           {shown.map((c) => {
             const on = picked.has(c.key);
             return (
               <button key={c.key} onClick={() => toggle(c.key)} className="w-full flex items-center gap-3 px-4 py-2 text-left active:bg-wa-surface hover:bg-wa-surface/70">
                 <Avatar src={c.avatar} name={c.name} size="size-11" textSize="text-base" />
-                <span className="flex-1 min-w-0 truncate text-[16px] text-wa-text">{c.name}</span>
+                <span className="flex-1 min-w-0 truncate text-[13.5px] text-wa-text">{c.name}</span>
                 <span
                   className={`size-6 rounded-md border-2 flex items-center justify-center ${
                     on ? "bg-[#21C063] border-[#21C063] text-wa-bg" : "border-wa-muted2"
@@ -104,7 +104,7 @@ const ChatListModal = ({ title, initialName = "", nameEditable = true, candidate
             onClick={async () => {
               if (await onDelete()) onClose();
             }}
-            className="shrink-0 h-12 text-[15px] text-red-400 border-t border-white/5 active:bg-white/5"
+            className="shrink-0 h-12 text-[13px] text-red-400 border-t border-white/5 active:bg-white/5"
           >
             Delete list
           </button>

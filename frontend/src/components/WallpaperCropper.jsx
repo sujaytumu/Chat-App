@@ -169,7 +169,7 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
         <button onClick={onCancel} aria-label="Cancel" className="size-10 flex items-center justify-center">
           <X size={24} />
         </button>
-        <h3 className="flex-1 text-[19px]">Crop wallpaper</h3>
+        <h3 className="flex-1 text-[16px]">Crop wallpaper</h3>
         <button onClick={done} disabled={!box} className="h-10 px-5 rounded-full bg-[#21C063] text-black font-medium flex items-center gap-1.5 disabled:opacity-40">
           <Check size={18} /> Done
         </button>
@@ -226,13 +226,13 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
             <button
               key={label}
               onClick={() => toggleLock(v)}
-              className={`h-9 px-4 rounded-full text-[14px] border ${locked === v ? "bg-[#103629] border-transparent text-[#D9FDD3]" : "border-white/25 text-white/80"}`}
+              className={`h-9 px-4 rounded-full text-[12px] border ${locked === v ? "bg-[#103629] border-transparent text-[#D9FDD3]" : "border-white/25 text-white/80"}`}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="text-[12.5px] text-white/60 text-center">Drag the frame to move it, drag a corner to resize. Only what&apos;s inside becomes your wallpaper.</p>
+        <p className="text-[10.5px] text-white/60 text-center">Drag the frame to move it, drag a corner to resize. Only what&apos;s inside becomes your wallpaper.</p>
       </div>
     </div>
   );

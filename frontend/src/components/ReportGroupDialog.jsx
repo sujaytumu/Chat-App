@@ -33,19 +33,19 @@ const ReportGroupDialog = ({ group, onClose, onReportedAndExit }) => {
   return (
     <div className="fixed inset-0 z-[97] bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl bg-wa-pop text-wa-text p-5" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-[19px] mb-1">Report "{group.name}"?</h3>
-        <p className="text-[14px] text-wa-muted mb-3">The group won't be told. Pick the closest reason.</p>
+        <h3 className="text-[16px] mb-1">Report "{group.name}"?</h3>
+        <p className="text-[12px] text-wa-muted mb-3">The group won't be told. Pick the closest reason.</p>
         {REASONS.map(([id, label]) => (
           <label key={id} className="flex items-center gap-3 py-2 cursor-pointer">
             <input type="radio" className="radio radio-success radio-sm" checked={reason === id} onChange={() => setReason(id)} />
-            <span className="text-[15.5px]">{label}</span>
+            <span className="text-[13px]">{label}</span>
           </label>
         ))}
         <label className="flex items-center gap-3 py-2 mt-1 cursor-pointer border-t border-white/10 pt-3">
           <input type="checkbox" className="checkbox checkbox-success checkbox-sm" checked={exit} onChange={(e) => setExit(e.target.checked)} />
-          <span className="text-[15px]">Also exit this group</span>
+          <span className="text-[13px]">Also exit this group</span>
         </label>
-        <div className="flex justify-end gap-5 mt-4 text-[15.5px]">
+        <div className="flex justify-end gap-5 mt-4 text-[13px]">
           <button onClick={onClose} className="text-[#21C063]" disabled={busy}>
             Cancel
           </button>

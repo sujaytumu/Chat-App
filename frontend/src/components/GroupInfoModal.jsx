@@ -139,7 +139,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           <button onClick={onClose} className="text-wa-text" aria-label="Close">
             <X size={24} />
           </button>
-          <h3 className="text-[19px]">Group info</h3>
+          <h3 className="text-[16px]">Group info</h3>
         </div>
 
         <div className="flex flex-col items-center gap-2 px-6 pt-2 pb-6 border-b border-white/10 relative">
@@ -187,7 +187,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                           setPhotoMenu(false);
                           o.run();
                         }}
-                        className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[15.5px] hover:bg-white/5 active:bg-white/10"
+                        className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[13px] hover:bg-white/5 active:bg-white/10"
                       >
                         <o.icon size={19} className="text-wa-icon" />
                         {o.label}
@@ -215,7 +215,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                       setEditingName(false);
                     }
                   }}
-                  className="min-w-0 flex-1 bg-transparent border-b-2 border-[#00A884] text-[24px] text-center focus:outline-none"
+                  className="min-w-0 flex-1 bg-transparent border-b-2 border-[#00A884] text-[20.5px] text-center focus:outline-none"
                 />
                 <button onClick={saveName} className="text-[#00A884]" aria-label="Save name">
                   <Check size={24} />
@@ -223,7 +223,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               </>
             ) : (
               <>
-                <h4 className="text-[26px] leading-tight text-center break-words min-w-0">{group.name}</h4>
+                <h4 className="text-[22px] leading-tight text-center break-words min-w-0">{group.name}</h4>
                 {canEdit && (
                   <button
                     onClick={() => {
@@ -239,7 +239,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               </>
             )}
           </div>
-          <p className="text-[15px] text-wa-muted">
+          <p className="text-[13px] text-wa-muted">
             Group · <span className="text-[#21C063] font-medium">{group.members.length} members</span>
           </p>
           <div className="mt-3 flex items-start justify-center gap-3">
@@ -253,7 +253,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                 <span className="w-full h-11 rounded-full bg-wa-field hover:bg-wa-hover flex items-center justify-center">
                   <b.icon size={22} />
                 </span>
-                <span className="text-[13px]">{b.label}</span>
+                <span className="text-[11px]">{b.label}</span>
               </button>
             ))}
           </div>
@@ -265,7 +265,7 @@ const GroupInfoModal = ({ group, onClose }) => {
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
             <Images size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[16px]">Media, links and docs</span>
+            <span className="flex-1 text-[13.5px]">Media, links and docs</span>
             <span className="text-wa-muted">{mediaCount}</span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
@@ -283,8 +283,8 @@ const GroupInfoModal = ({ group, onClose }) => {
           >
             <Timer size={22} className="text-wa-muted" />
             <span className="flex-1">
-              <span className="block text-[16px]">Disappearing messages</span>
-              <span className="block text-[13.5px] text-wa-muted">{DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}</span>
+              <span className="block text-[13.5px]">Disappearing messages</span>
+              <span className="block text-[11.5px] text-wa-muted">{DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}</span>
             </span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
@@ -293,7 +293,7 @@ const GroupInfoModal = ({ group, onClose }) => {
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
             <Settings size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[16px]">Group permissions</span>
+            <span className="flex-1 text-[13.5px]">Group permissions</span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
           <button
@@ -301,7 +301,7 @@ const GroupInfoModal = ({ group, onClose }) => {
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
             <Star size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[16px]">Starred messages</span>
+            <span className="flex-1 text-[13.5px]">Starred messages</span>
             <span className="text-wa-muted">{starred?.length || ""}</span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>

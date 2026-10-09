@@ -15,9 +15,9 @@ const DisappearingPanel = ({ group, isAdmin, onClose }) => {
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
-        <h3 className="text-[19px]">Disappearing messages</h3>
+        <h3 className="text-[16px]">Disappearing messages</h3>
       </div>
-      <p className="px-5 py-4 text-[14px] text-wa-muted">
+      <p className="px-5 py-4 text-[12px] text-wa-muted">
         {isAdmin
           ? "New messages sent in this group will disappear after the time you choose. Messages already sent aren't affected."
           : "Only admins can change this."}
@@ -29,7 +29,7 @@ const DisappearingPanel = ({ group, isAdmin, onClose }) => {
           onClick={() => setDisappearing(group._id, Number(secs))}
           className="flex items-center gap-4 px-5 py-3.5 text-left hover:bg-white/5 disabled:opacity-70"
         >
-          <span className="flex-1 text-[16px]">{label}</span>
+          <span className="flex-1 text-[13.5px]">{label}</span>
           {current === Number(secs) && <Check size={20} className="text-[#00A884]" />}
         </button>
       ))}

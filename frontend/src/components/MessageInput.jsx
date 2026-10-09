@@ -616,7 +616,7 @@ const MessageInput = () => {
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
-              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[13.5px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none"
               style={{ overflow: "hidden" }}
             />
 

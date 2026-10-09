@@ -52,7 +52,7 @@ const lastMessagePreview = (lastMessage) => {
 };
 
 const menuItem =
-  "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-wa-text hover:bg-white/5 text-left";
+  "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
 
 const Sidebar = () => {
   const {
@@ -339,7 +339,7 @@ const Sidebar = () => {
           <button onClick={clearSelected} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Cancel selection">
             <WaBack size={24} />
           </button>
-          <span className="flex-1 text-[22px] leading-none font-normal text-wa-text pl-5">{selected.size}</span>
+          <span className="flex-1 text-[18.5px] leading-none font-normal text-wa-text pl-5">{selected.size}</span>
           <button onClick={onPin} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
             {allPinned ? <WaUnpinAction /> : <WaPinAction />}
           </button>
@@ -409,10 +409,10 @@ const Sidebar = () => {
             >
               <WaBack size={24} />
             </button>
-            <h1 className="text-[22px] leading-none font-normal text-wa-text">Archived</h1>
+            <h1 className="text-[18.5px] leading-none font-normal text-wa-text">Archived</h1>
           </div>
         ) : (
-          <h1 className="text-[28px] lg:text-[24px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
+          <h1 className="text-[24px] lg:text-[20.5px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
         )}
 
         <div className="relative" ref={menuRef}>
@@ -450,7 +450,7 @@ const Sidebar = () => {
 
       {/* Archived: WhatsApp's info banner instead of search + chips */}
       {showArchived && !selecting && (
-        <p className="px-6 py-4 text-center text-[15px] leading-snug text-wa-muted border-b border-white/5">
+        <p className="px-6 py-4 text-center text-[13px] leading-snug text-wa-muted border-b border-white/5">
           These chats stay archived when new messages are received.
         </p>
       )}
@@ -465,7 +465,7 @@ const Sidebar = () => {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search"
-            className="flex-1 min-w-0 bg-transparent text-[16px] lg:text-[15px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[13.5px] lg:text-[13px] text-wa-text placeholder:text-wa-muted focus:outline-none"
           />
           {search && (
             <button onClick={() => setSearch("")} className="text-wa-muted hover:text-wa-text" aria-label="Clear search">
@@ -488,11 +488,11 @@ const Sidebar = () => {
           if (id === "__new") return (
         <button key="__new"
           onClick={() => setListModal({ id: "new" })}
-          className="h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[16px] lg:text-[14px] shrink-0 whitespace-nowrap border border-wa-field text-wa-icon hover:bg-white/5 flex items-center gap-1"
+          className="h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[13.5px] lg:text-[12px] shrink-0 whitespace-nowrap border border-wa-field text-wa-icon hover:bg-white/5 flex items-center gap-1"
           title="New list"
           aria-label="New list"
         >
-          <span className="text-[20px] lg:text-[18px] leading-none">+</span>
+          <span className="text-[17px] lg:text-[15.5px] leading-none">+</span>
           <span className="lg:hidden">New list</span>
         </button>
           );
@@ -501,7 +501,7 @@ const Sidebar = () => {
             <button
               key={id}
               onClick={() => setFilter(id)}
-              className={`h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[16px] lg:text-[13.5px] shrink-0 whitespace-nowrap border transition-colors ${
+              className={`h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[13.5px] lg:text-[11.5px] shrink-0 whitespace-nowrap border transition-colors ${
                 active
                   ? "bg-wa-tint border-transparent text-wa-tinttext font-medium"
                   : "border-wa-field text-wa-icon hover:bg-white/5"
@@ -519,12 +519,12 @@ const Sidebar = () => {
       <div className="overflow-y-auto flex-1 pb-24">
         {!showArchived && activeKeys && !search && (
           <div className="px-4 pb-2 flex items-center justify-between">
-            <span className="text-[14px] text-wa-muted">
+            <span className="text-[12px] text-wa-muted">
               {filter === "fav" ? "Favourites" : activeList?.name} · {items.length} chat{items.length === 1 ? "" : "s"}
             </span>
             <button
               onClick={() => setListModal({ id: filter === "fav" ? "favourites" : activeList.id })}
-              className="text-[14px] font-medium text-[#25D366] px-2 py-1"
+              className="text-[12px] font-medium text-[#25D366] px-2 py-1"
             >
               {filter === "fav" ? "Add" : "Edit"}
             </button>
@@ -541,9 +541,9 @@ const Sidebar = () => {
             <span className="size-12 flex items-center justify-center text-wa-muted">
               <WaArchive size={26} />
             </span>
-            <span className="flex-1 text-[17px] text-wa-muted">Archived</span>
+            <span className="flex-1 text-[14.5px] text-wa-muted">Archived</span>
             {archivedInfo.unread > 0 && (
-              <span className="text-[13px] font-medium text-[#25D366]">{archivedInfo.unread}</span>
+              <span className="text-[11px] font-medium text-[#25D366]">{archivedInfo.unread}</span>
             )}
           </button>
         )}
@@ -593,10 +593,10 @@ const Sidebar = () => {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[17px] lg:text-[16px] leading-[22px] text-wa-text truncate">{item.name}</span>
+                  <span className="text-[14.5px] lg:text-[13.5px] leading-[22px] text-wa-text truncate">{item.name}</span>
                   {item.lastMessage && (
                     <span
-                      className={`text-[12px] lg:text-[12.5px] leading-none shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
+                      className={`text-[10px] lg:text-[10.5px] leading-none shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
                     >
                       {formatChatListTime(item.lastMessage.createdAt)}
                     </span>
@@ -604,10 +604,10 @@ const Sidebar = () => {
                 </div>
                 <div className="flex items-center justify-between gap-3 mt-[3px]">
                   {isTyping ? (
-                    <span className="min-w-0 truncate text-[15px] text-[#25D366]">typing…</span>
+                    <span className="min-w-0 truncate text-[13px] text-[#25D366]">typing…</span>
                   ) : (
                   <span
-                    className={`flex items-center gap-1 min-w-0 text-[14.5px] lg:text-[14px] leading-5 ${
+                    className={`flex items-center gap-1 min-w-0 text-[12.5px] lg:text-[12px] leading-5 ${
                       hasUnread ? "text-wa-text" : "text-wa-muted"
                     }`}
                   >
@@ -626,7 +626,7 @@ const Sidebar = () => {
                     {item.muted && <WaBellOff size={16} />}
                     {hasUnread ? (
                       <span
-                        className={`min-w-[20px] h-5 px-1.5 rounded-full text-[12.5px] font-medium flex items-center justify-center ${
+                        className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-medium flex items-center justify-center ${
                           item.muted ? "bg-[#3B4A54] text-wa-text" : "bg-[#25D366] text-wa-bg"
                         }`}
                       >
@@ -645,7 +645,7 @@ const Sidebar = () => {
 
         {!showArchived && search.trim().length >= 2 && msgResults.length > 0 && (
           <div className="pt-2">
-            <p className="px-4 py-2 text-[13px] font-medium text-[#25D366]">Messages</p>
+            <p className="px-4 py-2 text-[11px] font-medium text-[#25D366]">Messages</p>
             {msgResults.map((r) => {
               const chat =
                 r.chatType === "group"
@@ -667,12 +667,12 @@ const Sidebar = () => {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-[16px] text-wa-text truncate">{name}</p>
+                      <p className="text-[13.5px] text-wa-text truncate">{name}</p>
                       <span className="text-xs text-wa-muted shrink-0">
                         {new Date(r.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                       </span>
                     </div>
-                    <SearchSnippet text={r.text} query={search} className="text-[14px] text-wa-muted line-clamp-1" />
+                    <SearchSnippet text={r.text} query={search} className="text-[12px] text-wa-muted line-clamp-1" />
                   </div>
                 </button>
               );
@@ -681,7 +681,7 @@ const Sidebar = () => {
         )}
 
         {items.length === 0 && msgResults.length === 0 && !msgSearching && (
-          <div className="text-center text-wa-muted py-10 px-6 text-[15px]">
+          <div className="text-center text-wa-muted py-10 px-6 text-[13px]">
             {search
               ? `No chats matching “${search}”`
               : showArchived
@@ -740,7 +740,7 @@ const Sidebar = () => {
       {confirmDelete && (
         <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>
           <div className="bg-wa-pop rounded-2xl w-full max-w-xs p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[17px] font-medium text-wa-text">
+            <h3 className="text-[14.5px] font-medium text-wa-text">
               Delete {selected.size > 1 ? `${selected.size} chats` : "this chat"}?
             </h3>
             <p className="text-sm text-wa-muted mt-2">

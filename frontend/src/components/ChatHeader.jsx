@@ -15,7 +15,7 @@ const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
 
-const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-wa-text hover:bg-white/5 text-left";
+const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
 
 const ChatHeader = () => {
   const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked } = useChatStore();
@@ -80,8 +80,8 @@ const ChatHeader = () => {
       >
         <Avatar src={isGroup ? data.groupPic : data.profilePic} name={name} isGroup={isGroup} size="size-11" textSize="text-xl" />
         <div className="min-w-0">
-          <h3 className="text-[19px] leading-6 font-medium text-wa-text truncate">{name}</h3>
-          <p className={`text-[13px] leading-4 truncate ${isOnline || status === "typing…" ? "text-[#25D366]" : "text-wa-muted"}`}>
+          <h3 className="text-[16px] leading-6 font-medium text-wa-text truncate">{name}</h3>
+          <p className={`text-[11px] leading-4 truncate ${isOnline || status === "typing…" ? "text-[#25D366]" : "text-wa-muted"}`}>
             {status}
           </p>
         </div>
