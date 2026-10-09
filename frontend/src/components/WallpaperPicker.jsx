@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { X, Image as ImageIcon, Check } from "lucide-react";
 import toast from "react-hot-toast";
-import { compressImage } from "../lib/imageUtils";
+import WallpaperCropper from "./WallpaperCropper";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useWallpaperStore, WALLPAPER_COLORS, cfgToStyle } from "../lib/wallpaper";
 
@@ -13,6 +13,7 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
   const clearWallpaper = useWallpaperStore((s) => s.clearWallpaper);
   const [pick, setPick] = useState(stored || null); // null = standard doodle
   const fileRef = useRef(null);
+  const [cropFile, setCropFile] = useState(null);
   useBackToClose(true, onClose);
 
   const isChat = scope !== "default";
@@ -23,12 +24,7 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
     e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("Please choose a picture");
-    try {
-      const img = await compressImage(file, { maxDimension: 1280, quality: 0.7 });
-      setPick({ kind: "image", value: img });
-    } catch {
-      toast.error("Couldn't use that picture");
-    }
+    setCropFile(file); // open the cropper so you choose exactly what to keep
   };
 
   const apply = () => {
@@ -42,6 +38,17 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
   const dark = pick?.kind === "color" && ["#0B141A", "#1F2C34", "#26333C", "#2B2142"].includes(pick.value);
 
   return (
+    <>
+    {cropFile && (
+      <WallpaperCropper
+        file={cropFile}
+        onCancel={() => setCropFile(null)}
+        onDone={(dataUrl) => {
+          setPick({ kind: "image", value: dataUrl });
+          setCropFile(null);
+        }}
+      />
+    )}
     <div className="fixed inset-0 z-[98] bg-black/60 flex items-center justify-center sm:p-4" onClick={onClose}>
       <div
         className="w-full sm:max-w-sm h-full sm:h-auto sm:max-h-[92vh] bg-wa-panel text-wa-text sm:rounded-2xl flex flex-col overflow-hidden"
@@ -127,6 +134,7 @@ const WallpaperPicker = ({ scope, chatName, onClose }) => {
         </div>
       </div>
     </div>
+    </>
   );
 };
 
