@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useCallStore } from "../store/useCallStore";
 import {
-  Phone,
-  Video,
-  VideoOff,
-  Mic,
-  MicOff,
-  Volume2,
   UploadCloud,
   MoreHorizontal,
   UserPlus,
@@ -15,6 +9,7 @@ import {
   SwitchCamera,
 } from "lucide-react";
 import { isPhoneLike } from "../lib/device";
+import { Phone, PhoneEnd, Video, VideoOff, Mic, MicOff, Volume2 } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 
 const AVATAR_COLORS = ["#00695C", "#4527A0", "#AD1457", "#2E7D32", "#1565C0", "#EF6C00"];
@@ -213,7 +208,7 @@ const CallManager = () => {
                 onClick={rejectCall}
                 className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
               >
-                <Phone size={26} className="rotate-[135deg]" />
+                <PhoneEnd size={28} />
               </button>
               <span className="text-xs text-[#8696A0]">Decline</span>
             </div>
@@ -440,7 +435,7 @@ const CallManager = () => {
               onClick={endCall}
               className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
             >
-              <Phone size={24} className="rotate-[135deg]" />
+              <PhoneEnd size={28} />
             </button>
             <span className="text-xs text-white/70">End</span>
           </div>
