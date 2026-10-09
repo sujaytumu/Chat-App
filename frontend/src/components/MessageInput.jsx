@@ -401,7 +401,7 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
-    <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full bg-wa-bg lg:bg-wa-panel border-t border-white/5">
+    <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full">
       {replyingTo && (
         <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
@@ -474,7 +474,10 @@ const MessageInput = () => {
         </div>
       )}
 
-      <form onSubmit={handleSendMessage} className="flex items-end gap-1.5">
+      <form
+        onSubmit={handleSendMessage}
+        className={`flex items-end gap-1 ${isRecording ? "" : "bg-wa-surface rounded-[28px] px-1.5 py-1 shadow-sm"}`}
+      >
         {isRecording ? (
           <div className="flex-1 flex items-center gap-3 bg-wa-surface rounded-full px-4 py-2 min-h-[48px]">
             <button
@@ -490,44 +493,10 @@ const MessageInput = () => {
             <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
           </div>
         ) : (
-          <div className="flex-1 min-w-0 flex items-end gap-0.5 bg-wa-surface rounded-[26px] px-1.5 py-1">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowEmojiPicker((s) => !s)}
-                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
-                aria-label="Emoji and stickers"
-              >
-                <Smile size={24} />
-              </button>
-              {showEmojiPicker && (
-                <Suspense fallback={null}>
-                  <EmojiStickerPicker
-                    onEmojiSelect={handleEmojiSelect}
-                    onStickerSelect={handleStickerSelect}
-                    onClose={() => setShowEmojiPicker(false)}
-                  />
-                </Suspense>
-              )}
-            </div>
-
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={text}
-              onChange={handleChange}
-              onKeyDown={handleKeyDown}
-              placeholder="Message"
-              spellCheck={false}
-              autoComplete="off"
-              autoCorrect="off"
-              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none"
-              style={{ overflow: "hidden" }}
-            />
-
+          <div className="flex-1 min-w-0 flex items-end gap-0.5">
             <div className="relative" ref={attachMenuRef}>
               {showAttachMenu && (
-                <div className="absolute bottom-full right-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
+                <div className="absolute bottom-full left-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
@@ -615,11 +584,45 @@ const MessageInput = () => {
               </button>
             </div>
 
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((s) => !s)}
+                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                aria-label="Emoji and stickers"
+              >
+                <Smile size={24} />
+              </button>
+              {showEmojiPicker && (
+                <Suspense fallback={null}>
+                  <EmojiStickerPicker
+                    onEmojiSelect={handleEmojiSelect}
+                    onStickerSelect={handleStickerSelect}
+                    onClose={() => setShowEmojiPicker(false)}
+                  />
+                </Suspense>
+              )}
+            </div>
+
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message"
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+              style={{ overflow: "hidden" }}
+            />
+
             {!text.trim() && !hasAttachment && (
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                className="lg:hidden size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
                 disabled={isProcessingAttachment}
                 aria-label="Take a photo"
                 title="Camera"
@@ -633,7 +636,7 @@ const MessageInput = () => {
         {!isRecording && (text.trim() || hasAttachment) ? (
           <button
             type="submit"
-            className="size-12 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all shadow-md shadow-black/30"
+            className="size-10 mb-0 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all"
             disabled={isSending}
             aria-label="Send"
           >
@@ -643,7 +646,7 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={isRecording ? () => stopRecording(false) : startRecording}
-            className="size-12 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all shadow-md shadow-black/30"
+            className={`size-10 rounded-full flex items-center justify-center active:scale-95 shrink-0 transition-all ${isRecording ? "bg-[#00A884] hover:bg-[#02906f] text-white" : "text-wa-muted hover:bg-white/10"}`}
             disabled={isSending}
             aria-label={isRecording ? "Send voice message" : "Record voice message"}
             title={isRecording ? "Send voice message" : "Record voice message"}
@@ -653,7 +656,7 @@ const MessageInput = () => {
             ) : isRecording ? (
               <WhatsAppSendIcon size={20} className="ml-0.5" />
             ) : (
-              <Mic size={24} />
+              <Mic size={23} />
             )}
           </button>
         )}
