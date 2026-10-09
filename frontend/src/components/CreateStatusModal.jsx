@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Type, Image as ImageIcon, Loader2 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
@@ -6,13 +6,19 @@ import toast from "react-hot-toast";
 
 const COLORS = ["#00A884", "#0B141A", "#7f66ff", "#ff8f4d", "#e91e8c", "#22c55e", "#2563eb"];
 
-const CreateStatusModal = ({ onClose, onCreated }) => {
-  const [mode, setMode] = useState(null); // "text" | "image"
+const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
+  const [mode, setMode] = useState(startWith === "text" ? "text" : null); // "text" | "image"
   const [text, setText] = useState("");
   const [bgColor, setBgColor] = useState(COLORS[0]);
   const [imagePreview, setImagePreview] = useState(null);
   const [isPosting, setIsPosting] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Camera button: go straight to the picture chooser.
+  useEffect(() => {
+    if (startWith === "image") fileInputRef.current?.click();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleImagePick = async (e) => {
     const file = e.target.files[0];
@@ -55,21 +61,21 @@ const CreateStatusModal = ({ onClose, onCreated }) => {
           </button>
         </div>
 
+        <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImagePick} />
         {!mode && (
           <div className="p-6 flex flex-col gap-3">
             <button
               onClick={() => setMode("text")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/5 hover:bg-white/10 text-white"
+              className="flex items-center gap-3 p-4 rounded-xl bg-wa-field hover:bg-wa-hover text-wa-text"
             >
               <Type size={20} className="text-[#00A884]" /> Text status
             </button>
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-3 p-4 rounded-xl bg-white/5 hover:bg-white/10 text-white"
+              className="flex items-center gap-3 p-4 rounded-xl bg-wa-field hover:bg-wa-hover text-wa-text"
             >
               <ImageIcon size={20} className="text-[#bf59cf]" /> Photo status
             </button>
-            <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImagePick} />
           </div>
         )}
 
