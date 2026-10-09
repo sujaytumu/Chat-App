@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle } from "lucide-react";
+import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
@@ -47,11 +47,12 @@ const ProfilePage = () => {
 
   const rows = [
     { icon: KeyRound, title: "Account", sub: "Name, about, email, password", to: "/settings/account" },
+    { icon: Lock, title: "Privacy", sub: "Read receipts, typing, blocked contacts", to: "/settings/privacy" },
     { icon: Star, title: "Starred messages", sub: "Messages you've saved", to: "/starred" },
-    { icon: MessageSquareText, title: "Chats", sub: "Archive or unarchive all chats", to: "/settings/chats" },
+    { icon: MessageSquareText, title: "Chats", sub: "Enter key, archive, chat history", to: "/settings/chats" },
     { icon: Bell, title: "Notifications", sub: "Message, group & call tones", to: "/settings/notifications" },
     { icon: Palette, title: "Appearance", sub: "Theme, chat wallpaper", to: "/settings/appearance" },
-    { icon: PieChart, title: "Storage and data", sub: "Cache and stored files", to: "/settings/storage" },
+    { icon: PieChart, title: "Storage and data", sub: "Storage by chat, backup, cache", to: "/settings/storage" },
     { icon: PersonStanding, title: "Accessibility", sub: "Animation, vibration", to: "/settings/accessibility" },
     { icon: HelpCircle, title: "Help and feedback", sub: "App version, updates, report a problem", to: "/settings/help" },
     { icon: Users, title: "Invite a friend", onClick: share },

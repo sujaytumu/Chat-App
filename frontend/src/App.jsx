@@ -37,6 +37,7 @@ const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default:
 const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
 const AccountPage = more("AccountPage");
 const StarredPage = more("StarredPage");
+const PrivacyPage = more("PrivacyPage");
 const ChatsSettingsPage = more("ChatsSettingsPage");
 const StoragePage = more("StoragePage");
 const AccessibilityPage = more("AccessibilityPage");
@@ -199,6 +200,10 @@ const App = () => {
           <Route
             path="/settings/account"
             element={authUser ? <MainLayout><AccountPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/privacy"
+            element={authUser ? <MainLayout><PrivacyPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/settings/chats"

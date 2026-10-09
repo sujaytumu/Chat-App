@@ -11,7 +11,7 @@ import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
 import { clearChatCache } from "../lib/chatCache";
 import { checkForUpdateNow, currentBuildId } from "../lib/versionCheck";
-import { getReduceMotion, setReduceMotion, getHaptics, setHaptics } from "../lib/uiSettings";
+import { getReduceMotion, setReduceMotion, getHaptics, setHaptics, getEnterSends, setEnterSends } from "../lib/uiSettings";
 import { formatChatListTime } from "../lib/utils";
 
 const card = "rounded-xl bg-wa-surface p-4";
@@ -194,8 +194,94 @@ export const StarredPage = () => {
   );
 };
 
+/* ---------------- Privacy ---------------- */
+export const PrivacyPage = () => {
+  const { authUser } = useAuthStore();
+  const { users, updatePrivacy, setUserBlocked } = useChatStore();
+  const pv = authUser?.privacy || {};
+  const blocked = useMemo(() => {
+    const ids = new Set((authUser?.blockedUsers || []).map(String));
+    return users.filter((u) => ids.has(String(u._id)));
+  }, [authUser, users]);
+  const [picking, setPicking] = useState(false);
+  const [q, setQ] = useState("");
+  const blockedIds = new Set((authUser?.blockedUsers || []).map(String));
+  const candidates = users.filter((u) => !blockedIds.has(String(u._id)) && u.fullName.toLowerCase().includes(q.trim().toLowerCase()));
+
+  return (
+    <SettingsShell title="Privacy">
+      <p className="text-[13.5px] text-wa-muted px-1">Who can see what about you.</p>
+      <ToggleRow
+        title="Read receipts"
+        sub="If you turn this off, you won't send or receive read receipts (blue ticks) in one-to-one chats. Group chats always show them."
+        checked={pv.readReceipts !== false}
+        onChange={(v) => updatePrivacy({ readReceipts: v })}
+      />
+      <ToggleRow
+        title="Typing indicator"
+        sub="Let people see when you're typing to them."
+        checked={pv.typing !== false}
+        onChange={(v) => updatePrivacy({ typing: v })}
+      />
+      <ToggleRow
+        title="Show when I'm online"
+        sub="If off, the green online dot is hidden from everyone."
+        checked={pv.online !== false}
+        onChange={(v) => updatePrivacy({ online: v })}
+      />
+
+      <div className={card}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[16px] text-wa-text">Blocked contacts</p>
+            <p className="text-[13.5px] text-wa-muted mt-0.5">Blocked people can&apos;t message or call you, and you can&apos;t message them.</p>
+          </div>
+        </div>
+        <div className="mt-3 -mx-2">
+          {blocked.length === 0 && <p className="px-2 py-2 text-[14px] text-wa-muted2">No one is blocked.</p>}
+          {blocked.map((u) => (
+            <div key={u._id} className="flex items-center gap-3 px-2 py-2">
+              <Avatar src={u.profilePic} name={u.fullName} size="size-10" />
+              <span className="flex-1 min-w-0 truncate text-[16px] text-wa-text">{u.fullName}</span>
+              <button className="text-[14px] font-medium text-[#25D366] px-3 py-1.5" onClick={() => setUserBlocked(u._id, false)}>
+                Unblock
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end mt-2">
+          <button className={ghostBtn} onClick={() => setPicking((v) => !v)}>
+            {picking ? "Done" : "Block someone"}
+          </button>
+        </div>
+        {picking && (
+          <div className="mt-3">
+            <input className={field} placeholder="Search people" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="mt-2 max-h-64 overflow-y-auto -mx-2">
+              {candidates.slice(0, 50).map((u) => (
+                <button
+                  key={u._id}
+                  className="w-full flex items-center gap-3 px-2 py-2 text-left hover:bg-white/5"
+                  onClick={async () => {
+                    if (window.confirm(`Block ${u.fullName}?`)) await setUserBlocked(u._id, true);
+                  }}
+                >
+                  <Avatar src={u.profilePic} name={u.fullName} size="size-10" />
+                  <span className="flex-1 min-w-0 truncate text-[16px] text-wa-text">{u.fullName}</span>
+                </button>
+              ))}
+              {candidates.length === 0 && <p className="px-2 py-2 text-[14px] text-wa-muted2">No one found.</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </SettingsShell>
+  );
+};
+
 /* ---------------- Chats: archive / unarchive everything ---------------- */
 export const ChatsSettingsPage = () => {
+  const [enterSends, setEnter] = useState(getEnterSends());
   const { authUser } = useAuthStore();
   const { users, groups, setChatArchived } = useChatStore();
   const [busy, setBusy] = useState(false);
@@ -217,6 +303,22 @@ export const ChatsSettingsPage = () => {
 
   return (
     <SettingsShell title="Chats">
+      <ToggleRow
+        title="Enter is send"
+        sub="Enter key sends your message. Turn off to make Enter start a new line (Ctrl/Cmd + Enter then sends)."
+        checked={enterSends}
+        onChange={(v) => {
+          setEnter(v);
+          setEnterSends(v);
+        }}
+      />
+      <div className={card}>
+        <p className="text-[16px] text-wa-text">Chat history</p>
+        <p className="text-[13.5px] text-wa-muted mt-0.5">Download a copy of all your chats, or pick one in Storage and data.</p>
+        <div className="flex justify-end mt-3">
+          <BackupButton />
+        </div>
+      </div>
       <div className={card}>
         <p className="text-[16px] text-wa-text">Archive all chats</p>
         <p className="text-[13.5px] text-wa-muted mt-0.5">Move every chat into Archived. You can bring them back any time.</p>
@@ -242,9 +344,47 @@ export const ChatsSettingsPage = () => {
 /* ---------------- Storage and data ---------------- */
 const fmtBytes = (n) => (n > 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
+// Downloads your chats as a JSON file (all chats, or one: chat = "d:<id>" / "g:<id>").
+const downloadBackup = async (chat) => {
+  const res = await axiosInstance.get("/messages/export", { params: chat ? { chat } : {}, responseType: "blob" });
+  const url = URL.createObjectURL(res.data);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `talkies-${chat ? "chat" : "chats"}-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+const BackupButton = ({ chat, label = "Back up chats" }) => {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      className={ghostBtn}
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        try {
+          await downloadBackup(chat);
+          toast.success("Backup downloaded");
+        } catch {
+          toast.error("Couldn't create the backup");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? <Loader2 className="animate-spin" size={18} /> : label}
+    </button>
+  );
+};
+
 export const StoragePage = () => {
+  const { users, groups } = useChatStore();
   const [usage, setUsage] = useState(null);
   const [clearing, setClearing] = useState(false);
+  const [rows, setRows] = useState(null);
 
   const measure = async () => {
     try {
@@ -256,7 +396,27 @@ export const StoragePage = () => {
   };
   useEffect(() => {
     measure();
+    let live = true;
+    axiosInstance
+      .get("/messages/storage-usage")
+      .then((r) => live && setRows(Array.isArray(r.data) ? r.data : []))
+      .catch(() => live && setRows([]));
+    return () => {
+      live = false;
+    };
   }, []);
+
+  const named = useMemo(() => {
+    const byKey = new Map([
+      ...users.map((u) => [`d:${u._id}`, { name: u.fullName, pic: u.profilePic, group: false }]),
+      ...groups.map((g) => [`g:${g._id}`, { name: g.name, pic: g.groupPic, group: true }]),
+    ]);
+    return (rows || []).map((r) => ({ ...r, ...(byKey.get(r.key) || { name: "Chat", pic: "", group: r.key[0] === "g" }) }));
+  }, [rows, users, groups]);
+  const totals = useMemo(
+    () => named.reduce((t, r) => ({ messages: t.messages + r.messages, photos: t.photos + r.photos, files: t.files + r.files, bytes: t.bytes + r.fileBytes }), { messages: 0, photos: 0, files: 0, bytes: 0 }),
+    [named]
+  );
 
   const clear = async () => {
     setClearing(true);
@@ -275,8 +435,40 @@ export const StoragePage = () => {
   return (
     <SettingsShell title="Storage and data">
       <div className={card}>
+        <p className={label}>Your chats</p>
+        <p className="text-[26px] text-wa-text">{rows === null ? "…" : `${totals.messages.toLocaleString()} messages`}</p>
+        <p className="text-[13.5px] text-wa-muted mt-1">
+          {rows === null ? "Counting…" : `${totals.photos.toLocaleString()} photos · ${totals.files.toLocaleString()} files${totals.bytes ? ` (${fmtBytes(totals.bytes)})` : ""}`}
+        </p>
+        <div className="flex justify-end mt-3">
+          <BackupButton />
+        </div>
+        <p className="text-[12.5px] text-wa-muted2 mt-2">The backup is a JSON file with every message&apos;s text, time and sender, plus links to photos and files.</p>
+      </div>
+
+      <div className={card}>
+        <p className="text-[16px] text-wa-text mb-1">Manage storage</p>
+        {rows === null && <div className="flex justify-center py-4"><Loader2 className="animate-spin text-[#25D366]" size={22} /></div>}
+        {rows !== null && named.length === 0 && <p className="text-[14px] text-wa-muted2 py-2">No messages yet.</p>}
+        <div className="-mx-2">
+          {named.slice(0, 30).map((r) => (
+            <div key={r.key} className="flex items-center gap-3 px-2 py-2">
+              <Avatar src={r.pic} name={r.name} isGroup={r.group} size="size-10" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[16px] text-wa-text truncate">{r.name}</span>
+                <span className="block text-[13px] text-wa-muted">
+                  {r.messages.toLocaleString()} messages{r.photos ? ` · ${r.photos} photos` : ""}{r.files ? ` · ${r.files} files` : ""}
+                </span>
+              </span>
+              <BackupButton chat={r.key} label="Export" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={card}>
         <p className={label}>Stored on this device</p>
-        <p className="text-[26px] text-wa-text">{usage === null ? "…" : fmtBytes(usage)}</p>
+        <p className="text-[22px] text-wa-text">{usage === null ? "…" : fmtBytes(usage)}</p>
         <p className="text-[13.5px] text-wa-muted mt-1">Saved app files and your last-seen chat list, so Talkies opens fast. Your messages stay on the server.</p>
         <div className="flex justify-end mt-3">
           <button className={ghostBtn} onClick={clear} disabled={clearing}>

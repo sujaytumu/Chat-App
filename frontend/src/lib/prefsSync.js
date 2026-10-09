@@ -16,6 +16,7 @@ export const SYNC_KEYS = [
   "talkies-wallpaper-off",
   "talkies-reduce-motion",
   "talkies-haptics-off",
+  "talkies-enter-newline",
   "talkies-message-sound-enabled",
   "talkies-call-ringtone-enabled",
   "talkies-call-tone",

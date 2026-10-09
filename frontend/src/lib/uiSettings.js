@@ -3,6 +3,7 @@ const KEYS = {
   reduceMotion: "talkies-reduce-motion",
   wallpaperOff: "talkies-wallpaper-off",
   hapticsOff: "talkies-haptics-off",
+  enterNewline: "talkies-enter-newline",
 };
 
 const read = (k) => {
@@ -24,6 +25,9 @@ const write = (k, on) => {
 export const getReduceMotion = () => read(KEYS.reduceMotion);
 export const getWallpaper = () => !read(KEYS.wallpaperOff);
 export const getHaptics = () => !read(KEYS.hapticsOff);
+// "Enter is send": on (default) Enter sends; off makes Enter a new line (Ctrl/Cmd+Enter then sends).
+export const getEnterSends = () => !read(KEYS.enterNewline);
+export const setEnterSends = (on) => write(KEYS.enterNewline, !on);
 
 export function applyUiSettings() {
   const cl = document.documentElement.classList;
