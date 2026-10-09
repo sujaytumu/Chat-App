@@ -544,14 +544,6 @@ const Sidebar = () => {
                 </div>
               </div>
             </button>
-            <button
-              onClick={() => setChatArchived({ type: item.type, data: item.data }, !item.archived)}
-              className={`hidden ${selecting ? "" : "lg:group-hover:flex"} absolute right-3 top-3 size-8 rounded-full items-center justify-center bg-wa-pop text-wa-icon hover:text-wa-text shadow-md`}
-              title={item.archived ? "Unarchive" : "Archive"}
-              aria-label={item.archived ? "Unarchive chat" : "Archive chat"}
-            >
-              <WaArchive size={18} up={item.archived} />
-            </button>
             </div>
           );
         })}
