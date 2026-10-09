@@ -1,3 +1,4 @@
+import { canCaptureScreen, getScreenTrack, noScreenShareMessage } from "../lib/screenCapture";
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
@@ -586,8 +587,8 @@ export const useCallStore = create((set, get) => ({
     }
     // Phone browsers don't implement getDisplayMedia — say so instead of
     // silently doing nothing.
-    if (!isScreenSharing && !navigator.mediaDevices?.getDisplayMedia) {
-      toast.error("Screen sharing isn't supported on this device or browser. Use Chrome, Edge or Firefox on a computer.", { duration: 5000 });
+    if (!isScreenSharing && !canCaptureScreen()) {
+      toast.error(noScreenShareMessage(), { duration: 7000 });
       return;
     }
 
@@ -606,8 +607,7 @@ export const useCallStore = create((set, get) => ({
     if (!isScreenSharing) {
       let screenTrack;
       try {
-        const displayStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        screenTrack = displayStream.getVideoTracks()[0];
+        screenTrack = await getScreenTrack();
       } catch {
         return; // user cancelled the picker — no-op
       }
