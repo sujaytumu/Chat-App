@@ -96,8 +96,16 @@ export function getCustomToneName(kind) {
   return localStorage.getItem(CUSTOM_NAME_KEY_PREFIX + kind) || "";
 }
 
+// Phones often report mp3/mp4/mpeg files as "video/*" or with no type at all,
+// so judge by type OR file extension.
+const SOUND_EXT = /\.(mp3|mp4|m4a|mpeg|mpg|mpga|aac|wav|ogg|oga|opus|flac|weba|webm|3gp|amr)$/i;
+export function isPlayableSoundFile(file) {
+  const t = file.type || "";
+  return t.startsWith("audio/") || t === "video/mp4" || t === "video/mpeg" || t === "video/webm" || t === "video/3gpp" || SOUND_EXT.test(file.name || "");
+}
+
 export async function saveCustomTone(kind, file) {
-  if (!file || !file.type.startsWith("audio/")) throw new Error("Please choose an audio file");
+  if (!file || !isPlayableSoundFile(file)) throw new Error("Please choose an audio file (mp3, mp4, mpeg, m4a, wav...)");
   if (file.size > MAX_CUSTOM_TONE_BYTES) throw new Error("That file is too large (max 4 MB)");
   await dbRun("readwrite", (store) => store.put(file, kind));
   localStorage.setItem(CUSTOM_NAME_KEY_PREFIX + kind, file.name);
