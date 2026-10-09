@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, Users } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, Users, SwitchCamera } from "lucide-react";
+import { isPhoneLike } from "../lib/device";
 import { useGroupCallStore, canShareScreen, MAX_GROUP_CALL } from "../store/useGroupCallStore";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -117,6 +118,8 @@ const Active = () => {
     toggleMute,
     toggleCamera,
     toggleScreenShare,
+    cameraFacing,
+    flipCamera,
   } = useGroupCallStore();
   const authUser = useAuthStore((s) => s.authUser);
   const users = useChatStore((s) => s.users);
@@ -136,7 +139,7 @@ const Active = () => {
     pic: authUser?.profilePic,
     muted: isMuted,
     videoOn: !!localVideo,
-    mirror: !isScreenSharing,
+    mirror: !isScreenSharing && cameraFacing === "user",
     contain: isScreenSharing,
     sharing: isScreenSharing,
   };
@@ -199,7 +202,12 @@ const Active = () => {
         <button onClick={toggleCamera} className={ctl(!cameraOn)} aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}>
           {cameraOn ? <Video size={26} /> : <VideoOff size={26} />}
         </button>
-        {canShareScreen() && (
+        {isPhoneLike() && cameraOn && !isScreenSharing && (
+          <button onClick={flipCamera} className={ctl(false)} aria-label="Switch camera">
+            <SwitchCamera size={26} />
+          </button>
+        )}
+        {(canShareScreen() || isPhoneLike()) && (
           <button onClick={toggleScreenShare} className={ctl(isScreenSharing)} aria-label={isScreenSharing ? "Stop sharing" : "Share screen"}>
             {isScreenSharing ? <ScreenShareOff size={26} /> : <ScreenShare size={26} />}
           </button>

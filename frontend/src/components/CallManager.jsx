@@ -12,7 +12,9 @@ import {
   UserPlus,
   Minimize2,
   Lock,
+  SwitchCamera,
 } from "lucide-react";
+import { isPhoneLike } from "../lib/device";
 import toast from "react-hot-toast";
 
 const AVATAR_COLORS = ["#00695C", "#4527A0", "#AD1457", "#2E7D32", "#1565C0", "#EF6C00"];
@@ -134,6 +136,7 @@ const CallManager = () => {
     toggleMute,
     toggleVideo,
     toggleScreenShare,
+    flipCamera,
     toggleSpeakerOutput,
     upgradeToVideo,
   } = useCallStore();
@@ -385,6 +388,15 @@ const CallManager = () => {
             </button>
             <span className="text-xs text-white/70">Video</span>
           </div>
+
+          {isVideo && isPhoneLike() && !isVideoOff && !isScreenSharing && (
+            <div className="flex flex-col items-center gap-1.5">
+              <button onClick={flipCamera} className={callBtn(false)} aria-label="Switch camera">
+                <SwitchCamera size={24} />
+              </button>
+              <span className="text-xs text-white/70">Flip</span>
+            </div>
+          )}
 
           <div className="flex flex-col items-center gap-1.5">
             <button onClick={toggleMute} className={callBtn(isMuted)}>
