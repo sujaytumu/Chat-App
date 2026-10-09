@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useChatStore } from "../store/useChatStore";
 import MainNav from "./MainNav";
+import { goTab } from "../lib/tabNav";
 
 // Shared shell for the main app screens (Chats / Updates / Calls) — puts the
 // persistent WhatsApp-style nav (rail on desktop, bottom bar on mobile)
@@ -16,7 +17,15 @@ import MainNav from "./MainNav";
 // Phone tabs in WhatsApp's order. Swiping the screen left/right moves between
 // them, just like tapping the bottom bar.
 const TABS = ["/", "/status", "/calls", "/profile"];
-let slideFrom = null; // "left" | "right": which side the next tab slides in from
+
+// The neighbouring tab is rendered next to the current one while you drag, so
+// the pages move together under your finger (and stop wherever you stop).
+const PEEK = {
+  "/": lazy(() => import("../pages/HomePage")),
+  "/status": lazy(() => import("../pages/StatusPage")),
+  "/calls": lazy(() => import("../pages/CallsPage")),
+  "/profile": lazy(() => import("../pages/ProfilePage")),
+};
 
 // Don't treat a drag as a tab swipe when it starts on something that scrolls
 // sideways (status row, chip row), a text field, a video or a slider.
@@ -35,32 +44,80 @@ const MainLayout = ({ children }) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
-  const touch = useRef(null);
   const tabIndex = TABS.indexOf(pathname);
   const swipeable = tabIndex !== -1 && !(pathname === "/" && hasOpenChat);
-  const slide = useRef(slideFrom);
-  slideFrom = null;
+  const track = useRef(null);
+  const drag = useRef(null);
+  const [peek, setPeek] = useState(null); // index of the neighbour tab being revealed
+
+  const setX = (x, animate) => {
+    const el = track.current;
+    if (!el) return;
+    el.style.transition = animate ? "transform 220ms cubic-bezier(.2,.8,.2,1)" : "none";
+    el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
+  };
+
+  // New page is in place: put everything back at rest.
+  useLayoutEffect(() => {
+    drag.current = null;
+    setPeek(null);
+    setX(0, false);
+  }, [pathname]);
 
   const onTouchStart = (e) => {
     if (!swipeable || e.touches.length !== 1 || window.innerWidth >= 1024 || blocksSwipe(e.target)) {
-      touch.current = null;
+      drag.current = null;
       return;
     }
     const t = e.touches[0];
-    touch.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+    drag.current = { x: t.clientX, y: t.clientY, t: Date.now(), lastX: t.clientX, lastT: Date.now(), v: 0, locked: false, dx: 0, w: window.innerWidth, busy: false };
   };
-  const onTouchEnd = (e) => {
-    const s = touch.current;
-    touch.current = null;
-    if (!s) return;
-    const t = e.changedTouches[0];
-    const dx = t.clientX - s.x;
-    const dy = t.clientY - s.y;
-    if (Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.8 || Date.now() - s.t > 800) return;
+  const onTouchMove = (e) => {
+    const d = drag.current;
+    if (!d || d.busy) return;
+    const t = e.touches[0];
+    const dx = t.clientX - d.x;
+    const dy = t.clientY - d.y;
+    if (!d.locked) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        drag.current = null; // a vertical scroll
+        return;
+      }
+      d.locked = true;
+    }
+    const now = Date.now();
+    if (now > d.lastT) d.v = (t.clientX - d.lastX) / (now - d.lastT);
+    d.lastX = t.clientX;
+    d.lastT = now;
     const next = tabIndex + (dx < 0 ? 1 : -1);
-    if (next < 0 || next >= TABS.length) return;
-    slideFrom = dx < 0 ? "right" : "left";
-    navigate(TABS[next]);
+    const exists = next >= 0 && next < TABS.length;
+    d.dx = exists ? dx : dx * 0.25; // edge: rubber-band
+    if (exists) setPeek((p) => (p === next ? p : next));
+    else setPeek(null);
+    setX(d.dx, false);
+  };
+  const onTouchEnd = () => {
+    const d = drag.current;
+    if (!d || !d.locked) {
+      drag.current = null;
+      return;
+    }
+    const dir = d.dx < 0 ? 1 : -1;
+    const next = tabIndex + dir;
+    const exists = next >= 0 && next < TABS.length;
+    const flung = Math.abs(d.v) > 0.5 && Math.sign(d.v) === Math.sign(d.dx);
+    if (exists && (Math.abs(d.dx) > d.w * 0.33 || flung)) {
+      d.busy = true;
+      setX(-dir * d.w, true);
+      setTimeout(() => goTab(navigate, pathname, TABS[next]), 220);
+    } else {
+      setX(0, true);
+      setTimeout(() => {
+        if (!drag.current?.busy) setPeek(null);
+      }, 230);
+      drag.current = null;
+    }
   };
 
   useEffect(() => {
@@ -95,11 +152,29 @@ const MainLayout = ({ children }) => {
     >
       <MainNav />
       <div
-        className={`flex-1 min-w-0 flex overflow-hidden ${slide.current ? `tab-slide-from-${slide.current}` : ""}`}
+        className="flex-1 min-w-0 overflow-hidden relative"
+        style={{ touchAction: swipeable ? "pan-y" : undefined }}
         onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
       >
-        {children}
+        <div ref={track} className="relative h-full w-full flex will-change-transform">
+          {children}
+          {peek !== null && (
+            <div
+              className="absolute top-0 h-full w-full flex bg-wa-bg pointer-events-none"
+              style={{ left: peek > tabIndex ? "100%" : "-100%" }}
+            >
+              <Suspense fallback={null}>
+                {(() => {
+                  const Peek = PEEK[TABS[peek]];
+                  return <Peek />;
+                })()}
+              </Suspense>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
