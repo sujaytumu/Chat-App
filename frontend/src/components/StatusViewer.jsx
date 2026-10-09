@@ -1,10 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { X, Eye, Trash2, Loader2, ChevronUp } from "lucide-react";
+import { X, Eye, Trash2, Loader2, ChevronUp, Music, MapPin, Headphones, FileText, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
 
-const DURATION_MS = 5000; // how long each update stays up, like WhatsApp
+const DURATION_MS = 5000; // how long a picture / text stays up, like WhatsApp
+
+const sizeLabel = (b) => (!b ? "" : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+
+// Turns web links in text into tappable links.
+const linkify = (text) =>
+  String(text)
+    .split(/(https?:\/\/[^\s<>"']+)/gi)
+    .map((part, i) =>
+      /^https?:\/\//i.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="underline text-[#53BDEB] break-all">
+          {part}
+        </a>
+      ) : (
+        part
+      )
+    );
 
 const ago = (iso) => {
   const d = new Date(iso);
@@ -22,12 +38,16 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const current = list[index];
+  const [mediaMs, setMediaMs] = useState(0); // length of the current video / audio
+  const mediaEl = useRef(null);
+  const songEl = useRef(null);
   useBackToClose(true, onClose);
 
   // Mark as seen when someone else's update comes up.
   useEffect(() => {
     if (!isOwn && current) axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
     setProgress(0);
+    setMediaMs(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?._id]);
 
@@ -48,7 +68,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       const dt = now - last.current;
       last.current = now;
       setProgress((p) => {
-        const np = p + dt / DURATION_MS;
+        const isMedia = current.type === "video" || current.type === "audio";
+        const total = isMedia ? Math.max(mediaMs, 1000) : DURATION_MS;
+        const np = p + dt / total;
         if (np >= 1) {
           queueMicrotask(next);
           return 1;
@@ -59,7 +81,16 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [current?._id, stop, next]);
+  }, [current?._id, stop, next, mediaMs]);
+
+  // Video / audio / song play only while the status is actually running.
+  useEffect(() => {
+    for (const el of [mediaEl.current, songEl.current]) {
+      if (!el) continue;
+      if (stop) el.pause();
+      else el.play?.().catch(() => {});
+    }
+  }, [stop, current?._id, mediaMs]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -129,12 +160,92 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
         onPointerLeave={() => setPaused(false)}
         onPointerCancel={() => setPaused(false)}
       >
-        {current.type === "text" ? (
+        {current.type === "text" && (
           <div className="w-full h-full flex items-center justify-center p-8" style={{ backgroundColor: current.backgroundColor }}>
-            <p className="text-white text-[28px] leading-snug text-center break-words">{current.content}</p>
+            <p className="text-white text-[28px] leading-snug text-center break-words whitespace-pre-wrap">{linkify(current.content)}</p>
           </div>
-        ) : (
-          <img src={current.content} alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />
+        )}
+        {current.type === "image" && <img src={current.content} alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
+        {current.type === "video" && (
+          <video
+            ref={mediaEl}
+            src={current.content}
+            autoPlay
+            playsInline
+            className="max-w-full max-h-full object-contain"
+            onLoadedMetadata={(e) => setMediaMs(Math.round((e.currentTarget.duration || 0) * 1000))}
+            onEnded={next}
+          />
+        )}
+        {current.type === "audio" && (
+          <div className="flex flex-col items-center gap-5 px-8 text-center">
+            <span className="size-28 rounded-full bg-[#ff8f4d] flex items-center justify-center">
+              <Headphones size={48} className="text-white" />
+            </span>
+            <p className="text-white text-[17px] break-all">{current.file?.name || "Audio"}</p>
+            <audio
+              ref={mediaEl}
+              src={current.content}
+              autoPlay
+              onLoadedMetadata={(e) => setMediaMs(Math.round((e.currentTarget.duration || 0) * 1000))}
+              onEnded={next}
+            />
+          </div>
+        )}
+        {current.type === "file" && (
+          <div className="flex flex-col items-center gap-4 px-8 text-center">
+            <span className="size-24 rounded-2xl bg-[#7f66ff] flex items-center justify-center">
+              <FileText size={44} className="text-white" />
+            </span>
+            <p className="text-white text-[17px] break-all">{current.file?.name || "File"}</p>
+            <p className="text-white/70 text-[14px]">{sizeLabel(current.file?.size)}</p>
+            <a
+              href={current.content}
+              target="_blank"
+              rel="noreferrer"
+              download={current.file?.name}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="relative z-30 mt-1 flex items-center gap-2 rounded-full bg-[#00A884] text-white px-6 py-3 text-[15.5px]"
+            >
+              <Download size={18} /> Open / download
+            </a>
+          </div>
+        )}
+        {current.song?.url && <audio ref={songEl} src={current.song.url} autoPlay loop />}
+
+        {/* Song + place tags */}
+        {(current.song?.url || current.location?.name) && (
+          <div className="absolute top-[calc(86px+env(safe-area-inset-top))] inset-x-0 z-20 flex flex-wrap justify-center gap-2 px-4 pointer-events-none">
+            {current.song?.url && (
+              <span className="flex items-center gap-1.5 rounded-full bg-black/55 text-white text-[13.5px] px-3 py-1.5 max-w-[80%]">
+                <Music size={14} className="shrink-0" /> <span className="truncate">{current.song.name || "Song"}</span>
+              </span>
+            )}
+            {current.location?.name && (
+              <a
+                href={
+                  current.location.lat != null
+                    ? `https://www.google.com/maps/search/?api=1&query=${current.location.lat},${current.location.lng}`
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.location.name)}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/55 text-white text-[13.5px] px-3 py-1.5 max-w-[80%]"
+              >
+                <MapPin size={14} className="text-[#F15C6D] shrink-0" /> <span className="truncate">{current.location.name}</span>
+              </a>
+            )}
+          </div>
+        )}
+
+        {/* Caption */}
+        {current.caption && (
+          <p className={`absolute inset-x-0 ${isOwn ? "bottom-16" : "bottom-0 pb-[calc(16px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[16px] bg-black/50 break-words`}>
+            {linkify(current.caption)}
+          </p>
         )}
         <button className="absolute left-0 top-24 bottom-24 w-1/3" onClick={prev} aria-label="Previous" />
         <button className="absolute right-0 top-24 bottom-24 w-1/3" onClick={next} aria-label="Next" />
