@@ -20,6 +20,12 @@ export function applyTheme(theme) {
   root.setAttribute("data-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", dark ? "#111B21" : "#FFFFFF");
+  // Android app: make the status/navigation bar icons readable on this theme.
+  try {
+    window.Capacitor?.Plugins?.SystemBars?.setStyle?.({ style: dark ? "DARK" : "LIGHT" });
+  } catch {
+    /* not in the app */
+  }
   const scheme = document.querySelector('meta[name="color-scheme"]');
   if (scheme) scheme.setAttribute("content", dark ? "dark" : "light");
 }
