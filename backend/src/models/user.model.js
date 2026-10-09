@@ -36,6 +36,14 @@ const userSchema = new mongoose.Schema(
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
+    // Privacy: what other people can see about me. Defaults are all on.
+    privacy: {
+      readReceipts: { type: Boolean, default: true },
+      typing: { type: Boolean, default: true },
+      online: { type: Boolean, default: true },
+    },
+    // People I have blocked (they can't message or call me; I can't message them).
+    blockedUsers: { type: [mongoose.Schema.Types.ObjectId], default: [] },
     // Chat lists shown as filter chips: the built-in "favourites" list plus the
     // user's own lists. Each holds chat keys ("d:<id>" / "g:<id>").
     chatLists: {

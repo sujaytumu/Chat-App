@@ -39,7 +39,19 @@ const io = new Server(server, {
 // (each socket joins room === userId) so all their devices get it.
 const userSockets = new Map(); // userId -> Set<socketId>
 const isOnline = (id) => (userSockets.get(id)?.size || 0) > 0;
-const onlineIds = () => [...userSockets.keys()];
+// Per-user privacy kept in memory for connected users: { typing, online, blocked:Set }
+const privacyCache = new Map();
+export function setPrivacyCache(userId, user) {
+  privacyCache.set(String(userId), {
+    typing: user?.privacy?.typing !== false,
+    online: user?.privacy?.online !== false,
+    blocked: new Set((user?.blockedUsers || []).map(String)),
+  });
+}
+export const refreshOnline = () => io.emit("getOnlineUsers", onlineIds());
+// People who hid their online status are left out of the list others receive.
+const onlineIds = () => [...userSockets.keys()].filter((id) => privacyCache.get(id)?.online !== false);
+const canSignal = (from, to) => !privacyCache.get(to)?.blocked.has(from) && !privacyCache.get(from)?.blocked.has(to);
 const roomFor = (id) => (isOnline(id) ? id : undefined);
 const DISCONNECT_CALL_GRACE_MS = 8000;
 
@@ -145,8 +157,9 @@ io.use(async (socket, next) => {
       .find((c) => c.startsWith("jwt="));
     if (!pair) return next(new Error("unauthorized"));
     const decoded = jwt.verify(decodeURIComponent(pair.slice(4)), process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select("fullName profilePic").lean();
+    const user = await User.findById(decoded.userId).select("fullName profilePic privacy blockedUsers").lean();
     if (!user) return next(new Error("unauthorized"));
+    setPrivacyCache(user._id, user);
     socket.data.userId = String(user._id);
     // Trusted identity shown to the other side of a call
     socket.data.profile = { _id: String(user._id), fullName: user.fullName, profilePic: user.profilePic };
@@ -169,6 +182,7 @@ io.on("connection", (socket) => {
 
   // ---- Typing indicators (1:1) ----
   socket.on("typing", ({ toUserId }) => {
+    if (privacyCache.get(userId)?.typing === false || !canSignal(userId, String(toUserId))) return;
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("typing", { fromUserId: userId });
@@ -196,6 +210,16 @@ io.on("connection", (socket) => {
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
   socket.on("callUser", async ({ toUserId, offer, callType }, ack) => {
     const fromUser = socket.data.profile; // never trust a client-supplied caller identity
+    let blocked = !canSignal(userId, String(toUserId));
+    if (!blocked && !isOnline(String(toUserId))) {
+      // Offline callee isn't in the cache — one quick lookup before we push-notify them.
+      const target = await User.findById(toUserId).select("blockedUsers").lean().catch(() => null);
+      blocked = !!target?.blockedUsers?.some((b) => String(b) === userId);
+    }
+    if (blocked) {
+      if (typeof ack === "function") ack({ delivered: false, reason: "blocked" });
+      return;
+    }
     // Never make signaling wait on the database — a slow/cold MongoDB used to
     // delay the ack past the client's timeout, which triggered duplicate
     // "callUser" retries and double-ringing / auto-reject on the callee.
@@ -564,7 +588,10 @@ io.on("connection", (socket) => {
 
     const sockets = userSockets.get(userId);
     sockets?.delete(socket.id);
-    if (!sockets || sockets.size === 0) userSockets.delete(userId);
+    if (!sockets || sockets.size === 0) {
+      userSockets.delete(userId);
+      privacyCache.delete(userId);
+    }
     io.emit("getOnlineUsers", onlineIds());
 
     // The user still has another live socket (reload, second tab, quick

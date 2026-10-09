@@ -17,6 +17,7 @@ import {
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import { compressImage } from "../lib/imageUtils";
+import { getEnterSends } from "../lib/uiSettings";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
 
 const EmojiStickerPicker = lazy(() => import("./EmojiStickerPicker"));
@@ -382,7 +383,8 @@ const MessageInput = () => {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    const enterSends = getEnterSends();
+    if (e.key === "Enter" && !e.shiftKey && (enterSends || e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       if (text.trim() || imagePreview || imageFallback || filePreview) {
         handleSendMessage(e);

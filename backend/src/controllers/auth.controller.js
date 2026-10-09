@@ -45,6 +45,8 @@ export const signup = async (req, res) => {
         pinnedChats: newUser.pinnedChats || [],
         mutedChats: newUser.mutedChats || [],
       chatLists: newUser.chatLists || [],
+      privacy: newUser.privacy,
+      blockedUsers: newUser.blockedUsers || [],
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -83,6 +85,8 @@ export const login = async (req, res) => {
       pinnedChats: user.pinnedChats || [],
       mutedChats: user.mutedChats || [],
       chatLists: user.chatLists || [],
+      privacy: user.privacy,
+      blockedUsers: user.blockedUsers || [],
     });
   } catch (error) {
     console.log("Error in login controller", error.message);
@@ -187,6 +191,7 @@ const PREF_KEYS = new Set([
   "talkies-wallpaper-off",
   "talkies-reduce-motion",
   "talkies-haptics-off",
+  "talkies-enter-newline",
   "talkies-message-sound-enabled",
   "talkies-call-ringtone-enabled",
   "talkies-call-tone",

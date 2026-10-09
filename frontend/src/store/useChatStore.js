@@ -169,6 +169,34 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Privacy switches (read receipts / typing / online). Optimistic with rollback.
+  updatePrivacy: async (patch) => {
+    const authUser = useAuthStore.getState().authUser;
+    if (!authUser) return false;
+    const prev = authUser.privacy || {};
+    useAuthStore.setState({ authUser: { ...authUser, privacy: { ...prev, ...patch } } });
+    try {
+      const res = await axiosInstance.put("/messages/privacy", patch);
+      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, privacy: res.data.privacy } } : {}));
+      return true;
+    } catch (error) {
+      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, privacy: prev } } : {}));
+      toast.error(error.response?.data?.error || "Couldn't update privacy");
+      return false;
+    }
+  },
+
+  setUserBlocked: async (userId, blocked) => {
+    try {
+      const res = await axiosInstance.put("/messages/block-user", { userId, blocked });
+      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, blockedUsers: res.data.blockedUsers } } : {}));
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't update block");
+      return false;
+    }
+  },
+
   // Delete a chat for me (the other side keeps theirs).
   deleteChat: async (chat) => {
     try {
@@ -749,7 +777,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     // Archive list changed on another device (or this one) — keep in sync.
-    ["archivedChats", "pinnedChats", "mutedChats", "chatLists"].forEach((field) => {
+    ["archivedChats", "pinnedChats", "mutedChats", "chatLists", "blockedUsers", "privacy"].forEach((field) => {
       socket.on(field, (list) => {
         useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, [field]: list } } : {}));
       });
@@ -807,6 +835,8 @@ export const useChatStore = create((set, get) => ({
       "pinnedChats",
       "mutedChats",
       "chatLists",
+      "blockedUsers",
+      "privacy",
       "groupReceipts",
       "messageReacted",
     ].forEach((event) => socket.off(event));

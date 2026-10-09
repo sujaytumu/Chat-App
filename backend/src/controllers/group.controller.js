@@ -42,7 +42,7 @@ export const createGroup = async (req, res) => {
       createdBy: myId,
     });
 
-    const populatedGroup = await Group.findById(group._id).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+    const populatedGroup = await Group.findById(group._id).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
 
     // Notify every member in real time so the group shows up instantly
     uniqueMembers.forEach((memberId) => {
@@ -66,7 +66,7 @@ export const createGroup = async (req, res) => {
 export const getUserGroups = async (req, res) => {
   try {
     const myId = req.user._id;
-    const groups = await Group.find({ members: myId }).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists").lean();
+    const groups = await Group.find({ members: myId }).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers").lean();
     const groupIds = groups.map((g) => g._id);
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -254,7 +254,7 @@ export const addMembers = async (req, res) => {
     group.members.push(...newMembers);
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
 
     newMembers.forEach((memberId) => {
       const socketId = getReceiverSocketId(memberId);
@@ -287,7 +287,7 @@ export const removeMember = async (req, res) => {
     group.admins = group.admins.filter((a) => !a.equals(memberId));
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
 
     const removedSocketId = getReceiverSocketId(memberId);
@@ -323,7 +323,7 @@ export const leaveGroup = async (req, res) => {
       await Group.findByIdAndDelete(groupId);
     } else {
       await group.save();
-      const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+      const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
       io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
     }
 
@@ -354,7 +354,7 @@ export const updateGroupPermissions = async (req, res) => {
       if (v === "admins" || v === "all") group.set(`permissions.${key}`, v);
     }
     await group.save();
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
     res.status(200).json(populatedGroup);
   } catch (error) {
@@ -401,7 +401,7 @@ export const setDisappearing = async (req, res) => {
     }
     group.disappearAfter = seconds;
     await group.save();
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
     res.status(200).json(populatedGroup);
   } catch (error) {
@@ -431,7 +431,7 @@ export const updateGroupInfo = async (req, res) => {
     }
     await group.save();
 
-    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists");
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers");
     io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
 
     res.status(200).json(populatedGroup);

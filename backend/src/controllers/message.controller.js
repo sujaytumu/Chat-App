@@ -5,7 +5,7 @@ import Group from "../models/group.model.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 
 import cloudinary from "../lib/cloudinary.js";
-import { getReceiverSocketId, io } from "../lib/socket.js";
+import { getReceiverSocketId, io, setPrivacyCache, refreshOnline } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUser } from "../lib/webPush.js";
 
@@ -19,7 +19,7 @@ export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
-      .select("-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists")
+      .select("-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -56,8 +56,10 @@ export const getUsersForSidebar = async (req, res) => {
     const lastMessageByUser = new Map(lastMessages.map((m) => [m._id.toString(), m]));
     const unreadByUser = new Map(unreadCounts.map((u) => [u._id.toString(), u.count]));
 
-    const usersWithMeta = filteredUsers.map((user) => {
+    const iHideReceipts = req.user.privacy?.readReceipts === false;
+    const usersWithMeta = filteredUsers.map(({ privacy, blockedUsers, ...user }) => {
       const lm = lastMessageByUser.get(user._id.toString());
+      const hideSeen = iHideReceipts || privacy?.readReceipts === false;
       return {
         ...user,
         lastMessage: lm
@@ -68,7 +70,7 @@ export const getUsersForSidebar = async (req, res) => {
               createdAt: lm.createdAt,
               senderId: lm.senderId,
               delivered: lm.delivered,
-              seen: lm.seen,
+              seen: hideSeen && String(lm.senderId) === String(loggedInUserId) ? false : lm.seen,
             }
           : null,
         unreadCount: unreadByUser.get(user._id.toString()) || 0,
@@ -113,6 +115,18 @@ export const getMessages = async (req, res) => {
       .lean();
     const messages = page.reverse();
 
+    // Read receipts are two-way, like WhatsApp: if either of us switched them
+    // off, neither of us sees "seen" on messages I sent in this chat.
+    const other = await User.findById(userToChatId).select("privacy").lean();
+    if (other?.privacy?.readReceipts === false || req.user.privacy?.readReceipts === false) {
+      for (const m of messages) {
+        if (String(m.senderId) === String(myId)) {
+          m.seen = false;
+          m.seenAt = null;
+        }
+      }
+    }
+
     res.status(200).json(messages);
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
@@ -152,7 +166,13 @@ export const sendMessage = async (req, res) => {
 
     // If the receiver currently has an active socket, the message will land
     // instantly, so we can mark it delivered right away.
-    const receiverSocketId = getReceiverSocketId(receiverId);
+    const receiver = await User.findById(receiverId).select("blockedUsers").lean();
+    if ((req.user.blockedUsers || []).some((b) => String(b) === String(receiverId))) {
+      return res.status(403).json({ error: "You blocked this contact. Unblock them to send messages." });
+    }
+    // They blocked me: the message is kept on my side (one tick) but never reaches them.
+    const blockedByThem = !!receiver?.blockedUsers?.some((b) => String(b) === String(senderId));
+    const receiverSocketId = blockedByThem ? undefined : getReceiverSocketId(receiverId);
     const isDelivered = !!receiverSocketId;
 
     const newMessage = new Message({
@@ -175,6 +195,8 @@ export const sendMessage = async (req, res) => {
 
     // Background push notification — reaches the recipient even if the app
     // isn't open at all, as long as they've granted notification permission.
+    if (blockedByThem) return res.status(201).json(newMessage);
+
     sendPushToUser(receiverId, {
       title: req.user.fullName,
       body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
@@ -249,7 +271,9 @@ export const markMessagesAsSeen = async (req, res) => {
       { $set: { seen: true, seenAt: new Date(), delivered: true } }
     );
 
-    if (result.modifiedCount > 0) {
+    const sender = result.modifiedCount > 0 ? await User.findById(senderId).select("privacy").lean() : null;
+    const receiptsOff = req.user.privacy?.readReceipts === false || sender?.privacy?.readReceipts === false;
+    if (result.modifiedCount > 0 && !receiptsOff) {
       const senderSocketId = getReceiverSocketId(senderId);
       if (senderSocketId) {
         io.to(senderSocketId).emit("messagesSeen", { by: myId, count: result.modifiedCount });
@@ -673,6 +697,121 @@ export const reactToMessage = async (req, res) => {
     res.status(200).json(payload);
   } catch (error) {
     console.log("Error in reactToMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+// ---- Privacy settings + blocking ----
+export const updatePrivacy = async (req, res) => {
+  try {
+    const set = {};
+    for (const k of ["readReceipts", "typing", "online"]) {
+      if (typeof req.body?.[k] === "boolean") set[`privacy.${k}`] = req.body[k];
+    }
+    if (!Object.keys(set).length) return res.status(400).json({ error: "Nothing to update" });
+    const user = await User.findByIdAndUpdate(req.user._id, { $set: set }, { new: true }).select("privacy blockedUsers");
+    setPrivacyCache(req.user._id, user);
+    if ("privacy.online" in set) refreshOnline();
+    io.to(req.user._id.toString()).emit("privacy", user.privacy);
+    res.status(200).json({ privacy: user.privacy });
+  } catch (error) {
+    console.log("Error in updatePrivacy controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const setUserBlocked = async (req, res) => {
+  try {
+    const { userId, blocked } = req.body || {};
+    if (!mongoose.isValidObjectId(userId) || String(userId) === String(req.user._id)) {
+      return res.status(400).json({ error: "Invalid contact" });
+    }
+    const update = blocked ? { $addToSet: { blockedUsers: userId } } : { $pull: { blockedUsers: userId } };
+    const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("privacy blockedUsers");
+    setPrivacyCache(req.user._id, user);
+    io.to(req.user._id.toString()).emit("blockedUsers", user.blockedUsers);
+    res.status(200).json({ blockedUsers: user.blockedUsers });
+  } catch (error) {
+    console.log("Error in setUserBlocked controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Storage per chat + chat backup ----
+const myMessageFilter = async (me) => {
+  const groupIds = (await Group.find({ members: me }).select("_id").lean()).map((g) => g._id);
+  return {
+    deletedFor: { $ne: me },
+    deletedForEveryone: { $ne: true },
+    $or: [{ senderId: me }, { receiverId: me }, { groupId: { $in: groupIds } }],
+  };
+};
+
+export const getStorageUsage = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const rows = await Message.aggregate([
+      { $match: await myMessageFilter(me) },
+      {
+        $group: {
+          _id: {
+            $cond: [{ $ifNull: ["$groupId", false] }, { $concat: ["g:", { $toString: "$groupId" }] },
+              { $concat: ["d:", { $toString: { $cond: [{ $eq: ["$senderId", me] }, "$receiverId", "$senderId"] } }] }],
+          },
+          messages: { $sum: 1 },
+          photos: { $sum: { $cond: [{ $gt: [{ $strLenCP: { $ifNull: ["$image", ""] } }, 0] }, 1, 0] } },
+          files: { $sum: { $cond: [{ $gt: [{ $strLenCP: { $ifNull: ["$file.url", ""] } }, 0] }, 1, 0] } },
+          fileBytes: { $sum: { $ifNull: ["$file.size", 0] } },
+        },
+      },
+      { $sort: { messages: -1 } },
+      { $limit: 200 },
+    ]);
+    res.status(200).json(rows.map((r) => ({ key: r._id, messages: r.messages, photos: r.photos, files: r.files, fileBytes: r.fileBytes })));
+  } catch (error) {
+    console.log("Error in getStorageUsage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Download my chats as JSON. `?chat=d:<id>|g:<id>` limits it to one chat.
+export const exportChats = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const only = typeof req.query.chat === "string" && /^[dg]:[a-f0-9]{24}$/i.test(req.query.chat) ? req.query.chat : null;
+    const filter = await myMessageFilter(me);
+    if (only) {
+      const id = only.slice(2);
+      filter.$or = only[0] === "g" ? [{ groupId: id }] : [{ senderId: me, receiverId: id }, { senderId: id, receiverId: me }];
+    }
+    const msgs = await Message.find(filter)
+      .sort({ createdAt: 1 })
+      .limit(100000)
+      .select("senderId receiverId groupId text image file createdAt")
+      .lean();
+    const [users, groups] = await Promise.all([
+      User.find({}).select("fullName").lean(),
+      Group.find({ members: me }).select("name").lean(),
+    ]);
+    const nameOf = new Map([...users.map((u) => [String(u._id), u.fullName]), ...groups.map((g) => [String(g._id), g.name])]);
+    const chats = new Map();
+    for (const m of msgs) {
+      const key = m.groupId ? `g:${m.groupId}` : `d:${String(m.senderId) === String(me) ? m.receiverId : m.senderId}`;
+      if (!chats.has(key)) chats.set(key, { chat: nameOf.get(key.slice(2)) || "Unknown", type: key[0] === "g" ? "group" : "direct", messages: [] });
+      chats.get(key).messages.push({
+        at: m.createdAt,
+        from: String(m.senderId) === String(me) ? "You" : nameOf.get(String(m.senderId)) || "Unknown",
+        text: m.text || undefined,
+        photo: m.image || undefined,
+        file: m.file?.url ? { name: m.file.name, url: m.file.url } : undefined,
+      });
+    }
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="talkies-chats-${new Date().toISOString().slice(0, 10)}.json"`);
+    res.status(200).send(JSON.stringify({ exportedAt: new Date(), exportedBy: req.user.fullName, chats: [...chats.values()] }, null, 2));
+  } catch (error) {
+    console.log("Error in exportChats controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

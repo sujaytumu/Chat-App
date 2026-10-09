@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Info, Phone, Video, X, Search, Palette } from "lucide-react";
+import { Info, Phone, Video, X, Search, Palette, Ban } from "lucide-react";
+import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
@@ -17,7 +18,7 @@ const iconBtn =
 const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[15px] text-wa-text hover:bg-white/5 text-left";
 
 const ChatHeader = () => {
-  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen } = useChatStore();
+  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked } = useChatStore();
   const { onlineUsers, authUser } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
   const groupCallStatus = useGroupCallStore((st) => st.status);
@@ -155,6 +156,20 @@ const ChatHeader = () => {
               >
                 <Palette size={18} className="text-wa-icon" /> Wallpaper
               </button>
+              {!isGroup && (
+                <button
+                  className={menuItem}
+                  onClick={async () => {
+                    setShowMenu(false);
+                    const blocked = (authUser?.blockedUsers || []).includes(data._id);
+                    if (!blocked && !window.confirm(`Block ${data.fullName}? They won't be able to message or call you.`)) return;
+                    if (await setUserBlocked(data._id, !blocked)) toast(blocked ? `${data.fullName} unblocked` : `${data.fullName} blocked`, { icon: "🚫" });
+                  }}
+                >
+                  <Ban size={18} className="text-wa-icon" />
+                  {(authUser?.blockedUsers || []).includes(data._id) ? "Unblock" : "Block"}
+                </button>
+              )}
               <button
                 className={menuItem}
                 onClick={() => {
