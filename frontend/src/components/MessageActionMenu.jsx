@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, Forward, Info, Languages } from "lucide-react";
+import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, StarOutline, Forward, Info, Languages } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 
 // Hover trigger + dropdown for per-message actions, matching WhatsApp's
@@ -44,7 +44,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
           visible || open ? "opacity-100" : "opacity-0"
         }`}
       >
-        <MoreVertical size={14} />
+        <MoreVertical size={18} />
       </button>
 
       {open && (
@@ -79,7 +79,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
               >
-                <Reply size={16} />
+                <Reply size={20} />
                 Reply
               </button>
               {message.text && (
@@ -87,7 +87,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onClick={handleCopy}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
                 >
-                  <Copy size={16} />
+                  <Copy size={20} />
                   Copy
                 </button>
               )}
@@ -99,7 +99,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   }}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
                 >
-                  <Languages size={16} />
+                  <Languages size={20} />
                   Translate
                 </button>
               )}
@@ -110,7 +110,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
               >
-                {message.pinned ? <PinOff size={16} /> : <Pin size={16} />}
+                {message.pinned ? <PinOff size={20} /> : <Pin size={20} />}
                 {message.pinned ? "Unpin" : "Pin"}
               </button>
               <button
@@ -120,7 +120,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
               >
-                <Star size={16} className={isStarred ? "fill-yellow-400 text-yellow-400" : ""} />
+                {isStarred ? <Star size={20} className="text-yellow-400" /> : <StarOutline size={20} />}
                 {isStarred ? "Unstar" : "Star"}
               </button>
               <button
@@ -130,7 +130,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
               >
-                <Forward size={16} />
+                <Forward size={20} />
                 Forward
               </button>
               <button
@@ -140,14 +140,14 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
               >
-                <Info size={16} />
+                <Info size={20} />
                 Info
               </button>
               <button
                 onClick={() => setConfirmingDelete(true)}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-white/5"
               >
-                <Trash2 size={16} />
+                <Trash2 size={20} />
                 Delete
               </button>
             </>
