@@ -1,24 +1,35 @@
+import { useMemo } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { MessageCircle, Phone, CircleDot } from "lucide-react";
+import { WaChats, WaUpdates, WaCalls } from "./icons/WaIcons";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import Avatar from "./Avatar";
 
 const items = [
-  { to: "/", icon: MessageCircle, label: "Chats", end: true },
-  { to: "/status", icon: CircleDot, label: "Updates" },
-  { to: "/calls", icon: Phone, label: "Calls" },
+  { to: "/", icon: WaChats, label: "Chats", end: true },
+  { to: "/status", icon: WaUpdates, label: "Updates" },
+  { to: "/calls", icon: WaCalls, label: "Calls" },
 ];
 
 // WhatsApp's persistent nav: Chats / Updates / Calls / You — a vertical rail
 // on desktop, a bottom tab bar (with a pill behind the active icon) on phones.
 const MainNav = () => {
   const { authUser } = useAuthStore();
-  const unread = useChatStore((s) =>
-    [...s.users, ...s.groups].reduce((sum, c) => sum + (c.unreadCount || 0), 0)
-  );
+  const archived = authUser?.archivedChats;
+  // Archived chats don't count towards the badge (like WhatsApp). Select the
+  // raw lists and total below so the selector stays stable between renders.
+  const users = useChatStore((s) => s.users);
+  const groups = useChatStore((s) => s.groups);
+  const unread = useMemo(() => {
+    const hidden = new Set(archived || []);
+    return (
+      users.reduce((sum, c) => sum + (hidden.has(`d:${c._id}`) ? 0 : c.unreadCount || 0), 0) +
+      groups.reduce((sum, c) => sum + (hidden.has(`g:${c._id}`) ? 0 : c.unreadCount || 0), 0)
+    );
+  }, [users, groups, archived]);
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
+  const youActive = pathname === "/profile" || pathname === "/starred" || pathname.startsWith("/settings");
 
   // On a phone an open chat takes the whole screen, like WhatsApp.
   const hideOnPhone = hasOpenChat && pathname === "/";
@@ -39,7 +50,7 @@ const MainNav = () => {
               }`
             }
           >
-            <Icon size={22} />
+            <Icon size={24} filled={false} />
             {to === "/" && unread > 0 && (
               <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
                 {unread > 99 ? "99+" : unread}
@@ -51,11 +62,9 @@ const MainNav = () => {
         <NavLink
           to="/profile"
           title="You"
-          className={({ isActive }) =>
-            `size-11 rounded-xl flex items-center justify-center transition-colors ${
-              isActive ? "bg-[#2A3942]" : "hover:bg-white/5"
-            }`
-          }
+          className={`size-11 rounded-xl flex items-center justify-center transition-colors ${
+            youActive ? "bg-[#2A3942]" : "hover:bg-white/5"
+          }`}
         >
           <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-8" textSize="text-sm" />
         </NavLink>
@@ -73,36 +82,28 @@ const MainNav = () => {
               <>
                 <span
                   className={`relative h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
-                    isActive ? "bg-[#103629] text-[#E9EDEF]" : "text-[#AEBAC1]"
+                    isActive ? "bg-[#103629] text-[#D9FDD3]" : "text-[#D1D7DB] active:bg-white/5"
                   }`}
                 >
-                  <Icon size={24} strokeWidth={isActive ? 2.4 : 2} />
+                  <Icon size={26} filled={isActive} />
                   {to === "/" && unread > 0 && (
-                    <span className="absolute top-0 right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
+                    <span className="absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-[#0B141A] text-[11px] font-semibold flex items-center justify-center">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}
                 </span>
-                <span className={`text-xs ${isActive ? "text-[#E9EDEF] font-semibold" : "text-[#AEBAC1]"}`}>
-                  {label}
-                </span>
+                <span className={`text-[13px] leading-none text-[#E9EDEF] ${isActive ? "font-semibold" : ""}`}>{label}</span>
               </>
             )}
           </NavLink>
         ))}
         <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center gap-1">
-          {({ isActive }) => (
-            <>
-              <span
-                className={`h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
-                  isActive ? "bg-[#103629]" : ""
-                }`}
-              >
-                <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
-              </span>
-              <span className={`text-xs ${isActive ? "text-[#E9EDEF] font-semibold" : "text-[#AEBAC1]"}`}>You</span>
-            </>
-          )}
+          <span className={`h-8 w-16 rounded-full flex items-center justify-center`}>
+            <span className={`rounded-full p-[3px] ${youActive ? "bg-[#103629] ring-0" : ""}`}>
+              <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
+            </span>
+          </span>
+          <span className={`text-[13px] leading-none text-[#E9EDEF] ${youActive ? "font-semibold" : ""}`}>You</span>
         </NavLink>
       </nav>
     </>

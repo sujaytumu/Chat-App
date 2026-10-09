@@ -4,6 +4,9 @@ import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { useThemeStore } from "./store/useThemeStore";
+import { applyUiSettings } from "./lib/uiSettings";
+
+applyUiSettings();
 
 // Wrapper to provide global theme
 const RootWrapper = () => {

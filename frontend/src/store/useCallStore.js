@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
 import { startRingtone, stopRingtoneSound, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
+import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
 // carrier networks (symmetric NAT / CGNAT is extremely common on VoLTE/5G),
@@ -36,7 +37,7 @@ const ICE_SERVERS = {
 // Prefer the server-configured ICE servers (private TURN credentials from the
 // backend env); fall back to the built-in defaults above if that fails.
 let iceConfigCache = null;
-async function getIceConfig() {
+export async function getIceConfig() {
   if (iceConfigCache) return iceConfigCache;
   try {
     const res = await axiosInstance.get("/calls/ice-config", { timeout: 4000 });
@@ -135,6 +136,7 @@ let pendingCandidates = [];
 let voiceOriginShare = false; // screen share started from a voice call (no camera to go back to)
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
+let speakerNoticeShown = false; // the "phone decides the speaker" hint is shown once per page load
 let ringDeferred = false; // incoming ring held back while a phone's system notification is alerting
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
@@ -194,7 +196,7 @@ export const useCallStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     const authUser = useAuthStore.getState().authUser;
     if (!socket) return;
-    if (get().callStatus !== "idle") {
+    if (get().callStatus !== "idle" || isGroupCallBusy()) {
       toast.error("Already in a call");
       return;
     }
@@ -511,7 +513,17 @@ export const useCallStore = create((set, get) => ({
     const supportsSinkId = remoteAudioEl?.setSinkId || remoteVideoEl?.setSinkId;
 
     if (!supportsSinkId || !navigator.mediaDevices?.enumerateDevices) {
-      toast("Speaker routing is controlled by your device on this browser", { icon: "🔊" });
+      // Phone browsers (Android Chrome, iOS Safari) don't let a web page pick the
+      // earpiece or the loudspeaker — the phone decides. Still flip the button so
+      // it shows its on/off state like WhatsApp, and say so once, plainly.
+      set({ isSpeakerOn: !get().isSpeakerOn });
+      if (!speakerNoticeShown) {
+        speakerNoticeShown = true;
+        toast("This browser can't switch the speaker — your phone decides where call audio plays", {
+          icon: "🔊",
+          duration: 3500,
+        });
+      }
       return;
     }
 
@@ -676,6 +688,11 @@ export const useCallStore = create((set, get) => ({
     });
 
     socket.on("incomingCall", ({ fromUser, offer, callType }) => {
+      // In a group call: this is a busy signal for the caller.
+      if (isGroupCallBusy()) {
+        socket.emit("rejectCall", { toUserId: fromUser._id });
+        return;
+      }
       // Busy? auto-reject — but first self-heal a genuinely stale state
       // (callStatus says busy but there's no active connection AND it's
       // been long enough that this can't just be the brief setup window

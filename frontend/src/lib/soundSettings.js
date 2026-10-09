@@ -131,3 +131,71 @@ export async function removeCustomTone(kind) {
   if (old) URL.revokeObjectURL(old);
   urlCache.delete(kind);
 }
+
+
+// ---- Group tone + vibration (per device) -----------------------------------
+const GROUP_TONE_KEY = "talkies-group-tone"; // "same" (default) | "none" | tone id | "custom"
+export function getGroupTone() {
+  return localStorage.getItem(GROUP_TONE_KEY) || "same";
+}
+export function setGroupTone(id) {
+  localStorage.setItem(GROUP_TONE_KEY, id);
+  syncPrefsToWorker();
+}
+
+export const VIBRATIONS = [
+  { id: "off", label: "Off" },
+  { id: "default", label: "Default" },
+  { id: "short", label: "Short" },
+  { id: "long", label: "Long" },
+];
+const VIB_KEYS = { message: "talkies-vib-message", group: "talkies-vib-group", call: "talkies-vib-call" };
+const PATTERNS = {
+  message: { default: [200, 100, 200], short: [100], long: [600] },
+  group: { default: [200, 100, 200], short: [100], long: [600] },
+  call: { default: [700, 400, 700, 400], short: [300, 300], long: [1200, 300] },
+};
+export function getVibration(kind) {
+  return localStorage.getItem(VIB_KEYS[kind]) || "default";
+}
+export function setVibration(kind, id) {
+  localStorage.setItem(VIB_KEYS[kind], id);
+  syncPrefsToWorker();
+}
+// null = vibration off
+export function vibrationPattern(kind, id = getVibration(kind)) {
+  return PATTERNS[kind]?.[id] || null;
+}
+
+// The service worker shows notifications while the app is closed and can't read
+// localStorage, so mirror the bits it needs into Cache Storage ("prefs-v1" is
+// deliberately not a "talkies-" cache so it survives the worker's clean-ups).
+export async function syncPrefsToWorker() {
+  try {
+    if (typeof caches === "undefined") return;
+    const prefs = {
+      message: vibrationPattern("message"),
+      group: vibrationPattern("group"),
+      call: vibrationPattern("call"),
+      groupSilent: getGroupTone() === "none",
+    };
+    const cache = await caches.open("prefs-v1");
+    await cache.put("/__prefs", new Response(JSON.stringify(prefs), { headers: { "Content-Type": "application/json" } }));
+  } catch {
+    /* best effort */
+  }
+}
+
+// "Reset notification settings"
+export async function resetNotificationSettings() {
+  [
+    MESSAGE_SOUND_KEY,
+    CALL_RINGTONE_KEY,
+    CALL_TONE_KEY,
+    MESSAGE_TONE_KEY,
+    GROUP_TONE_KEY,
+    ...Object.values(VIB_KEYS),
+  ].forEach((k) => localStorage.removeItem(k));
+  await Promise.all(["message", "group", "call"].map((k) => removeCustomTone(k)));
+  syncPrefsToWorker();
+}

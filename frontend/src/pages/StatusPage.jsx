@@ -25,15 +25,15 @@ const StatusPage = () => {
   }, [loadFeed]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0B141A] overflow-hidden pb-[72px] lg:pb-0">
-      <div className="p-4 border-b border-black/30">
-        <h2 className="text-lg font-semibold text-[#E9EDEF]">Status</h2>
+    <div className="flex-1 flex flex-col bg-[#0B141A] overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Updates</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
-            <Loader2 className="animate-spin text-[#00A884]" size={28} />
+            <Loader2 className="animate-spin text-[#25D366]" size={28} />
           </div>
         ) : (
           <>
@@ -43,14 +43,14 @@ const StatusPage = () => {
                   ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
                   : setShowCreate(true)
               }
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5"
+              className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-[#1F2C34]"
             >
               <div className="relative">
                 <img
                   src={authUser.profilePic || "/avatar.png"}
                   alt="My status"
-                  className={`size-12 rounded-full object-cover ${
-                    feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-[#0B141A]" : ""
+                  className={`size-14 rounded-full object-cover ${
+                    feed.myStatuses.length > 0 ? "ring-2 ring-[#25D366] ring-offset-2 ring-offset-[#0B141A]" : ""
                   }`}
                 />
                 <span
@@ -58,13 +58,13 @@ const StatusPage = () => {
                     e.stopPropagation();
                     setShowCreate(true);
                   }}
-                  className="absolute -bottom-1 -right-1 size-5 rounded-full bg-[#00A884] flex items-center justify-center text-white"
+                  className="absolute -bottom-1 -right-1 size-5 rounded-full bg-[#25D366] flex items-center justify-center text-white"
                 >
                   <Plus size={12} />
                 </span>
               </div>
               <div className="text-left">
-                <p className="font-medium text-[#E9EDEF]">My status</p>
+                <p className="text-[17px] text-[#E9EDEF]">My status</p>
                 <p className="text-xs text-[#8696A0]">
                   {feed.myStatuses.length > 0 ? `${feed.myStatuses.length} update(s) · tap to view` : "Tap to add status"}
                 </p>
@@ -78,17 +78,17 @@ const StatusPage = () => {
                   <button
                     key={user._id}
                     onClick={() => setViewing({ user, statuses, isOwn: false })}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5"
+                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-[#1F2C34]"
                   >
                     <img
                       src={user.profilePic || "/avatar.png"}
                       alt={user.fullName}
-                      className={`size-12 rounded-full object-cover ${
-                        hasUnseen ? "ring-2 ring-[#00A884]" : "ring-2 ring-[#8696A0]/40"
+                      className={`size-14 rounded-full object-cover ${
+                        hasUnseen ? "ring-2 ring-[#25D366]" : "ring-2 ring-[#8696A0]/40"
                       } ring-offset-2 ring-offset-[#0B141A]`}
                     />
                     <div className="text-left">
-                      <p className="font-medium text-[#E9EDEF]">{user.fullName}</p>
+                      <p className="text-[17px] text-[#E9EDEF]">{user.fullName}</p>
                       <p className="text-xs text-[#8696A0]">
                         {new Date(statuses[statuses.length - 1].createdAt).toLocaleTimeString("en-US", {
                           hour: "2-digit",
