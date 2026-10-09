@@ -11,6 +11,7 @@ import {
 import { isPhoneLike } from "../lib/device";
 import { Phone, PhoneEnd, Video, VideoOff, Mic, MicOff, Volume2 } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
+import { TRANSPARENT_POSTER } from "../lib/utils";
 
 const AVATAR_COLORS = ["#00695C", "#4527A0", "#AD1457", "#2E7D32", "#1565C0", "#EF6C00"];
 const colorForName = (name = "") => {
@@ -321,6 +322,8 @@ const CallManager = () => {
             ref={remoteVideoRef}
             autoPlay
             playsInline
+            poster={TRANSPARENT_POSTER}
+            style={{ visibility: remoteStream ? "visible" : "hidden" }}
             // A shared screen must not be cropped like a camera feed is.
             className={`w-full h-full ${remoteScreenSharing ? "object-contain bg-black" : "object-cover"}`}
           />
@@ -345,6 +348,8 @@ const CallManager = () => {
             ref={localVideoRef}
             autoPlay
             playsInline
+            poster={TRANSPARENT_POSTER}
+            style={{ visibility: localStream ? "visible" : "hidden" }}
             muted
             className="absolute top-4 right-4 w-24 h-32 sm:w-32 sm:h-44 object-cover rounded-lg border-2 border-white/20 shadow-lg"
           />

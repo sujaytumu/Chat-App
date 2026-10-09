@@ -5,6 +5,7 @@ import { useGroupCallStore, canShareScreen, MAX_GROUP_CALL } from "../store/useG
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import Avatar from "./Avatar";
+import { TRANSPARENT_POSTER } from "../lib/utils";
 
 // Same control look as 1-to-1 calls: dark circle, solid white while "on".
 const btnBase = "size-16 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95";
@@ -46,6 +47,7 @@ const Tile = ({ stream, name, label, pic, muted, videoOn, mirror, contain, self,
         ref={ref}
         autoPlay
         playsInline
+        poster={TRANSPARENT_POSTER}
         muted={self}
         className={`absolute inset-0 size-full ${contain ? "object-contain bg-black" : "object-cover"} ${mirror ? "-scale-x-100" : ""} ${
           videoOn ? "" : "opacity-0"
