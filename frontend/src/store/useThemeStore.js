@@ -20,6 +20,12 @@ export function applyTheme(theme) {
   root.setAttribute("data-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", dark ? "#111B21" : "#FFFFFF");
+  // In the Android app the status/navigation bars follow the page theme
+  try {
+    window.Capacitor?.Plugins?.AppChrome?.setTheme({ color: dark ? "#111B21" : "#FFFFFF", dark })?.catch?.(() => {});
+  } catch {
+    /* not in the Android app */
+  }
   const scheme = document.querySelector('meta[name="color-scheme"]');
   if (scheme) scheme.setAttribute("content", dark ? "dark" : "light");
 }

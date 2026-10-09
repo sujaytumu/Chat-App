@@ -1,3 +1,4 @@
+import { startPrefsSync } from "./lib/prefsSync";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import MainLayout from "./components/MainLayout";
@@ -62,6 +63,13 @@ const App = () => {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Keep appearance + sound choices the same on every device signed into this account
+  const signedInId = authUser?._id;
+  useEffect(() => {
+    if (!signedInId) return;
+    return startPrefsSync();
+  }, [signedInId]);
 
   // Like WhatsApp, the app always opens on Chats: if it is (re)opened on
   // Updates / Calls / Profile / Settings, or you come back to it after being
