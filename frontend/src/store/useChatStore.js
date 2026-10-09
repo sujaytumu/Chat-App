@@ -151,6 +151,24 @@ export const useChatStore = create((set, get) => ({
   setChatPinned: (chat, pinned, opts) => get().setChatFlag("pinnedChats", chat, pinned, opts),
   setChatMuted: (chat, muted, opts) => get().setChatFlag("mutedChats", chat, muted, opts),
 
+  // Favourites + custom lists: [{ id, name, chats: ["d:<id>"|"g:<id>"] }].
+  // Optimistic, rolled back on failure. Returns true when saved.
+  setChatLists: async (lists) => {
+    const authUser = useAuthStore.getState().authUser;
+    if (!authUser) return false;
+    const prev = authUser.chatLists || [];
+    useAuthStore.setState({ authUser: { ...authUser, chatLists: lists } });
+    try {
+      const res = await axiosInstance.put("/messages/chat-lists", { lists });
+      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, chatLists: res.data.chatLists } } : {}));
+      return true;
+    } catch (error) {
+      useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, chatLists: prev } } : {}));
+      toast.error(error.response?.data?.error || "Couldn't update list");
+      return false;
+    }
+  },
+
   // Delete a chat for me (the other side keeps theirs).
   deleteChat: async (chat) => {
     try {
@@ -731,7 +749,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     // Archive list changed on another device (or this one) — keep in sync.
-    ["archivedChats", "pinnedChats", "mutedChats"].forEach((field) => {
+    ["archivedChats", "pinnedChats", "mutedChats", "chatLists"].forEach((field) => {
       socket.on(field, (list) => {
         useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, [field]: list } } : {}));
       });
@@ -788,6 +806,7 @@ export const useChatStore = create((set, get) => ({
       "archivedChats",
       "pinnedChats",
       "mutedChats",
+      "chatLists",
       "groupReceipts",
       "messageReacted",
     ].forEach((event) => socket.off(event));

@@ -19,7 +19,7 @@ export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
-      .select("-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats")
+      .select("-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -458,6 +458,34 @@ const makeChatListToggle = (field, event, max) => async (req, res) => {
 };
 export const setChatPinned = makeChatListToggle("pinnedChats", "pinnedChats", 3);
 export const setChatMuted = makeChatListToggle("mutedChats", "mutedChats", 0);
+
+// Replace the user's chat lists (Favourites + custom lists) in one go.
+// Body: { lists: [{ id, name, chats: ["d:<id>" | "g:<id>"] }] }
+const CHAT_KEY = /^[dg]:[a-f0-9]{24}$/i;
+export const setChatLists = async (req, res) => {
+  try {
+    const raw = Array.isArray(req.body?.lists) ? req.body.lists : null;
+    if (!raw || raw.length > 11) return res.status(400).json({ error: "Invalid lists" });
+    const seen = new Set();
+    const lists = [];
+    for (const l of raw) {
+      const id = String(l?.id || "").slice(0, 40);
+      const name = String(l?.name || "").trim().slice(0, 30);
+      if (!id || !name || seen.has(id)) return res.status(400).json({ error: "Invalid list" });
+      seen.add(id);
+      const chats = [...new Set((Array.isArray(l.chats) ? l.chats : []).map(String))].filter((k) => CHAT_KEY.test(k));
+      if (chats.length > 1000) return res.status(400).json({ error: "List too large" });
+      lists.push({ id, name, chats });
+    }
+    const user = await User.findByIdAndUpdate(req.user._id, { $set: { chatLists: lists } }, { new: true }).select("chatLists");
+    const chatLists = user?.chatLists || [];
+    io.to(req.user._id.toString()).emit("chatLists", chatLists);
+    res.status(200).json({ chatLists });
+  } catch (error) {
+    console.log("Error in setChatLists controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 // Delete a chat for me: every message in it is hidden from my side only (the
 // other person / group members keep theirs), like WhatsApp's "Delete chat".

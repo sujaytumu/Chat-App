@@ -36,6 +36,19 @@ const userSchema = new mongoose.Schema(
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
+    // Chat lists shown as filter chips: the built-in "favourites" list plus the
+    // user's own lists. Each holds chat keys ("d:<id>" / "g:<id>").
+    chatLists: {
+      type: [
+        {
+          _id: false,
+          id: { type: String, required: true },
+          name: { type: String, required: true, maxlength: 30 },
+          chats: { type: [String], default: [] },
+        },
+      ],
+      default: [],
+    },
     // Web Push subscriptions (one per browser/device the user has granted
     // notification permission on)
     pushSubscriptions: [

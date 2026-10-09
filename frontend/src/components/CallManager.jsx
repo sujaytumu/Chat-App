@@ -255,6 +255,7 @@ const CallManager = () => {
 
   // ---- Outgoing / active call ----
   const isVideo = callType === "video";
+  const canFlip = isVideo && isPhoneLike() && !isVideoOff && !isScreenSharing;
   const statusText =
     callStatus === "calling"
       ? isRemoteRinging
@@ -307,12 +308,22 @@ const CallManager = () => {
             </p>
           )}
         </div>
-        <button
-          onClick={() => toast("Group calling isn't supported yet", { icon: "👥" })}
-          className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
-        >
-          <UserPlus size={18} />
-        </button>
+        {canFlip ? (
+          <button
+            onClick={flipCamera}
+            className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
+            aria-label="Switch camera"
+          >
+            <SwitchCamera size={20} />
+          </button>
+        ) : (
+          <button
+            onClick={() => toast("Group calling isn't supported yet", { icon: "👥" })}
+            className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
+          >
+            <UserPlus size={18} />
+          </button>
+        )}
       </div>
 
       {isVideo ? (
@@ -388,15 +399,6 @@ const CallManager = () => {
             </button>
             <span className="text-xs text-white/70">Video</span>
           </div>
-
-          {isVideo && isPhoneLike() && !isVideoOff && !isScreenSharing && (
-            <div className="flex flex-col items-center gap-1.5">
-              <button onClick={flipCamera} className={callBtn(false)} aria-label="Switch camera">
-                <SwitchCamera size={24} />
-              </button>
-              <span className="text-xs text-white/70">Flip</span>
-            </div>
-          )}
 
           <div className="flex flex-col items-center gap-1.5">
             <button onClick={toggleMute} className={callBtn(isMuted)}>
