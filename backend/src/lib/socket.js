@@ -457,6 +457,55 @@ io.on("connection", (socket) => {
     reply({ ok: true, callType: type, participants: [] });
   });
 
+  // Someone already in a group call rings other members of the group to join
+  // (the WhatsApp "Add participant" flow).
+  const lastRung = (socket.data.lastRung = socket.data.lastRung || new Map());
+  socket.on("groupCall:ring", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const { groupId, userIds } = payload || {};
+    if (typeof groupId !== "string" || !Array.isArray(userIds)) return reply({ ok: false, error: "Invalid request" });
+    const call = groupCalls.get(groupId);
+    if (!call || !call.participants.has(userId)) return reply({ ok: false, error: "You're not in this call" });
+    const group = await Group.findOne({ _id: groupId, members: userId }).select("name groupPic members").lean().catch(() => null);
+    if (!group) return reply({ ok: false, error: "You're not in this group" });
+
+    const memberSet = new Set(group.members.map(String));
+    const now = Date.now();
+    const targets = [...new Set(userIds.filter((id) => typeof id === "string"))]
+      .filter((id) => id !== userId && memberSet.has(id) && !call.participants.has(id))
+      .filter((id) => now - (lastRung.get(`${groupId}:${id}`) || 0) > 20000) // don't spam the same person
+      .slice(0, MAX_GROUP_CALL);
+    if (!targets.length) return reply({ ok: true, rung: [] });
+
+    targets.forEach((id) => {
+      lastRung.set(`${groupId}:${id}`, now);
+      const room = roomFor(id);
+      if (room) {
+        io.to(room).emit("groupCall:incoming", {
+          groupId,
+          groupName: group.name,
+          groupPic: group.groupPic || "",
+          callType: call.callType,
+          from: socket.data.profile,
+        });
+      }
+    });
+    sendPushToUsers(
+      targets,
+      {
+        title: group.name,
+        body: `${socket.data.profile?.fullName || "Someone"} is calling you to join a group ${call.callType === "video" ? "video" : "voice"} call`,
+        icon: group.groupPic || "/icon-v2-192.png",
+        isCall: true,
+        tag: `group-call-${groupId}`,
+        data: { url: "/", chatType: "group", chatId: groupId },
+      },
+      CALL_PUSH_OPTIONS,
+      `g:${groupId}`
+    );
+    reply({ ok: true, rung: targets });
+  });
+
   socket.on("groupCall:join", async (payload, ack) => {
     const reply = typeof ack === "function" ? ack : () => {};
     const { groupId } = payload || {};

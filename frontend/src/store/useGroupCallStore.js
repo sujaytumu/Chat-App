@@ -394,6 +394,15 @@ export const useGroupCallStore = create((set, get) => {
       dismissIncoming();
     },
 
+    // Ring other group members to join this call. Resolves to the ids actually rung.
+    ringMembers: (userIds) =>
+      new Promise((resolve) => {
+        const { status, groupId } = get();
+        const socket = socketOf();
+        if (status !== "active" || !socket) return resolve([]);
+        socket.emit("groupCall:ring", { groupId, userIds }, (res) => resolve(res?.ok ? res.rung || [] : []));
+      }),
+
     leave: () => {
       const { status, groupId } = get();
       if (status === "idle") return;
