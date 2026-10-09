@@ -19,23 +19,23 @@ const GroupPermissionsPanel = ({ group, isAdmin, onClose }) => {
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
-        <h3 className="text-[19px]">Group permissions</h3>
+        <h3 className="text-[16px]">Group permissions</h3>
       </div>
-      <p className="px-5 py-3 text-[14px] text-wa-muted">
+      <p className="px-5 py-3 text-[12px] text-wa-muted">
         {isAdmin ? "Choose what members can do in this group. Admins can always do everything." : "Only admins can change these."}
       </p>
       <div className="flex-1 overflow-y-auto">
         {ROWS.map((r) => (
           <div key={r.key} className="flex items-center gap-4 px-5 py-3.5 border-b border-white/5">
             <span className="min-w-0 flex-1">
-              <span className="block text-[16px]">{r.title}</span>
-              <span className="block text-[13.5px] text-wa-muted">{r.sub}</span>
+              <span className="block text-[13.5px]">{r.title}</span>
+              <span className="block text-[11.5px] text-wa-muted">{r.sub}</span>
             </span>
             <select
               disabled={!isAdmin}
               value={perms[r.key]}
               onChange={(e) => setPerm(group._id, r.key, e.target.value)}
-              className="bg-wa-field text-wa-text rounded-lg px-3 py-2 text-[14.5px] disabled:opacity-60"
+              className="bg-wa-field text-wa-text rounded-lg px-3 py-2 text-[12.5px] disabled:opacity-60"
             >
               <option value="all">All members</option>
               <option value="admins">Only admins</option>

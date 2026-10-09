@@ -15,12 +15,12 @@ import { getReduceMotion, setReduceMotion, getHaptics, setHaptics, getEnterSends
 import { formatChatListTime } from "../lib/utils";
 
 const card = "rounded-xl bg-wa-surface p-4";
-const label = "text-[13px] text-wa-muted mb-1.5";
+const label = "text-[11px] text-wa-muted mb-1.5";
 const field =
-  "w-full h-11 rounded-lg bg-wa-bg border border-wa-field px-3 text-[16px] text-wa-text placeholder:text-wa-muted2 focus:outline-none focus:border-[#25D366]";
+  "w-full h-11 rounded-lg bg-wa-bg border border-wa-field px-3 text-[13.5px] text-wa-text placeholder:text-wa-muted2 focus:outline-none focus:border-[#25D366]";
 const primaryBtn =
-  "h-11 px-5 rounded-full bg-[#25D366] text-wa-bg font-semibold text-[15px] disabled:opacity-40 active:scale-[.98] transition";
-const ghostBtn = "h-11 px-5 rounded-full border border-wa-field text-wa-text text-[15px] hover:bg-white/5 active:bg-white/10 disabled:opacity-40";
+  "h-11 px-5 rounded-full bg-[#25D366] text-wa-bg font-semibold text-[13px] disabled:opacity-40 active:scale-[.98] transition";
+const ghostBtn = "h-11 px-5 rounded-full border border-wa-field text-wa-text text-[13px] hover:bg-white/5 active:bg-white/10 disabled:opacity-40";
 
 /* ---------------- Account: photo, name, about, email, password ---------------- */
 export const AccountPage = () => {
@@ -78,7 +78,7 @@ export const AccountPage = () => {
         <input className={field} value={name} maxLength={50} onChange={(e) => setName(e.target.value)} />
         <p className={`${label} mt-4`}>About</p>
         <input className={field} value={about} maxLength={139} placeholder="Say something about yourself" onChange={(e) => setAbout(e.target.value)} />
-        <p className="text-[12px] text-wa-muted2 mt-1.5 text-right">{about.length}/139</p>
+        <p className="text-[10px] text-wa-muted2 mt-1.5 text-right">{about.length}/139</p>
         <div className="flex justify-end mt-2">
           <button
             className={primaryBtn}
@@ -92,17 +92,17 @@ export const AccountPage = () => {
 
       <div className={card}>
         <p className={label}>Email</p>
-        <p className="text-[16px] text-wa-text break-all">{authUser?.email}</p>
+        <p className="text-[13.5px] text-wa-text break-all">{authUser?.email}</p>
         <p className={`${label} mt-4`}>Member since</p>
-        <p className="text-[16px] text-wa-text">
+        <p className="text-[13.5px] text-wa-text">
           {authUser?.createdAt ? new Date(authUser.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "—"}
         </p>
       </div>
 
       <Link to="/settings/two-step" className={`${card} flex items-center gap-3 hover:bg-wa-pop`}>
         <span className="flex-1 min-w-0">
-          <span className="block text-[16px] text-wa-text">Two-step verification</span>
-          <span className="block text-[13.5px] text-wa-muted mt-0.5">
+          <span className="block text-[13.5px] text-wa-text">Two-step verification</span>
+          <span className="block text-[11.5px] text-wa-muted mt-0.5">
             {authUser?.twoFactor?.enabled ? "On · extra code when you sign in" : "Add a code from an authenticator app"}
           </span>
         </span>
@@ -110,7 +110,7 @@ export const AccountPage = () => {
       </Link>
 
       <form onSubmit={changePw} className={card}>
-        <p className="text-[16px] text-wa-text mb-3">Change password</p>
+        <p className="text-[13.5px] text-wa-text mb-3">Change password</p>
         <input className={`${field} mb-3`} type="password" autoComplete="current-password" placeholder="Current password" value={cur} onChange={(e) => setCur(e.target.value)} />
         <input className={field} type="password" autoComplete="new-password" placeholder="New password (8+ characters)" value={next} onChange={(e) => setNext(e.target.value)} />
         <div className="flex justify-end mt-3">
@@ -146,11 +146,11 @@ const BackupCodes = ({ codes }) => {
   };
   return (
     <div className={card}>
-      <p className="text-[16px] text-wa-text">Your backup codes</p>
-      <p className="text-[13.5px] text-wa-muted mt-0.5">
+      <p className="text-[13.5px] text-wa-text">Your backup codes</p>
+      <p className="text-[11.5px] text-wa-muted mt-0.5">
         Save these somewhere safe. If you lose your phone, each code lets you sign in once. They won&apos;t be shown again.
       </p>
-      <div className="grid grid-cols-2 gap-2 mt-3 font-mono text-[16px] text-wa-text">
+      <div className="grid grid-cols-2 gap-2 mt-3 font-mono text-[13.5px] text-wa-text">
         {codes.map((c) => (
           <span key={c} className="rounded-lg bg-wa-bg px-3 py-2 text-center">{c}</span>
         ))}
@@ -248,7 +248,7 @@ export const TwoStepPage = () => {
 
   const codeInput = (
     <input
-      className={`${field} text-center tracking-[0.3em] text-[20px]`}
+      className={`${field} text-center tracking-[0.3em] text-[17px]`}
       inputMode="numeric"
       autoComplete="one-time-code"
       maxLength={mode === "disable" ? 11 : 7}
@@ -265,8 +265,8 @@ export const TwoStepPage = () => {
       ) : (
         <>
           <div className={card}>
-            <p className="text-[16px] text-wa-text">{status.enabled ? "Two-step verification is on" : "Add extra security to your account"}</p>
-            <p className="text-[13.5px] text-wa-muted mt-1">
+            <p className="text-[13.5px] text-wa-text">{status.enabled ? "Two-step verification is on" : "Add extra security to your account"}</p>
+            <p className="text-[11.5px] text-wa-muted mt-1">
               {status.enabled
                 ? `When you sign in, you'll enter a 6-digit code from your authenticator app after your password. ${status.backupCodesLeft} backup code${status.backupCodesLeft === 1 ? "" : "s"} left.`
                 : "After your password, you'll also enter a 6-digit code from an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password…). Even if someone learns your password, they can't sign in."}
@@ -282,14 +282,14 @@ export const TwoStepPage = () => {
 
           {setup && (
             <div className={card}>
-              <p className="text-[16px] text-wa-text">1. Scan this in your authenticator app</p>
+              <p className="text-[13.5px] text-wa-text">1. Scan this in your authenticator app</p>
               <div className="flex justify-center my-3">
                 <img src={setup.qr} alt="Authenticator QR code" className="rounded-lg bg-white p-2" width={220} height={220} />
               </div>
-              <p className="text-[13.5px] text-wa-muted">Can&apos;t scan? Enter this key instead:</p>
-              <p className="font-mono text-[15px] text-wa-text break-all select-all mt-1">{setup.secret}</p>
-              <a className="inline-block mt-2 text-[14px] text-[#25D366]" href={setup.otpauthUrl}>Open in authenticator app</a>
-              <p className="text-[16px] text-wa-text mt-5 mb-2">2. Enter the 6-digit code it shows</p>
+              <p className="text-[11.5px] text-wa-muted">Can&apos;t scan? Enter this key instead:</p>
+              <p className="font-mono text-[13px] text-wa-text break-all select-all mt-1">{setup.secret}</p>
+              <a className="inline-block mt-2 text-[12px] text-[#25D366]" href={setup.otpauthUrl}>Open in authenticator app</a>
+              <p className="text-[13.5px] text-wa-text mt-5 mb-2">2. Enter the 6-digit code it shows</p>
               {codeInput}
               <div className="flex justify-end gap-2 mt-3">
                 <button className={ghostBtn} onClick={() => { setSetup(null); setCode(""); }}>Cancel</button>
@@ -311,9 +311,9 @@ export const TwoStepPage = () => {
 
           {status.enabled && mode === "regen" && (
             <div className={card}>
-              <p className="text-[16px] text-wa-text mb-2">Enter a code from your authenticator app</p>
+              <p className="text-[13.5px] text-wa-text mb-2">Enter a code from your authenticator app</p>
               {codeInput}
-              <p className="text-[12.5px] text-wa-muted2 mt-2">Your old backup codes stop working.</p>
+              <p className="text-[10.5px] text-wa-muted2 mt-2">Your old backup codes stop working.</p>
               <div className="flex justify-end gap-2 mt-3">
                 <button className={ghostBtn} onClick={() => setMode(null)}>Cancel</button>
                 <button className={primaryBtn} onClick={regen} disabled={busy || code.replace(/\s/g, "").length !== 6}>Create</button>
@@ -323,10 +323,10 @@ export const TwoStepPage = () => {
 
           {status.enabled && mode === "disable" && (
             <div className={card}>
-              <p className="text-[16px] text-wa-text mb-2">Confirm it&apos;s you</p>
+              <p className="text-[13.5px] text-wa-text mb-2">Confirm it&apos;s you</p>
               <input className={`${field} mb-3`} type="password" autoComplete="current-password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
               {codeInput}
-              <p className="text-[12.5px] text-wa-muted2 mt-2">Use your authenticator code or a backup code.</p>
+              <p className="text-[10.5px] text-wa-muted2 mt-2">Use your authenticator code or a backup code.</p>
               <div className="flex justify-end gap-2 mt-3">
                 <button className={ghostBtn} onClick={() => setMode(null)}>Cancel</button>
                 <button className={primaryBtn} onClick={disable} disabled={busy || !pw || code.trim().length < 6}>Turn off</button>
@@ -391,7 +391,7 @@ export const StarredPage = () => {
       {list === null ? (
         <div className="flex justify-center py-10"><Loader2 className="animate-spin text-[#25D366]" size={28} /></div>
       ) : rows.length === 0 ? (
-        <p className="text-center text-wa-muted py-10 text-[15px]">No starred messages yet.<br />Long-press a message and tap Star to keep it here.</p>
+        <p className="text-center text-wa-muted py-10 text-[13px]">No starred messages yet.<br />Long-press a message and tap Star to keep it here.</p>
       ) : (
         <div className="-mx-4">
           {rows.map(({ m, chat, name, pic, body, mine }) => (
@@ -407,10 +407,10 @@ export const StarredPage = () => {
               <Avatar src={pic} name={name} isGroup={!!m.groupId} size="size-12" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="text-[16px] text-wa-text truncate">{name || "Chat"}</span>
+                  <span className="text-[13.5px] text-wa-text truncate">{name || "Chat"}</span>
                   <span className="text-xs text-wa-muted shrink-0">{formatChatListTime(m.createdAt)}</span>
                 </span>
-                <span className="block text-[14.5px] text-wa-muted line-clamp-2">{mine ? "You: " : ""}{body}</span>
+                <span className="block text-[12.5px] text-wa-muted line-clamp-2">{mine ? "You: " : ""}{body}</span>
               </span>
             </button>
           ))}
@@ -436,7 +436,7 @@ export const PrivacyPage = () => {
 
   return (
     <SettingsShell title="Privacy">
-      <p className="text-[13.5px] text-wa-muted px-1">Who can see what about you.</p>
+      <p className="text-[11.5px] text-wa-muted px-1">Who can see what about you.</p>
       <ToggleRow
         title="Read receipts"
         sub="If you turn this off, you won't send or receive read receipts (blue ticks) in one-to-one chats. Group chats always show them."
@@ -458,8 +458,8 @@ export const PrivacyPage = () => {
 
       <Link to="/settings/two-step" className={`${card} flex items-center gap-3 hover:bg-wa-pop`}>
         <span className="flex-1 min-w-0">
-          <span className="block text-[16px] text-wa-text">Two-step verification</span>
-          <span className="block text-[13.5px] text-wa-muted mt-0.5">Add a code from an authenticator app when you sign in</span>
+          <span className="block text-[13.5px] text-wa-text">Two-step verification</span>
+          <span className="block text-[11.5px] text-wa-muted mt-0.5">Add a code from an authenticator app when you sign in</span>
         </span>
         <span className="text-wa-muted">›</span>
       </Link>
@@ -467,17 +467,17 @@ export const PrivacyPage = () => {
       <div className={card}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[16px] text-wa-text">Blocked contacts</p>
-            <p className="text-[13.5px] text-wa-muted mt-0.5">Blocked people can&apos;t message or call you, and you can&apos;t message them.</p>
+            <p className="text-[13.5px] text-wa-text">Blocked contacts</p>
+            <p className="text-[11.5px] text-wa-muted mt-0.5">Blocked people can&apos;t message or call you, and you can&apos;t message them.</p>
           </div>
         </div>
         <div className="mt-3 -mx-2">
-          {blocked.length === 0 && <p className="px-2 py-2 text-[14px] text-wa-muted2">No one is blocked.</p>}
+          {blocked.length === 0 && <p className="px-2 py-2 text-[12px] text-wa-muted2">No one is blocked.</p>}
           {blocked.map((u) => (
             <div key={u._id} className="flex items-center gap-3 px-2 py-2">
               <Avatar src={u.profilePic} name={u.fullName} size="size-10" />
-              <span className="flex-1 min-w-0 truncate text-[16px] text-wa-text">{u.fullName}</span>
-              <button className="text-[14px] font-medium text-[#25D366] px-3 py-1.5" onClick={() => setUserBlocked(u._id, false)}>
+              <span className="flex-1 min-w-0 truncate text-[13.5px] text-wa-text">{u.fullName}</span>
+              <button className="text-[12px] font-medium text-[#25D366] px-3 py-1.5" onClick={() => setUserBlocked(u._id, false)}>
                 Unblock
               </button>
             </div>
@@ -501,10 +501,10 @@ export const PrivacyPage = () => {
                   }}
                 >
                   <Avatar src={u.profilePic} name={u.fullName} size="size-10" />
-                  <span className="flex-1 min-w-0 truncate text-[16px] text-wa-text">{u.fullName}</span>
+                  <span className="flex-1 min-w-0 truncate text-[13.5px] text-wa-text">{u.fullName}</span>
                 </button>
               ))}
-              {candidates.length === 0 && <p className="px-2 py-2 text-[14px] text-wa-muted2">No one found.</p>}
+              {candidates.length === 0 && <p className="px-2 py-2 text-[12px] text-wa-muted2">No one found.</p>}
             </div>
           </div>
         )}
@@ -547,15 +547,15 @@ export const ChatsSettingsPage = () => {
         }}
       />
       <div className={card}>
-        <p className="text-[16px] text-wa-text">Chat history</p>
-        <p className="text-[13.5px] text-wa-muted mt-0.5">Download a copy of all your chats, or pick one in Storage and data.</p>
+        <p className="text-[13.5px] text-wa-text">Chat history</p>
+        <p className="text-[11.5px] text-wa-muted mt-0.5">Download a copy of all your chats, or pick one in Storage and data.</p>
         <div className="flex justify-end mt-3">
           <BackupButton />
         </div>
       </div>
       <div className={card}>
-        <p className="text-[16px] text-wa-text">Archive all chats</p>
-        <p className="text-[13.5px] text-wa-muted mt-0.5">Move every chat into Archived. You can bring them back any time.</p>
+        <p className="text-[13.5px] text-wa-text">Archive all chats</p>
+        <p className="text-[11.5px] text-wa-muted mt-0.5">Move every chat into Archived. You can bring them back any time.</p>
         <div className="flex justify-end mt-3">
           <button className={ghostBtn} disabled={busy || toArchive.length === 0} onClick={() => run(toArchive, true)}>
             Archive {toArchive.length}
@@ -563,8 +563,8 @@ export const ChatsSettingsPage = () => {
         </div>
       </div>
       <div className={card}>
-        <p className="text-[16px] text-wa-text">Unarchive all chats</p>
-        <p className="text-[13.5px] text-wa-muted mt-0.5">Return everything in Archived to your chat list.</p>
+        <p className="text-[13.5px] text-wa-text">Unarchive all chats</p>
+        <p className="text-[11.5px] text-wa-muted mt-0.5">Return everything in Archived to your chat list.</p>
         <div className="flex justify-end mt-3">
           <button className={ghostBtn} disabled={busy || toRestore.length === 0} onClick={() => run(toRestore, false)}>
             Unarchive {toRestore.length}
@@ -670,27 +670,27 @@ export const StoragePage = () => {
     <SettingsShell title="Storage and data">
       <div className={card}>
         <p className={label}>Your chats</p>
-        <p className="text-[26px] text-wa-text">{rows === null ? "…" : `${totals.messages.toLocaleString()} messages`}</p>
-        <p className="text-[13.5px] text-wa-muted mt-1">
+        <p className="text-[22px] text-wa-text">{rows === null ? "…" : `${totals.messages.toLocaleString()} messages`}</p>
+        <p className="text-[11.5px] text-wa-muted mt-1">
           {rows === null ? "Counting…" : `${totals.photos.toLocaleString()} photos · ${totals.files.toLocaleString()} files${totals.bytes ? ` (${fmtBytes(totals.bytes)})` : ""}`}
         </p>
         <div className="flex justify-end mt-3">
           <BackupButton />
         </div>
-        <p className="text-[12.5px] text-wa-muted2 mt-2">The backup is a JSON file with every message&apos;s text, time and sender, plus links to photos and files.</p>
+        <p className="text-[10.5px] text-wa-muted2 mt-2">The backup is a JSON file with every message&apos;s text, time and sender, plus links to photos and files.</p>
       </div>
 
       <div className={card}>
-        <p className="text-[16px] text-wa-text mb-1">Manage storage</p>
+        <p className="text-[13.5px] text-wa-text mb-1">Manage storage</p>
         {rows === null && <div className="flex justify-center py-4"><Loader2 className="animate-spin text-[#25D366]" size={22} /></div>}
-        {rows !== null && named.length === 0 && <p className="text-[14px] text-wa-muted2 py-2">No messages yet.</p>}
+        {rows !== null && named.length === 0 && <p className="text-[12px] text-wa-muted2 py-2">No messages yet.</p>}
         <div className="-mx-2">
           {named.slice(0, 30).map((r) => (
             <div key={r.key} className="flex items-center gap-3 px-2 py-2">
               <Avatar src={r.pic} name={r.name} isGroup={r.group} size="size-10" />
               <span className="min-w-0 flex-1">
-                <span className="block text-[16px] text-wa-text truncate">{r.name}</span>
-                <span className="block text-[13px] text-wa-muted">
+                <span className="block text-[13.5px] text-wa-text truncate">{r.name}</span>
+                <span className="block text-[11px] text-wa-muted">
                   {r.messages.toLocaleString()} messages{r.photos ? ` · ${r.photos} photos` : ""}{r.files ? ` · ${r.files} files` : ""}
                 </span>
               </span>
@@ -702,8 +702,8 @@ export const StoragePage = () => {
 
       <div className={card}>
         <p className={label}>Stored on this device</p>
-        <p className="text-[22px] text-wa-text">{usage === null ? "…" : fmtBytes(usage)}</p>
-        <p className="text-[13.5px] text-wa-muted mt-1">Saved app files and your last-seen chat list, so Talkies opens fast. Your messages stay on the server.</p>
+        <p className="text-[18.5px] text-wa-text">{usage === null ? "…" : fmtBytes(usage)}</p>
+        <p className="text-[11.5px] text-wa-muted mt-1">Saved app files and your last-seen chat list, so Talkies opens fast. Your messages stay on the server.</p>
         <div className="flex justify-end mt-3">
           <button className={ghostBtn} onClick={clear} disabled={clearing}>
             {clearing ? <Loader2 className="animate-spin" size={18} /> : "Clear cache"}
@@ -740,7 +740,7 @@ export const HelpPage = () => {
     <SettingsShell title="Help and feedback">
       <div className={card}>
         <p className={label}>App version</p>
-        <p className="text-[16px] text-wa-text font-mono">{currentBuildId()}</p>
+        <p className="text-[13.5px] text-wa-text font-mono">{currentBuildId()}</p>
         <div className="flex justify-end mt-3">
           <button className={ghostBtn} onClick={check} disabled={checking}>
             {checking ? <Loader2 className="animate-spin" size={18} /> : (<span className="flex items-center gap-2"><RefreshCw size={16} /> Check for updates</span>)}
@@ -752,7 +752,7 @@ export const HelpPage = () => {
         href="https://github.com/sujaytumu/Chat-App/issues/new"
         target="_blank"
         rel="noreferrer"
-        className={`${card} flex items-center gap-3 text-[16px] text-wa-text hover:bg-wa-pop`}
+        className={`${card} flex items-center gap-3 text-[13.5px] text-wa-text hover:bg-wa-pop`}
       >
         <span className="flex-1">Report a problem</span>
         <ExternalLink size={18} className="text-wa-muted" />

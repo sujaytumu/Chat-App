@@ -61,7 +61,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                       onReact(e);
                       close();
                     }}
-                    className={`text-[22px] leading-none rounded-full p-1 hover:scale-125 transition-transform ${
+                    className={`text-[18.5px] leading-none rounded-full p-1 hover:scale-125 transition-transform ${
                       message.reactions?.some((r) => String(r.user) === String(authUserId) && r.emoji === e)
                         ? "bg-white/15"
                         : ""

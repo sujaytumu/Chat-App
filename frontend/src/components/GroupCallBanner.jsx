@@ -20,15 +20,15 @@ const GroupCallBanner = ({ group }) => {
         <Icon size={18} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-[15px] text-wa-text truncate">
+        <p className="text-[13px] text-wa-text truncate">
           {st.callType === "video" ? "Video" : "Voice"} call in progress
         </p>
-        <p className="text-[12.5px] text-[#8DB5A3]">{n} in call</p>
+        <p className="text-[10.5px] text-[#8DB5A3]">{n} in call</p>
       </div>
       <button
         disabled={full || oneToOne !== "idle"}
         onClick={() => joinCall(group._id, { name: group.name, groupPic: group.groupPic })}
-        className="h-9 px-5 rounded-full bg-[#21C063] text-wa-bg text-[14px] font-semibold disabled:opacity-40"
+        className="h-9 px-5 rounded-full bg-[#21C063] text-wa-bg text-[12px] font-semibold disabled:opacity-40"
       >
         {full ? "Full" : "Join"}
       </button>

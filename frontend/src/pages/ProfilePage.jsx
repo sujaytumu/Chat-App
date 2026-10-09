@@ -67,8 +67,8 @@ const ProfilePage = () => {
         <r.icon size={26} strokeWidth={1.7} className={iconCls} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[17px] leading-[22px] text-wa-text">{r.title}</span>
-        {r.sub && <span className="block text-[14.5px] leading-5 text-wa-muted mt-0.5">{r.sub}</span>}
+        <span className="block text-[14.5px] leading-[22px] text-wa-text">{r.title}</span>
+        {r.sub && <span className="block text-[12.5px] leading-5 text-wa-muted mt-0.5">{r.sub}</span>}
       </span>
     </>
   );
@@ -84,7 +84,7 @@ const ProfilePage = () => {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search settings"
-              className="flex-1 min-w-0 bg-transparent text-[18px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+              className="flex-1 min-w-0 bg-transparent text-[15.5px] text-wa-text placeholder:text-wa-muted focus:outline-none"
             />
             <button
               onClick={() => {
@@ -100,7 +100,7 @@ const ProfilePage = () => {
         ) : (
           <>
             <h1
-              className={`flex-1 min-w-0 truncate text-[28px] leading-none font-normal text-wa-text transition-opacity ${
+              className={`flex-1 min-w-0 truncate text-[24px] leading-none font-normal text-wa-text transition-opacity ${
                 scrolled ? "opacity-100" : "opacity-0"
               }`}
             >
@@ -132,7 +132,7 @@ const ProfilePage = () => {
             />
             <div className="relative flex flex-col items-center pt-6 pb-6">
               {authUser?.about && (
-                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-wa-surface px-5 py-3 text-[16px] text-wa-text text-center">
+                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-wa-surface px-5 py-3 text-[13.5px] text-wa-text text-center">
                   <span className="line-clamp-2 break-words">{authUser.about}</span>
                   <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-3 rotate-45 bg-wa-surface" />
                 </Link>
@@ -150,10 +150,10 @@ const ProfilePage = () => {
                 )}
               </button>
               <div className="mt-6 flex items-center gap-2 px-6 max-w-full">
-                <h2 className="text-[28px] leading-8 font-normal text-wa-text truncate">{authUser?.fullName}</h2>
+                <h2 className="text-[24px] leading-8 font-normal text-wa-text truncate">{authUser?.fullName}</h2>
                 <ChevronDown size={22} className="text-wa-muted shrink-0" />
               </div>
-              <p className="mt-1 text-[17px] text-wa-muted truncate max-w-full px-6">{handle}</p>
+              <p className="mt-1 text-[14.5px] text-wa-muted truncate max-w-full px-6">{handle}</p>
             </div>
           </div>
         )}
@@ -170,7 +170,7 @@ const ProfilePage = () => {
           )
         )}
 
-        {rows.length === 0 && <p className="text-center text-wa-muted py-10 text-[15px]">No results</p>}
+        {rows.length === 0 && <p className="text-center text-wa-muted py-10 text-[13px]">No results</p>}
 
         {!query && (
           <>
@@ -185,7 +185,7 @@ const ProfilePage = () => {
               <span className="size-12 flex items-center justify-center shrink-0">
                 <LogOut size={26} strokeWidth={1.7} className="text-red-400" />
               </span>
-              <span className="text-[17px] text-red-400">Log out</span>
+              <span className="text-[14.5px] text-red-400">Log out</span>
             </button>
           </>
         )}

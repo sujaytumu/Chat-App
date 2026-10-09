@@ -55,7 +55,7 @@ const ChatSearchBar = () => {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search in this chat"
-            className="flex-1 bg-transparent outline-none text-[15px] text-wa-text placeholder:text-wa-muted"
+            className="flex-1 bg-transparent outline-none text-[13px] text-wa-text placeholder:text-wa-muted"
           />
         </div>
       </div>
@@ -72,7 +72,7 @@ const ChatSearchBar = () => {
                 className="w-full text-left px-4 py-3 hover:bg-white/5 border-b border-white/5"
               >
                 <p className="text-xs text-wa-muted mb-0.5">{formatWhen(r.createdAt)}</p>
-                <SearchSnippet text={r.text} query={q} className="text-[15px] text-wa-text" />
+                <SearchSnippet text={r.text} query={q} className="text-[13px] text-wa-text" />
               </button>
             ))
           )}

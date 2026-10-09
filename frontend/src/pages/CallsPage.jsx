@@ -23,7 +23,7 @@ const formatCallTime = (dateStr) => {
 const QuickAction = ({ icon, label, onClick }) => (
   <button onClick={onClick} className="flex flex-col items-center gap-2 w-[72px] shrink-0">
     <span className="size-14 rounded-full bg-wa-tint text-wa-tinttext flex items-center justify-center">{icon}</span>
-    <span className="text-[13px] text-wa-text2 truncate max-w-full">{label}</span>
+    <span className="text-[11px] text-wa-text2 truncate max-w-full">{label}</span>
   </button>
 );
 
@@ -90,12 +90,12 @@ const CallsPage = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search"
-            className="flex-1 bg-transparent outline-none text-[17px] text-wa-text placeholder:text-wa-muted"
+            className="flex-1 bg-transparent outline-none text-[14.5px] text-wa-text placeholder:text-wa-muted"
           />
         </div>
       ) : (
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Calls</h1>
+          <h1 className="text-[24px] leading-none font-bold tracking-tight text-wa-text">Calls</h1>
           <div className="flex items-center gap-1 relative">
             <button onClick={() => setSearching(true)} className="size-10 flex items-center justify-center text-wa-icon" aria-label="Search">
               <Search size={24} />
@@ -107,7 +107,7 @@ const CallsPage = () => {
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-11 z-40 min-w-[180px] rounded-xl bg-wa-pop shadow-xl py-2">
-                  <button onClick={() => navigate("/settings/privacy")} className="w-full text-left px-5 py-2.5 text-[15px] text-wa-text hover:bg-wa-hover">
+                  <button onClick={() => navigate("/settings/privacy")} className="w-full text-left px-5 py-2.5 text-[13px] text-wa-text hover:bg-wa-hover">
                     Settings
                   </button>
                 </div>
@@ -127,7 +127,7 @@ const CallsPage = () => {
           </div>
         )}
 
-        <h2 className="px-4 pb-2 text-[16px] font-semibold text-wa-text">Recent</h2>
+        <h2 className="px-4 pb-2 text-[13.5px] font-semibold text-wa-text">Recent</h2>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
@@ -150,8 +150,8 @@ const CallsPage = () => {
               >
                 <img src={otherUser.profilePic || "/avatar.png"} alt={otherUser.fullName} className="size-12 rounded-full object-cover shrink-0" />
                 <div className="flex-1 min-w-0 text-left">
-                  <p className={`text-[17px] truncate ${isMissed && !isOutgoing ? "text-red-500" : "text-wa-text"}`}>{otherUser.fullName}</p>
-                  <div className="flex items-center gap-1 text-[14px] text-wa-muted">
+                  <p className={`text-[14.5px] truncate ${isMissed && !isOutgoing ? "text-red-500" : "text-wa-text"}`}>{otherUser.fullName}</p>
+                  <div className="flex items-center gap-1 text-[12px] text-wa-muted">
                     {dir}
                     <span>{formatCallTime(call.createdAt)}</span>
                   </div>
@@ -178,7 +178,7 @@ const CallsPage = () => {
         <div className="fixed inset-0 z-[120] bg-black/50 flex items-end sm:items-center justify-center" onClick={() => setPicker(false)}>
           <div className="w-full sm:max-w-sm max-h-[75vh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-wa-panel" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 pt-4 pb-2">
-              <h3 className="text-[18px] font-semibold text-wa-text">New call</h3>
+              <h3 className="text-[15.5px] font-semibold text-wa-text">New call</h3>
               <button onClick={() => setPicker(false)} className="size-9 flex items-center justify-center text-wa-icon"><X size={22} /></button>
             </div>
             <div className="overflow-y-auto pb-4">
@@ -186,7 +186,7 @@ const CallsPage = () => {
               {pickable.map((u) => (
                 <div key={u._id} className="flex items-center gap-3 px-5 py-2.5">
                   <img src={u.profilePic || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
-                  <span className="flex-1 min-w-0 truncate text-[16px] text-wa-text">{u.fullName}</span>
+                  <span className="flex-1 min-w-0 truncate text-[13.5px] text-wa-text">{u.fullName}</span>
                   <button onClick={() => { setPicker(false); handleCallBack(u, "audio"); }} className="size-10 flex items-center justify-center text-wa-icon"><Phone size={21} /></button>
                   <button onClick={() => { setPicker(false); handleCallBack(u, "video"); }} className="size-10 flex items-center justify-center text-wa-icon"><Video size={21} /></button>
                 </div>

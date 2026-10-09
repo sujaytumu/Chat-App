@@ -60,13 +60,13 @@ const Tile = ({ stream, name, label, pic, muted, videoOn, mirror, contain, self,
         </div>
       )}
       <div className="absolute left-2 bottom-2 right-2 flex items-center gap-1.5 pointer-events-none">
-        <span className="max-w-full truncate rounded-full bg-black/55 px-2.5 py-1 text-[12.5px] text-white flex items-center gap-1">
+        <span className="max-w-full truncate rounded-full bg-black/55 px-2.5 py-1 text-[10.5px] text-white flex items-center gap-1">
           {muted && <MicOff size={13} className="shrink-0" />}
           <span className="truncate">{label ?? (self ? "You" : name)}</span>
         </span>
       </div>
       {connecting && !self && (
-        <div className="absolute top-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[12px] text-white/90">Connecting…</div>
+        <div className="absolute top-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] text-white/90">Connecting…</div>
       )}
     </div>
   );
@@ -83,23 +83,23 @@ const Incoming = () => {
   return (
     <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col items-center justify-between py-16 px-6">
       <div className="flex flex-col items-center text-center">
-        <p className="text-[15px] text-wa-muted mb-6">Group {isVideo ? "video" : "voice"} call</p>
+        <p className="text-[13px] text-wa-muted mb-6">Group {isVideo ? "video" : "voice"} call</p>
         <Avatar src={incoming.groupPic} name={incoming.groupName} isGroup size="size-32" textSize="text-5xl" />
-        <h2 className="mt-6 text-[28px] text-wa-text max-w-full truncate">{incoming.groupName}</h2>
-        <p className="mt-2 text-[16px] text-wa-muted">{incoming.from?.fullName || "Someone"} is calling…</p>
+        <h2 className="mt-6 text-[24px] text-wa-text max-w-full truncate">{incoming.groupName}</h2>
+        <p className="mt-2 text-[13.5px] text-wa-muted">{incoming.from?.fullName || "Someone"} is calling…</p>
       </div>
       <div className="flex items-center gap-16">
         <div className="flex flex-col items-center gap-2">
           <button onClick={decline} className="size-16 rounded-full bg-[#F15C6D] text-white flex items-center justify-center active:scale-95" aria-label="Decline">
             <PhoneOff size={28} />
           </button>
-          <span className="text-[13px] text-wa-muted">Decline</span>
+          <span className="text-[11px] text-wa-muted">Decline</span>
         </div>
         <div className="flex flex-col items-center gap-2">
           <button onClick={accept} className="size-16 rounded-full bg-[#21C063] text-wa-bg flex items-center justify-center active:scale-95" aria-label="Join">
             {isVideo ? <Video size={28} /> : <Phone size={28} />}
           </button>
-          <span className="text-[13px] text-wa-muted">Join</span>
+          <span className="text-[11px] text-wa-muted">Join</span>
         </div>
       </div>
     </div>
@@ -120,7 +120,7 @@ const Ctl = ({ on, onClick, label, children, danger }) => (
     >
       {children}
     </button>
-    <span className="text-[12px] text-wa-muted">{label}</span>
+    <span className="text-[10px] text-wa-muted">{label}</span>
   </div>
 );
 
@@ -154,8 +154,8 @@ const ParticipantsSheet = ({ groupId, onClose }) => {
     <div className="flex items-center gap-3 px-5 py-2.5">
       <Avatar src={m.profilePic} name={m.fullName} size="size-11" />
       <div className="min-w-0 flex-1">
-        <p className="text-[16px] text-wa-text truncate">{m._id === authUser._id ? "You" : m.fullName}</p>
-        <p className="text-[13px] text-wa-muted">{right?.sub}</p>
+        <p className="text-[13.5px] text-wa-text truncate">{m._id === authUser._id ? "You" : m.fullName}</p>
+        <p className="text-[11px] text-wa-muted">{right?.sub}</p>
       </div>
       {right?.node}
     </div>
@@ -169,22 +169,22 @@ const ParticipantsSheet = ({ groupId, onClose }) => {
       >
         <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-white/20" />
         <div className="flex items-center px-5 py-3">
-          <h3 className="flex-1 text-[19px] text-wa-text">Add participant</h3>
-          <button onClick={onClose} className="text-[15px] text-[#21C063]">
+          <h3 className="flex-1 text-[16px] text-wa-text">Add participant</h3>
+          <button onClick={onClose} className="text-[13px] text-[#21C063]">
             Done
           </button>
         </div>
         <div className="overflow-y-auto pb-4">
-          <p className="px-5 pt-1 pb-1 text-[13px] text-wa-muted">In this call ({joined.length})</p>
+          <p className="px-5 pt-1 pb-1 text-[11px] text-wa-muted">In this call ({joined.length})</p>
           {joined.map((m) => (
             <Row key={m._id} m={m} right={{ sub: "Joined", node: <span className="size-2.5 rounded-full bg-[#21C063]" /> }} />
           ))}
 
           {rest.length > 0 && (
             <div className="flex items-center px-5 pt-4 pb-1">
-              <p className="flex-1 text-[13px] text-wa-muted">Not in the call ({rest.length})</p>
+              <p className="flex-1 text-[11px] text-wa-muted">Not in the call ({rest.length})</p>
               {!full && (
-                <button onClick={() => ring(rest.map((m) => m._id))} className="text-[13.5px] text-[#21C063]">
+                <button onClick={() => ring(rest.map((m) => m._id))} className="text-[11.5px] text-[#21C063]">
                   Ring everyone
                 </button>
               )}
@@ -209,7 +209,7 @@ const ParticipantsSheet = ({ groupId, onClose }) => {
               }}
             />
           ))}
-          {full && <p className="px-5 pt-3 text-[13px] text-wa-muted">This call is full ({MAX_GROUP_CALL} people).</p>}
+          {full && <p className="px-5 pt-3 text-[11px] text-wa-muted">This call is full ({MAX_GROUP_CALL} people).</p>}
         </div>
       </div>
     </div>
@@ -283,8 +283,8 @@ const Active = () => {
       {/* Top bar: name + lock + timer in the middle, switch-camera on the right */}
       <div className="relative flex items-center justify-center px-14 pt-[calc(14px+env(safe-area-inset-top))] pb-2 shrink-0">
         <div className="text-center min-w-0">
-          <p className="text-[17px] text-wa-text truncate">{groupName}</p>
-          <p className="text-[12.5px] text-wa-muted flex items-center justify-center gap-1">
+          <p className="text-[14.5px] text-wa-text truncate">{groupName}</p>
+          <p className="text-[10.5px] text-wa-muted flex items-center justify-center gap-1">
             <Lock size={11} />
             {status === "joining" ? "Connecting…" : `${fmt(elapsed)} · ${count} in call`}
           </p>

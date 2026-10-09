@@ -8,8 +8,8 @@ const NoChatSelected = () => {
         <div className="mx-auto size-24 rounded-full bg-wa-surface flex items-center justify-center">
           <MessageCircleHeart className="size-11 text-[#25D366]" strokeWidth={1.6} />
         </div>
-        <h2 className="text-[28px] font-light text-wa-text">Talkies</h2>
-        <p className="text-wa-muted text-[15px] leading-relaxed">
+        <h2 className="text-[24px] font-light text-wa-text">Talkies</h2>
+        <p className="text-wa-muted text-[13px] leading-relaxed">
           Send and receive messages, share photos and make voice or video calls. Select a chat from the list to
           get started.
         </p>

@@ -36,7 +36,7 @@ const GroupEmojiPhoto = ({ onClose, onSave }) => {
           <button onClick={onClose} aria-label="Close">
             <X size={24} />
           </button>
-          <h3 className="text-[19px] flex-1">Emoji & sticker</h3>
+          <h3 className="text-[16px] flex-1">Emoji & sticker</h3>
           <button
             onClick={() => onSave(renderEmojiPhoto(emoji, bg))}
             className="size-10 rounded-full bg-[#00A884] flex items-center justify-center"
@@ -48,7 +48,7 @@ const GroupEmojiPhoto = ({ onClose, onSave }) => {
 
         <div className="flex flex-col items-center gap-3 py-3">
           <div
-            className="size-32 rounded-full flex items-center justify-center text-[64px] leading-none"
+            className="size-32 rounded-full flex items-center justify-center text-[54.5px] leading-none"
             style={{ background: bg }}
           >
             {emoji}

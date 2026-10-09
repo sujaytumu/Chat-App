@@ -9,7 +9,7 @@ const SettingsShell = ({ title, children, back = "/profile", right = null, flush
       <Link to={back} className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
         <WaBack size={24} />
       </Link>
-      <h1 className="text-[22px] font-normal pl-3 truncate flex-1">{title}</h1>
+      <h1 className="text-[18.5px] font-normal pl-3 truncate flex-1">{title}</h1>
       {right}
     </div>
     <div className="flex-1 overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-8">
@@ -46,8 +46,8 @@ export const ToggleRow = ({ title, sub, checked, onChange }) => (
     aria-checked={checked}
   >
     <span className="flex-1 min-w-0">
-      <span className="block text-[16px] text-wa-text">{title}</span>
-      {sub && <span className="block text-[13.5px] text-wa-muted mt-0.5">{sub}</span>}
+      <span className="block text-[13.5px] text-wa-text">{title}</span>
+      {sub && <span className="block text-[11.5px] text-wa-muted mt-0.5">{sub}</span>}
     </span>
     <Switch checked={checked} />
   </button>

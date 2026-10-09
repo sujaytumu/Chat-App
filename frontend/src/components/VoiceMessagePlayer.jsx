@@ -133,7 +133,7 @@ const VoiceMessagePlayer = ({ file, onError }) => {
             />
           ))}
         </div>
-        <div className="flex items-center justify-between text-[11px] opacity-80 tabular-nums mt-0.5">
+        <div className="flex items-center justify-between text-[9.4px] opacity-80 tabular-nums mt-0.5">
           <span>{fmt(shown)}</span>
           {(playing || rate !== 1) && (
             <button type="button" onClick={cycleSpeed} className="px-1.5 rounded-full bg-white/20 font-medium">

@@ -74,11 +74,11 @@ export const AppearancePage = () => {
       />
 
       <button onClick={() => setPicking(true)} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field">
-        <span className="block text-[16px]">Default wallpaper</span>
-        <span className="block text-[13.5px] text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Wallpaper.</span>
+        <span className="block text-[13.5px]">Default wallpaper</span>
+        <span className="block text-[11.5px] text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Wallpaper.</span>
       </button>
       {chatCount > 0 && (
-        <button onClick={clearAllChats} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[15px]">
+        <button onClick={clearAllChats} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[13px]">
           Reset {chatCount} chat{chatCount > 1 ? "s" : ""} with their own wallpaper
         </button>
       )}
@@ -108,7 +108,7 @@ export const AppearancePage = () => {
                 <div className="rounded bg-neutral"></div>
               </div>
             </div>
-            <span className="text-[11px] font-medium truncate w-full text-center">
+            <span className="text-[9.4px] font-medium truncate w-full text-center">
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </span>
           </button>

@@ -139,10 +139,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       <div className="absolute top-[calc(18px+env(safe-area-inset-top))] inset-x-0 flex items-center gap-3 px-3 z-20 bg-gradient-to-b from-black/50 to-transparent pb-6 pt-1">
         <img src={user.profilePic || "/avatar.png"} alt={user.fullName} className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
-          <p className="text-white text-[16px] font-medium truncate">{isOwn ? "My status" : user.fullName}</p>
-          <p className="text-white/80 text-[13px] truncate">{ago(current.createdAt)}</p>
+          <p className="text-white text-[13.5px] font-medium truncate">{isOwn ? "My status" : user.fullName}</p>
+          <p className="text-white/80 text-[11px] truncate">{ago(current.createdAt)}</p>
           {current.song?.url && (
-            <p className="flex items-center gap-1.5 text-white text-[13px] leading-5 min-w-0">
+            <p className="flex items-center gap-1.5 text-white text-[11px] leading-5 min-w-0">
               <Music size={13} className="shrink-0" />
               <span className="truncate">{current.song.name || "Song"}</span>
             </p>
@@ -156,7 +156,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
               }
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 text-white/90 text-[13px] leading-5 min-w-0"
+              className="flex items-center gap-1.5 text-white/90 text-[11px] leading-5 min-w-0"
             >
               <MapPin size={13} className="shrink-0 text-[#F15C6D]" />
               <span className="truncate">{current.location.name}</span>
@@ -183,7 +183,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       >
         {current.type === "text" && (
           <div className="w-full h-full flex items-center justify-center p-8" style={{ backgroundColor: current.backgroundColor }}>
-            <p className="text-white text-[28px] leading-snug text-center break-words whitespace-pre-wrap">{linkify(current.content)}</p>
+            <p className="text-white text-[24px] leading-snug text-center break-words whitespace-pre-wrap">{linkify(current.content)}</p>
           </div>
         )}
         {current.type === "image" && <img src={current.content} alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
@@ -203,7 +203,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             <span className="size-28 rounded-full bg-[#ff8f4d] flex items-center justify-center">
               <Headphones size={48} className="text-white" />
             </span>
-            <p className="text-white text-[17px] break-all">{current.file?.name || "Audio"}</p>
+            <p className="text-white text-[14.5px] break-all">{current.file?.name || "Audio"}</p>
             <audio
               ref={mediaEl}
               src={current.content}
@@ -218,8 +218,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             <span className="size-24 rounded-2xl bg-[#7f66ff] flex items-center justify-center">
               <FileText size={44} className="text-white" />
             </span>
-            <p className="text-white text-[17px] break-all">{current.file?.name || "File"}</p>
-            <p className="text-white/70 text-[14px]">{sizeLabel(current.file?.size)}</p>
+            <p className="text-white text-[14.5px] break-all">{current.file?.name || "File"}</p>
+            <p className="text-white/70 text-[12px]">{sizeLabel(current.file?.size)}</p>
             <a
               href={current.content}
               target="_blank"
@@ -227,7 +227,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
               download={current.file?.name}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
-              className="relative z-30 mt-1 flex items-center gap-2 rounded-full bg-[#00A884] text-white px-6 py-3 text-[15.5px]"
+              className="relative z-30 mt-1 flex items-center gap-2 rounded-full bg-[#00A884] text-white px-6 py-3 text-[13px]"
             >
               <Download size={18} /> Open / download
             </a>
@@ -237,7 +237,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
         {/* Caption */}
         {current.caption && (
-          <p className={`absolute inset-x-0 ${isOwn ? "bottom-16" : "bottom-0 pb-[calc(16px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[16px] bg-black/50 break-words`}>
+          <p className={`absolute inset-x-0 ${isOwn ? "bottom-16" : "bottom-0 pb-[calc(16px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
             {linkify(current.caption)}
           </p>
         )}
@@ -252,7 +252,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
           className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center gap-0.5 pt-6 pb-[calc(14px+env(safe-area-inset-bottom))] text-white bg-gradient-to-t from-black/70 to-transparent"
         >
           <ChevronUp size={20} className="text-white/80" />
-          <span className="flex items-center gap-1.5 text-[15px]">
+          <span className="flex items-center gap-1.5 text-[13px]">
             <Eye size={18} /> {viewCount}
           </span>
         </button>
@@ -268,14 +268,14 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20" />
             <div className="flex items-center gap-3 px-5 py-3">
               <Eye size={20} className="text-wa-muted" />
-              <h3 className="flex-1 text-[18px] text-wa-text">Viewed by {viewCount}</h3>
+              <h3 className="flex-1 text-[15.5px] text-wa-text">Viewed by {viewCount}</h3>
               <button onClick={() => setShowViewers(false)} className="text-wa-muted" aria-label="Close">
                 <X size={22} />
               </button>
             </div>
             <div className="overflow-y-auto pb-3">
               {views.length === 0 ? (
-                <p className="text-center text-wa-muted py-10 text-[15px]">
+                <p className="text-center text-wa-muted py-10 text-[13px]">
                   {viewCount > 0 ? "Viewer names aren't available for this older update." : "No views yet"}
                 </p>
               ) : (
@@ -283,8 +283,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
                   <div key={v.user._id} className="flex items-center gap-3 px-5 py-2.5">
                     <img src={v.user.profilePic || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
                     <div className="min-w-0">
-                      <p className="text-[16px] text-wa-text truncate">{v.user.fullName}</p>
-                      <p className="text-[13.5px] text-wa-muted">{ago(v.at)}</p>
+                      <p className="text-[13.5px] text-wa-text truncate">{v.user.fullName}</p>
+                      <p className="text-[11.5px] text-wa-muted">{ago(v.at)}</p>
                     </div>
                   </div>
                 ))
@@ -298,9 +298,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       {confirmDelete && (
         <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center p-6" onClick={() => setConfirmDelete(false)}>
           <div className="w-full max-w-xs rounded-2xl bg-wa-pop p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[18px] text-wa-text mb-1">Delete this status update?</h3>
-            <p className="text-[14px] text-wa-muted mb-5">It will be removed for everyone who could see it.</p>
-            <div className="flex justify-end gap-6 text-[15.5px]">
+            <h3 className="text-[15.5px] text-wa-text mb-1">Delete this status update?</h3>
+            <p className="text-[12px] text-wa-muted mb-5">It will be removed for everyone who could see it.</p>
+            <div className="flex justify-end gap-6 text-[13px]">
               <button onClick={() => setConfirmDelete(false)} className="text-[#21C063]" disabled={deleting}>
                 Cancel
               </button>

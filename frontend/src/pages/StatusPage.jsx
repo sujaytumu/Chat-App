@@ -35,7 +35,7 @@ const StatusPage = () => {
   return (
     <div className="relative flex-1 flex flex-col bg-wa-bg overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
+        <h1 className="text-[24px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -72,8 +72,8 @@ const StatusPage = () => {
                 </span>
               </div>
               <div className="text-left min-w-0">
-                <p className="text-[17px] text-wa-text">My status</p>
-                <p className="text-[14px] text-wa-muted">
+                <p className="text-[14.5px] text-wa-text">My status</p>
+                <p className="text-[12px] text-wa-muted">
                   {feed.myStatuses.length > 0
                     ? statusTime(feed.myStatuses[feed.myStatuses.length - 1].createdAt)
                     : "Tap to add status update"}
@@ -88,7 +88,7 @@ const StatusPage = () => {
               ([title, list]) =>
                 list.length > 0 && (
                   <div key={title}>
-                    <p className="px-4 pt-4 pb-1 text-[14px] font-medium text-wa-muted">{title}</p>
+                    <p className="px-4 pt-4 pb-1 text-[12px] font-medium text-wa-muted">{title}</p>
                     {list.map(({ user, statuses, hasUnseen }) => (
                       <button
                         key={user._id}
@@ -103,8 +103,8 @@ const StatusPage = () => {
                           } ring-offset-2 ring-offset-wa-bg`}
                         />
                         <div className="text-left min-w-0">
-                          <p className="text-[17px] text-wa-text truncate">{user.fullName}</p>
-                          <p className="text-[14px] text-wa-muted">{statusTime(statuses[statuses.length - 1].createdAt)}</p>
+                          <p className="text-[14.5px] text-wa-text truncate">{user.fullName}</p>
+                          <p className="text-[12px] text-wa-muted">{statusTime(statuses[statuses.length - 1].createdAt)}</p>
                         </div>
                       </button>
                     ))}
@@ -116,7 +116,7 @@ const StatusPage = () => {
               <p className="text-center text-wa-muted py-10 text-sm">No status updates yet</p>
             )}
 
-            <p className="flex items-center justify-center gap-1.5 px-6 py-6 text-[13.5px] text-wa-muted text-center border-t border-white/10 mt-4">
+            <p className="flex items-center justify-center gap-1.5 px-6 py-6 text-[11.5px] text-wa-muted text-center border-t border-white/10 mt-4">
               <Lock size={13} className="shrink-0" /> Your status updates are{" "}
               <span className="text-[#00A884]">end-to-end encrypted</span>
             </p>

@@ -94,13 +94,13 @@ const NotificationSettings = () => {
 
 
 // ---------- WhatsApp-style rows and dialog ----------
-const Section = ({ children }) => <p className="px-4 pt-5 pb-1 text-[15px] text-wa-muted">{children}</p>;
+const Section = ({ children }) => <p className="px-4 pt-5 pb-1 text-[13px] text-wa-muted">{children}</p>;
 const Divider = () => <div className="h-px bg-white/5 mt-2" />;
 
 const Row = ({ title, sub, onClick }) => (
   <button type="button" onClick={onClick} className="w-full px-4 py-4 text-left hover:bg-white/5 active:bg-wa-surface transition-colors">
-    <span className="block text-[17px] leading-[22px] text-wa-text">{title}</span>
-    <span className="block text-[14.5px] leading-5 text-wa-muted mt-0.5">{sub}</span>
+    <span className="block text-[14.5px] leading-[22px] text-wa-text">{title}</span>
+    <span className="block text-[12.5px] leading-5 text-wa-muted mt-0.5">{sub}</span>
   </button>
 );
 
@@ -151,17 +151,17 @@ const ChoiceDialog = ({ title, options, value, onPreview, onSave, onClose, kind,
   return (
     <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center p-6" onClick={onClose}>
       <div className="w-full max-w-sm bg-wa-pop rounded-3xl pt-6 pb-3 shadow-2xl max-h-[85dvh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <h3 className="px-6 text-[20px] text-wa-text mb-3">{title}</h3>
+        <h3 className="px-6 text-[17px] text-wa-text mb-3">{title}</h3>
         <div className="overflow-y-auto flex-1">
           {all.map((o) => (
             <button key={o.id} type="button" onClick={() => pick(o.id)} className="w-full flex items-center gap-4 px-6 py-3 text-left hover:bg-white/5">
               <Radio on={sel === o.id} />
-              <span className="text-[16px] text-wa-text truncate">{o.label}</span>
+              <span className="text-[13.5px] text-wa-text truncate">{o.label}</span>
             </button>
           ))}
           {allowCustom && (
             <div className="flex items-center gap-2 px-6 py-2">
-              <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-2 text-[14.5px] text-[#21C063] py-2">
+              <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center gap-2 text-[12.5px] text-[#21C063] py-2">
                 <Music size={16} /> {customName ? "Choose a different sound" : "Choose from this device"}
               </button>
               {customName && (
@@ -238,7 +238,7 @@ export const NotificationsPage = () => {
           {menu && (
             <div className="absolute right-2 top-full mt-1 w-64 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30">
               <button
-                className="w-full px-4 py-3 text-[15px] text-wa-text text-left hover:bg-white/5"
+                className="w-full px-4 py-3 text-[13px] text-wa-text text-left hover:bg-white/5"
                 onClick={async () => {
                   setMenu(false);
                   await resetNotificationSettings();
@@ -269,8 +269,8 @@ export const NotificationsPage = () => {
           className="w-full flex items-center gap-4 px-4 py-4 text-left hover:bg-white/5"
         >
           <span className="flex-1 min-w-0">
-            <span className="block text-[17px] leading-[22px] text-wa-text">Conversation tones</span>
-            <span className="block text-[14.5px] leading-5 text-wa-muted mt-0.5">Play sounds for incoming messages.</span>
+            <span className="block text-[14.5px] leading-[22px] text-wa-text">Conversation tones</span>
+            <span className="block text-[12.5px] leading-5 text-wa-muted mt-0.5">Play sounds for incoming messages.</span>
           </span>
           <Switch checked={convTones} />
         </button>
