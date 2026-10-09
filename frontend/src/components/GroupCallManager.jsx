@@ -288,13 +288,23 @@ const Active = () => {
             {status === "joining" ? "Connecting…" : `${fmt(elapsed)} · ${count} in call`}
           </p>
         </div>
-        <button
-          onClick={() => setShowPeople(true)}
-          className="absolute right-3 top-[calc(10px+env(safe-area-inset-top))] size-11 rounded-full flex items-center justify-center text-wa-text bg-white/10 active:bg-white/20"
-          aria-label="Add participant"
-        >
-          <UserPlus size={22} />
-        </button>
+        {isPhoneLike() && cameraOn && !isScreenSharing ? (
+          <button
+            onClick={flipCamera}
+            className="absolute right-3 top-[calc(10px+env(safe-area-inset-top))] size-11 rounded-full flex items-center justify-center text-wa-text bg-white/10 active:bg-white/20"
+            aria-label="Switch camera"
+          >
+            <SwitchCamera size={22} />
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowPeople(true)}
+            className="absolute right-3 top-[calc(10px+env(safe-area-inset-top))] size-11 rounded-full flex items-center justify-center text-wa-text bg-white/10 active:bg-white/20"
+            aria-label="Add participant"
+          >
+            <UserPlus size={22} />
+          </button>
+        )}
       </div>
 
       {spot ? (
@@ -323,11 +333,6 @@ const Active = () => {
           <Ctl on={isMuted} onClick={toggleMute} label={isMuted ? "Unmute" : "Mute"}>
             {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
           </Ctl>
-          {isPhoneLike() && cameraOn && !isScreenSharing && (
-            <Ctl onClick={flipCamera} label="Flip">
-              <SwitchCamera size={28} />
-            </Ctl>
-          )}
           {canShare && (
             <Ctl on={isScreenSharing} onClick={toggleScreenShare} label={isScreenSharing ? "Stop" : "Share"}>
               {isScreenSharing ? <ScreenShareOff size={28} /> : <ScreenShare size={28} />}

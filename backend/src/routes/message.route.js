@@ -13,6 +13,7 @@ import {
   ackDelivered,
   setChatPinned,
   setChatMuted,
+  setChatLists,
   deleteChatForMe,
   searchMessages,
   reactToMessage,
@@ -33,6 +34,7 @@ router.put("/archive", protectRoute, setChatArchived);
 router.post("/ack-delivered", protectRoute, ackDelivered);
 router.put("/pin-chat", protectRoute, setChatPinned);
 router.put("/mute-chat", protectRoute, setChatMuted);
+router.put("/chat-lists", protectRoute, setChatLists);
 router.delete("/chat/:chatType/:chatId", protectRoute, deleteChatForMe);
 router.put("/seen/:id", protectRoute, markMessagesAsSeen);
 router.put("/pin/:id", protectRoute, togglePinMessage);

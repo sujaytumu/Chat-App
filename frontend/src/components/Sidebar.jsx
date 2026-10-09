@@ -19,6 +19,7 @@ import {
 import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
 import { buzz } from "../lib/uiSettings";
+import ChatListModal from "./ChatListModal";
 import {
   WaBack,
   WaKebab,
@@ -38,6 +39,7 @@ const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 const FILTERS = [
   { id: "all", label: "All" },
   { id: "unread", label: "Unread" },
+  { id: "fav", label: "Favourites" },
   { id: "groups", label: "Groups" },
   { id: "online", label: "Online" },
 ];
@@ -65,6 +67,7 @@ const Sidebar = () => {
     setChatArchived,
     setChatPinned,
     setChatMuted,
+    setChatLists,
     deleteChat,
     searchMessages,
     jumpToMessage,
@@ -81,6 +84,7 @@ const Sidebar = () => {
       setChatArchived: st.setChatArchived,
       setChatPinned: st.setChatPinned,
       setChatMuted: st.setChatMuted,
+      setChatLists: st.setChatLists,
       deleteChat: st.deleteChat,
       searchMessages: st.searchMessages,
       jumpToMessage: st.jumpToMessage,
@@ -191,6 +195,19 @@ const Sidebar = () => {
   const mutedKeys = authUser?.mutedChats;
   const mutedSet = useMemo(() => new Set(mutedKeys || []), [mutedKeys]);
 
+  // Favourites (built in) + the user's own lists, kept on the account.
+  const rawLists = authUser?.chatLists;
+  const lists = useMemo(() => rawLists || [], [rawLists]);
+  const favList = lists.find((l) => l.id === "favourites");
+  const customLists = lists.filter((l) => l.id !== "favourites");
+  const [listModal, setListModal] = useState(null); // null | { id } (id "new" = create)
+  const activeList = filter.startsWith("list:") ? customLists.find((l) => `list:${l.id}` === filter) : null;
+  const activeKeys = useMemo(() => {
+    if (filter === "fav") return new Set(favList?.chats || []);
+    if (activeList) return new Set(activeList.chats);
+    return null;
+  }, [filter, favList, activeList]);
+
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
 
@@ -236,10 +253,11 @@ const Sidebar = () => {
         if (filter === "unread") return item.unreadCount > 0;
         if (filter === "groups") return item.type === "group";
         if (filter === "online") return item.online;
+        if (activeKeys) return activeKeys.has(`${item.type === "group" ? "g" : "d"}:${item.data._id}`);
         return true;
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, showArchived]);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, showArchived, activeKeys]);
 
   const selectedItems = items.filter((i) => selected.has(i.key));
   const allPinned = selectedItems.length > 0 && selectedItems.every((i) => i.pinned);
@@ -265,6 +283,29 @@ const Sidebar = () => {
     bulk((i) => setChatArchived(chatOf(i), !showArchived, { silent: true }), (n) =>
       showArchived ? `${n} chat${n > 1 ? "s" : ""} unarchived` : `${n} chat${n > 1 ? "s" : ""} archived`
     );
+  // ---- Lists ----
+  const keyOf = (i) => `${i.type === "group" ? "g" : "d"}:${i.data._id}`;
+  const candidates = useMemo(
+    () => [
+      ...users.map((u) => ({ key: `d:${u._id}`, name: u.fullName, avatar: u.profilePic })),
+      ...groups.map((g) => ({ key: `g:${g._id}`, name: g.name, avatar: g.groupPic })),
+    ],
+    [users, groups]
+  );
+  const putList = (id, name, chats) => {
+    const exists = lists.some((l) => l.id === id);
+    const next = exists ? lists.map((l) => (l.id === id ? { ...l, name, chats } : l)) : [...lists, { id, name, chats }];
+    return setChatLists(next);
+  };
+  const addSelectedTo = async (id, name) => {
+    const keys = selectedItems.map(keyOf);
+    const cur = lists.find((l) => l.id === id)?.chats || [];
+    const allIn = keys.every((k) => cur.includes(k));
+    const chats = allIn ? cur.filter((k) => !keys.includes(k)) : [...new Set([...cur, ...keys])];
+    clearSelected();
+    const ok = await putList(id, name, chats);
+    if (ok) toast(allIn ? `Removed from ${name}` : `Added to ${name}`);
+  };
   const onDelete = async () => {
     setConfirmDelete(false);
     const targets = selectedItems;
@@ -326,6 +367,31 @@ const Sidebar = () => {
                 >
                   Select all
                 </button>
+                <button
+                  className={menuItem}
+                  onClick={() => {
+                    setShowSelMenu(false);
+                    addSelectedTo("favourites", "Favourites");
+                  }}
+                >
+                  {selectedItems.length > 0 && selectedItems.every((i) => favList?.chats.includes(keyOf(i)))
+                    ? "Remove from Favourites"
+                    : "Add to Favourites"}
+                </button>
+                {customLists.map((l) => (
+                  <button
+                    key={l.id}
+                    className={menuItem}
+                    onClick={() => {
+                      setShowSelMenu(false);
+                      addSelectedTo(l.id, l.name);
+                    }}
+                  >
+                    <span className="truncate">
+                      {selectedItems.length > 0 && selectedItems.every((i) => l.chats.includes(keyOf(i))) ? "Remove from" : "Add to"} {l.name}
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -413,7 +479,11 @@ const Sidebar = () => {
       {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
       {!showArchived && (
       <div className={`flex gap-2 overflow-x-auto no-scrollbar px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
-        {FILTERS.map(({ id, label }) => {
+        {[
+          ...FILTERS.slice(0, 3),
+          ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name })),
+          ...FILTERS.slice(3),
+        ].map(({ id, label }) => {
           const active = filter === id;
           return (
             <button
@@ -430,11 +500,31 @@ const Sidebar = () => {
             </button>
           );
         })}
+        <button
+          onClick={() => setListModal({ id: "new" })}
+          className="h-10 px-4 rounded-full text-[16px] whitespace-nowrap border border-wa-field text-wa-icon hover:bg-white/5 flex items-center gap-1"
+          aria-label="New list"
+        >
+          <span className="text-[20px] leading-none">+</span> New list
+        </button>
       </div>
       )}
 
       {/* Chat list */}
       <div className="overflow-y-auto flex-1 pb-24">
+        {!showArchived && activeKeys && !search && (
+          <div className="px-4 pb-2 flex items-center justify-between">
+            <span className="text-[14px] text-wa-muted">
+              {filter === "fav" ? "Favourites" : activeList?.name} · {items.length} chat{items.length === 1 ? "" : "s"}
+            </span>
+            <button
+              onClick={() => setListModal({ id: filter === "fav" ? "favourites" : activeList.id })}
+              className="text-[14px] font-medium text-[#25D366] px-2 py-1"
+            >
+              {filter === "fav" ? "Add" : "Edit"}
+            </button>
+          </div>
+        )}
         {!showArchived && archivedInfo.count > 0 && !search && filter === "all" && (
           <button
             onClick={() => {
@@ -593,6 +683,8 @@ const Sidebar = () => {
               ? "No archived chats"
               : filter === "all"
               ? "No chats yet"
+              : activeKeys
+              ? "No chats in this list yet. Tap Add / Edit above, or select chats and use ⋮ → Add to list."
               : "Nothing here"}
           </div>
         )}
@@ -607,6 +699,38 @@ const Sidebar = () => {
       >
         <WaNewChat size={28} />
       </button>
+
+      {listModal && (() => {
+        const isNew = listModal.id === "new";
+        const isFav = listModal.id === "favourites";
+        const cur = isNew ? null : isFav ? favList : customLists.find((l) => l.id === listModal.id);
+        const id = isNew ? `l${Date.now().toString(36)}` : listModal.id;
+        return (
+          <ChatListModal
+            title={isNew ? "New list" : isFav ? "Favourites" : "Edit list"}
+            initialName={isFav ? "Favourites" : cur?.name || ""}
+            nameEditable={!isFav}
+            initialKeys={cur?.chats || []}
+            candidates={candidates}
+            onClose={() => setListModal(null)}
+            onSave={async (name, chats) => {
+              if (customLists.length >= 10 && isNew) return toast.error("You can have up to 10 lists"), false;
+              const ok = await putList(id, name, chats);
+              if (ok && isNew) setFilter(`list:${id}`);
+              return ok;
+            }}
+            onDelete={
+              isNew || isFav
+                ? undefined
+                : async () => {
+                    const ok = await setChatLists(lists.filter((l) => l.id !== id));
+                    if (ok) setFilter("all");
+                    return ok;
+                  }
+            }
+          />
+        );
+      })()}
 
       {confirmDelete && (
         <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>

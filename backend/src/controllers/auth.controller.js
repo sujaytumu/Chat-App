@@ -44,6 +44,7 @@ export const signup = async (req, res) => {
         archivedChats: newUser.archivedChats || [],
         pinnedChats: newUser.pinnedChats || [],
         mutedChats: newUser.mutedChats || [],
+      chatLists: newUser.chatLists || [],
       });
     } else {
       res.status(400).json({ message: "Invalid user data" });
@@ -81,6 +82,7 @@ export const login = async (req, res) => {
       archivedChats: user.archivedChats || [],
       pinnedChats: user.pinnedChats || [],
       mutedChats: user.mutedChats || [],
+      chatLists: user.chatLists || [],
     });
   } catch (error) {
     console.log("Error in login controller", error.message);
