@@ -31,19 +31,15 @@ export const WaKebab = ({ size = 24, className = "" }) => (
 
 // Pin chat (selection bar): outlined tack with a small star, like WhatsApp
 export const WaPinAction = ({ size = 24, className = "" }) => (
-  <svg {...base(size, className)}>
-    <g {...stroke}>
-      <path d="M8 3h8M9.5 3v6L6.5 13h11l-3-4V3M12 13v6" />
-    </g>
-    <path fill="currentColor" d="M18.5 15.2l1 2 2.2.3-1.6 1.5.4 2.2-2-1.1-2 1.1.4-2.2-1.6-1.5 2.2-.3z" />
+  <svg {...base(size, className)} fill="currentColor">
+    <path d="M14 4v5c0 1.12.37 2.16 1 3H9c.65-.86 1-1.9 1-3V4h4m3-2H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3V4h1c.55 0 1-.45 1-1s-.45-1-1-1z" />
   </svg>
 );
 
 export const WaUnpinAction = ({ size = 24, className = "" }) => (
-  <svg {...base(size, className)}>
-    <g {...stroke}>
-      <path d="M8 3h8M9.5 3v6L6.5 13h11l-3-4V3M12 13v6M3.5 3.5l17 17" />
-    </g>
+  <svg {...base(size, className)} fill="currentColor">
+    <path d="M14 4v5c0 1.12.37 2.16 1 3H9c.65-.86 1-1.9 1-3V4h4m3-2H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3V4h1c.55 0 1-.45 1-1s-.45-1-1-1z" />
+    <path d="M4 3.4L20.6 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
   </svg>
 );
 
@@ -55,37 +51,28 @@ export const WaPinSolid = ({ size = 18, className = "" }) => (
 );
 
 export const WaTrash = ({ size = 24, className = "" }) => (
-  <svg {...base(size, className)}>
-    <g {...stroke}>
-      <path d="M4 7h16M9 7V4.5h6V7M6.5 7l.8 12.2A1.8 1.8 0 009.1 21h5.8a1.8 1.8 0 001.8-1.8L17.5 7M10 11v6M14 11v6" />
-    </g>
+  <svg {...base(size, className)} fill="currentColor">
+    <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z" />
   </svg>
 );
 
 export const WaBell = ({ size = 24, className = "" }) => (
-  <svg {...base(size, className)}>
-    <g {...stroke}>
-      <path d="M5.5 17.5h13l-1.7-2.2v-4.8a4.8 4.8 0 00-9.6 0v4.8L5.5 17.5zM10 20.3a2.2 2.2 0 004 0" />
-    </g>
+  <svg {...base(size, className)} fill="currentColor">
+    <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" />
   </svg>
 );
 
 export const WaBellOff = ({ size = 24, className = "" }) => (
-  <svg {...base(size, className)}>
-    <g {...stroke}>
-      <path d="M5.5 17.5h13l-1.7-2.2v-4.8a4.8 4.8 0 00-9.6 0v4.8L5.5 17.5zM10 20.3a2.2 2.2 0 004 0M3.5 3.5l17 17" />
-    </g>
+  <svg {...base(size, className)} fill="currentColor">
+    <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z" />
+    <path d="M4 3.4L20.6 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
   </svg>
 );
 
 // Archive: wide lid, box below, arrow down (unarchive = arrow up)
 export const WaArchive = ({ size = 24, className = "", up = false }) => (
-  <svg {...base(size, className)}>
-    <g {...stroke}>
-      <rect x="3" y="3.5" width="18" height="4.5" rx="1.3" />
-      <path d="M4.5 8v11a1.5 1.5 0 001.5 1.5h12a1.5 1.5 0 001.5-1.5V8" />
-      {up ? <path d="M12 17.5V11.5M9.3 14.2l2.7-2.7 2.7 2.7" /> : <path d="M12 11v6M9.3 14.3l2.7 2.7 2.7-2.7" />}
-    </g>
+  <svg {...base(size, className)} fill="currentColor">
+    <path d={up ? "M20.55 5.22l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.15.55L3.46 5.22C3.17 5.57 3 6.01 3 6.5V19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.49-.17-.93-.45-1.28zM6.24 5h11.52l.83 1H5.42l.82-1zM5 19V8h14v11H5zm3-5h2.55v3h2.9v-3H16l-4-4z" : "M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM6.24 5h11.52l.81.97H5.44l.8-.97zM5 19V8h14v11H5zm8.45-9h-2.9v3H8l4 4 4-4h-2.55z"} />
   </svg>
 );
 
