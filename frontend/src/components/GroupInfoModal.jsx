@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Crown, UserMinus, UserPlus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2 } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
+import { useGroupCallStore } from "../store/useGroupCallStore";
+import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
 
 const GroupInfoModal = ({ group, onClose }) => {
-  const { users, addMembersToGroup, removeMemberFromGroup, leaveGroup, updateGroupInfo } = useChatStore();
+  const { users, addMembersToGroup, removeMemberFromGroup, leaveGroup, updateGroupInfo, setChatSearchOpen } = useChatStore();
+  const startGroupCall = useGroupCallStore((st) => st.startCall);
+  const joinGroupCall = useGroupCallStore((st) => st.joinCall);
+  const groupCallActive = useGroupCallStore((st) => !!st.states[group._id]?.active);
+  const oneToOneBusy = useCallStore((st) => st.callStatus !== "idle");
+  const groupBusy = useGroupCallStore((st) => st.status !== "idle");
+  const callBusy = oneToOneBusy || groupBusy;
   const { authUser } = useAuthStore();
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [toAdd, setToAdd] = useState([]);
@@ -78,6 +86,19 @@ const GroupInfoModal = ({ group, onClose }) => {
     if (isAdmin) setPhotoMenu((o) => !o);
     else if (group.groupPic) setViewPhoto(true);
   };
+
+  const placeCall = (type) => {
+    onClose();
+    if (groupCallActive) joinGroupCall(group._id, { name: group.name, groupPic: group.groupPic });
+    else startGroupCall(group, type);
+  };
+
+  const actionBtns = [
+    { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
+    { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
+    isAdmin && { icon: UserPlus, label: "Add", run: () => setShowAddMembers(true) },
+    { icon: Search, label: "Search", run: () => { onClose(); setTimeout(() => setChatSearchOpen(true), 50); } },
+  ].filter(Boolean);
 
   const handleLeave = async () => {
     if (!confirm(`Leave "${group.name}"?`)) return;
@@ -194,6 +215,21 @@ const GroupInfoModal = ({ group, onClose }) => {
           <p className="text-[15px] text-[#8696A0]">
             Group · <span className="text-[#21C063] font-medium">{group.members.length} members</span>
           </p>
+          <div className="mt-3 flex items-start justify-center gap-3">
+            {actionBtns.map((b) => (
+              <button
+                key={b.label}
+                onClick={b.run}
+                disabled={b.disabled}
+                className="flex flex-col items-center gap-1.5 w-[76px] disabled:opacity-40"
+              >
+                <span className="w-full h-11 rounded-full bg-[#2A3942] hover:bg-[#33444E] flex items-center justify-center">
+                  <b.icon size={22} />
+                </span>
+                <span className="text-[13px]">{b.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -243,20 +279,18 @@ const GroupInfoModal = ({ group, onClose }) => {
               <div key={member._id} className="flex items-center gap-3 px-4 py-2.5">
                 <img
                   src={member.profilePic || "/avatar.png"}
-                  alt={member.fullName}
+                  alt={member._id === authUser._id ? "You" : member.fullName}
                   className="size-9 rounded-full object-cover"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate flex items-center gap-1">
-                    {member.fullName}
-                    {member._id === authUser._id && <span className="text-xs text-[#8696A0]">(you)</span>}
+                    {member._id === authUser._id ? "You" : member.fullName}
+                    
                   </p>
-                  {memberIsAdmin && (
-                    <p className="text-xs text-amber-500 flex items-center gap-1">
-                      <Crown size={11} /> Admin
-                    </p>
-                  )}
                 </div>
+                {memberIsAdmin && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-[#103529] text-[#7FE3A8] shrink-0">Group admin</span>
+                )}
                 {isAdmin && member._id !== authUser._id && (
                   <button
                     onClick={() => removeMemberFromGroup(group._id, member._id)}
@@ -273,7 +307,7 @@ const GroupInfoModal = ({ group, onClose }) => {
 
         <div className="p-4 border-t border-white/10">
           <button onClick={handleLeave} className="btn btn-outline btn-error btn-sm w-full gap-2">
-            <LogOut size={14} /> Leave group
+            <LogOut size={14} /> Exit group
           </button>
         </div>
       </div>
