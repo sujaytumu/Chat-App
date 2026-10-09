@@ -25,9 +25,9 @@ const StatusPage = () => {
   }, [loadFeed]);
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0B141A] overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
+    <div className="flex-1 flex flex-col bg-wa-bg overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <h1 className="text-[28px] leading-none font-bold tracking-tight text-[#E9EDEF]">Updates</h1>
+        <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -43,14 +43,14 @@ const StatusPage = () => {
                   ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
                   : setShowCreate(true)
               }
-              className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-[#1F2C34]"
+              className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface"
             >
               <div className="relative">
                 <img
                   src={authUser.profilePic || "/avatar.png"}
                   alt="My status"
                   className={`size-14 rounded-full object-cover ${
-                    feed.myStatuses.length > 0 ? "ring-2 ring-[#25D366] ring-offset-2 ring-offset-[#0B141A]" : ""
+                    feed.myStatuses.length > 0 ? "ring-2 ring-[#25D366] ring-offset-2 ring-offset-wa-bg" : ""
                   }`}
                 />
                 <span
@@ -64,8 +64,8 @@ const StatusPage = () => {
                 </span>
               </div>
               <div className="text-left">
-                <p className="text-[17px] text-[#E9EDEF]">My status</p>
-                <p className="text-xs text-[#8696A0]">
+                <p className="text-[17px] text-wa-text">My status</p>
+                <p className="text-xs text-wa-muted">
                   {feed.myStatuses.length > 0 ? `${feed.myStatuses.length} update(s) · tap to view` : "Tap to add status"}
                 </p>
               </div>
@@ -73,23 +73,23 @@ const StatusPage = () => {
 
             {feed.others.length > 0 && (
               <>
-                <p className="px-4 pt-3 pb-1 text-xs font-medium text-[#8696A0]">Recent updates</p>
+                <p className="px-4 pt-3 pb-1 text-xs font-medium text-wa-muted">Recent updates</p>
                 {feed.others.map(({ user, statuses, hasUnseen }) => (
                   <button
                     key={user._id}
                     onClick={() => setViewing({ user, statuses, isOwn: false })}
-                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-[#1F2C34]"
+                    className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface"
                   >
                     <img
                       src={user.profilePic || "/avatar.png"}
                       alt={user.fullName}
                       className={`size-14 rounded-full object-cover ${
-                        hasUnseen ? "ring-2 ring-[#25D366]" : "ring-2 ring-[#8696A0]/40"
-                      } ring-offset-2 ring-offset-[#0B141A]`}
+                        hasUnseen ? "ring-2 ring-[#25D366]" : "ring-2 ring-wa-muted/40"
+                      } ring-offset-2 ring-offset-wa-bg`}
                     />
                     <div className="text-left">
-                      <p className="text-[17px] text-[#E9EDEF]">{user.fullName}</p>
-                      <p className="text-xs text-[#8696A0]">
+                      <p className="text-[17px] text-wa-text">{user.fullName}</p>
+                      <p className="text-xs text-wa-muted">
                         {new Date(statuses[statuses.length - 1].createdAt).toLocaleTimeString("en-US", {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -102,7 +102,7 @@ const StatusPage = () => {
             )}
 
             {feed.others.length === 0 && feed.myStatuses.length === 0 && (
-              <p className="text-center text-[#8696A0] py-10 text-sm">No status updates yet</p>
+              <p className="text-center text-wa-muted py-10 text-sm">No status updates yet</p>
             )}
           </>
         )}

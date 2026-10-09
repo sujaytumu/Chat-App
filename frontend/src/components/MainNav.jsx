@@ -37,7 +37,7 @@ const MainNav = () => {
   return (
     <>
       {/* Desktop: vertical rail */}
-      <nav className="hidden lg:flex flex-col items-center w-[72px] bg-[#111B21] border-r border-white/5 py-4 gap-3 shrink-0">
+      <nav className="hidden lg:flex flex-col items-center w-[72px] bg-wa-panel border-r border-white/5 py-4 gap-3 shrink-0">
         {items.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
@@ -46,13 +46,13 @@ const MainNav = () => {
             title={label}
             className={({ isActive }) =>
               `relative size-11 rounded-xl flex items-center justify-center transition-colors ${
-                isActive ? "bg-[#2A3942] text-[#E9EDEF]" : "text-[#AEBAC1] hover:bg-white/5"
+                isActive ? "bg-wa-field text-wa-text" : "text-wa-icon hover:bg-white/5"
               }`
             }
           >
             <Icon size={24} filled={false} />
             {to === "/" && unread > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-[#0B141A] text-[10px] font-bold flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#25D366] text-wa-bg text-[10px] font-bold flex items-center justify-center">
                 {unread > 99 ? "99+" : unread}
               </span>
             )}
@@ -63,7 +63,7 @@ const MainNav = () => {
           to="/profile"
           title="You"
           className={`size-11 rounded-xl flex items-center justify-center transition-colors ${
-            youActive ? "bg-[#2A3942]" : "hover:bg-white/5"
+            youActive ? "bg-wa-field" : "hover:bg-white/5"
           }`}
         >
           <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-8" textSize="text-sm" />
@@ -74,7 +74,7 @@ const MainNav = () => {
       <nav
         className={`${
           hideOnPhone ? "hidden" : "flex"
-        } lg:hidden fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-[#0B141A] border-t border-white/5 items-stretch justify-around z-30`}
+        } lg:hidden fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
       >
         {items.map(({ to, icon: Icon, label, end }) => (
           <NavLink key={to} to={to} end={end} className="flex-1 flex flex-col items-center justify-center gap-1">
@@ -82,28 +82,28 @@ const MainNav = () => {
               <>
                 <span
                   className={`relative h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
-                    isActive ? "bg-[#103629] text-[#D9FDD3]" : "text-[#D1D7DB] active:bg-white/5"
+                    isActive ? "bg-wa-tint text-wa-tinttext" : "text-wa-text2 active:bg-white/5"
                   }`}
                 >
                   <Icon size={26} filled={isActive} />
                   {to === "/" && unread > 0 && (
-                    <span className="absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-[#0B141A] text-[11px] font-semibold flex items-center justify-center">
+                    <span className="absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-wa-bg text-[11px] font-semibold flex items-center justify-center">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}
                 </span>
-                <span className={`text-[13px] leading-none text-[#E9EDEF] ${isActive ? "font-semibold" : ""}`}>{label}</span>
+                <span className={`text-[13px] leading-none text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
               </>
             )}
           </NavLink>
         ))}
         <NavLink to="/profile" className="flex-1 flex flex-col items-center justify-center gap-1">
           <span className={`h-8 w-16 rounded-full flex items-center justify-center`}>
-            <span className={`rounded-full p-[3px] ${youActive ? "bg-[#103629] ring-0" : ""}`}>
+            <span className={`rounded-full p-[3px] ${youActive ? "bg-wa-tint ring-0" : ""}`}>
               <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
             </span>
           </span>
-          <span className={`text-[13px] leading-none text-[#E9EDEF] ${youActive ? "font-semibold" : ""}`}>You</span>
+          <span className={`text-[13px] leading-none text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
         </NavLink>
       </nav>
     </>

@@ -40,7 +40,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setOpen((s) => !s)}
-        className={`size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 mb-1 transition-opacity ${
+        className={`size-6 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 mb-1 transition-opacity ${
           visible || open ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -49,7 +49,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
 
       {open && (
         <div
-          className={`absolute ${isMe ? "right-0" : "left-0"} bottom-full mb-1 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-20 overflow-hidden max-h-[70vh] overflow-y-auto`}
+          className={`absolute ${isMe ? "right-0" : "left-0"} bottom-full mb-1 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-20 overflow-hidden max-h-[70vh] overflow-y-auto`}
         >
           {!confirmingDelete ? (
             <>
@@ -77,7 +77,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onReply();
                   close();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
                 <Reply size={20} />
                 Reply
@@ -85,7 +85,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
               {message.text && (
                 <button
                   onClick={handleCopy}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
                 >
                   <Copy size={20} />
                   Copy
@@ -97,7 +97,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                     onTranslate();
                     close();
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
                 >
                   <Languages size={20} />
                   Translate
@@ -108,7 +108,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onTogglePin();
                   close();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
                 {message.pinned ? <PinOff size={20} /> : <Pin size={20} />}
                 {message.pinned ? "Unpin" : "Pin"}
@@ -118,7 +118,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onToggleStar();
                   close();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
                 {isStarred ? <Star size={20} className="text-yellow-400" /> : <StarOutline size={20} />}
                 {isStarred ? "Unstar" : "Star"}
@@ -128,7 +128,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onForward();
                   close();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
                 <Forward size={20} />
                 Forward
@@ -138,7 +138,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onInfo();
                   close();
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
                 <Info size={20} />
                 Info
@@ -158,7 +158,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                   onDelete("me");
                   close();
                 }}
-                className="w-full text-left px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                className="w-full text-left px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
                 Delete for me
               </button>
@@ -175,7 +175,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
               )}
               <button
                 onClick={close}
-                className="w-full text-left px-4 py-2.5 text-sm text-[#8696A0] hover:bg-white/5 border-t border-white/10"
+                className="w-full text-left px-4 py-2.5 text-sm text-wa-muted hover:bg-white/5 border-t border-white/10"
               >
                 Cancel
               </button>

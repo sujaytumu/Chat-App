@@ -134,9 +134,9 @@ const GroupInfoModal = ({ group, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center sm:p-4">
-      <div className="bg-[#111B21] text-[#E9EDEF] sm:rounded-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
+      <div className="bg-wa-panel text-wa-text sm:rounded-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
         <div className="flex items-center gap-5 px-4 h-14 shrink-0">
-          <button onClick={onClose} className="text-[#E9EDEF]" aria-label="Close">
+          <button onClick={onClose} className="text-wa-text" aria-label="Close">
             <X size={24} />
           </button>
           <h3 className="text-[19px]">Group info</h3>
@@ -147,13 +147,13 @@ const GroupInfoModal = ({ group, onClose }) => {
             <button
               type="button"
               onClick={onAvatarClick}
-              className="relative block size-40 rounded-full overflow-hidden bg-[#2A3942] group"
+              className="relative block size-40 rounded-full overflow-hidden bg-wa-field group"
               aria-label={canEdit ? "Change group photo" : "View group photo"}
             >
               {group.groupPic ? (
                 <img src={group.groupPic} alt={group.name} className="size-full object-cover" />
               ) : (
-                <span className="size-full flex items-center justify-center text-6xl text-[#8696A0]">
+                <span className="size-full flex items-center justify-center text-6xl text-wa-muted">
                   {group.name?.[0]?.toUpperCase()}
                 </span>
               )}
@@ -169,7 +169,7 @@ const GroupInfoModal = ({ group, onClose }) => {
             </button>
 
             {photoMenu && (
-              <div className="absolute z-10 left-1/2 -translate-x-1/2 top-[calc(100%+6px)] w-56 rounded-2xl bg-[#233138] border border-white/10 shadow-2xl py-2">
+              <div className="absolute z-10 left-1/2 -translate-x-1/2 top-[calc(100%+6px)] w-56 rounded-2xl bg-wa-pop border border-white/10 shadow-2xl py-2">
                 {[
                   group.groupPic && { icon: Eye, label: "View photo", run: () => setViewPhoto(true) },
                   { icon: Camera, label: "Take photo", run: () => cameraRef.current?.click() },
@@ -189,7 +189,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                         }}
                         className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[15.5px] hover:bg-white/5 active:bg-white/10"
                       >
-                        <o.icon size={19} className="text-[#AEBAC1]" />
+                        <o.icon size={19} className="text-wa-icon" />
                         {o.label}
                       </button>
                     </div>
@@ -230,7 +230,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                       setNameDraft(group.name);
                       setEditingName(true);
                     }}
-                    className="text-[#E9EDEF] shrink-0"
+                    className="text-wa-text shrink-0"
                     aria-label="Edit group name"
                   >
                     <Pencil size={20} />
@@ -239,7 +239,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               </>
             )}
           </div>
-          <p className="text-[15px] text-[#8696A0]">
+          <p className="text-[15px] text-wa-muted">
             Group · <span className="text-[#21C063] font-medium">{group.members.length} members</span>
           </p>
           <div className="mt-3 flex items-start justify-center gap-3">
@@ -250,7 +250,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                 disabled={b.disabled}
                 className="flex flex-col items-center gap-1.5 w-[76px] disabled:opacity-40"
               >
-                <span className="w-full h-11 rounded-full bg-[#2A3942] hover:bg-[#33444E] flex items-center justify-center">
+                <span className="w-full h-11 rounded-full bg-wa-field hover:bg-wa-hover flex items-center justify-center">
                   <b.icon size={22} />
                 </span>
                 <span className="text-[13px]">{b.label}</span>
@@ -264,10 +264,10 @@ const GroupInfoModal = ({ group, onClose }) => {
             onClick={() => setShowMedia(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
-            <Images size={22} className="text-[#8696A0]" />
+            <Images size={22} className="text-wa-muted" />
             <span className="flex-1 text-[16px]">Media, links and docs</span>
-            <span className="text-[#8696A0]">{mediaCount}</span>
-            <ChevronRight size={18} className="text-[#8696A0]" />
+            <span className="text-wa-muted">{mediaCount}</span>
+            <ChevronRight size={18} className="text-wa-muted" />
           </button>
           {mediaData?.media.length > 0 && (
             <div className="flex gap-1.5 px-5 py-3 overflow-x-auto border-b border-white/10">
@@ -281,32 +281,32 @@ const GroupInfoModal = ({ group, onClose }) => {
             onClick={() => setShowDisappear(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
-            <Timer size={22} className="text-[#8696A0]" />
+            <Timer size={22} className="text-wa-muted" />
             <span className="flex-1">
               <span className="block text-[16px]">Disappearing messages</span>
-              <span className="block text-[13.5px] text-[#8696A0]">{DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}</span>
+              <span className="block text-[13.5px] text-wa-muted">{DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}</span>
             </span>
-            <ChevronRight size={18} className="text-[#8696A0]" />
+            <ChevronRight size={18} className="text-wa-muted" />
           </button>
           <button
             onClick={() => setShowPerms(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
-            <Settings size={22} className="text-[#8696A0]" />
+            <Settings size={22} className="text-wa-muted" />
             <span className="flex-1 text-[16px]">Group permissions</span>
-            <ChevronRight size={18} className="text-[#8696A0]" />
+            <ChevronRight size={18} className="text-wa-muted" />
           </button>
           <button
             onClick={() => setShowStarred(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
-            <Star size={22} className="text-[#8696A0]" />
+            <Star size={22} className="text-wa-muted" />
             <span className="flex-1 text-[16px]">Starred messages</span>
-            <span className="text-[#8696A0]">{starred?.length || ""}</span>
-            <ChevronRight size={18} className="text-[#8696A0]" />
+            <span className="text-wa-muted">{starred?.length || ""}</span>
+            <ChevronRight size={18} className="text-wa-muted" />
           </button>
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <span className="text-sm font-medium text-[#8696A0]">Members</span>
+            <span className="text-sm font-medium text-wa-muted">Members</span>
             {canAddMembers && (
               <button
                 onClick={() => setShowAddMembers((s) => !s)}
@@ -336,7 +336,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                   </label>
                 ))}
                 {nonMembers.length === 0 && (
-                  <p className="text-xs text-[#8696A0]">Everyone is already in this group</p>
+                  <p className="text-xs text-wa-muted">Everyone is already in this group</p>
                 )}
               </div>
               <button className="btn btn-xs btn-primary" onClick={handleAdd} disabled={toAdd.length === 0}>
@@ -361,7 +361,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                   </p>
                 </div>
                 {memberIsAdmin && (
-                  <span className="text-xs px-2 py-0.5 rounded bg-[#103529] text-[#7FE3A8] shrink-0">Group admin</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-wa-tint text-wa-tinttext shrink-0">Group admin</span>
                 )}
                 {isAdmin && member._id !== authUser._id && (
                   <button

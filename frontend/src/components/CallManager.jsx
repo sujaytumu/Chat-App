@@ -105,7 +105,7 @@ const useCallWakeLock = (active) => {
 // bg-white on one element leaves the winner up to stylesheet order.
 const gridBtnBase = "size-16 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95";
 const gridBtnOff = `${gridBtnBase} bg-white/10 hover:bg-white/15 text-white`;
-const gridBtnOn = `${gridBtnBase} bg-white hover:bg-white/90 text-[#0B141A] shadow-lg shadow-white/10`;
+const gridBtnOn = `${gridBtnBase} bg-white hover:bg-white/90 text-wa-bg shadow-lg shadow-white/10`;
 const gridBtn = gridBtnOff;
 const callBtn = (active) => (active ? gridBtnOn : gridBtnOff);
 
@@ -190,8 +190,8 @@ const CallManager = () => {
   // ---- Incoming call ----
   if (callStatus === "incoming") {
     return (
-      <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
-        <div className="bg-[#1F2C34] rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
+      <div className="wa-dark fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
+        <div className="bg-wa-surface rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
           <div className="relative mx-auto mb-4 size-24">
             <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
             <div className="relative">
@@ -199,7 +199,7 @@ const CallManager = () => {
             </div>
           </div>
           <h3 className="text-xl font-semibold text-white">{remoteUser?.fullName}</h3>
-          <p className="text-sm text-[#8696A0] mb-6">
+          <p className="text-sm text-wa-muted mb-6">
             Incoming {callType === "video" ? "video" : "voice"} call…
           </p>
           <div className="flex items-center justify-center gap-10">
@@ -210,7 +210,7 @@ const CallManager = () => {
               >
                 <PhoneEnd size={28} />
               </button>
-              <span className="text-xs text-[#8696A0]">Decline</span>
+              <span className="text-xs text-wa-muted">Decline</span>
             </div>
             <div className="flex flex-col items-center gap-2">
               <button
@@ -219,7 +219,7 @@ const CallManager = () => {
               >
                 <Phone size={26} />
               </button>
-              <span className="text-xs text-[#8696A0]">Accept</span>
+              <span className="text-xs text-wa-muted">Accept</span>
             </div>
           </div>
         </div>
@@ -234,10 +234,10 @@ const CallManager = () => {
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
       <button
         onClick={() => setIsMinimized(false)}
-        className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-[#1F2C34] rounded-full pl-2 pr-4 py-2 flex items-center gap-2 shadow-2xl"
+        className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-wa-surface rounded-full pl-2 pr-4 py-2 flex items-center gap-2 shadow-2xl"
       >
         <CallAvatar user={remoteUser} size="size-8" />
-        <span className="text-white text-sm font-medium">{remoteUser?.fullName}</span>
+        <span className="text-wa-text text-sm font-medium">{remoteUser?.fullName}</span>
         <span className="text-[#00A884] text-xs">
           {callStatus === "calling"
             ? isRemoteRinging
@@ -264,7 +264,7 @@ const CallManager = () => {
         : callDuration || (isVideo ? "Video call" : "Voice call");
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#0B141A] flex flex-col">
+    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
 
       {audioBlocked && (
@@ -338,7 +338,7 @@ const CallManager = () => {
                 <CallAvatar user={remoteUser} />
               </div>
               <p className="text-lg font-medium">{remoteUser?.fullName}</p>
-              <p className="text-sm text-[#8696A0] mt-1">{statusText}</p>
+              <p className="text-sm text-wa-muted mt-1">{statusText}</p>
             </div>
           )}
           <video
@@ -406,13 +406,13 @@ const CallManager = () => {
             </button>
             <span className="text-xs text-white/70">More</span>
             {showMoreMenu && (
-              <div className="absolute bottom-full mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-44 z-10">
+              <div className="absolute bottom-full mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-44 z-10">
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
                     setIsMinimized(true);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-[#D1D7DB] hover:bg-white/5"
+                  className="w-full text-left px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
                 >
                   Switch to chat
                 </button>

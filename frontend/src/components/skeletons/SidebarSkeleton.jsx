@@ -4,7 +4,7 @@ const SidebarSkeleton = () => {
   const rows = Array(8).fill(null);
 
   return (
-    <aside className="h-full w-full lg:w-[400px] xl:w-[420px] shrink-0 bg-[#0B141A] flex flex-col lg:border-r lg:border-white/5">
+    <aside className="h-full w-full lg:w-[400px] xl:w-[420px] shrink-0 bg-wa-bg flex flex-col lg:border-r lg:border-white/5">
       <div className="px-4 pt-4 pb-3">
         <div className="h-7 w-32 rounded-md bg-white/10 animate-pulse" />
       </div>

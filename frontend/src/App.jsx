@@ -108,7 +108,7 @@ const App = () => {
 
   if (isCheckingAuth && !authUser)
     return (
-      <div className="flex items-center justify-center h-[100dvh] bg-[#0B141A]">
+      <div className="flex items-center justify-center h-[100dvh] bg-wa-bg">
         <Loader className="size-10 animate-spin text-[#25D366]" />
       </div>
     );
@@ -120,7 +120,7 @@ const App = () => {
       // soft green background. (The old light-green wrapper showed through as a
       // strip at the bottom of the chat on phone browsers.)
       className={`min-h-[100dvh] flex flex-col ${
-        authUser ? "bg-[#0B141A] text-[#E9EDEF]" : "bg-[#D9E5D8] text-gray-900"
+        authUser ? "bg-wa-bg text-wa-text" : "bg-[#D9E5D8] text-gray-900"
       }`}
     >
       {/* Navbar — hidden on the chat screen itself to give messages more room;

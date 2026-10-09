@@ -2,6 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Colour themes -------------------------------------------------------
+   The app is bright (white, WhatsApp-style) by default. Dark themes add the
+   `wa-dark` class to <html>; call screens carry `wa-dark` themselves so they
+   stay dark in either mode. Components use bg-wa-bg, text-wa-text, ... */
+:root {
+  --wa-bg: 255 255 255;
+  --wa-panel: 255 255 255;
+  --wa-surface: 240 242 245;
+  --wa-pop: 255 255 255;
+  --wa-field: 233 237 239;
+  --wa-hover: 226 230 233;
+  --wa-text: 17 27 33;
+  --wa-muted: 102 119 129;
+  --wa-icon: 84 101 111;
+  --wa-text2: 59 74 84;
+  --wa-muted2: 134 150 160;
+  --wa-out: 217 253 211;
+  --wa-tint: 217 253 211;
+  --wa-tinttext: 10 107 61;
+  --wa-wallpaper: #EFEAE2;
+  --wa-doodle: #000000;
+  --wa-doodle-opacity: 0.06;
+  --wa-scroll: #C5CDD2;
+  --wa-scroll-hover: #AEB8BE;
+}
+.wa-dark {
+  --wa-bg: 11 20 26;
+  --wa-panel: 17 27 33;
+  --wa-surface: 31 44 52;
+  --wa-pop: 35 49 56;
+  --wa-field: 42 57 66;
+  --wa-hover: 38 51 60;
+  --wa-text: 233 237 239;
+  --wa-muted: 134 150 160;
+  --wa-icon: 174 186 193;
+  --wa-text2: 209 215 219;
+  --wa-muted2: 102 119 129;
+  --wa-out: 20 77 55;
+  --wa-tint: 16 54 41;
+  --wa-tinttext: 217 253 211;
+  --wa-wallpaper: #0B141A;
+  --wa-doodle: #FFFFFF;
+  --wa-doodle-opacity: 0.055;
+  --wa-scroll: #374248;
+  --wa-scroll-hover: #4A575F;
+}
+
+/* White see-through overlays were designed for dark screens; in the bright
+   theme they become dark see-through overlays (outside the always-dark call
+   screens). */
+
+html:not(.wa-dark) .bg-white\/10 { background-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .bg-white\/15 { background-color: rgb(0 0 0 / 0.15); }
+html:not(.wa-dark) .bg-white\/20 { background-color: rgb(0 0 0 / 0.2); }
+html:not(.wa-dark) .bg-white\/30 { background-color: rgb(0 0 0 / 0.3); }
+html:not(.wa-dark) .bg-white\/35 { background-color: rgb(0 0 0 / 0.35); }
+html:not(.wa-dark) .bg-white\/5 { background-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .border-white\/10 { border-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .border-white\/20 { border-color: rgb(0 0 0 / 0.2); }
+html:not(.wa-dark) .border-white\/5 { border-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .active\:bg-white\/10:active { background-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .active\:bg-white\/15:active { background-color: rgb(0 0 0 / 0.15); }
+html:not(.wa-dark) .active\:bg-white\/30:active { background-color: rgb(0 0 0 / 0.3); }
+html:not(.wa-dark) .active\:bg-white\/5:active { background-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .hover\:bg-white\/10:hover { background-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .hover\:bg-white\/15:hover { background-color: rgb(0 0 0 / 0.15); }
+html:not(.wa-dark) .hover\:bg-white\/25:hover { background-color: rgb(0 0 0 / 0.25); }
+html:not(.wa-dark) .hover\:bg-white\/5:hover { background-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .hover\:bg-white\/90:hover { background-color: rgb(0 0 0 / 0.9); }
+html:not(.wa-dark) .lg\:border-white\/5 { border-color: rgb(0 0 0 / 0.05); }
+.wa-dark .bg-white\/10 { background-color: rgb(255 255 255 / 0.1); }
+.wa-dark .bg-white\/15 { background-color: rgb(255 255 255 / 0.15); }
+.wa-dark .bg-white\/20 { background-color: rgb(255 255 255 / 0.2); }
+.wa-dark .bg-white\/30 { background-color: rgb(255 255 255 / 0.3); }
+.wa-dark .bg-white\/35 { background-color: rgb(255 255 255 / 0.35); }
+.wa-dark .bg-white\/5 { background-color: rgb(255 255 255 / 0.05); }
+.wa-dark .border-white\/10 { border-color: rgb(255 255 255 / 0.1); }
+.wa-dark .border-white\/20 { border-color: rgb(255 255 255 / 0.2); }
+.wa-dark .border-white\/5 { border-color: rgb(255 255 255 / 0.05); }
+.wa-dark .active\:bg-white\/10:active { background-color: rgb(255 255 255 / 0.1); }
+.wa-dark .active\:bg-white\/15:active { background-color: rgb(255 255 255 / 0.15); }
+.wa-dark .active\:bg-white\/30:active { background-color: rgb(255 255 255 / 0.3); }
+.wa-dark .active\:bg-white\/5:active { background-color: rgb(255 255 255 / 0.05); }
+.wa-dark .hover\:bg-white\/10:hover { background-color: rgb(255 255 255 / 0.1); }
+.wa-dark .hover\:bg-white\/15:hover { background-color: rgb(255 255 255 / 0.15); }
+.wa-dark .hover\:bg-white\/25:hover { background-color: rgb(255 255 255 / 0.25); }
+.wa-dark .hover\:bg-white\/5:hover { background-color: rgb(255 255 255 / 0.05); }
+.wa-dark .hover\:bg-white\/90:hover { background-color: rgb(255 255 255 / 0.9); }
+.wa-dark .lg\:border-white\/5 { border-color: rgb(255 255 255 / 0.05); }
+
 /* Phones: no 300ms tap delay, no grey tap flash, no rubber-banding the page. */
 html {
   -webkit-text-size-adjust: 100%;
@@ -13,7 +103,7 @@ button, a, [role="button"], input, select, textarea, label, summary {
 html,
 body,
 #root {
-  background-color: #0B141A;
+  background-color: rgb(var(--wa-bg));
 }
 /* While the chat shell is mounted the document itself never scrolls — only the
    message list / chat list do. Prevents the header scrolling out of view. */
@@ -40,7 +130,7 @@ body {
 
 /* Dark chat wallpaper: a faint tiled doodle pattern over the base colour. */
 .chat-wallpaper {
-  background-color: #0B141A;
+  background-color: var(--wa-wallpaper);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='%23ffffff' stroke-opacity='0.055' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='30' cy='32' r='9'/%3E%3Cpolygon points='122,16 126,26 137,27 129,34 131,45 122,39 113,45 115,34 107,27 118,26' transform='rotate(12 122 30)'/%3E%3Cpath d='M208 52c-12-9-18-17-12-24 5-6 12-3 12 3 0-6 7-9 12-3 6 7 0 15-12 24z'/%3E%3Crect x='38' y='100' width='26' height='22' rx='6' transform='rotate(-14 51 111)'/%3E%3Cpath d='M112 116q8-14 16 0t16 0t16 0'/%3E%3Cpath d='M190 98h34a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-20l-10 9v-9h-4a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8z'/%3E%3Cpath d='M30 186v18M21 195h18'/%3E%3Cpath d='M118 178a16 16 0 1 0 14 24a13 13 0 0 1-14-24z'/%3E%3Cpath d='M186 214l12-20l12 20z' transform='rotate(8 198 205)'/%3E%3Cpath d='M236 170v26a7 7 0 1 1-4-6v-18l14-4v18' transform='scale(.9) translate(26 14)'/%3E%3Ccircle cx='84' cy='60' r='2'/%3E%3Ccircle cx='160' cy='150' r='2'/%3E%3Ccircle cx='70' cy='236' r='2'/%3E%3Ccircle cx='232' cy='88' r='2'/%3E%3Cpath d='M150 232c6-10 14-10 20 0'/%3E%3C/svg%3E");
   background-size: 260px 260px;
 }
@@ -67,7 +157,7 @@ body {
 /* Thin, dark scrollbars (like WhatsApp Web) instead of the bright default. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #374248 transparent;
+  scrollbar-color: var(--wa-scroll) transparent;
 }
 *::-webkit-scrollbar {
   width: 6px;
@@ -77,11 +167,11 @@ body {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #374248;
+  background: var(--wa-scroll);
   border-radius: 8px;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #4a575f;
+  background: var(--wa-scroll-hover);
 }
 
 /* Selected text uses the WhatsApp green instead of the browser blue. */

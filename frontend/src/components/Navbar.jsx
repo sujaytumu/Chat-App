@@ -7,7 +7,7 @@ const Navbar = () => {
 
   return (
     <header
-      className="bg-[#202C33] border-b border-black/30 fixed w-full top-0 z-40"
+      className="bg-wa-panel border-b border-black/30 fixed w-full top-0 z-40"
     >
       <div className="container mx-auto px-4 h-16">
         <div className="flex items-center justify-between h-full">
@@ -17,7 +17,7 @@ const Navbar = () => {
               <div className="size-9 rounded-lg bg-[#e91e8c]/15 flex items-center justify-center">
                 <MessageSquare className="w-5 h-5 text-[#e91e8c]" />
               </div>
-              <h1 className="text-lg font-bold text-[#E9EDEF]">Talkies 💬</h1>
+              <h1 className="text-lg font-bold text-wa-text">Talkies 💬</h1>
             </Link>
           </div>
 
@@ -25,10 +25,10 @@ const Navbar = () => {
           <div className="flex items-center gap-2">
             <Link
               to={"/settings"}
-              className="size-9 rounded-full flex items-center justify-center text-[#AEBAC1] hover:bg-white/10 transition-colors group relative"
+              className="size-9 rounded-full flex items-center justify-center text-wa-icon hover:bg-white/10 transition-colors group relative"
             >
               <Settings className="w-4 h-4" />
-              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-[#233138] text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-wa-pop text-wa-text shadow px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                 Settings
               </span>
             </Link>
@@ -37,20 +37,20 @@ const Navbar = () => {
               <>
                 <Link
                   to={"/profile"}
-                  className="size-9 rounded-full flex items-center justify-center text-[#AEBAC1] hover:bg-white/10 transition-colors group relative"
+                  className="size-9 rounded-full flex items-center justify-center text-wa-icon hover:bg-white/10 transition-colors group relative"
                 >
                   <User className="size-5" />
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-[#233138] text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-wa-pop text-wa-text shadow px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                     Profile
                   </span>
                 </Link>
 
                 <button
-                  className="size-9 rounded-full flex items-center justify-center text-[#AEBAC1] hover:bg-white/10 transition-colors group relative"
+                  className="size-9 rounded-full flex items-center justify-center text-wa-icon hover:bg-white/10 transition-colors group relative"
                   onClick={logout}
                 >
                   <LogOut className="size-5" />
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-[#233138] text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-xs bg-wa-pop text-wa-text shadow px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                     Logout
                   </span>
                 </button>

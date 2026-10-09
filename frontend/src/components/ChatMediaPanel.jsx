@@ -26,7 +26,7 @@ export function useChatMedia(chatType, chatId) {
 }
 
 export const MediaThumb = ({ item, className = "", onClick }) => (
-  <button type="button" onClick={onClick} className={`relative overflow-hidden bg-[#1F2C34] ${className}`}>
+  <button type="button" onClick={onClick} className={`relative overflow-hidden bg-wa-surface ${className}`}>
     {item.kind === "image" ? (
       <img src={item.url} alt="" loading="lazy" className="size-full object-cover" />
     ) : (
@@ -51,22 +51,22 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
     ["docs", "Docs", data?.docs.length],
     ["links", "Links", data?.links.length],
   ];
-  const empty = <p className="text-center text-[#8696A0] py-16 text-[15px]">Nothing here yet</p>;
+  const empty = <p className="text-center text-wa-muted py-16 text-[15px]">Nothing here yet</p>;
 
   return (
-    <div className="fixed inset-0 z-[96] bg-[#0B141A] text-[#E9EDEF] flex flex-col sm:max-w-md sm:mx-auto">
-      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-[#111B21]">
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
         </button>
         <h3 className="text-[19px] truncate">{title}</h3>
       </div>
-      <div className="flex shrink-0 bg-[#111B21] border-b border-white/10">
+      <div className="flex shrink-0 bg-wa-panel border-b border-white/10">
         {tabs.map(([id, label, n]) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex-1 py-3 text-[15px] border-b-2 ${tab === id ? "border-[#00A884] text-[#00A884]" : "border-transparent text-[#8696A0]"}`}
+            className={`flex-1 py-3 text-[15px] border-b-2 ${tab === id ? "border-[#00A884] text-[#00A884]" : "border-transparent text-wa-muted"}`}
           >
             {label}
             {n ? ` (${n})` : ""}
@@ -76,7 +76,7 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
 
       <div className="flex-1 overflow-y-auto">
         {!data ? (
-          <p className="text-center text-[#8696A0] py-16">Loading…</p>
+          <p className="text-center text-wa-muted py-16">Loading…</p>
         ) : tab === "media" ? (
           data.media.length ? (
             <div className="grid grid-cols-3 gap-0.5">
@@ -103,16 +103,16 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
                 download={d.name}
                 className="flex items-center gap-3 px-4 py-3 hover:bg-white/5"
               >
-                <span className="size-11 rounded-lg bg-[#1F2C34] flex items-center justify-center shrink-0">
-                  <FileText size={22} className="text-[#8696A0]" />
+                <span className="size-11 rounded-lg bg-wa-surface flex items-center justify-center shrink-0">
+                  <FileText size={22} className="text-wa-muted" />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15.5px]">{d.name || "Document"}</span>
-                  <span className="block text-[13px] text-[#8696A0]">
+                  <span className="block text-[13px] text-wa-muted">
                     {[fmtSize(d.size), fmtDate(d.createdAt)].filter(Boolean).join(" · ")}
                   </span>
                 </span>
-                <Download size={18} className="text-[#8696A0]" />
+                <Download size={18} className="text-wa-muted" />
               </a>
             ))
           ) : (
@@ -121,12 +121,12 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
         ) : data.links.length ? (
           data.links.map((l) => (
             <a key={l._id} href={l.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
-              <span className="size-11 rounded-lg bg-[#1F2C34] flex items-center justify-center shrink-0">
-                <Link2 size={22} className="text-[#8696A0]" />
+              <span className="size-11 rounded-lg bg-wa-surface flex items-center justify-center shrink-0">
+                <Link2 size={22} className="text-wa-muted" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] text-[#53BDEB]">{l.url}</span>
-                <span className="block text-[13px] text-[#8696A0]">{fmtDate(l.createdAt)}</span>
+                <span className="block text-[13px] text-wa-muted">{fmtDate(l.createdAt)}</span>
               </span>
             </a>
           ))

@@ -36,8 +36,8 @@ const Avatar = ({ src, name = "", isGroup = false, size = "size-14", textSize = 
 
   if (isGroup) {
     return (
-      <div className={`${base} bg-[#1F2C34] flex items-center justify-center`}>
-        <UsersRound className="size-1/2 text-[#8696A0]" />
+      <div className={`${base} bg-wa-surface flex items-center justify-center`}>
+        <UsersRound className="size-1/2 text-wa-muted" />
       </div>
     );
   }

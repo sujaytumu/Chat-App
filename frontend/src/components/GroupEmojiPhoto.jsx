@@ -29,7 +29,7 @@ const GroupEmojiPhoto = ({ onClose, onSave }) => {
   return (
     <div className="fixed inset-0 z-[95] bg-black/70 flex items-center justify-center sm:p-4" onClick={onClose}>
       <div
-        className="w-full sm:max-w-sm h-full sm:h-auto sm:max-h-[92vh] bg-[#111B21] text-[#E9EDEF] sm:rounded-2xl flex flex-col overflow-hidden"
+        className="w-full sm:max-w-sm h-full sm:h-auto sm:max-h-[92vh] bg-wa-panel text-wa-text sm:rounded-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-5 px-4 h-14 shrink-0">

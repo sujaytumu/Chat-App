@@ -401,16 +401,16 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
-    <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full bg-[#0B141A] lg:bg-[#111B21] border-t border-white/5">
+    <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full bg-wa-bg lg:bg-wa-panel border-t border-white/5">
       {replyingTo && (
-        <div className="mb-2 flex items-center gap-2 bg-[#2A3942] rounded-lg pl-3 pr-2 py-2">
+        <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
             <p className="text-xs font-medium text-[#00A884]">Replying to</p>
-            <p className="text-xs text-[#8696A0] truncate">
+            <p className="text-xs text-wa-muted truncate">
               {replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : replyingTo.text}
             </p>
           </div>
-          <button onClick={clearReplyingTo} className="text-[#8696A0] hover:text-white shrink-0">
+          <button onClick={clearReplyingTo} className="text-wa-muted hover:text-wa-text shrink-0">
             <X size={16} />
           </button>
         </div>
@@ -425,7 +425,7 @@ const MessageInput = () => {
             />
             <button
               onClick={clearAttachments}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2A3942] text-[#E9EDEF] flex items-center justify-center"
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-wa-field text-wa-text flex items-center justify-center"
               type="button"
             >
               <X className="size-3" />
@@ -435,18 +435,18 @@ const MessageInput = () => {
       )}
 
       {imageFallback && (
-        <div className="mb-2.5 flex items-center gap-2 bg-[#2A3942] rounded-lg p-2 pr-3 max-w-xs shadow-sm">
+        <div className="mb-2.5 flex items-center gap-2 bg-wa-field rounded-lg p-2 pr-3 max-w-xs shadow-sm">
           <div className="size-10 rounded-md bg-white/10 flex items-center justify-center shrink-0">
             <ImageIcon size={18} className="text-[#00A884]" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate text-[#E9EDEF]">{imageFallback.name}</p>
-            <p className="text-xs text-[#8696A0]">Photo · preview unavailable, will still send</p>
+            <p className="text-sm font-medium truncate text-wa-text">{imageFallback.name}</p>
+            <p className="text-xs text-wa-muted">Photo · preview unavailable, will still send</p>
           </div>
           <button
             onClick={clearAttachments}
             type="button"
-            className="size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10"
+            className="size-6 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10"
           >
             <X size={14} />
           </button>
@@ -454,20 +454,20 @@ const MessageInput = () => {
       )}
 
       {filePreview && (
-        <div className="mb-2.5 flex items-center gap-2 bg-[#2A3942] rounded-lg p-2 pr-3 max-w-xs shadow-sm">
+        <div className="mb-2.5 flex items-center gap-2 bg-wa-field rounded-lg p-2 pr-3 max-w-xs shadow-sm">
           <div className="size-10 rounded-md bg-white/10 flex items-center justify-center shrink-0">
             {filePreview.kind === "video" && <VideoIcon size={18} className="text-[#00A884]" />}
             {filePreview.kind === "audio" && <Music size={18} className="text-[#00A884]" />}
             {filePreview.kind === "document" && <FileText size={18} className="text-[#00A884]" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium truncate text-[#E9EDEF]">{filePreview.name}</p>
-            <p className="text-xs text-[#8696A0]">{formatFileSize(filePreview.size)}</p>
+            <p className="text-sm font-medium truncate text-wa-text">{filePreview.name}</p>
+            <p className="text-xs text-wa-muted">{formatFileSize(filePreview.size)}</p>
           </div>
           <button
             onClick={clearAttachments}
             type="button"
-            className="size-6 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10"
+            className="size-6 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10"
           >
             <X size={14} />
           </button>
@@ -476,26 +476,26 @@ const MessageInput = () => {
 
       <form onSubmit={handleSendMessage} className="flex items-end gap-1.5">
         {isRecording ? (
-          <div className="flex-1 flex items-center gap-3 bg-[#1F2C34] rounded-full px-4 py-2 min-h-[48px]">
+          <div className="flex-1 flex items-center gap-3 bg-wa-surface rounded-full px-4 py-2 min-h-[48px]">
             <button
               type="button"
               onClick={() => stopRecording(true)}
-              className="text-[#8696A0] hover:text-red-400 transition-colors shrink-0"
+              className="text-wa-muted hover:text-red-400 transition-colors shrink-0"
               title="Cancel recording"
             >
               <Trash2 size={19} />
             </button>
             <span className="size-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
-            <span className="text-[#D1D7DB] text-sm tabular-nums">{formatDuration(recordingSeconds)}</span>
-            <span className="text-[#8696A0] text-xs ml-auto hidden sm:inline">Recording voice message…</span>
+            <span className="text-wa-text2 text-sm tabular-nums">{formatDuration(recordingSeconds)}</span>
+            <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
           </div>
         ) : (
-          <div className="flex-1 min-w-0 flex items-end gap-0.5 bg-[#1F2C34] rounded-[26px] px-1.5 py-1">
+          <div className="flex-1 min-w-0 flex items-end gap-0.5 bg-wa-surface rounded-[26px] px-1.5 py-1">
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker((s) => !s)}
-                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
                 aria-label="Emoji and stickers"
               >
                 <Smile size={24} />
@@ -521,17 +521,17 @@ const MessageInput = () => {
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
-              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-[22px] max-h-32 min-h-[40px] text-[#E9EDEF] placeholder:text-[#8696A0] focus:outline-none"
+              className="flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[16px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none"
               style={{ overflow: "hidden" }}
             />
 
             <div className="relative" ref={attachMenuRef}>
               {showAttachMenu && (
-                <div className="absolute bottom-full right-0 mb-2 bg-[#233138] rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
+                <div className="absolute bottom-full right-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
                   >
                     <span className="size-8 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
                       <ImageIcon size={16} className="text-white" />
@@ -541,7 +541,7 @@ const MessageInput = () => {
                   <button
                     type="button"
                     onClick={() => documentInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
                   >
                     <span className="size-8 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
                       <FileText size={16} className="text-white" />
@@ -551,7 +551,7 @@ const MessageInput = () => {
                   <button
                     type="button"
                     onClick={() => audioInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
                   >
                     <span className="size-8 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
                       <Music size={16} className="text-white" />
@@ -562,7 +562,7 @@ const MessageInput = () => {
                     type="button"
                     onClick={handleShareLocation}
                     disabled={isSharingLocation}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-[#D1D7DB]"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
                   >
                     <span className="size-8 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0">
                       {isSharingLocation ? (
@@ -603,7 +603,7 @@ const MessageInput = () => {
               <button
                 type="button"
                 onClick={() => setShowAttachMenu((s) => !s)}
-                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
                 disabled={isProcessingAttachment}
                 aria-label="Attach"
               >
@@ -619,7 +619,7 @@ const MessageInput = () => {
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="size-10 rounded-full flex items-center justify-center text-[#8696A0] hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
                 disabled={isProcessingAttachment}
                 aria-label="Take a photo"
                 title="Camera"

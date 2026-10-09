@@ -17,8 +17,8 @@ class ErrorBoundary extends Component {
     if (!this.state.hasError) return this.props.children;
     if (this.props.silent) return null;
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center bg-[#0B141A] min-h-screen">
-        <p className="text-[#E9EDEF] font-medium">Something went wrong on this screen.</p>
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center bg-wa-bg min-h-screen">
+        <p className="text-wa-text font-medium">Something went wrong on this screen.</p>
         <div className="flex gap-2">
           <button
             onClick={() => this.setState({ hasError: false })}
@@ -28,7 +28,7 @@ class ErrorBoundary extends Component {
           </button>
           <button
             onClick={() => (window.location.href = "/")}
-            className="px-4 py-2 rounded-lg bg-white/10 text-[#E9EDEF] text-sm"
+            className="px-4 py-2 rounded-lg bg-white/10 text-wa-text text-sm"
           >
             Go to chats
           </button>
