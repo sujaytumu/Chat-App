@@ -11,6 +11,7 @@ import {
   updateGroupInfo,
   updateGroupPermissions,
   setDisappearing,
+  reportGroup,
 } from "../controllers/group.controller.js";
 
 const router = express.Router();
@@ -20,6 +21,7 @@ router.post("/", protectRoute, createGroup);
 router.get("/:id/messages", protectRoute, getGroupMessages);
 router.post("/:id/messages", protectRoute, sendGroupMessage);
 router.put("/:id", protectRoute, updateGroupInfo);
+router.post("/:id/report", protectRoute, reportGroup);
 router.put("/:id/disappearing", protectRoute, setDisappearing);
 router.put("/:id/permissions", protectRoute, updateGroupPermissions);
 router.post("/:id/members", protectRoute, addMembers);

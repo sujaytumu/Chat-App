@@ -1,3 +1,4 @@
+import Report from "../models/report.model.js";
 import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
 import cloudinary from "../lib/cloudinary.js";
@@ -358,6 +359,29 @@ export const updateGroupPermissions = async (req, res) => {
     res.status(200).json(populatedGroup);
   } catch (error) {
     console.log("Error in updateGroupPermissions controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const reportGroup = async (req, res) => {
+  try {
+    const { id: groupId } = req.params;
+    const myId = req.user._id;
+    const group = await Group.findById(groupId).select("members");
+    if (!group || !group.members.some((m) => m.equals(myId))) {
+      return res.status(403).json({ error: "You are not a member of this group" });
+    }
+    const reasons = ["spam", "abuse", "inappropriate", "scam", "other"];
+    const reason = reasons.includes(req.body?.reason) ? req.body.reason : "other";
+    const details = String(req.body?.details || "").slice(0, 500);
+    await Report.findOneAndUpdate(
+      { reporterId: myId, groupId },
+      { reason, details },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in reportGroup controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -8,6 +8,7 @@ import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
+import ReportGroupDialog from "./ReportGroupDialog";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
@@ -48,6 +49,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const canEdit = isAdmin || perms.editInfo === "all";
   const canAddMembers = isAdmin || perms.addMembers === "all";
   const [showPerms, setShowPerms] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
   const memberIds = new Set(group.members.map((m) => m._id || m));
   const nonMembers = users.filter((u) => !memberIds.has(u._id));
@@ -375,12 +377,25 @@ const GroupInfoModal = ({ group, onClose }) => {
           })}
         </div>
 
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 space-y-2">
+          <button onClick={() => setShowReport(true)} className="btn btn-ghost btn-sm w-full gap-2 text-[#F15C6D]">
+            <ThumbsDown size={14} /> Report group
+          </button>
           <button onClick={handleLeave} className="btn btn-outline btn-error btn-sm w-full gap-2">
             <LogOut size={14} /> Exit group
           </button>
         </div>
       </div>
+      {showReport && (
+        <ReportGroupDialog
+          group={group}
+          onClose={() => setShowReport(false)}
+          onReportedAndExit={async () => {
+            await leaveGroup(group._id);
+            onClose();
+          }}
+        />
+      )}
       {showDisappear && <DisappearingPanel group={group} isAdmin={isAdmin} onClose={() => setShowDisappear(false)} />}
       {showPerms && <GroupPermissionsPanel group={group} isAdmin={isAdmin} onClose={() => setShowPerms(false)} />}
       {showStarred && (
