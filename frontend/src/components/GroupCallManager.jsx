@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, Users, SwitchCamera } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Lock } from "lucide-react";
 import { isPhoneLike } from "../lib/device";
 import { useGroupCallStore, canShareScreen, MAX_GROUP_CALL } from "../store/useGroupCallStore";
 import { useChatStore } from "../store/useChatStore";
@@ -103,11 +103,121 @@ const Incoming = () => {
   );
 };
 
+// One labelled round control, same look as the 1-to-1 call screen.
+const Ctl = ({ on, onClick, label, children, danger }) => (
+  <div className="flex flex-col items-center gap-1.5 w-[84px]">
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className={
+        danger
+          ? "size-[66px] rounded-full bg-[#F15C6D] hover:bg-[#e04a5b] text-white flex items-center justify-center active:scale-95 transition"
+          : `${ctl(on).replace("size-16", "size-[66px]")}`
+      }
+    >
+      {children}
+    </button>
+    <span className="text-[12px] text-wa-muted">{label}</span>
+  </div>
+);
+
+// "Add participant": who is in the call right now, and who can be rung.
+const ParticipantsSheet = ({ groupId, onClose }) => {
+  const authUser = useAuthStore((s) => s.authUser);
+  const group = useChatStore((s) => s.groups.find((g) => g._id === groupId));
+  const inCall = useGroupCallStore((s) => s.states[groupId]?.participants) || [];
+  const tiles = useGroupCallStore((s) => s.tiles);
+  const ringMembers = useGroupCallStore((s) => s.ringMembers);
+  const onlineUsers = useAuthStore((s) => s.onlineUsers);
+  const [ringing, setRinging] = useState({}); // userId -> true while we wait for them
+  const full = inCall.length >= MAX_GROUP_CALL;
+
+  const joinedIds = new Set([authUser._id, ...inCall.map((p) => p._id), ...Object.keys(tiles)]);
+  const members = (group?.members || []).filter((m) => (m._id || m) !== undefined && typeof m === "object");
+  const joined = members.filter((m) => joinedIds.has(m._id));
+  const rest = members.filter((m) => !joinedIds.has(m._id));
+
+  const ring = async (ids) => {
+    const rung = await ringMembers(ids);
+    if (!rung.length) return;
+    setRinging((r) => ({ ...r, ...Object.fromEntries(rung.map((id) => [id, true])) }));
+    setTimeout(
+      () => setRinging((r) => Object.fromEntries(Object.entries(r).filter(([id]) => !rung.includes(id)))),
+      30000
+    );
+  };
+
+  const Row = ({ m, right }) => (
+    <div className="flex items-center gap-3 px-5 py-2.5">
+      <Avatar src={m.profilePic} name={m.fullName} size="size-11" />
+      <div className="min-w-0 flex-1">
+        <p className="text-[16px] text-wa-text truncate">{m._id === authUser._id ? "You" : m.fullName}</p>
+        <p className="text-[13px] text-wa-muted">{right?.sub}</p>
+      </div>
+      {right?.node}
+    </div>
+  );
+
+  return (
+    <div className="absolute inset-0 z-10 bg-black/60 flex items-end" onClick={onClose}>
+      <div
+        className="w-full max-h-[78%] bg-wa-panel rounded-t-3xl flex flex-col pb-[env(safe-area-inset-bottom)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-white/20" />
+        <div className="flex items-center px-5 py-3">
+          <h3 className="flex-1 text-[19px] text-wa-text">Add participant</h3>
+          <button onClick={onClose} className="text-[15px] text-[#21C063]">
+            Done
+          </button>
+        </div>
+        <div className="overflow-y-auto pb-4">
+          <p className="px-5 pt-1 pb-1 text-[13px] text-wa-muted">In this call ({joined.length})</p>
+          {joined.map((m) => (
+            <Row key={m._id} m={m} right={{ sub: "Joined", node: <span className="size-2.5 rounded-full bg-[#21C063]" /> }} />
+          ))}
+
+          {rest.length > 0 && (
+            <div className="flex items-center px-5 pt-4 pb-1">
+              <p className="flex-1 text-[13px] text-wa-muted">Not in the call ({rest.length})</p>
+              {!full && (
+                <button onClick={() => ring(rest.map((m) => m._id))} className="text-[13.5px] text-[#21C063]">
+                  Ring everyone
+                </button>
+              )}
+            </div>
+          )}
+          {rest.map((m) => (
+            <Row
+              key={m._id}
+              m={m}
+              right={{
+                sub: ringing[m._id] ? "Ringing…" : onlineUsers.includes(m._id) ? "Online" : "Offline",
+                node: (
+                  <button
+                    disabled={full || ringing[m._id]}
+                    onClick={() => ring([m._id])}
+                    className="size-10 rounded-full bg-[#21C063] disabled:bg-white/10 disabled:text-wa-muted text-wa-bg flex items-center justify-center active:scale-95"
+                    aria-label={`Ring ${m.fullName}`}
+                  >
+                    <Phone size={18} />
+                  </button>
+                ),
+              }}
+            />
+          ))}
+          {full && <p className="px-5 pt-3 text-[13px] text-wa-muted">This call is full ({MAX_GROUP_CALL} people).</p>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Active = () => {
   const {
     status,
+    groupId,
     groupName,
-    groupPic,
     startedAt,
     tiles,
     localVideo,
@@ -123,6 +233,7 @@ const Active = () => {
   } = useGroupCallStore();
   const authUser = useAuthStore((s) => s.authUser);
   const users = useChatStore((s) => s.users);
+  const [showPeople, setShowPeople] = useState(false);
   const elapsed = useElapsed(startedAt);
 
   if (status === "idle") return null;
@@ -161,21 +272,27 @@ const Active = () => {
 
   const gridCls =
     count <= 1 ? "grid-cols-1" : count === 2 ? "grid-cols-1 md:grid-cols-2" : count <= 4 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3";
-  const renderTile = (t, small) => (
-    <Tile key={t.id} {...t} small={small} />
-  );
+  const renderTile = (t, small) => <Tile key={t.id} {...t} small={small} />;
+  const canShare = canShareScreen() || isPhoneLike();
 
   return (
     <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col">
-      <div className="flex items-center gap-3 px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shrink-0">
-        <Avatar src={groupPic} name={groupName} isGroup size="size-10" textSize="text-lg" />
-        <div className="min-w-0 flex-1">
+      {/* Top bar: name + lock + timer in the middle, add-participant on the right */}
+      <div className="relative flex items-center justify-center px-14 pt-[calc(14px+env(safe-area-inset-top))] pb-2 shrink-0">
+        <div className="text-center min-w-0">
           <p className="text-[17px] text-wa-text truncate">{groupName}</p>
-          <p className="text-[13px] text-wa-muted flex items-center gap-1.5">
-            <Users size={13} /> {status === "joining" ? "Connecting…" : `${count} in call · ${fmt(elapsed)}`}
+          <p className="text-[12.5px] text-wa-muted flex items-center justify-center gap-1">
+            <Lock size={11} />
+            {status === "joining" ? "Connecting…" : `${fmt(elapsed)} · ${count} in call`}
           </p>
         </div>
-        <span className="text-[12px] text-wa-muted2">max {MAX_GROUP_CALL}</span>
+        <button
+          onClick={() => setShowPeople(true)}
+          className="absolute right-3 top-[calc(10px+env(safe-area-inset-top))] size-11 rounded-full flex items-center justify-center text-wa-text bg-white/10 active:bg-white/20"
+          aria-label="Add participant"
+        >
+          <UserPlus size={22} />
+        </button>
       </div>
 
       {spot ? (
@@ -195,27 +312,35 @@ const Active = () => {
         <div className={`flex-1 min-h-0 grid ${gridCls} auto-rows-fr gap-2 px-2 pb-2`}>{all.map((t) => renderTile(t))}</div>
       )}
 
-      <div className="shrink-0 flex items-center justify-center gap-4 px-4 pt-3 pb-[calc(20px+env(safe-area-inset-bottom))] bg-wa-panel rounded-t-3xl">
-        <button onClick={toggleMute} className={ctl(isMuted)} aria-label={isMuted ? "Unmute" : "Mute"}>
-          {isMuted ? <MicOff size={26} /> : <Mic size={26} />}
-        </button>
-        <button onClick={toggleCamera} className={ctl(!cameraOn)} aria-label={cameraOn ? "Turn camera off" : "Turn camera on"}>
-          {cameraOn ? <Video size={26} /> : <VideoOff size={26} />}
-        </button>
-        {isPhoneLike() && cameraOn && !isScreenSharing && (
-          <button onClick={flipCamera} className={ctl(false)} aria-label="Switch camera">
-            <SwitchCamera size={26} />
-          </button>
-        )}
-        {(canShareScreen() || isPhoneLike()) && (
-          <button onClick={toggleScreenShare} className={ctl(isScreenSharing)} aria-label={isScreenSharing ? "Stop sharing" : "Share screen"}>
-            {isScreenSharing ? <ScreenShareOff size={26} /> : <ScreenShare size={26} />}
-          </button>
-        )}
-        <button onClick={leave} className="size-16 rounded-full bg-[#F15C6D] hover:bg-[#e04a5b] text-white flex items-center justify-center active:scale-95" aria-label="Leave call">
-          <PhoneOff size={28} />
-        </button>
+      {/* Bottom panel: same dark rounded sheet with labelled round buttons as 1-to-1 calls */}
+      <div className="shrink-0 bg-wa-panel rounded-t-3xl px-3 pt-4 pb-[calc(18px+env(safe-area-inset-bottom))]">
+        <div className="flex flex-wrap items-start justify-center gap-x-3 gap-y-3 max-w-md mx-auto">
+          <Ctl on={!cameraOn} onClick={toggleCamera} label={cameraOn ? "Video" : "Video off"}>
+            {cameraOn ? <Video size={28} /> : <VideoOff size={28} />}
+          </Ctl>
+          <Ctl on={isMuted} onClick={toggleMute} label={isMuted ? "Unmute" : "Mute"}>
+            {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
+          </Ctl>
+          {isPhoneLike() && cameraOn && !isScreenSharing && (
+            <Ctl onClick={flipCamera} label="Flip">
+              <SwitchCamera size={28} />
+            </Ctl>
+          )}
+          {canShare && (
+            <Ctl on={isScreenSharing} onClick={toggleScreenShare} label={isScreenSharing ? "Stop" : "Share"}>
+              {isScreenSharing ? <ScreenShareOff size={28} /> : <ScreenShare size={28} />}
+            </Ctl>
+          )}
+          <Ctl onClick={() => setShowPeople(true)} label="Add">
+            <UserPlus size={28} />
+          </Ctl>
+          <Ctl danger onClick={leave} label="End">
+            <PhoneOff size={30} />
+          </Ctl>
+        </div>
       </div>
+
+      {showPeople && <ParticipantsSheet groupId={groupId} onClose={() => setShowPeople(false)} />}
     </div>
   );
 };
