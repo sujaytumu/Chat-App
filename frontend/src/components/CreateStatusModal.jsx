@@ -1,46 +1,197 @@
-import { useState, useRef, useEffect } from "react";
-import { X, Type, Image as ImageIcon, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation } from "lucide-react";
+import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
-import toast from "react-hot-toast";
+import { readFileAsBase64, formatFileSize } from "../lib/fileUtils";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const COLORS = ["#00A884", "#0B141A", "#7f66ff", "#ff8f4d", "#e91e8c", "#22c55e", "#2563eb"];
+const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
+const MAX_SONG_BYTES = 4 * 1024 * 1024;
+const AUDIO_ACCEPT = "audio/*,video/mp4,video/mpeg,.mp3,.m4a,.mp4,.mpeg,.mpga,.aac,.wav,.ogg,.opus,.flac";
+
+// Length (seconds) of a picked audio / video file.
+const mediaDuration = (file, tag) =>
+  new Promise((resolve) => {
+    const el = document.createElement(tag);
+    const url = URL.createObjectURL(file);
+    el.preload = "metadata";
+    el.onloadedmetadata = () => {
+      resolve(Number.isFinite(el.duration) ? el.duration : 0);
+      URL.revokeObjectURL(url);
+    };
+    el.onerror = () => {
+      resolve(0);
+      URL.revokeObjectURL(url);
+    };
+    el.src = url;
+  });
+
+// Place suggestions around the person, from OpenStreetMap's free lookup.
+async function suggestPlaces() {
+  const pos = await new Promise((resolve, reject) =>
+    navigator.geolocation
+      ? navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 })
+      : reject(new Error("no geolocation"))
+  );
+  const { latitude: lat, longitude: lng } = pos.coords;
+  const out = [];
+  const add = (name) => name && !out.some((o) => o.name === name) && out.push({ name, lat, lng });
+  try {
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=18&lat=${lat}&lon=${lng}`,
+      { headers: { Accept: "application/json" } }
+    );
+    const j = await r.json();
+    const a = j.address || {};
+    const area = a.suburb || a.neighbourhood || a.village || a.town || a.city_district;
+    const city = a.city || a.town || a.village || a.county;
+    add(j.name && j.name !== area ? `${j.name}${area ? `, ${area}` : ""}` : null);
+    add(area && city ? `${area}, ${city}` : area);
+    add(city && a.state ? `${city}, ${a.state}` : city);
+    add(a.state && a.country ? `${a.state}, ${a.country}` : a.state);
+  } catch {
+    /* offline or blocked: coordinates below still work */
+  }
+  add(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+  return out;
+}
+
+const LocationSheet = ({ onPick, onClose }) => {
+  const [places, setPlaces] = useState(null);
+  const [error, setError] = useState("");
+  const [custom, setCustom] = useState("");
+  useEffect(() => {
+    suggestPlaces()
+      .then(setPlaces)
+      .catch(() => setError("Couldn't get your location. Allow location access, or type a place below."));
+  }, []);
+  return (
+    <div className="absolute inset-0 z-10 bg-black/60 flex items-end" onClick={onClose}>
+      <div className="w-full bg-wa-panel rounded-t-3xl pb-[env(safe-area-inset-bottom)] max-h-[75%] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20" />
+        <div className="flex items-center px-5 py-3">
+          <h3 className="flex-1 text-[18px] text-wa-text">Add location</h3>
+          <button onClick={onClose} className="text-wa-muted" aria-label="Close">
+            <X size={22} />
+          </button>
+        </div>
+        <div className="overflow-y-auto pb-3">
+          {!places && !error && (
+            <p className="flex items-center gap-2 px-5 py-4 text-wa-muted text-[15px]">
+              <Loader2 size={16} className="animate-spin" /> Finding places near you…
+            </p>
+          )}
+          {error && <p className="px-5 py-3 text-[14px] text-wa-muted">{error}</p>}
+          {places?.map((p) => (
+            <button key={p.name} onClick={() => onPick(p)} className="w-full flex items-center gap-4 px-5 py-3 text-left hover:bg-white/5">
+              <span className="size-10 rounded-full bg-wa-field flex items-center justify-center shrink-0">
+                <Navigation size={18} className="text-[#21C063]" />
+              </span>
+              <span className="text-[16px] text-wa-text">{p.name}</span>
+            </button>
+          ))}
+          <div className="px-5 pt-3 flex gap-2">
+            <input
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              placeholder="Or type a place name"
+              maxLength={100}
+              className="flex-1 min-w-0 rounded-full bg-wa-field text-wa-text placeholder:text-wa-muted px-4 py-2.5 text-[15px] focus:outline-none"
+            />
+            <button
+              disabled={!custom.trim()}
+              onClick={() => onPick({ name: custom.trim() })}
+              className="rounded-full bg-[#00A884] disabled:opacity-40 text-white px-5 text-[15px]"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
-  const [mode, setMode] = useState(startWith === "text" ? "text" : null); // "text" | "image"
+  const [kind, setKind] = useState("text"); // text | image | video | audio | file
   const [text, setText] = useState("");
   const [bgColor, setBgColor] = useState(COLORS[0]);
-  const [imagePreview, setImagePreview] = useState(null);
+  const [media, setMedia] = useState(null); // { data, url(preview), name, size, mime, duration }
+  const [caption, setCaption] = useState("");
+  const [song, setSong] = useState(null); // { data, name, size }
+  const [place, setPlace] = useState(null); // { name, lat, lng }
+  const [showPlaces, setShowPlaces] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
-  const fileInputRef = useRef(null);
+  const mediaRef = useRef(null);
+  const audioRef = useRef(null);
+  const fileRef = useRef(null);
+  const songRef = useRef(null);
+  useBackToClose(true, onClose);
 
-  // Camera button: go straight to the picture chooser.
   useEffect(() => {
-    if (startWith === "image") fileInputRef.current?.click();
+    if (startWith === "image") mediaRef.current?.click();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleImagePick = async (e) => {
-    const file = e.target.files[0];
+  const take = async (e, as) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
+    if (file.size > MAX_MEDIA_BYTES && !file.type.startsWith("image/")) return toast.error("Pick a file under 10 MB");
     try {
-      const compressed = await compressImage(file, { maxDimension: 1080, quality: 0.8 });
-      setImagePreview(compressed);
-      setMode("image");
+      if (as === "media" && file.type.startsWith("image/")) {
+        const data = await compressImage(file, { maxDimension: 1080, quality: 0.8 });
+        setMedia({ data, url: data, name: file.name, size: file.size, mime: file.type });
+        setKind("image");
+      } else if (as === "media" && file.type.startsWith("video/")) {
+        const duration = await mediaDuration(file, "video");
+        setMedia({ data: await readFileAsBase64(file), url: URL.createObjectURL(file), name: file.name, size: file.size, mime: file.type, duration });
+        setKind("video");
+      } else if (as === "audio") {
+        const duration = await mediaDuration(file, "audio");
+        setMedia({ data: await readFileAsBase64(file), url: URL.createObjectURL(file), name: file.name, size: file.size, mime: file.type || "audio/mpeg", duration });
+        setKind("audio");
+      } else if (as === "file") {
+        setMedia({ data: await readFileAsBase64(file), name: file.name, size: file.size, mime: file.type || "application/octet-stream" });
+        setKind("file");
+      } else {
+        return toast.error("Choose a photo or a video");
+      }
     } catch {
-      toast.error("Could not process that image");
+      toast.error("Couldn't read that file");
     }
   };
 
-  const handlePost = async () => {
+  const takeSong = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > MAX_SONG_BYTES) return toast.error("Pick a song under 4 MB");
+    try {
+      setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, ""), size: file.size });
+    } catch {
+      toast.error("Couldn't read that song");
+    }
+  };
+
+  const canPost = kind === "text" ? !!text.trim() : !!media;
+
+  const post = async () => {
+    if (!canPost) return toast.error(kind === "text" ? "Write something first" : "Add a file first");
     setIsPosting(true);
     try {
-      if (mode === "text") {
-        if (!text.trim()) return toast.error("Write something first");
-        await axiosInstance.post("/status", { type: "text", content: text.trim(), backgroundColor: bgColor });
-      } else {
-        await axiosInstance.post("/status", { type: "image", content: imagePreview });
-      }
+      const body = {
+        type: kind,
+        content: kind === "text" ? text.trim() : media.data,
+        backgroundColor: bgColor,
+        caption: kind === "text" ? "" : caption,
+        ...(kind !== "text" && kind !== "image" ? { file: { name: media.name, size: media.size, mime: media.mime, duration: media.duration } } : {}),
+        ...(song ? { song: { data: song.data, name: song.name, size: song.size } } : {}),
+        ...(place ? { location: place } : {}),
+      };
+      await axiosInstance.post("/status", body);
       toast.success("Status posted");
       onCreated();
       onClose();
@@ -51,80 +202,148 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
     }
   };
 
+  const tool = (Icon, label, onClick, active) => (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 w-14 ${active ? "text-[#21C063]" : "text-wa-icon"}`}
+      aria-label={label}
+    >
+      <span className={`size-11 rounded-full flex items-center justify-center ${active ? "bg-[#103629]" : "bg-wa-field"}`}>
+        <Icon size={20} />
+      </span>
+      <span className="text-[11px]">{label}</span>
+    </button>
+  );
+
   return (
-    <div className="fixed inset-0 z-[150] bg-black/70 flex items-center justify-center p-4">
-      <div className="bg-wa-surface rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h3 className="font-semibold text-wa-text">Add status</h3>
-          <button onClick={onClose} className="text-wa-muted hover:text-wa-text">
-            <X size={20} />
-          </button>
-        </div>
+    <div className="wa-dark fixed inset-0 z-[150] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10">
+      <div className="flex items-center gap-5 px-4 h-14 shrink-0">
+        <button onClick={onClose} aria-label="Close">
+          <X size={24} />
+        </button>
+        <h3 className="text-[19px] flex-1">Add status</h3>
+      </div>
 
-        <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImagePick} />
-        {!mode && (
-          <div className="p-6 flex flex-col gap-3">
-            <button
-              onClick={() => setMode("text")}
-              className="flex items-center gap-3 p-4 rounded-xl bg-wa-field hover:bg-wa-hover text-wa-text"
-            >
-              <Type size={20} className="text-[#00A884]" /> Text status
-            </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-3 p-4 rounded-xl bg-wa-field hover:bg-wa-hover text-wa-text"
-            >
-              <ImageIcon size={20} className="text-[#bf59cf]" /> Photo status
-            </button>
-          </div>
-        )}
-
-        {mode === "text" && (
-          <div className="p-4">
-            <div
-              className="rounded-xl h-48 flex items-center justify-center p-4 mb-3"
-              style={{ backgroundColor: bgColor }}
-            >
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3">
+        {/* The status itself */}
+        {kind === "text" && (
+          <>
+            <div className="rounded-2xl min-h-[260px] flex items-center justify-center p-5 mb-3" style={{ backgroundColor: bgColor }}>
               <textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Type a status…"
-                autoFocus
-                maxLength={140}
-                className="bg-transparent text-white text-xl text-center placeholder:text-white/60 resize-none focus:outline-none w-full h-full flex items-center"
+                placeholder="Type a status… (you can paste a link)"
+                autoFocus={startWith !== "image"}
+                maxLength={700}
+                rows={5}
+                className="bg-transparent text-white text-[24px] text-center placeholder:text-white/60 resize-none focus:outline-none w-full"
               />
             </div>
-            <div className="flex gap-2 justify-center mb-4">
+            <div className="flex gap-2.5 justify-center mb-2">
               {COLORS.map((c) => (
                 <button
                   key={c}
                   onClick={() => setBgColor(c)}
-                  className={`size-7 rounded-full ${bgColor === c ? "ring-2 ring-white" : ""}`}
+                  className={`size-8 rounded-full ${bgColor === c ? "ring-2 ring-white" : ""}`}
                   style={{ backgroundColor: c }}
+                  aria-label={`Background ${c}`}
                 />
               ))}
+            </div>
+          </>
+        )}
+        {kind === "image" && media && <img src={media.url} alt="Status preview" className="w-full max-h-[48vh] object-contain rounded-2xl bg-black/30" />}
+        {kind === "video" && media && <video src={media.url} controls className="w-full max-h-[48vh] rounded-2xl bg-black" />}
+        {kind === "audio" && media && (
+          <div className="rounded-2xl bg-wa-field p-5 flex flex-col items-center gap-3">
+            <span className="size-16 rounded-full bg-[#ff8f4d] flex items-center justify-center">
+              <Headphones size={28} className="text-white" />
+            </span>
+            <p className="text-[15px] text-center break-all">{media.name}</p>
+            <audio src={media.url} controls className="w-full" />
+          </div>
+        )}
+        {kind === "file" && media && (
+          <div className="rounded-2xl bg-wa-field p-5 flex items-center gap-4">
+            <span className="size-14 rounded-xl bg-[#7f66ff] flex items-center justify-center shrink-0">
+              <FileText size={26} className="text-white" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[15.5px] break-all">{media.name}</p>
+              <p className="text-[13px] text-wa-muted">{formatFileSize(media.size)}</p>
             </div>
           </div>
         )}
 
-        {mode === "image" && imagePreview && (
-          <div className="p-4">
-            <img src={imagePreview} alt="Status preview" className="w-full max-h-64 object-contain rounded-xl mb-4" />
-          </div>
+        {kind !== "text" && (
+          <input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Add a caption…"
+            maxLength={700}
+            className="mt-3 w-full rounded-full bg-wa-field text-wa-text placeholder:text-wa-muted px-4 py-3 text-[15px] focus:outline-none"
+          />
         )}
 
-        {mode && (
-          <div className="p-4 border-t border-white/10">
-            <button
-              onClick={handlePost}
-              disabled={isPosting}
-              className="btn w-full bg-[#00A884] hover:bg-[#02906f] text-white border-none"
-            >
-              {isPosting ? <Loader2 className="animate-spin" size={18} /> : "Post status"}
-            </button>
+        {/* Song / place chips */}
+        {(song || place) && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {song && (
+              <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[13.5px] max-w-full">
+                <Music size={14} className="text-[#21C063] shrink-0" />
+                <span className="truncate">{song.name}</span>
+                <button onClick={() => setSong(null)} className="size-5 rounded-full flex items-center justify-center text-wa-muted" aria-label="Remove song">
+                  <X size={13} />
+                </button>
+              </span>
+            )}
+            {place && (
+              <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[13.5px] max-w-full">
+                <MapPin size={14} className="text-[#F15C6D] shrink-0" />
+                <span className="truncate">{place.name}</span>
+                <button onClick={() => setPlace(null)} className="size-5 rounded-full flex items-center justify-center text-wa-muted" aria-label="Remove location">
+                  <X size={13} />
+                </button>
+              </span>
+            )}
           </div>
         )}
       </div>
+
+      {/* Tools + send */}
+      <div className="shrink-0 border-t border-white/10 px-3 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] flex items-end gap-1.5">
+        <div className="flex-1 flex items-start justify-start gap-0.5 overflow-x-auto no-scrollbar">
+          {tool(Type, "Text", () => setKind("text"), kind === "text")}
+          {tool(ImageIcon, "Photo", () => mediaRef.current?.click(), kind === "image" || kind === "video")}
+          {tool(Headphones, "Audio", () => audioRef.current?.click(), kind === "audio")}
+          {tool(FileText, "File", () => fileRef.current?.click(), kind === "file")}
+          {tool(Music, "Song", () => songRef.current?.click(), !!song)}
+          {tool(MapPin, "Location", () => setShowPlaces(true), !!place)}
+        </div>
+        <button
+          onClick={post}
+          disabled={isPosting || !canPost}
+          className="size-14 rounded-full bg-[#00A884] disabled:opacity-40 text-white flex items-center justify-center shrink-0 active:scale-95"
+          aria-label="Post status"
+        >
+          {isPosting ? <Loader2 className="animate-spin" size={22} /> : <Send size={22} />}
+        </button>
+      </div>
+
+      <input ref={mediaRef} type="file" accept="image/*,video/*" className="hidden" onChange={(e) => take(e, "media")} />
+      <input ref={audioRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={(e) => take(e, "audio")} />
+      <input ref={fileRef} type="file" className="hidden" onChange={(e) => take(e, "file")} />
+      <input ref={songRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={takeSong} />
+
+      {showPlaces && (
+        <LocationSheet
+          onClose={() => setShowPlaces(false)}
+          onPick={(p) => {
+            setPlace(p);
+            setShowPlaces(false);
+          }}
+        />
+      )}
     </div>
   );
 };
