@@ -427,6 +427,24 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Admin: change the group's name and/or photo ({ name, groupPic } or { removeGroupPic: true }).
+  updateGroupInfo: async (groupId, payload) => {
+    try {
+      const res = await axiosInstance.put(`/groups/${groupId}`, payload);
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? { ...g, ...res.data } : g)),
+        selectedChat:
+          state.selectedChat?.type === "group" && state.selectedChat.data._id === groupId
+            ? { type: "group", data: res.data }
+            : state.selectedChat,
+      }));
+      return true;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't update the group");
+      return false;
+    }
+  },
+
   addMembersToGroup: async (groupId, memberIds) => {
     try {
       const res = await axiosInstance.post(`/groups/${groupId}/members`, { memberIds });
