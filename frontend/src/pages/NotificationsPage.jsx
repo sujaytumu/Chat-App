@@ -169,7 +169,7 @@ const ChoiceDialog = ({ title, options, value, onPreview, onSave, onClose, kind,
                   <Trash2 size={16} />
                 </button>
               )}
-              <input ref={fileRef} type="file" accept="audio/*" className="hidden" onChange={onFile} />
+              <input ref={fileRef} type="file" accept="audio/*,video/mp4,video/mpeg,video/webm,.mp3,.mp4,.m4a,.mpeg,.mpg,.mpga,.aac,.wav,.ogg,.oga,.opus,.flac,.weba,.3gp,.amr" className="hidden" onChange={onFile} />
             </div>
           )}
         </div>
