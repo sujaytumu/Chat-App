@@ -1,0 +1,60 @@
+name: Android app (APK)
+
+# Builds the Talkies Android app (a thin shell around the website that adds
+# native screen sharing) and publishes it as a GitHub Release, so there's one
+# stable download link:
+# https://github.com/sujaytumu/Chat-App/releases/download/android-latest/talkies.apk
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install and sync Capacitor
+        working-directory: mobile
+        run: |
+          npm ci
+          npx cap sync android
+
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Keep a copy on the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: talkies-apk
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk talkies.apk
+          gh release delete android-latest --cleanup-tag -y || true
+          gh release create android-latest talkies.apk \
+            --title "Talkies Android app" \
+            --notes "Install on Android: open this page on your phone, download talkies.apk and allow installing from your browser when asked. Adds screen sharing to calls." \
+            --target "${{ github.sha }}"
