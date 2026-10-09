@@ -182,6 +182,7 @@ export const useCallStore = create((set, get) => ({
   isRemoteRinging: false, // true once the callee's device has actually started ringing
   isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
   isScreenSharing: false,
+  cameraFacing: "user", // front / back camera on phones
   remoteMuted: false, // the other person has muted their mic
   remoteVideoOff: false, // the other person has turned their camera off
   remoteScreenSharing: false, // the other person is sharing their screen
@@ -414,6 +415,29 @@ export const useCallStore = create((set, get) => ({
     sendMediaState(get);
   },
 
+  // Front <-> back camera (phones): swap the outgoing track without renegotiating.
+  flipCamera: async () => {
+    const { localStream, isScreenSharing, isVideoOff } = get();
+    if (!pc || isScreenSharing || !localStream) return;
+    const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+    const old = localStream.getVideoTracks()[0];
+    if (!sender || !old) return;
+    const facing = get().cameraFacing === "user" ? "environment" : "user";
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } } });
+      const next = s.getVideoTracks()[0];
+      next.enabled = !isVideoOff;
+      await sender.replaceTrack(next);
+      localStream.removeTrack(old);
+      old.stop();
+      localStream.addTrack(next);
+      cameraTrack = next;
+      set({ cameraFacing: facing, localStream: new MediaStream(localStream.getTracks()) });
+    } catch {
+      toast.error("Couldn't switch camera");
+    }
+  },
+
   // Upgrades an in-progress voice call to video, mirroring WhatsApp's
   // "tap the video icon during a voice call" behavior.
   upgradeToVideo: async () => {
@@ -452,6 +476,7 @@ export const useCallStore = create((set, get) => ({
       cameraTrack = null;
     }
     set({
+      cameraFacing: "user",
       callStatus: "idle",
       remoteUser: null,
       incomingOffer: null,

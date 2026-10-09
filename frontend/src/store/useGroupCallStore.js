@@ -75,6 +75,7 @@ const initial = {
   localVideo: null,
   isMuted: false,
   cameraOn: false,
+  cameraFacing: "user", // "user" = front camera, "environment" = back
   isScreenSharing: false,
 };
 
@@ -417,7 +418,9 @@ export const useGroupCallStore = create((set, get) => {
         cameraTrack = null;
       } else {
         try {
-          const s = await gum({ video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
+          const s = await gum({
+            video: { facingMode: { ideal: get().cameraFacing }, width: { ideal: 640 }, height: { ideal: 480 } },
+          });
           cameraTrack = s.getVideoTracks()[0];
           camOn = true;
         } catch {
@@ -428,6 +431,21 @@ export const useGroupCallStore = create((set, get) => {
       applyOutboundVideo();
     },
 
+    // Front <-> back camera (phones). Swaps the track on every connection in place.
+    flipCamera: async () => {
+      if (get().status !== "active" || !camOn || screenTrack) return;
+      const facing = get().cameraFacing === "user" ? "environment" : "user";
+      try {
+        const s = await gum({ video: { facingMode: { ideal: facing }, width: { ideal: 640 }, height: { ideal: 480 } } });
+        cameraTrack?.stop();
+        cameraTrack = s.getVideoTracks()[0];
+        set({ cameraFacing: facing });
+        applyOutboundVideo();
+      } catch {
+        toast.error("Couldn't switch camera");
+      }
+    },
+
     toggleScreenShare: async () => {
       if (get().status !== "active") return;
       if (screenTrack) {
@@ -435,7 +453,7 @@ export const useGroupCallStore = create((set, get) => {
         return;
       }
       if (!canShareScreen()) {
-        toast("Screen sharing works on laptop and desktop browsers", { icon: "🖥️" });
+        toast("Phone browsers can't share their screen (Android and iPhone don't allow it). You can still watch anyone who shares from a laptop.", { icon: "🖥️", duration: 5000 });
         return;
       }
       try {
