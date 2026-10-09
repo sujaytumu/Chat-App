@@ -476,6 +476,59 @@ export const deleteChatForMe = async (req, res) => {
   }
 };
 
+// Shared media for a chat's info screen: photos & videos, documents, links.
+export const getChatMedia = async (req, res) => {
+  try {
+    const { chatType, chatId } = req.params;
+    const myId = req.user._id;
+    if (!["direct", "group"].includes(chatType) || !mongoose.isValidObjectId(chatId)) {
+      return res.status(400).json({ error: "Invalid chat" });
+    }
+    let scope;
+    if (chatType === "group") {
+      const isMember = await Group.exists({ _id: chatId, members: myId });
+      if (!isMember) return res.status(403).json({ error: "You are not a member of this group" });
+      scope = { groupId: chatId };
+    } else {
+      scope = {
+        groupId: null,
+        $or: [
+          { senderId: myId, receiverId: chatId },
+          { senderId: chatId, receiverId: myId },
+        ],
+      };
+    }
+    const visible = { ...scope, deletedFor: { $ne: myId }, deletedForEveryone: { $ne: true } };
+    const pick = "image file text senderId createdAt";
+    const [media, docs, linkMsgs] = await Promise.all([
+      Message.find({ ...visible, $or: [{ image: { $ne: "" } }, { "file.type": "video" }] })
+        .sort({ createdAt: -1 }).limit(300).select(pick).lean(),
+      Message.find({ ...visible, "file.type": "document" }).sort({ createdAt: -1 }).limit(200).select(pick).lean(),
+      Message.find({ ...visible, text: /https?:\/\//i }).sort({ createdAt: -1 }).limit(200).select(pick).lean(),
+    ]);
+    const links = [];
+    for (const m of linkMsgs) {
+      for (const url of m.text.match(/https?:\/\/[^\s<>"']+/gi) || []) {
+        links.push({ _id: `${m._id}-${links.length}`, url, text: m.text, createdAt: m.createdAt, senderId: m.senderId });
+      }
+    }
+    res.status(200).json({
+      media: media.map((m) => ({
+        _id: m._id,
+        createdAt: m.createdAt,
+        kind: m.image ? "image" : "video",
+        url: m.image || m.file?.url,
+        duration: m.file?.duration,
+      })),
+      docs: docs.map((m) => ({ _id: m._id, createdAt: m.createdAt, name: m.file?.name, size: m.file?.size, url: m.file?.url })),
+      links,
+    });
+  } catch (error) {
+    console.log("Error in getChatMedia controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 // Search message text. Everywhere the person can see (default), or inside one
