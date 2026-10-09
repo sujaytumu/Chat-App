@@ -1,69 +1,209 @@
-import { useEffect, useState } from "react";
-import { X, ChevronLeft, ChevronRight, Eye } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { X, Eye, Trash2, Loader2, ChevronUp } from "lucide-react";
+import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
+import { useBackToClose } from "../lib/useBackToClose";
 
-const StatusViewer = ({ user, statuses, isOwn, onClose }) => {
+const DURATION_MS = 5000; // how long each update stays up, like WhatsApp
+
+const ago = (iso) => {
+  const d = new Date(iso);
+  const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+  return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${t}`;
+};
+
+const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
+  const [list, setList] = useState(initial);
   const [index, setIndex] = useState(0);
-  const current = statuses[index];
+  const [progress, setProgress] = useState(0); // 0..1 of the current update
+  const [paused, setPaused] = useState(false);
+  const [showViewers, setShowViewers] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const current = list[index];
+  useBackToClose(true, onClose);
 
+  // Mark as seen when someone else's update comes up.
   useEffect(() => {
-    if (!isOwn && current) {
-      axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
-    }
+    if (!isOwn && current) axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
+    setProgress(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?._id]);
 
+  const next = useCallback(() => {
+    if (index >= list.length - 1) onClose();
+    else setIndex((i) => i + 1);
+  }, [index, list.length, onClose]);
+  const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
+
+  // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
+  const stop = paused || showViewers || confirmDelete;
+  const last = useRef(0);
+  useEffect(() => {
+    if (!current || stop) return;
+    last.current = performance.now();
+    let raf;
+    const tick = (now) => {
+      const dt = now - last.current;
+      last.current = now;
+      setProgress((p) => {
+        const np = p + dt / DURATION_MS;
+        if (np >= 1) {
+          queueMicrotask(next);
+          return 1;
+        }
+        return np;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [current?._id, stop, next]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") prev();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await axiosInstance.delete(`/status/${current._id}`);
+      toast.success("Status deleted");
+      const rest = list.filter((s) => s._id !== current._id);
+      setConfirmDelete(false);
+      if (rest.length === 0) return onClose();
+      setList(rest);
+      setIndex((i) => Math.min(i, rest.length - 1));
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Couldn't delete the status");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!current) return null;
 
-  const next = () => setIndex((i) => Math.min(i + 1, statuses.length - 1));
-  const prev = () => setIndex((i) => Math.max(i - 1, 0));
+  const views = (current.views || []).filter((v) => v.user).sort((a, b) => new Date(b.at) - new Date(a.at));
+  const viewCount = Math.max(views.length, current.viewedBy?.length || 0);
 
   return (
-    <div className="fixed inset-0 z-[150] bg-black flex items-center justify-center">
-      <div className="absolute top-0 inset-x-0 flex gap-1 p-2 z-10">
-        {statuses.map((s, i) => (
-          <div key={s._id} className="flex-1 h-0.5 bg-white/30 rounded-full overflow-hidden">
-            <div className={`h-full bg-white ${i < index ? "w-full" : i === index ? "w-full" : "w-0"}`} />
+    <div className="wa-dark fixed inset-0 z-[150] bg-black flex items-center justify-center select-none">
+      {/* Progress bars */}
+      <div className="absolute top-0 inset-x-0 flex gap-1 px-2 pt-[calc(8px+env(safe-area-inset-top))] z-20">
+        {list.map((s, i) => (
+          <div key={s._id} className="flex-1 h-[3px] bg-white/30 rounded-full overflow-hidden">
+            <div className="h-full bg-white" style={{ width: `${(i < index ? 1 : i === index ? progress : 0) * 100}%` }} />
           </div>
         ))}
       </div>
 
-      <div className="absolute top-6 left-4 flex items-center gap-2 z-10">
-        <img src={user.profilePic || "/avatar.png"} alt={user.fullName} className="size-9 rounded-full object-cover" />
-        <span className="text-white text-sm font-medium">{user.fullName}</span>
+      {/* Header */}
+      <div className="absolute top-[calc(18px+env(safe-area-inset-top))] inset-x-0 flex items-center gap-3 px-3 z-20 bg-gradient-to-b from-black/50 to-transparent pb-6 pt-1">
+        <img src={user.profilePic || "/avatar.png"} alt={user.fullName} className="size-10 rounded-full object-cover" />
+        <div className="min-w-0 flex-1">
+          <p className="text-white text-[16px] font-medium truncate">{isOwn ? "My status" : user.fullName}</p>
+          <p className="text-white/80 text-[13px]">{ago(current.createdAt)}</p>
+        </div>
+        {isOwn && (
+          <button onClick={() => setConfirmDelete(true)} className="size-10 flex items-center justify-center text-white" aria-label="Delete status">
+            <Trash2 size={22} />
+          </button>
+        )}
+        <button onClick={onClose} className="size-10 flex items-center justify-center text-white" aria-label="Close">
+          <X size={26} />
+        </button>
       </div>
 
-      <button onClick={onClose} className="absolute top-6 right-4 text-white z-10">
-        <X size={24} />
-      </button>
-
-      <div className="w-full h-full max-w-md flex items-center justify-center relative">
-        {index > 0 && (
-          <button onClick={prev} className="absolute left-2 z-10 text-white/70 hover:text-white">
-            <ChevronLeft size={28} />
-          </button>
-        )}
-        {index < statuses.length - 1 && (
-          <button onClick={next} className="absolute right-2 z-10 text-white/70 hover:text-white">
-            <ChevronRight size={28} />
-          </button>
-        )}
-
+      {/* The update; tap left / right to move, hold to pause */}
+      <div
+        className="w-full h-full max-w-md relative flex items-center justify-center"
+        onPointerDown={() => setPaused(true)}
+        onPointerUp={() => setPaused(false)}
+        onPointerLeave={() => setPaused(false)}
+        onPointerCancel={() => setPaused(false)}
+      >
         {current.type === "text" ? (
-          <div
-            className="w-full h-full flex items-center justify-center p-8"
-            style={{ backgroundColor: current.backgroundColor }}
-          >
-            <p className="text-white text-2xl text-center break-words">{current.content}</p>
+          <div className="w-full h-full flex items-center justify-center p-8" style={{ backgroundColor: current.backgroundColor }}>
+            <p className="text-white text-[28px] leading-snug text-center break-words">{current.content}</p>
           </div>
         ) : (
-          <img src={current.content} alt="Status" className="max-w-full max-h-full object-contain" />
+          <img src={current.content} alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />
         )}
+        <button className="absolute left-0 top-24 bottom-24 w-1/3" onClick={prev} aria-label="Previous" />
+        <button className="absolute right-0 top-24 bottom-24 w-1/3" onClick={next} aria-label="Next" />
       </div>
 
+      {/* Owner: who has seen it */}
       {isOwn && (
-        <div className="absolute bottom-6 left-4 flex items-center gap-1.5 text-white/80 text-sm">
-          <Eye size={16} /> {current.viewedBy?.length || 0} viewed
+        <button
+          onClick={() => setShowViewers(true)}
+          className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center gap-0.5 pt-6 pb-[calc(14px+env(safe-area-inset-bottom))] text-white bg-gradient-to-t from-black/70 to-transparent"
+        >
+          <ChevronUp size={20} className="text-white/80" />
+          <span className="flex items-center gap-1.5 text-[15px]">
+            <Eye size={18} /> {viewCount}
+          </span>
+        </button>
+      )}
+
+      {/* Viewers sheet */}
+      {showViewers && (
+        <div className="absolute inset-0 z-30 bg-black/60 flex items-end" onClick={() => setShowViewers(false)}>
+          <div
+            className="w-full max-w-md mx-auto max-h-[75%] bg-wa-panel rounded-t-3xl flex flex-col pb-[env(safe-area-inset-bottom)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20" />
+            <div className="flex items-center gap-3 px-5 py-3">
+              <Eye size={20} className="text-wa-muted" />
+              <h3 className="flex-1 text-[18px] text-wa-text">Viewed by {viewCount}</h3>
+              <button onClick={() => setShowViewers(false)} className="text-wa-muted" aria-label="Close">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="overflow-y-auto pb-3">
+              {views.length === 0 ? (
+                <p className="text-center text-wa-muted py-10 text-[15px]">
+                  {viewCount > 0 ? "Viewer names aren't available for this older update." : "No views yet"}
+                </p>
+              ) : (
+                views.map((v) => (
+                  <div key={v.user._id} className="flex items-center gap-3 px-5 py-2.5">
+                    <img src={v.user.profilePic || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
+                    <div className="min-w-0">
+                      <p className="text-[16px] text-wa-text truncate">{v.user.fullName}</p>
+                      <p className="text-[13.5px] text-wa-muted">{ago(v.at)}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center p-6" onClick={() => setConfirmDelete(false)}>
+          <div className="w-full max-w-xs rounded-2xl bg-wa-pop p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[18px] text-wa-text mb-1">Delete this status update?</h3>
+            <p className="text-[14px] text-wa-muted mb-5">It will be removed for everyone who could see it.</p>
+            <div className="flex justify-end gap-6 text-[15.5px]">
+              <button onClick={() => setConfirmDelete(false)} className="text-[#21C063]" disabled={deleting}>
+                Cancel
+              </button>
+              <button onClick={handleDelete} className="text-[#F15C6D] flex items-center gap-1.5" disabled={deleting}>
+                {deleting && <Loader2 size={14} className="animate-spin" />} Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
