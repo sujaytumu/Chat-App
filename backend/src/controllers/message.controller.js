@@ -538,3 +538,45 @@ export const searchMessages = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// React to a message with one emoji (sending the same emoji again, or null, removes it).
+export const reactToMessage = async (req, res) => {
+  try {
+    const { id: messageId } = req.params;
+    const myId = req.user._id;
+    let { emoji } = req.body || {};
+    if (!mongoose.isValidObjectId(messageId)) return res.status(400).json({ error: "Invalid message" });
+    if (emoji != null && (typeof emoji !== "string" || emoji.length > 16 || !/\p{Extended_Pictographic}/u.test(emoji))) {
+      return res.status(400).json({ error: "Invalid reaction" });
+    }
+
+    const message = await Message.findById(messageId).select("senderId receiverId groupId reactions deletedForEveryone");
+    if (!message || message.deletedForEveryone) return res.status(404).json({ error: "Message not found" });
+
+    if (message.groupId) {
+      const isMember = await Group.exists({ _id: message.groupId, members: myId });
+      if (!isMember) return res.status(403).json({ error: "You are not part of this conversation" });
+    } else if (!message.senderId.equals(myId) && !message.receiverId?.equals(myId)) {
+      return res.status(403).json({ error: "You are not part of this conversation" });
+    }
+
+    const existing = message.reactions.find((r) => r.user.equals(myId));
+    message.reactions = message.reactions.filter((r) => !r.user.equals(myId));
+    if (emoji && existing?.emoji !== emoji) message.reactions.push({ user: myId, emoji });
+    await message.save();
+
+    const payload = { _id: message._id, reactions: message.reactions };
+    if (message.groupId) {
+      io.to(message.groupId.toString()).emit("messageReacted", payload);
+    } else {
+      [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+        const socketId = getReceiverSocketId(uid);
+        if (socketId) io.to(socketId).emit("messageReacted", payload);
+      });
+    }
+    res.status(200).json(payload);
+  } catch (error) {
+    console.log("Error in reactToMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 
 // Hover trigger + dropdown for per-message actions, matching WhatsApp's
 // long-press/hover message menu.
-const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo, onTranslate }) => {
+const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo, onTranslate, onReact }) => {
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const menuRef = useRef(null);
@@ -53,6 +53,25 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
         >
           {!confirmingDelete ? (
             <>
+              <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+                {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((e) => (
+                  <button
+                    key={e}
+                    onClick={() => {
+                      onReact(e);
+                      close();
+                    }}
+                    className={`text-[22px] leading-none rounded-full p-1 hover:scale-125 transition-transform ${
+                      message.reactions?.some((r) => String(r.user) === String(authUserId) && r.emoji === e)
+                        ? "bg-white/15"
+                        : ""
+                    }`}
+                    aria-label={`React ${e}`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
               <button
                 onClick={() => {
                   onReply();

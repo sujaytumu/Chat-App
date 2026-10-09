@@ -15,6 +15,7 @@ import {
   setChatMuted,
   deleteChatForMe,
   searchMessages,
+  reactToMessage,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -22,6 +23,7 @@ const router = express.Router();
 router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/starred/all", protectRoute, getStarredMessages);
 router.get("/search/all", protectRoute, searchMessages);
+router.put("/react/:id", protectRoute, reactToMessage);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);

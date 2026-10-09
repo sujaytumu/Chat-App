@@ -42,6 +42,7 @@ const ChatContainer = () => {
     pendingJump,
     clearPendingJump,
     isFetchingMessages,
+    reactToMessage,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const messageEndRef = useRef(null);
@@ -280,6 +281,7 @@ const ChatContainer = () => {
             onToggleStar: () => toggleStarMessage(message._id),
             onForward: () => setForwardingMessage(message),
             onInfo: () => setInfoMessage(message),
+            onReact: (emoji) => reactToMessage(message._id, emoji),
             onTranslate: hasText ? () => translateAndToast(message.text) : undefined,
           };
 
@@ -410,6 +412,24 @@ const ChatContainer = () => {
 
               {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
             </div>
+            {message.reactions?.length > 0 && !message.deletedForEveryone && (
+              <div className={`flex -mt-1.5 px-2 ${isMe ? "justify-end" : isGroup ? "justify-start pl-10" : "justify-start"}`}>
+                <div className="flex items-center gap-1 bg-[#1F2C34] border border-[#0B141A] rounded-full px-1.5 py-0.5 shadow-sm">
+                  {Object.entries(
+                    message.reactions.reduce((acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] || 0) + 1 }), {})
+                  ).map(([emoji, count]) => (
+                    <button
+                      key={emoji}
+                      onClick={() => reactToMessage(message._id, emoji)}
+                      className="text-[14px] leading-none flex items-center gap-0.5"
+                    >
+                      {emoji}
+                      {count > 1 && <span className="text-[11px] text-[#8696A0]">{count}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             </div>
           );
         })}
