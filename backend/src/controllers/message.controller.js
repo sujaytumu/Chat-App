@@ -604,10 +604,11 @@ const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 export const searchMessages = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-    if (q.length < 2 || q.length > 100) return res.status(200).json([]);
+    const kind = ["docs", "links", "photos"].includes(req.query.kind) ? req.query.kind : "";
+    if (q.length > 100 || (!kind && q.length < 2)) return res.status(200).json([]);
     const myId = req.user._id;
     const { chatType, chatId } = req.query;
-    const rx = new RegExp(escapeRegex(q), "i"); // literal match, so no regex injection
+    const rx = q ? new RegExp(escapeRegex(q), "i") : null; // literal match, so no regex injection
 
     let scope;
     if (chatType === "direct" && mongoose.isValidObjectId(chatId)) {
@@ -632,21 +633,35 @@ export const searchMessages = async (req, res) => {
       };
     }
 
+    // Documents / Links / Photos filters (the chips on WhatsApp's search screen)
+    let match;
+    if (kind === "links") {
+      const linkRx = /(https?:\/\/|www\.)/i;
+      match = rx ? { $and: [{ text: linkRx }, { text: rx }] } : { text: linkRx };
+    } else if (kind === "photos") {
+      match = { image: { $nin: ["", null] }, ...(rx ? { text: rx } : {}) };
+    } else if (kind === "docs") {
+      match = { "file.type": "document", ...(rx ? { $or: [{ "file.name": rx }, { text: rx }] } : {}) };
+    } else {
+      match = { $or: [{ text: rx }, { "file.name": rx }] };
+    }
+
     const found = await Message.find({
-      $and: [scope],
-      text: rx,
+      $and: [scope, match],
       deletedFor: { $ne: myId },
       deletedForEveryone: { $ne: true },
     })
       .sort({ createdAt: -1 })
-      .limit(40)
-      .select("text senderId receiverId groupId createdAt")
+      .limit(60)
+      .select("text image file.name file.type senderId receiverId groupId createdAt")
       .lean();
 
     res.status(200).json(
       found.map((msg) => ({
         _id: msg._id,
         text: msg.text,
+        image: msg.image || "",
+        file: msg.file?.name ? { name: msg.file.name, type: msg.file.type } : null,
         createdAt: msg.createdAt,
         senderId: msg.senderId,
         chatType: msg.groupId ? "group" : "direct",

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
+import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -95,6 +96,7 @@ const Sidebar = () => {
   const { onlineUsers, authUser, logout } = useAuthStore();
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const listRef = useScrollMemory("chats");
@@ -461,21 +463,14 @@ const Sidebar = () => {
       {/* Search pill */}
       {!showArchived && (
       <div className={`px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
-        <div className="flex items-center gap-3 h-12 lg:h-10 rounded-full bg-wa-surface px-4 focus-within:ring-2 focus-within:ring-[#25D366]/50">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="w-full flex items-center gap-3 h-12 lg:h-10 rounded-full bg-wa-surface px-4 text-left"
+          aria-label="Search"
+        >
           <Search size={20} className="text-wa-muted shrink-0" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search"
-            className="flex-1 min-w-0 bg-transparent text-[13.5px] lg:text-[13px] text-wa-text placeholder:text-wa-muted focus:outline-none"
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="text-wa-muted hover:text-wa-text" aria-label="Clear search">
-              <X size={18} />
-            </button>
-          )}
-        </div>
+          <span className="text-[13.5px] lg:text-[13px] text-wa-muted">Search</span>
+        </button>
       </div>
       )}
 
@@ -697,6 +692,8 @@ const Sidebar = () => {
           </div>
         )}
       </div>
+
+      {searchOpen && <SearchScreen onClose={() => setSearchOpen(false)} />}
 
       {/* Floating action button */}
       <button
