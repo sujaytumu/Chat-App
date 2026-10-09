@@ -1,5 +1,6 @@
+import toast from "react-hot-toast";
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Lock } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Users, Lock } from "lucide-react";
 import { isPhoneLike } from "../lib/device";
 import { useGroupCallStore, canShareScreen, MAX_GROUP_CALL } from "../store/useGroupCallStore";
 import { useChatStore } from "../store/useChatStore";
@@ -279,7 +280,7 @@ const Active = () => {
 
   return (
     <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col">
-      {/* Top bar: name + lock + timer in the middle, add-participant on the right */}
+      {/* Top bar: name + lock + timer in the middle, switch-camera on the right */}
       <div className="relative flex items-center justify-center px-14 pt-[calc(14px+env(safe-area-inset-top))] pb-2 shrink-0">
         <div className="text-center min-w-0">
           <p className="text-[17px] text-wa-text truncate">{groupName}</p>
@@ -296,15 +297,7 @@ const Active = () => {
           >
             <SwitchCamera size={22} />
           </button>
-        ) : (
-          <button
-            onClick={() => setShowPeople(true)}
-            className="absolute right-3 top-[calc(10px+env(safe-area-inset-top))] size-11 rounded-full flex items-center justify-center text-wa-text bg-white/10 active:bg-white/20"
-            aria-label="Add participant"
-          >
-            <UserPlus size={22} />
-          </button>
-        )}
+        ) : null}
       </div>
 
       {spot ? (
@@ -326,20 +319,25 @@ const Active = () => {
 
       {/* Bottom panel: same dark rounded sheet with labelled round buttons as 1-to-1 calls */}
       <div className="shrink-0 bg-wa-panel rounded-t-3xl px-3 pt-4 pb-[calc(18px+env(safe-area-inset-bottom))]">
-        <div className="flex flex-wrap items-start justify-center gap-x-3 gap-y-3 max-w-md mx-auto">
+        <div className="grid grid-cols-3 gap-x-6 gap-y-5 max-w-xs mx-auto justify-items-center">
           <Ctl on={!cameraOn} onClick={toggleCamera} label={cameraOn ? "Video" : "Video off"}>
             {cameraOn ? <Video size={28} /> : <VideoOff size={28} />}
           </Ctl>
           <Ctl on={isMuted} onClick={toggleMute} label={isMuted ? "Unmute" : "Mute"}>
             {isMuted ? <MicOff size={28} /> : <Mic size={28} />}
           </Ctl>
-          {canShare && (
-            <Ctl on={isScreenSharing} onClick={toggleScreenShare} label={isScreenSharing ? "Stop" : "Share"}>
-              {isScreenSharing ? <ScreenShareOff size={28} /> : <ScreenShare size={28} />}
-            </Ctl>
-          )}
+          <Ctl
+            on={isScreenSharing}
+            onClick={canShare ? toggleScreenShare : () => toast("Screen sharing isn't supported on this device")}
+            label={isScreenSharing ? "Stop" : "Share"}
+          >
+            {isScreenSharing ? <ScreenShareOff size={28} /> : <ScreenShare size={28} />}
+          </Ctl>
           <Ctl onClick={() => setShowPeople(true)} label="Add">
             <UserPlus size={28} />
+          </Ctl>
+          <Ctl onClick={() => setShowPeople(true)} label="People">
+            <Users size={28} />
           </Ctl>
           <Ctl danger onClick={leave} label="End">
             <PhoneOff size={30} />
