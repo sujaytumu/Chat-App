@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Info, Phone, Video, X, Search } from "lucide-react";
+import { Info, Phone, Video, X, Search, Palette } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
@@ -8,6 +8,7 @@ import { WaBack, WaKebab, WaArchive } from "./icons/WaIcons";
 import GroupCallBanner from "./GroupCallBanner";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 
+const WallpaperPicker = lazy(() => import("./WallpaperPicker"));
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 
 const iconBtn =
@@ -25,6 +26,7 @@ const ChatHeader = () => {
   const joinGroupCall = useGroupCallStore((st) => st.joinCall);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showWallpaper, setShowWallpaper] = useState(false);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -148,6 +150,15 @@ const ChatHeader = () => {
                 className={menuItem}
                 onClick={() => {
                   setShowMenu(false);
+                  setShowWallpaper(true);
+                }}
+              >
+                <Palette size={18} className="text-wa-icon" /> Wallpaper
+              </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
                   setChatArchived(selectedChat, !isArchived);
                   // Archiving closes the chat, like WhatsApp
                   if (!isArchived) setSelectedChat(null);
@@ -170,6 +181,11 @@ const ChatHeader = () => {
         </div>
       </div>
 
+      {showWallpaper && (
+        <Suspense fallback={null}>
+          <WallpaperPicker scope={`${selectedChat.type}:${data._id}`} chatName={name} onClose={() => setShowWallpaper(false)} />
+        </Suspense>
+      )}
       {showGroupInfo && isGroup && (
         <Suspense fallback={null}>
           <GroupInfoModal group={data} onClose={() => setShowGroupInfo(false)} />
