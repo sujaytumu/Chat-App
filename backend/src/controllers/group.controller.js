@@ -125,7 +125,12 @@ export const getGroupMessages = async (req, res) => {
     }
 
     const limit = Math.min(parseInt(req.query.limit, 10) || 80, 200);
-    const query = { groupId, deletedFor: { $ne: myId } };
+    const query = {
+      groupId,
+      deletedFor: { $ne: myId },
+      // expired messages can linger a minute before MongoDB removes them
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+    };
     if (req.query.before && !Number.isNaN(Date.parse(req.query.before))) {
       query.createdAt = { $lt: new Date(req.query.before) };
     }
@@ -199,6 +204,7 @@ export const sendGroupMessage = async (req, res) => {
       file: fileAttachment,
       replyTo: replyTo || null,
       seenBy: [senderId],
+      expiresAt: group.disappearAfter > 0 ? new Date(Date.now() + group.disappearAfter * 1000) : null,
     });
     newMessage = await newMessage.populate("replyTo", "text image file senderId");
 
@@ -352,6 +358,30 @@ export const updateGroupPermissions = async (req, res) => {
     res.status(200).json(populatedGroup);
   } catch (error) {
     console.log("Error in updateGroupPermissions controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const DISAPPEAR_OPTIONS = [0, 24 * 3600, 7 * 24 * 3600, 90 * 24 * 3600];
+
+// Admins turn disappearing messages on/off (applies to messages sent from now on).
+export const setDisappearing = async (req, res) => {
+  try {
+    const { id: groupId } = req.params;
+    const seconds = Number(req.body?.seconds);
+    if (!DISAPPEAR_OPTIONS.includes(seconds)) return res.status(400).json({ error: "Invalid duration" });
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ error: "Group not found" });
+    if (!group.admins.some((a) => a.equals(req.user._id))) {
+      return res.status(403).json({ error: "Only admins can change disappearing messages" });
+    }
+    group.disappearAfter = seconds;
+    await group.save();
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats");
+    io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
+    res.status(200).json(populatedGroup);
+  } catch (error) {
+    console.log("Error in setDisappearing controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

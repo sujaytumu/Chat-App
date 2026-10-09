@@ -26,6 +26,8 @@ const groupSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    // Disappearing messages: new messages vanish this many seconds after being sent (0 = off).
+    disappearAfter: { type: Number, default: 0 },
     // Who may do what. Defaults keep the original behaviour.
     permissions: {
       editInfo: { type: String, enum: ["admins", "all"], default: "admins" },

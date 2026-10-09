@@ -10,6 +10,7 @@ import {
   leaveGroup,
   updateGroupInfo,
   updateGroupPermissions,
+  setDisappearing,
 } from "../controllers/group.controller.js";
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.post("/", protectRoute, createGroup);
 router.get("/:id/messages", protectRoute, getGroupMessages);
 router.post("/:id/messages", protectRoute, sendGroupMessage);
 router.put("/:id", protectRoute, updateGroupInfo);
+router.put("/:id/disappearing", protectRoute, setDisappearing);
 router.put("/:id/permissions", protectRoute, updateGroupPermissions);
 router.post("/:id/members", protectRoute, addMembers);
 router.delete("/:id/members/:memberId", protectRoute, removeMember);

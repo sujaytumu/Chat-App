@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -8,6 +8,7 @@ import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
+import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
@@ -47,6 +48,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const canEdit = isAdmin || perms.editInfo === "all";
   const canAddMembers = isAdmin || perms.addMembers === "all";
   const [showPerms, setShowPerms] = useState(false);
+  const [showDisappear, setShowDisappear] = useState(false);
   const memberIds = new Set(group.members.map((m) => m._id || m));
   const nonMembers = users.filter((u) => !memberIds.has(u._id));
 
@@ -274,6 +276,17 @@ const GroupInfoModal = ({ group, onClose }) => {
           )}
 
           <button
+            onClick={() => setShowDisappear(true)}
+            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
+          >
+            <Timer size={22} className="text-[#8696A0]" />
+            <span className="flex-1">
+              <span className="block text-[16px]">Disappearing messages</span>
+              <span className="block text-[13.5px] text-[#8696A0]">{DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}</span>
+            </span>
+            <ChevronRight size={18} className="text-[#8696A0]" />
+          </button>
+          <button
             onClick={() => setShowPerms(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
           >
@@ -368,6 +381,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           </button>
         </div>
       </div>
+      {showDisappear && <DisappearingPanel group={group} isAdmin={isAdmin} onClose={() => setShowDisappear(false)} />}
       {showPerms && <GroupPermissionsPanel group={group} isAdmin={isAdmin} onClose={() => setShowPerms(false)} />}
       {showStarred && (
         <ChatStarredPanel

@@ -28,7 +28,7 @@ const colorForId = (id = "") =>
 
 const ChatContainer = () => {
   const {
-    messages,
+    messages: allMessages,
     isMessagesLoading,
     selectedChat,
     typingUsers,
@@ -46,6 +46,20 @@ const ChatContainer = () => {
     reactToMessage,
   } = useChatStore();
   const { authUser } = useAuthStore();
+
+  // Disappearing messages: hide each one the moment it expires (the server
+  // also deletes it for good a little later).
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const hasExpiring = allMessages.some((m) => m.expiresAt);
+  useEffect(() => {
+    if (!hasExpiring) return;
+    const t = setInterval(() => setNowTick(Date.now()), 15000);
+    return () => clearInterval(t);
+  }, [hasExpiring]);
+  const messages = useMemo(
+    () => (hasExpiring ? allMessages.filter((m) => !m.expiresAt || new Date(m.expiresAt).getTime() > nowTick) : allMessages),
+    [allMessages, hasExpiring, nowTick]
+  );
   // Phone Back closes the in-chat search bar first (before leaving the chat).
   useBackToClose(chatSearchOpen, () => useChatStore.getState().setChatSearchOpen(false));
   const messageEndRef = useRef(null);
