@@ -1,3 +1,4 @@
+import { canCaptureScreen, getScreenTrack, noScreenShareMessage } from "../lib/screenCapture";
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
@@ -15,9 +16,8 @@ export const MAX_GROUP_CALL = 6;
 const RING_MS = 40_000;
 const NO_ONE_JOINED_MS = 60_000;
 
-// Phones can't share their screen from a browser, so only offer it where it works.
-export const canShareScreen = () =>
-  !!navigator.mediaDevices?.getDisplayMedia && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+// Laptop browsers (getDisplayMedia) and the Talkies Android app (native capture).
+export const canShareScreen = () => canCaptureScreen();
 
 // ---- Live objects (not React state) ----
 const peers = new Map(); // userId -> { pc, makingOffer, ignoreOffer, polite, candidates, stream, videoSender, attached, restarted }
@@ -453,12 +453,11 @@ export const useGroupCallStore = create((set, get) => {
         return;
       }
       if (!canShareScreen()) {
-        toast("Phone browsers can't share their screen (Android and iPhone don't allow it). You can still watch anyone who shares from a laptop.", { icon: "🖥️", duration: 5000 });
+        toast(noScreenShareMessage(), { icon: "🖥️", duration: 7000 });
         return;
       }
       try {
-        const ds = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-        screenTrack = ds.getVideoTracks()[0];
+        screenTrack = await getScreenTrack();
         screenTrack.onended = () => get().stopScreenShare();
         applyOutboundVideo();
       } catch (err) {
