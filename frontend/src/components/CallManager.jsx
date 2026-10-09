@@ -3,7 +3,6 @@ import { useCallStore } from "../store/useCallStore";
 import {
   UploadCloud,
   MoreHorizontal,
-  UserPlus,
   Minimize2,
   Lock,
   SwitchCamera,
@@ -317,12 +316,7 @@ const CallManager = () => {
             <SwitchCamera size={20} />
           </button>
         ) : (
-          <button
-            onClick={() => toast("Group calling isn't supported yet", { icon: "👥" })}
-            className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
-          >
-            <UserPlus size={18} />
-          </button>
+          <span className="size-11" aria-hidden />
         )}
       </div>
 
