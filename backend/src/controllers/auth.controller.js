@@ -176,3 +176,48 @@ export const checkAuth = (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+// Only these appearance/sound keys may be stored, each as a short string.
+const UI_PREF_KEYS = [
+  "chat-theme",
+  "talkies-reduce-motion",
+  "talkies-wallpaper-off",
+  "talkies-haptics-off",
+  "talkies-message-sound-enabled",
+  "talkies-call-ringtone-enabled",
+  "talkies-call-tone",
+  "talkies-message-tone",
+  "talkies-group-tone",
+  "talkies-vib-message",
+  "talkies-vib-group",
+  "talkies-vib-call",
+];
+
+export const getUiPrefs = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("uiPrefs").lean();
+    res.status(200).json({ uiPrefs: user?.uiPrefs || {} });
+  } catch (error) {
+    console.log("Error in getUiPrefs controller: ", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const updateUiPrefs = async (req, res) => {
+  try {
+    const incoming = req.body?.prefs;
+    if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+      return res.status(400).json({ message: "Invalid preferences" });
+    }
+    const clean = {};
+    for (const key of UI_PREF_KEYS) {
+      const value = incoming[key];
+      if (typeof value === "string" && value.length <= 60) clean[key] = value;
+    }
+    await User.findByIdAndUpdate(req.user._id, { $set: { uiPrefs: clean } });
+    res.status(200).json({ uiPrefs: clean });
+  } catch (error) {
+    console.log("Error in updateUiPrefs controller: ", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};

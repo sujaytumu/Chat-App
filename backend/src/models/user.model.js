@@ -30,6 +30,9 @@ const userSchema = new mongoose.Schema(
     },
     // Same key format: chats pinned to the top (max 3) and chats whose
     // notifications are muted.
+    // Appearance & sound choices (theme, wallpaper, tones...) so every device —
+    // browser, installed app, Android app — looks and sounds the same.
+    uiPrefs: { type: mongoose.Schema.Types.Mixed, default: {} },
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
     // Web Push subscriptions (one per browser/device the user has granted

@@ -2,7 +2,7 @@
   "appId": "com.sujaytumu.talkies",
   "appName": "Talkies",
   "webDir": "www",
-  "backgroundColor": "#0B141A",
+  "backgroundColor": "#FFFFFF",
   "appendUserAgent": "TalkiesApp",
   "server": {
     "url": "https://chat-app-jjcg.onrender.com",
@@ -11,13 +11,12 @@
   "android": {
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": false,
-    "backgroundColor": "#0B141A"
+    "backgroundColor": "#FFFFFF"
   },
   "plugins": {
     "SystemBars": {
       "insetsHandling": "native",
-      "initialViewportFitValueHint": "cover",
-      "style": "DARK"
+      "initialViewportFitValueHint": "cover"
     }
   }
 }
