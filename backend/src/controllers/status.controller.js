@@ -1,34 +1,66 @@
 import Status from "../models/status.model.js";
 import cloudinary from "../lib/cloudinary.js";
+import { uploadFileAttachment } from "../lib/uploadFile.js";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
+const MAX_MEDIA_BASE64 = 13 * 1024 * 1024;
+const MAX_SONG_BASE64 = 6 * 1024 * 1024;
+
 export const createStatus = async (req, res) => {
   try {
-    const { type, content, backgroundColor } = req.body;
+    const { type, content, backgroundColor, caption, file, song, location } = req.body;
     const myId = req.user._id;
 
-    if (!type || !content) {
+    if (!["text", "image", "video", "audio", "file"].includes(type) || !content) {
       return res.status(400).json({ error: "Status needs a type and content" });
     }
-
-    let finalContent = content;
-    if (type === "image") {
-      const uploadResponse = await cloudinary.uploader.upload(content, {
-        folder: "chat-app/status",
-        resource_type: "image",
-      });
-      finalContent = uploadResponse.secure_url;
+    if (type !== "text" && typeof content === "string" && content.length > MAX_MEDIA_BASE64) {
+      return res.status(413).json({ error: "That file is too large for a status" });
     }
 
-    const status = await Status.create({
+    const doc = {
       userId: myId,
       type,
-      content: finalContent,
       backgroundColor: backgroundColor || "#00A884",
+      caption: typeof caption === "string" ? caption.trim().slice(0, 700) : "",
       expiresAt: new Date(Date.now() + TWENTY_FOUR_HOURS_MS),
-    });
+    };
 
+    if (type === "text") {
+      doc.content = String(content).slice(0, 700);
+    } else if (type === "image") {
+      const uploadResponse = await cloudinary.uploader.upload(content, { folder: "chat-app/status", resource_type: "image" });
+      doc.content = uploadResponse.secure_url;
+    } else {
+      const mime = type === "video" ? "video/mp4" : type === "audio" ? "audio/mpeg" : "application/octet-stream";
+      const uploaded = await uploadFileAttachment({
+        data: content,
+        name: file?.name,
+        mimeType: file?.mime || mime,
+        size: file?.size,
+        duration: file?.duration,
+      });
+      doc.content = uploaded.url;
+      doc.file = { name: uploaded.name, size: uploaded.size, mime: file?.mime || mime };
+    }
+
+    if (song?.data) {
+      if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
+      const uploaded = await uploadFileAttachment({ data: song.data, name: song.name, mimeType: "audio/mpeg", size: song.size });
+      doc.song = { url: uploaded.url, name: String(song.name || "Song").slice(0, 80) };
+    }
+
+    if (location && typeof location.name === "string" && location.name.trim()) {
+      const lat = Number(location.lat);
+      const lng = Number(location.lng);
+      doc.location = {
+        name: location.name.trim().slice(0, 100),
+        ...(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : {}),
+      };
+    }
+
+    const status = await Status.create(doc);
     res.status(201).json(status);
   } catch (error) {
     console.log("Error in createStatus controller:", error.message);
