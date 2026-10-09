@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { optimizeImage } from "../lib/cdn";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
@@ -153,7 +154,7 @@ const CallsPage = () => {
                 onClick={() => handleCallBack(otherUser, call.callType)}
                 className="w-full flex items-center gap-4 px-4 py-2.5 hover:bg-wa-hover active:bg-wa-surface transition-colors"
               >
-                <img src={otherUser.profilePic || "/avatar.png"} alt={otherUser.fullName} className="size-12 rounded-full object-cover shrink-0" />
+                <img src={optimizeImage(otherUser.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt={otherUser.fullName} className="size-12 rounded-full object-cover shrink-0" />
                 <div className="flex-1 min-w-0 text-left">
                   <p className={`text-[14.5px] truncate ${isMissed && !isOutgoing ? "text-red-500" : "text-wa-text"}`}>{otherUser.fullName}</p>
                   <div className="flex items-center gap-1 text-[12px] text-wa-muted">
@@ -190,7 +191,7 @@ const CallsPage = () => {
               {pickable.length === 0 && <p className="text-center text-wa-muted py-8 text-sm">No contacts yet</p>}
               {pickable.map((u) => (
                 <div key={u._id} className="flex items-center gap-3 px-5 py-2.5">
-                  <img src={u.profilePic || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
+                  <img src={optimizeImage(u.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt="" className="size-11 rounded-full object-cover" />
                   <span className="flex-1 min-w-0 truncate text-[13.5px] text-wa-text">{u.fullName}</span>
                   <button onClick={() => { setPicker(false); handleCallBack(u, "audio"); }} className="size-10 flex items-center justify-center text-wa-icon"><Phone size={21} /></button>
                   <button onClick={() => { setPicker(false); handleCallBack(u, "video"); }} className="size-10 flex items-center justify-center text-wa-icon"><Video size={21} /></button>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { optimizeImage } from "../lib/cdn";
 import { X, Send } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 
@@ -39,7 +40,7 @@ const ForwardMessageModal = ({ message, onClose }) => {
                 selected?.data._id === item.data._id ? "bg-white/10" : ""
               }`}
             >
-              <img src={item.avatar || "/avatar.png"} alt={item.name} className="size-10 rounded-full object-cover" />
+              <img src={optimizeImage(item.avatar || "/avatar.png", 120)} loading="lazy" decoding="async" alt={item.name} className="size-10 rounded-full object-cover" />
               <span className="text-wa-text2 truncate">{item.name}</span>
             </button>
           ))}

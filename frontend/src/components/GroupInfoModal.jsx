@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { optimizeImage } from "../lib/cdn";
 import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
@@ -151,7 +152,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               aria-label={canEdit ? "Change group photo" : "View group photo"}
             >
               {group.groupPic ? (
-                <img src={group.groupPic} alt={group.name} className="size-full object-cover" />
+                <img src={optimizeImage(group.groupPic, 120)} loading="lazy" decoding="async" alt={group.name} className="size-full object-cover" />
               ) : (
                 <span className="size-full flex items-center justify-center text-6xl text-wa-muted">
                   {group.name?.[0]?.toUpperCase()}

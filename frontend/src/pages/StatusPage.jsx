@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { optimizeImage } from "../lib/cdn";
 import { Plus, Loader2, Pencil, Camera, Lock } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
@@ -57,7 +58,7 @@ const StatusPage = () => {
             >
               <div className="relative">
                 <img
-                  src={authUser.profilePic || "/avatar.png"}
+                  src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
                   alt="My status"
                   className={`size-14 rounded-full object-cover ${
                     feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""
@@ -98,7 +99,7 @@ const StatusPage = () => {
                         className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface"
                       >
                         <img
-                          src={user.profilePic || "/avatar.png"}
+                          src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
                           alt={user.fullName}
                           className={`size-14 rounded-full object-cover ring-2 ${
                             hasUnseen ? "ring-[#00A884]" : "ring-wa-muted/40"

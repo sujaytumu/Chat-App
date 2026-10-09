@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { optimizeImage } from "../lib/cdn";
 import { X, Eye, Trash2, Loader2, ChevronUp, Music, MapPin, Headphones, FileText, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -137,7 +138,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
       {/* Header */}
       <div className="absolute top-[calc(18px+env(safe-area-inset-top))] inset-x-0 flex items-center gap-3 px-3 z-20 bg-gradient-to-b from-black/50 to-transparent pb-6 pt-1">
-        <img src={user.profilePic || "/avatar.png"} alt={user.fullName} className="size-10 rounded-full object-cover" />
+        <img src={optimizeImage(user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt={user.fullName} className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="text-white text-[13.5px] font-medium truncate">{isOwn ? "My status" : user.fullName}</p>
           <p className="text-white/80 text-[11px] truncate">{ago(current.createdAt)}</p>
@@ -186,7 +187,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             <p className="text-white text-[24px] leading-snug text-center break-words whitespace-pre-wrap">{linkify(current.content)}</p>
           </div>
         )}
-        {current.type === "image" && <img src={current.content} alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
+        {current.type === "image" && <img src={optimizeImage(current.content, 1080)} decoding="async" alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
         {current.type === "video" && (
           <video
             ref={mediaEl}
@@ -281,7 +282,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
               ) : (
                 views.map((v) => (
                   <div key={v.user._id} className="flex items-center gap-3 px-5 py-2.5">
-                    <img src={v.user.profilePic || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
+                    <img src={optimizeImage(v.user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt="" className="size-11 rounded-full object-cover" />
                     <div className="min-w-0">
                       <p className="text-[13.5px] text-wa-text truncate">{v.user.fullName}</p>
                       <p className="text-[11.5px] text-wa-muted">{ago(v.at)}</p>
