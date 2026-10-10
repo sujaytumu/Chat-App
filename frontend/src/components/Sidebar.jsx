@@ -21,6 +21,8 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
+import { Lock } from "lucide-react";
+import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import {
   WaBack,
@@ -109,6 +111,19 @@ const Sidebar = () => {
   const [showArchived, setShowArchived] = useState(false);
   // Phone Back leaves the Archived folder (back to the main list).
   useBackToClose(showArchived, () => setShowArchived(false));
+  // Locked chats folder: only open while the PIN session is unlocked.
+  const [showLocked, setShowLocked] = useState(false);
+  const lockUnlocked = useChatLockStore((s) => s.unlocked);
+  const requestUnlock = useChatLockStore((s) => s.requestUnlock);
+  const relock = useChatLockStore((s) => s.relock);
+  useBackToClose(showLocked, () => {
+    setShowLocked(false);
+    relock();
+  });
+  useEffect(() => {
+    if (showLocked && !lockUnlocked) setShowLocked(false);
+  }, [showLocked, lockUnlocked]);
+  const folderOpen = showArchived || showLocked;
 
   // ---- Message search (server-side), shown under the matching chats ----
   const [msgResults, setMsgResults] = useState([]);
@@ -201,6 +216,7 @@ const Sidebar = () => {
   const archivedSet = useMemo(() => new Set(archivedKeys || []), [archivedKeys]);
   const pinnedKeys = authUser?.pinnedChats;
   const pinnedSet = useMemo(() => new Set(pinnedKeys || []), [pinnedKeys]);
+  const lockedSet = useMemo(() => new Set(authUser?.lockedChats || []), [authUser?.lockedChats]);
   const mutedKeys = authUser?.mutedChats;
   const unreadMarkedSet = useMemo(() => new Set(authUser?.markedUnread || []), [authUser?.markedUnread]);
   const mutedSet = useMemo(() => new Set(mutedKeys || []), [mutedKeys]);
@@ -228,6 +244,7 @@ const Sidebar = () => {
         data: u,
         key: `d-${u._id}`,
         archived: archivedSet.has(`d:${u._id}`),
+        locked: lockedSet.has(`d:${u._id}`),
         pinned: pinnedSet.has(`d:${u._id}`),
         muted: mutedSet.has(`d:${u._id}`),
         markedUnread: unreadMarkedSet.has(`d:${u._id}`),
@@ -246,6 +263,7 @@ const Sidebar = () => {
         data: g,
         key: `g-${g._id}`,
         archived: archivedSet.has(`g:${g._id}`),
+        locked: lockedSet.has(`g:${g._id}`),
         pinned: pinnedSet.has(`g:${g._id}`),
         muted: mutedSet.has(`g:${g._id}`),
         markedUnread: unreadMarkedSet.has(`g:${g._id}`),
@@ -260,7 +278,7 @@ const Sidebar = () => {
       }));
 
     return [...directItems, ...groupItems]
-      .filter((item) => item.archived === showArchived)
+      .filter((item) => (showLocked ? item.locked : !item.locked && item.archived === showArchived))
       .filter((item) => {
         if (filter === "unread") return item.unreadCount > 0;
         if (filter === "groups") return item.type === "group";
@@ -269,7 +287,7 @@ const Sidebar = () => {
         return true;
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, activeKeys]);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, showLocked, lockedSet, activeKeys]);
 
   const selectedItems = items.filter((i) => selected.has(i.key));
   const allPinned = selectedItems.length > 0 && selectedItems.every((i) => i.pinned);
@@ -328,9 +346,9 @@ const Sidebar = () => {
 
   const totalUnread = useMemo(
     () =>
-      users.reduce((sum, c) => sum + (archivedSet.has(`d:${c._id}`) ? 0 : c.unreadCount || 0), 0) +
-      groups.reduce((sum, c) => sum + (archivedSet.has(`g:${c._id}`) ? 0 : c.unreadCount || 0), 0),
-    [users, groups, archivedSet]
+      users.reduce((sum, c) => sum + (archivedSet.has(`d:${c._id}`) || lockedSet.has(`d:${c._id}`) ? 0 : c.unreadCount || 0), 0) +
+      groups.reduce((sum, c) => sum + (archivedSet.has(`g:${c._id}`) || lockedSet.has(`g:${c._id}`) ? 0 : c.unreadCount || 0), 0),
+    [users, groups, archivedSet, lockedSet]
   );
 
   // Archived chats: how many, and how many have unread messages
@@ -338,9 +356,15 @@ const Sidebar = () => {
     const all = [
       ...users.map((u) => ({ k: `d:${u._id}`, unread: u.unreadCount || 0 })),
       ...groups.map((g) => ({ k: `g:${g._id}`, unread: g.unreadCount || 0 })),
-    ].filter((c) => archivedSet.has(c.k));
+    ].filter((c) => archivedSet.has(c.k) && !lockedSet.has(c.k));
     return { count: all.length, unread: all.filter((c) => c.unread > 0).length };
-  }, [users, groups, archivedSet]);
+  }, [users, groups, archivedSet, lockedSet]);
+
+  // Locked chats: just how many (names and previews stay hidden until unlocked)
+  const lockedCount = useMemo(
+    () => [...users.map((u) => `d:${u._id}`), ...groups.map((g) => `g:${g._id}`)].filter((k) => lockedSet.has(k)).length,
+    [users, groups, lockedSet]
+  );
 
   if (isUsersLoading) return <SidebarSkeleton />;
 
@@ -429,17 +453,22 @@ const Sidebar = () => {
       )}
 
       {/* Title + menu */}
-      <div className={`${selecting ? "hidden" : "flex"} items-center justify-between ${showArchived ? "px-2 pt-3 pb-2 border-b border-white/5" : "px-4 pt-4 pb-3"}`}>
-        {showArchived ? (
+      <div className={`${selecting ? "hidden" : "flex"} items-center justify-between ${folderOpen ? "px-2 pt-3 pb-2 border-b border-white/5" : "px-4 pt-4 pb-3"}`}>
+        {folderOpen ? (
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowArchived(false)}
+              onClick={() => {
+                if (showLocked) {
+                  setShowLocked(false);
+                  relock();
+                } else setShowArchived(false);
+              }}
               className="size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors"
               aria-label="Back to chats"
             >
               <WaBack size={24} />
             </button>
-            <h1 className="text-[18.5px] leading-none font-normal text-wa-text">Archived</h1>
+            <h1 className="text-[18.5px] leading-none font-normal text-wa-text">{showLocked ? "Locked chats" : "Archived"}</h1>
           </div>
         ) : (
           <h1 className="text-[24px] lg:text-[20.5px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
@@ -479,14 +508,16 @@ const Sidebar = () => {
       </div>
 
       {/* Archived: WhatsApp's info banner instead of search + chips */}
-      {showArchived && !selecting && (
+      {folderOpen && !selecting && (
         <p className="px-6 py-4 text-center text-[13px] leading-snug text-wa-muted border-b border-white/5">
-          These chats stay archived when new messages are received.
+          {showLocked
+            ? "Locked chats are hidden from your chat list and search. They lock again when you leave this folder."
+            : "These chats stay archived when new messages are received."}
         </p>
       )}
 
       {/* Search pill */}
-      {!showArchived && (
+      {!folderOpen && (
       <div className={`px-4 pb-3 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         <button
           onClick={() => setSearchOpen(true)}
@@ -500,7 +531,7 @@ const Sidebar = () => {
       )}
 
       {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
-      {!showArchived && (
+      {!folderOpen && (
       <div className={`flex gap-2 lg:gap-1.5 overflow-x-auto no-scrollbar px-4 lg:px-3 pb-3 lg:pb-2.5 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         {[
           ...FILTERS,
@@ -539,7 +570,7 @@ const Sidebar = () => {
 
       {/* Chat list */}
       <div ref={listRef} className="overflow-y-auto flex-1 pb-24">
-        {!showArchived && activeKeys && !search && (
+        {!folderOpen && activeKeys && !search && (
           <div className="px-4 pb-2 flex items-center justify-between">
             <span className="text-[12px] text-wa-muted">
               {filter === "fav" ? "Favourites" : activeList?.name} · {items.length} chat{items.length === 1 ? "" : "s"}
@@ -552,7 +583,7 @@ const Sidebar = () => {
             </button>
           </div>
         )}
-        {!showArchived && archivedInfo.count > 0 && !search && filter === "all" && (
+        {!folderOpen && archivedInfo.count > 0 && !search && filter === "all" && (
           <button
             onClick={() => {
               setFilter("all");
@@ -567,6 +598,18 @@ const Sidebar = () => {
             {archivedInfo.unread > 0 && (
               <span className="text-[11px] font-medium text-[#25D366]">{archivedInfo.unread}</span>
             )}
+          </button>
+        )}
+        {!folderOpen && lockedCount > 0 && !search && filter === "all" && (
+          <button
+            onClick={() => requestUnlock(() => setShowLocked(true))}
+            className="w-full pl-3 pr-4 py-2.5 flex items-center gap-3 text-left hover:bg-wa-surface/70 active:bg-wa-surface transition-colors"
+          >
+            <span className="size-12 flex items-center justify-center text-wa-muted">
+              <Lock size={24} />
+            </span>
+            <span className="flex-1 text-[14.5px] text-wa-muted">Locked chats</span>
+            <span className="text-[11px] font-medium text-wa-muted">{lockedCount}</span>
           </button>
         )}
 
@@ -667,7 +710,7 @@ const Sidebar = () => {
           );
         })}
 
-        {!showArchived && search.trim().length >= 2 && msgResults.length > 0 && (
+        {!folderOpen && search.trim().length >= 2 && msgResults.length > 0 && (
           <div className="pt-2">
             <p className="px-4 py-2 text-[11px] font-medium text-[#25D366]">Messages</p>
             {msgResults.map((r) => {
@@ -708,6 +751,8 @@ const Sidebar = () => {
           <div className="text-center text-wa-muted py-10 px-6 text-[13px]">
             {search
               ? `No chats matching “${search}”`
+              : showLocked
+              ? "No locked chats"
               : showArchived
               ? "No archived chats"
               : filter === "all"

@@ -17,17 +17,18 @@ const items = [
 const MainNav = () => {
   const { authUser } = useAuthStore();
   const archived = authUser?.archivedChats;
+  const lockedKeys = authUser?.lockedChats;
   // Archived chats don't count towards the badge (like WhatsApp). Select the
   // raw lists and total below so the selector stays stable between renders.
   const users = useChatStore((s) => s.users);
   const groups = useChatStore((s) => s.groups);
   const unread = useMemo(() => {
-    const hidden = new Set(archived || []);
+    const hidden = new Set([...(archived || []), ...(lockedKeys || [])]);
     return (
       users.reduce((sum, c) => sum + (hidden.has(`d:${c._id}`) ? 0 : c.unreadCount || 0), 0) +
       groups.reduce((sum, c) => sum + (hidden.has(`g:${c._id}`) ? 0 : c.unreadCount || 0), 0)
     );
-  }, [users, groups, archived]);
+  }, [users, groups, archived, lockedKeys]);
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
   const navigate = useNavigate();

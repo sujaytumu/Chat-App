@@ -62,6 +62,15 @@ const apiLimiter = rateLimit({
   handler: json429("Too many requests. Slow down a little."),
 });
 app.use("/api", apiLimiter);
+const lockLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 15,
+  skipSuccessfulRequests: true,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: json429("Too many PIN attempts. Try again in a few minutes."),
+});
+app.use("/api/messages/lock", lockLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
 app.use("/api/auth/change-password", authLimiter);

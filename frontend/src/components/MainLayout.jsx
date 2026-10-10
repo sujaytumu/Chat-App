@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "re
 import { useLocation, useNavigate } from "react-router-dom";
 import { useChatStore } from "../store/useChatStore";
 import MainNav from "./MainNav";
+import ChatLockHost from "./ChatLockHost";
 import { goTab } from "../lib/tabNav";
 
 // Shared shell for the main app screens (Chats / Updates / Calls) — puts the
@@ -151,6 +152,7 @@ const MainLayout = ({ children }) => {
       style={{ height: "var(--app-height, 100dvh)" }}
     >
       <MainNav />
+      <ChatLockHost />
       <div
         className="flex-1 min-w-0 overflow-hidden relative"
         style={{ touchAction: swipeable ? "pan-y" : undefined }}

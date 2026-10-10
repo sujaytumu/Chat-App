@@ -10,6 +10,7 @@ import {
   isPushActive,
 } from "../lib/notificationSound";
 import { vibrationPattern } from "../lib/soundSettings";
+import { useChatLockStore, isChatLocked } from "./useChatLockStore";
 
 function notifyIncoming(senderName, message, isGroup = false) {
   // Muted chats stay silent (the unread badge still counts).
@@ -18,14 +19,15 @@ function notifyIncoming(senderName, message, isGroup = false) {
   // Phone with the app in the background: the system notification (from Web
   // Push) carries the sound — don't also try to play one from a frozen page.
   if (shouldLeaveToSystemAlert()) return;
+  const locked = useAuthStore.getState().authUser?.lockedChats?.includes(muteKey);
   playNotificationSound(isGroup);
   const buzz = vibrationPattern(isGroup ? "group" : "message");
   if (buzz) navigator.vibrate?.(buzz);
   // With Web Push active the service worker shows the notification itself.
   if (isPushActive()) return;
   const body = message.image ? "📷 Photo" : message.text || "New message";
-  showDesktopNotification(isGroup ? `${senderName}` : senderName, {
-    body: isGroup && message.text ? message.text : body,
+  showDesktopNotification(locked ? "Talkies" : isGroup ? `${senderName}` : senderName, {
+    body: locked ? "You have a new message" : isGroup && message.text ? message.text : body,
     icon: "/icon-v2-192.png",
     tag: isGroup ? `group-${message.groupId}` : `dm-${message.senderId}`,
   });
@@ -272,6 +274,11 @@ export const useChatStore = create((set, get) => ({
     // Re-opening a chat is instant: show what we last had (memory, then disk)
     // right away and refresh from the server in the background.
     const key = chatKeyOf(chat);
+    // Locked chats open only after the PIN has been entered
+    if (isChatLocked(chat) && !useChatLockStore.getState().unlocked) {
+      useChatLockStore.getState().requestUnlock(() => get().setSelectedChat(chat));
+      return;
+    }
     const userId = useAuthStore.getState().authUser?._id;
     const cached = msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [];
     set({ selectedChat: chat, messages: cached, hasMoreMessages: false, chatSearchOpen: false });
@@ -858,7 +865,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     // Archive list changed on another device (or this one) — keep in sync.
-    ["archivedChats", "pinnedChats", "mutedChats", "markedUnread", "chatLists", "blockedUsers", "privacy"].forEach((field) => {
+    ["archivedChats", "lockedChats", "pinnedChats", "mutedChats", "markedUnread", "chatLists", "blockedUsers", "privacy"].forEach((field) => {
       socket.on(field, (list) => {
         useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, [field]: list } } : {}));
       });
@@ -913,6 +920,7 @@ export const useChatStore = create((set, get) => ({
       "groupUpdated",
       "removedFromGroup",
       "archivedChats",
+      "lockedChats",
       "pinnedChats",
       "mutedChats",
       "markedUnread",
