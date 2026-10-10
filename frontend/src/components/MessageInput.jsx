@@ -12,6 +12,7 @@ import {
   Trash2,
   MapPin,
   BarChart3,
+  UserRound,
   Smile,
   Camera,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import PollModal from "./PollModal";
+import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import { getEnterSends } from "../lib/uiSettings";
@@ -51,6 +53,7 @@ const MessageInput = () => {
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
   const authUser = useAuthStore((st) => st.authUser);
+  const [showContacts, setShowContacts] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
   const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
@@ -472,6 +475,19 @@ const MessageInput = () => {
 
   return (
     <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full">
+      {showContacts && (
+        <ContactPicker
+          onClose={() => setShowContacts(false)}
+          onPick={async (u) => {
+            setShowContacts(false);
+            try {
+              await sendMessage({ contactUserId: u._id });
+            } catch {
+              /* toast shown by store */
+            }
+          }}
+        />
+      )}
       {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
       {mentionCandidates.length > 0 && (
         <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
@@ -670,6 +686,19 @@ const MessageInput = () => {
                       <BarChart3 size={16} className="text-white" />
                     </span>
                     Poll
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowContacts(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                  >
+                    <span className="size-8 rounded-full bg-[#009de2] flex items-center justify-center shrink-0">
+                      <UserRound size={16} className="text-white" />
+                    </span>
+                    Contact
                   </button>
                 </div>
               )}

@@ -82,6 +82,11 @@ const messageSchema = new mongoose.Schema(
       waveform: { type: [Number], default: undefined },
     },
     editedAt: { type: Date, default: null },
+    // Shared contact card (another Talkies user).
+    contact: {
+      type: { userId: mongoose.Schema.Types.ObjectId, fullName: String, profilePic: String },
+      default: undefined,
+    },
     // Poll: question + options; each option keeps the ids of the people who chose it.
     poll: {
       type: {
