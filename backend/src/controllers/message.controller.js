@@ -60,6 +60,8 @@ export const getUsersForSidebar = async (req, res) => {
     const usersWithMeta = filteredUsers.map(({ privacy, blockedUsers, ...user }) => {
       const lm = lastMessageByUser.get(user._id.toString());
       const hideSeen = iHideReceipts || privacy?.readReceipts === false;
+      // "Last seen" is hidden both ways when either side turned online status off.
+      if (privacy?.online === false || req.user.privacy?.online === false) user.lastSeen = null;
       return {
         ...user,
         lastMessage: lm
