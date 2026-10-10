@@ -23,7 +23,7 @@ const fallbackBars = (seed) => {
   });
 };
 
-const VoiceMessagePlayer = ({ file, onError }) => {
+const VoiceMessagePlayer = ({ file, onError, autoNext }) => {
   const audioRef = useRef(null);
   const barsRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -44,6 +44,17 @@ const VoiceMessagePlayer = ({ file, onError }) => {
     };
   }, []);
 
+  // Like WhatsApp: when one incoming voice note ends, the next incoming one starts by itself.
+  useEffect(() => {
+    const audio = audioRef.current;
+    const go = () => {
+      if (audio && audio.paused) toggleRef.current?.();
+    };
+    audio?.addEventListener("voice-autoplay", go);
+    return () => audio?.removeEventListener("voice-autoplay", go);
+  }, []);
+  const toggleRef = useRef(null);
+
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -55,6 +66,16 @@ const VoiceMessagePlayer = ({ file, onError }) => {
     } else {
       audio.pause();
     }
+  };
+
+  toggleRef.current = toggle;
+
+  const playNext = () => {
+    const all = Array.from(document.querySelectorAll("audio[data-voice-incoming]"));
+    const next = all[all.indexOf(audioRef.current) + 1];
+    if (!next) return;
+    next.closest("[data-voice-row]")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    next.dispatchEvent(new Event("voice-autoplay"));
   };
 
   const cycleSpeed = (e) => {
@@ -106,7 +127,7 @@ const VoiceMessagePlayer = ({ file, onError }) => {
   const shown = playing || current > 0 ? current : duration;
 
   return (
-    <div className="flex items-center gap-2.5 mb-1 min-w-[230px] max-w-[270px] select-none">
+    <div data-voice-row="1" className="flex items-center gap-2.5 mb-1 min-w-[230px] max-w-[270px] select-none">
       <button
         type="button"
         onClick={toggle}
@@ -147,6 +168,7 @@ const VoiceMessagePlayer = ({ file, onError }) => {
         ref={audioRef}
         src={file.url}
         preload="metadata"
+        data-voice-incoming={autoNext ? "1" : undefined}
         onLoadedMetadata={onLoadedMetadata}
         onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
         onPlay={() => setPlaying(true)}
@@ -155,6 +177,7 @@ const VoiceMessagePlayer = ({ file, onError }) => {
           setPlaying(false);
           setCurrent(0);
           if (currentlyPlaying === audioRef.current) currentlyPlaying = null;
+          if (autoNext) playNext();
         }}
         onError={onError}
       />
