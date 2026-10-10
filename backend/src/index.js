@@ -82,6 +82,12 @@ app.use("/api/push", pushRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/status", statusRoutes);
 
+// Tiny wake-up / keep-alive endpoint (no database, no auth).
+app.get("/api/health", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).send("ok");
+});
+
 if (process.env.NODE_ENV === "production") {
   app.use(
     express.static(path.join(__dirname, "../frontend/dist"), {

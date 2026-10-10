@@ -14,6 +14,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <link rel="preconnect" href="https://res.cloudinary.com" crossorigin />
     <title>Talkies</title>
+    <!-- Wake the server the instant the page starts (in parallel with downloading the app), so a sleeping host is already warm when the app asks for data. -->
+    <script>try{fetch("/api/health",{cache:"no-store",credentials:"omit",keepalive:true}).catch(function(){})}catch(e){}</script>
     <!-- Right colours from the very first paint (white by default), so nothing flashes before the app loads. -->
     <script>
       try {
