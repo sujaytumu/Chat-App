@@ -465,12 +465,14 @@ const ChatContainer = () => {
                         const url = await openViewOnce(message._id);
                         if (url) setLightboxSrc(url);
                       }}
-                      className={`flex items-center gap-2.5 py-1 pr-3 text-[13px] ${message.viewOnceOpened ? "text-wa-muted" : "text-wa-text"}`}
+                      className={`flex items-center gap-2 py-0.5 text-[13px] ${message.viewOnceOpened ? "text-wa-muted" : "text-wa-text"}`}
                     >
-                      <span className="size-9 rounded-full border-2 border-current flex items-center justify-center text-[13px] font-bold">
+                      <span className="size-[22px] shrink-0 rounded-full border-[1.5px] border-dashed border-current flex items-center justify-center text-[10.5px] font-semibold leading-none">
                         {message.viewOnceOpened ? "✓" : "1"}
                       </span>
                       <span>{message.viewOnceOpened ? "Opened" : isMe ? "Photo" : "Tap to view photo"}</span>
+                      {/* room for the time, which sits on the same line */}
+                      <span aria-hidden="true" className={`inline-block ${isMe ? "w-[58px]" : "w-[38px]"}`} />
                     </button>
                   )}
                   {message.image && (
@@ -516,7 +518,7 @@ const ChatContainer = () => {
                   )}
                   <span
                     className={`${
-                      hasText ? "absolute bottom-1 right-2" : "self-end mt-0.5"
+                      hasText || (message.viewOnce && !message.image) ? "absolute bottom-1 right-2" : "self-end mt-0.5"
                     } text-[9.4px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
                   >
                     {message.editedAt && <span>Edited</span>}
