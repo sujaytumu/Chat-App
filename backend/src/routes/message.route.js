@@ -28,6 +28,7 @@ import {
   setChatMarkedUnread,
   getChatMedia,
   getDirectDisappearing,
+  linkPreview,
   setDirectDisappearing,
 } from "../controllers/message.controller.js";
 
@@ -43,6 +44,7 @@ router.put("/poll/:id/vote", protectRoute, votePoll);
 router.post("/view-once/:id", protectRoute, openViewOnce);
 router.get("/disappearing/:id", protectRoute, getDirectDisappearing);
 router.put("/disappearing/:id", protectRoute, setDirectDisappearing);
+router.get("/link-preview", protectRoute, linkPreview);
 router.get("/storage-usage", protectRoute, getStorageUsage);
 router.get("/export", protectRoute, exportChats);
 router.get("/:id", protectRoute, getMessages);
