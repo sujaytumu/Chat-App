@@ -1,4 +1,5 @@
 import { THEMES } from "../constants";
+import { CHAT_COLORS, getChatColor, setChatColor } from "../lib/chatColor";
 import { useThemeStore } from "../store/useThemeStore";
 import { Download, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
@@ -58,6 +59,7 @@ export const AppearancePage = () => {
   const { theme, setTheme } = useThemeStore();
   const [wallpaper, setWall] = useState(getWallpaper());
   const [picking, setPicking] = useState(false);
+  const [color, setColor] = useState(getChatColor());
   const chatCount = useWallpaperStore((s) => Object.keys(s.chats).length);
   const clearAllChats = useWallpaperStore((s) => s.clearAllChatWallpapers);
 
@@ -83,6 +85,33 @@ export const AppearancePage = () => {
         </button>
       )}
       {picking && <WallpaperPicker scope="default" onClose={() => setPicking(false)} />}
+
+      <div className="rounded-xl bg-wa-surface p-4">
+        <span className="block text-[13.5px]">Chat colour</span>
+        <span className="block text-[11.5px] text-wa-muted mb-3">The colour of your own message bubbles</span>
+        <div className="flex flex-wrap gap-3">
+          {CHAT_COLORS.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => {
+                setChatColor(c.id);
+                setColor(c.id);
+              }}
+              className="flex flex-col items-center gap-1.5 w-[58px]"
+              aria-label={c.name}
+              aria-pressed={color === c.id}
+            >
+              <span
+                className={`size-11 rounded-full border-2 flex items-center justify-center transition-transform active:scale-90 ${color === c.id ? "border-[#00A884] scale-105" : "border-black/10"}`}
+                style={{ background: c.swatch }}
+              >
+                {color === c.id && <span className="text-[#00A884] text-[18px] font-bold leading-none">✓</span>}
+              </span>
+              <span className="text-[10.5px] text-wa-muted truncate w-full text-center">{c.name}</span>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="flex flex-col gap-1 pt-2">
         <h2 className="text-lg font-semibold">Theme</h2>
