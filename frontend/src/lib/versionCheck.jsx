@@ -14,7 +14,12 @@ import { useCallStore } from "../store/useCallStore";
 
 const ENTRY_RE = /assets\/index-[A-Za-z0-9_-]+\.js/;
 const RELOAD_LOG_KEY = "talkies-auto-reloads";
-const FRESH_PAGE_MS = 20_000;
+// "Not touched yet": until the person taps / types / scrolls, switching builds is invisible,
+// so it is done straight away however long the (possibly cold) server took to answer.
+let touched = false;
+["pointerdown", "keydown", "touchstart", "wheel"].forEach((ev) =>
+  window.addEventListener(ev, () => (touched = true), { once: true, passive: true, capture: true })
+);
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 
 function currentEntry() {
@@ -26,7 +31,18 @@ async function latestEntry() {
   const res = await fetch(`/index.html?v=${Date.now()}`, { cache: "no-store", credentials: "same-origin" });
   if (!res.ok) return null;
   const html = await res.text();
-  return html.match(ENTRY_RE)?.[0] || null;
+  const entry = html.match(ENTRY_RE)?.[0] || null;
+  // Put the fresh page into the app-shell cache first, so the reload that follows
+  // opens the NEW build instead of the old saved copy.
+  if (entry && entry !== currentEntry()) {
+    try {
+      const cache = await caches.open("talkies-shell-v1");
+      await cache.put("/index.html", new Response(html, { headers: { "content-type": "text/html; charset=utf-8" } }));
+    } catch {
+      /* no cache access — the reload still works */
+    }
+  }
+  return entry;
 }
 
 // Guard against a reload loop (e.g. a stale replica still serving the old
@@ -87,7 +103,7 @@ async function check() {
   // Also refresh the service worker so notifications use the new code.
   navigator.serviceWorker?.getRegistration().then((reg) => reg?.update()).catch(() => {});
 
-  if (performance.now() < FRESH_PAGE_MS && !inCall()) {
+  if (!touched && !inCall()) {
     reloadNow();
   } else if (!updateReady) {
     offerUpdate();
