@@ -24,6 +24,7 @@ import ChatListModal from "./ChatListModal";
 import { Lock } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
+import { useDraftStore } from "../store/useDraftStore";
 import {
   WaBack,
   WaKebab,
@@ -59,6 +60,7 @@ const menuItem =
   "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
 
 const Sidebar = () => {
+  const drafts = useDraftStore((s) => s.drafts);
   const {
     getUsers,
     getGroups,
@@ -616,6 +618,7 @@ const Sidebar = () => {
         {items.map((item) => {
           const isSelected = selectedChat?.type === item.type && selectedChat.data._id === item.data._id;
           const hasUnread = item.unreadCount > 0;
+          const draftText = !isSelected ? drafts[`${item.type === "group" ? "g" : "d"}:${item.data._id}`] : "";
           const sentByMe = item.lastMessage && item.lastMessage.senderId === authUser?._id;
           const isTyping =
             (typingUsers[item.type === "group" ? `group:${item.data._id}` : item.data._id]?.size ?? 0) > 0;
@@ -676,15 +679,22 @@ const Sidebar = () => {
                       hasUnread ? "text-wa-text" : "text-wa-muted"
                     }`}
                   >
-                    {sentByMe && item.type === "direct" && (
+                    {!draftText && sentByMe && item.type === "direct" && (
                       <span className="shrink-0 text-wa-muted">
                         <MessageTicks message={item.lastMessage} />
                       </span>
                     )}
+                    {draftText ? (
+                      <span className="truncate">
+                        <span className="text-[#25D366]">Draft: </span>
+                        {draftText}
+                      </span>
+                    ) : (
                     <span className="truncate">
                       {sentByMe && item.type === "group" ? "You: " : ""}
                       {lastMessagePreview(item.lastMessage)}
                     </span>
+                    )}
                   </span>
                   )}
                   <span className="flex items-center gap-1.5 shrink-0 text-wa-muted">
