@@ -503,9 +503,8 @@ const Sidebar = () => {
       {!showArchived && (
       <div className={`flex gap-2 lg:gap-1.5 overflow-x-auto no-scrollbar px-4 lg:px-3 pb-3 lg:pb-2.5 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         {[
-          ...FILTERS.slice(0, 3),
+          ...FILTERS,
           ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name })),
-          ...FILTERS.slice(3),
           { id: "__new" },
         ].map(({ id, label }) => {
           if (id === "__new") return (
