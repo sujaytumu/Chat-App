@@ -70,6 +70,39 @@ const ChatContainer = () => {
     () => (hasExpiring ? allMessages.filter((m) => !m.expiresAt || new Date(m.expiresAt).getTime() > nowTick) : allMessages),
     [allMessages, hasExpiring, nowTick]
   );
+  // Swipe a message to the right to reply, like WhatsApp.
+  const swipe = useRef({ x: 0, y: 0, on: false, dx: 0 });
+  const swipeStart = (e) => {
+    const t = e.touches[0];
+    swipe.current = { x: t.clientX, y: t.clientY, on: false, dx: 0 };
+    e.currentTarget.style.transition = "none";
+  };
+  const swipeMove = (e) => {
+    const t = e.touches[0];
+    const sw = swipe.current;
+    const dx = t.clientX - sw.x;
+    const dy = t.clientY - sw.y;
+    if (!sw.on) {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return void (sw.x = Infinity);
+      if (dx > 12 && dx > Math.abs(dy) * 1.5) sw.on = true;
+      else return;
+    }
+    if (sw.x === Infinity) return;
+    sw.dx = Math.min(dx, 90);
+    e.currentTarget.style.translate = `${Math.max(sw.dx, 0) * 0.8}px 0`;
+  };
+  const swipeEnd = (e, onReply) => {
+    const el = e.currentTarget;
+    const sw = swipe.current;
+    el.style.transition = "translate .2s cubic-bezier(.2,.8,.2,1)";
+    el.style.translate = "0 0";
+    setTimeout(() => (el.style.transition = ""), 260);
+    if (sw.on && sw.dx > 56 && onReply) {
+      navigator.vibrate?.(12);
+      onReply();
+    }
+    swipe.current = { x: 0, y: 0, on: false, dx: 0 };
+  };
   // Bubbles that arrive while the chat is open ease in; the ones already there don't animate.
   const freshRef = useRef({ key: null, ids: new Set() });
   const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
@@ -350,6 +383,11 @@ const ChatContainer = () => {
               } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
               onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
+              style={{ touchAction: "pan-y" }}
+              onTouchStart={message.deletedForEveryone ? undefined : (e) => swipeStart(e)}
+              onTouchMove={message.deletedForEveryone ? undefined : (e) => swipeMove(e)}
+              onTouchEnd={message.deletedForEveryone ? undefined : (e) => swipeEnd(e, () => setReplyingTo(message))}
+              onTouchCancel={message.deletedForEveryone ? undefined : (e) => swipeEnd(e)}
             >
               {isGroup && !isMe &&
                 (isFirstInGroup ? (
