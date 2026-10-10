@@ -122,9 +122,20 @@ const ChatContainer = () => {
     }
     swipe.current = { x: 0, y: 0, on: false, dx: 0 };
   };
+  const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
+  // "N unread messages" divider: remembered when the chat is opened, before they are marked read.
+  const [unreadMark, setUnreadMark] = useState({ key: null, id: null, count: 0 });
+  useEffect(() => {
+    if (!chatKeyNow || unreadMark.key === chatKeyNow || !allMessages.length || isMessagesLoading) return;
+    const me = authUser._id;
+    const unread = allMessages.filter((m) => m.senderId !== me && !m.deletedForEveryone && (selectedChat.type === "group" ? !m.seenBy?.includes(me) : !m.seen));
+    setUnreadMark({ key: chatKeyNow, id: unread[0]?._id || null, count: unread.length });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatKeyNow, allMessages, isMessagesLoading]);
+  const unreadDividerId = unreadMark.key === chatKeyNow ? unreadMark.id : null;
+
   // Bubbles that arrive while the chat is open ease in; the ones already there don't animate.
   const freshRef = useRef({ key: null, ids: new Set() });
-  const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
   if (freshRef.current.key !== chatKeyNow) freshRef.current = { key: chatKeyNow, ids: new Set(messages.map((m) => m._id)) };
   const seenIds = freshRef.current.ids;
   const isFreshMsg = (id) => seenIds.size > 0 && !seenIds.has(id);
@@ -388,6 +399,13 @@ const ChatContainer = () => {
 
           return (
             <div key={message._id} className={`${isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}${isFreshMsg(message._id) ? " msg-in" : ""}`}>
+            {unreadDividerId === message._id && unreadMark.count > 0 && (
+              <div className="flex justify-center my-3">
+                <span className="px-3 py-1 rounded-lg bg-wa-surface/90 text-wa-muted text-[11.5px] uppercase tracking-wide">
+                  {unreadMark.count} unread message{unreadMark.count > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
             {showDateDivider && (
               <div className="flex justify-center my-3">
                 <span className="bg-wa-surface/95 text-wa-muted text-[10.5px] px-3 py-1 rounded-lg shadow-sm">
