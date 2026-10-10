@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
+import DirectChatSetting, { pairKey } from "../models/directChatSetting.model.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
@@ -127,6 +128,8 @@ export const getMessages = async (req, res) => {
         { senderId: myId, receiverId: userToChatId },
         { senderId: userToChatId, receiverId: myId },
       ],
+      // disappearing messages can linger a minute before MongoDB removes them
+      $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }],
     };
     if (req.query.before && !Number.isNaN(Date.parse(req.query.before))) {
       query.createdAt = { $lt: new Date(req.query.before) };
@@ -200,9 +203,11 @@ export const sendMessage = async (req, res) => {
     const receiverSocketId = blockedByThem ? undefined : getReceiverSocketId(receiverId);
     const isDelivered = !!receiverSocketId;
 
+    const dSetting = await DirectChatSetting.findOne({ key: pairKey(senderId, receiverId) }).select("disappearAfter").lean();
     const newMessage = new Message({
       senderId,
       receiverId,
+      expiresAt: dSetting?.disappearAfter > 0 ? new Date(Date.now() + dSetting.disappearAfter * 1000) : null,
       text: poll ? `📊 ${poll.question}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
       contact: contact || undefined,
@@ -971,6 +976,39 @@ export const exportChats = async (req, res) => {
     res.status(200).send(JSON.stringify({ exportedAt: new Date(), exportedBy: req.user.fullName, chats: [...chats.values()] }, null, 2));
   } catch (error) {
     console.log("Error in exportChats controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const DIRECT_DISAPPEAR_OPTIONS = [0, 24 * 3600, 7 * 24 * 3600, 90 * 24 * 3600];
+
+export const getDirectDisappearing = async (req, res) => {
+  try {
+    const doc = await DirectChatSetting.findOne({ key: pairKey(req.user._id, req.params.id) }).select("disappearAfter").lean();
+    res.status(200).json({ seconds: doc?.disappearAfter || 0 });
+  } catch (error) {
+    console.log("Error in getDirectDisappearing controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Either person can switch disappearing messages on/off; applies to messages sent from now on.
+export const setDirectDisappearing = async (req, res) => {
+  try {
+    const seconds = Number(req.body?.seconds);
+    if (!DIRECT_DISAPPEAR_OPTIONS.includes(seconds)) return res.status(400).json({ error: "Invalid duration" });
+    const otherId = req.params.id;
+    if (!mongoose.isValidObjectId(otherId)) return res.status(400).json({ error: "Invalid user" });
+    await DirectChatSetting.findOneAndUpdate(
+      { key: pairKey(req.user._id, otherId) },
+      { $set: { disappearAfter: seconds } },
+      { upsert: true }
+    );
+    const sid = getReceiverSocketId(otherId);
+    if (sid) io.to(sid).emit("directDisappearing", { userId: String(req.user._id), seconds });
+    res.status(200).json({ seconds });
+  } catch (error) {
+    console.log("Error in setDirectDisappearing controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

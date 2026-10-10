@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
+import { Timer, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -13,6 +13,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 
 const WallpaperPicker = lazy(() => import("./WallpaperPicker"));
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
+const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
 
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
@@ -52,6 +53,13 @@ const ChatHeader = () => {
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
   const [showClear, setShowClear] = useState(false);
+  const [showDisappear, setShowDisappear] = useState(false);
+  useBackToClose(showDisappear, () => setShowDisappear(false));
+  const directId = selectedChat?.type === "direct" ? selectedChat.data._id : null;
+  const directSecs = useChatStore((st) => (directId ? st.directDisappear[directId] || 0 : 0));
+  useEffect(() => {
+    if (directId) useChatStore.getState().loadDirectDisappear(directId);
+  }, [directId]);
   const [keepStarred, setKeepStarred] = useState(true);
   useBackToClose(showClear, () => setShowClear(false));
   const menuRef = useRef(null);
@@ -237,6 +245,18 @@ const ChatHeader = () => {
                 {isLocked ? <LockOpen size={20} className="text-wa-icon" /> : <Lock size={20} className="text-wa-icon" />}
                 {isLocked ? "Remove chat lock" : "Lock chat"}
               </button>
+              {selectedChat.type === "direct" && (
+                <button
+                  className={menuItem}
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowDisappear(true);
+                  }}
+                >
+                  <Timer size={18} className="text-wa-icon" /> Disappearing messages
+                  <span className="ml-auto text-[11.5px] text-wa-muted">{directSecs ? (directSecs === 86400 ? "24 hours" : directSecs === 604800 ? "7 days" : "90 days") : "Off"}</span>
+                </button>
+              )}
               <button
                 className={menuItem}
                 onClick={() => {
@@ -259,6 +279,15 @@ const ChatHeader = () => {
           )}
         </div>
       </div>
+
+      {showDisappear && directId && (
+        <Suspense fallback={null}>
+          <DisappearingPanel
+            direct={{ current: directSecs, onPick: (secs) => useChatStore.getState().setDirectDisappearing(directId, secs) }}
+            onClose={() => setShowDisappear(false)}
+          />
+        </Suspense>
+      )}
 
       {showWallpaper && (
         <Suspense fallback={null}>
