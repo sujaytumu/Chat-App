@@ -14,6 +14,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 const WallpaperPicker = lazy(() => import("./WallpaperPicker"));
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
+const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
 
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
@@ -50,6 +51,7 @@ const ChatHeader = () => {
   const startGroupCall = useGroupCallStore((st) => st.startCall);
   const joinGroupCall = useGroupCallStore((st) => st.joinCall);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showContactInfo, setShowContactInfo] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
@@ -132,8 +134,7 @@ const ChatHeader = () => {
 
       <button
         className="flex items-center gap-3 text-left disabled:cursor-default min-w-0 flex-1 rounded-lg py-0.5"
-        onClick={() => isGroup && setShowGroupInfo(true)}
-        disabled={!isGroup}
+        onClick={() => (isGroup ? setShowGroupInfo(true) : setShowContactInfo(true))}
       >
         <Avatar src={isGroup ? data.groupPic : data.profilePic} name={name} isGroup={isGroup} size="size-11" textSize="text-xl" />
         <div className="min-w-0">
@@ -323,6 +324,11 @@ const ChatHeader = () => {
             </div>
           </div>
         </div>
+      )}
+      {showContactInfo && !isGroup && (
+        <Suspense fallback={null}>
+          <ContactInfoModal user={data} status={status} onClose={() => setShowContactInfo(false)} />
+        </Suspense>
       )}
       {showGroupInfo && isGroup && (
         <Suspense fallback={null}>
