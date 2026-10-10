@@ -11,12 +11,14 @@ import {
   Mic,
   Trash2,
   MapPin,
+  BarChart3,
   Smile,
   Camera,
 } from "lucide-react";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
+import PollModal from "./PollModal";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import { getEnterSends } from "../lib/uiSettings";
@@ -49,6 +51,7 @@ const MessageInput = () => {
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
   const authUser = useAuthStore((st) => st.authUser);
+  const [showPoll, setShowPoll] = useState(false);
   const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
   const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
@@ -469,6 +472,7 @@ const MessageInput = () => {
 
   return (
     <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full">
+      {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
       {mentionCandidates.length > 0 && (
         <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
           {mentionCandidates.map((m) => (
@@ -653,6 +657,19 @@ const MessageInput = () => {
                       )}
                     </span>
                     Location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowPoll(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                  >
+                    <span className="size-8 rounded-full bg-[#f5a623] flex items-center justify-center shrink-0">
+                      <BarChart3 size={16} className="text-white" />
+                    </span>
+                    Poll
                   </button>
                 </div>
               )}

@@ -5,6 +5,7 @@ import cloudinary from "../lib/cloudinary.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUsers } from "../lib/webPush.js";
+import { sanitizePoll } from "../lib/poll.js";
 import { markGroupSeen } from "../lib/groupReceipts.js";
 
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -155,10 +156,11 @@ export const getGroupMessages = async (req, res) => {
 export const sendGroupMessage = async (req, res) => {
   try {
     const { text, image, file, replyTo, mentions } = req.body;
+    const poll = sanitizePoll(req.body.poll);
     const { id: groupId } = req.params;
     const senderId = req.user._id;
 
-    if (!text?.trim() && !image && !file) {
+    if (!text?.trim() && !image && !file && !poll) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -209,7 +211,8 @@ export const sendGroupMessage = async (req, res) => {
       senderId,
       groupId,
       deliveredTo,
-      text: text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : text?.trim() || "",
+      poll: poll || undefined,
       image: imageUrl,
       file: fileAttachment,
       replyTo: replyTo || null,

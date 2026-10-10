@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
+import { sanitizePoll } from "../lib/poll.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 
 import cloudinary from "../lib/cloudinary.js";
@@ -141,10 +142,11 @@ export const getMessages = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { text, image, file, replyTo, viewOnce } = req.body;
+    const poll = sanitizePoll(req.body.poll);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
-    if (!text?.trim() && !image && !file) {
+    if (!text?.trim() && !image && !file && !poll) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -182,7 +184,8 @@ export const sendMessage = async (req, res) => {
     const newMessage = new Message({
       senderId,
       receiverId,
-      text: text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : text?.trim() || "",
+      poll: poll || undefined,
       image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
       viewOnce: !!(viewOnce && imageUrl && !fileAttachment),
       viewOnceUrl: viewOnce && imageUrl && !fileAttachment ? imageUrl : undefined,
@@ -678,6 +681,43 @@ export const searchMessages = async (req, res) => {
     );
   } catch (error) {
     console.log("Error in searchMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Vote in a poll (choose / change / clear). Body: { optionIds: [...] }
+export const votePoll = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const message = await Message.findById(id).select("poll senderId receiverId groupId deletedForEveryone");
+    if (!message?.poll || message.deletedForEveryone) return res.status(404).json({ error: "Poll not found" });
+    if (message.groupId) {
+      if (!(await Group.exists({ _id: message.groupId, members: myId }))) return res.status(403).json({ error: "Not a member" });
+    } else if (![message.senderId, message.receiverId].some((u) => String(u) === String(myId))) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    let chosen = [...new Set((Array.isArray(req.body?.optionIds) ? req.body.optionIds : []).map(String))];
+    chosen = chosen.filter((oid) => message.poll.options.some((o) => String(o._id) === oid));
+    if (!message.poll.multiple) chosen = chosen.slice(0, 1);
+    for (const o of message.poll.options) {
+      o.votes = o.votes.filter((v) => String(v) !== String(myId));
+      if (chosen.includes(String(o._id))) o.votes.push(myId);
+    }
+    await message.save();
+    const payload = { _id: message._id, poll: message.poll };
+    if (message.groupId) {
+      io.to(message.groupId.toString()).emit("messagePoll", payload);
+    } else {
+      [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+        const socketId = getReceiverSocketId(uid);
+        if (socketId) io.to(socketId).emit("messagePoll", payload);
+      });
+    }
+    res.status(200).json(payload);
+  } catch (error) {
+    console.log("Error in votePoll controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -18,6 +18,7 @@ import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
+import PollCard from "./PollCard";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
@@ -48,6 +49,7 @@ const ChatContainer = () => {
     isFetchingMessages,
     reactToMessage,
     openViewOnce,
+    votePoll,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
@@ -298,7 +300,7 @@ const ChatContainer = () => {
           // The first bubble of a run from the same person gets a tail and a
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
-          const hasText = !!message.text && !location;
+          const hasText = !!message.text && !location && !message.poll;
 
           const menuProps = {
             message,
@@ -432,7 +434,9 @@ const ChatContainer = () => {
                     />
                   )}
                   {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
-                  {location ? (
+                  {message.poll ? (
+                    <PollCard message={message} authUserId={authUser._id} onVote={(ids) => votePoll(message._id, ids)} />
+                  ) : location ? (
                     <LocationCard location={location} />
                   ) : (
                     message.text && (

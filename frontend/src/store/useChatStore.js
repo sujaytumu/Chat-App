@@ -455,6 +455,14 @@ export const useChatStore = create((set, get) => ({
     get().applyEdit(res.data);
     set({ editingMessage: null });
   },
+  votePoll: async (messageId, optionIds) => {
+    try {
+      const res = await axiosInstance.put(`/messages/poll/${messageId}/vote`, { optionIds });
+      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, poll: res.data.poll } : m)) }));
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't save your vote");
+    }
+  },
   openViewOnce: async (messageId) => {
     try {
       const res = await axiosInstance.post(`/messages/view-once/${messageId}`);
@@ -755,6 +763,9 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("messageEdited", (m) => get().applyEdit(m));
+    socket.on("messagePoll", ({ _id, poll }) =>
+      set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, poll } : m)) }))
+    );
     socket.on("messageViewOnce", ({ _id }) =>
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, viewOnceOpened: true } : m)) }))
     );
@@ -891,6 +902,7 @@ export const useChatStore = create((set, get) => ({
       "groupReceipts",
       "messageReacted",
       "messageEdited",
+      "messagePoll",
       "messageViewOnce",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });
