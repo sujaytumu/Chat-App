@@ -291,6 +291,34 @@ const Sidebar = () => {
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
   }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, showLocked, lockedSet, activeKeys]);
 
+  // Laptop keyboard shortcuts: Ctrl/Cmd+K or "/" = search, Alt+↑/↓ = previous / next chat.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = e.target?.tagName;
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      } else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setSearchOpen(true);
+      } else if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        const list = itemsRef.current;
+        const cur = useChatStore.getState().selectedChat;
+        const at = cur ? list.findIndex((x) => x.type === cur.type && x.data._id === cur.data._id) : -1;
+        const next = list[at + (e.key === "ArrowDown" ? 1 : -1)] || (at === -1 ? list[0] : null);
+        if (next) {
+          e.preventDefault();
+          useChatStore.getState().setSelectedChat({ type: next.type, data: next.data });
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const selectedItems = items.filter((i) => selected.has(i.key));
   const allPinned = selectedItems.length > 0 && selectedItems.every((i) => i.pinned);
   const allMuted = selectedItems.length > 0 && selectedItems.every((i) => i.muted);
