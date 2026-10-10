@@ -82,6 +82,8 @@ const messageSchema = new mongoose.Schema(
       waveform: { type: [Number], default: undefined },
     },
     editedAt: { type: Date, default: null },
+    // Shown as "Forwarded" above the message.
+    forwarded: { type: Boolean, default: false },
     // Shared contact card (another Talkies user).
     contact: {
       type: { userId: mongoose.Schema.Types.ObjectId, fullName: String, profilePic: String },

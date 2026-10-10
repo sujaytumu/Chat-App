@@ -18,6 +18,7 @@ import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
+import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
 import ContactCard from "./ContactCard";
@@ -470,6 +471,11 @@ const ChatContainer = () => {
                       style={{ color: colorForId(message.senderId) }}
                     >
                       {sender?.fullName || "Unknown"}
+                    </span>
+                  )}
+                  {message.forwarded && (
+                    <span className="flex items-center gap-1 text-[10.5px] italic mb-0.5 text-wa-muted">
+                      <Forward size={12} /> Forwarded
                     </span>
                   )}
                   {message.pinned && (

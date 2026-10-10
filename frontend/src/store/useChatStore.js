@@ -553,6 +553,7 @@ export const useChatStore = create((set, get) => ({
           ? `/messages/send/${targetChat.data._id}`
           : `/groups/${targetChat.data._id}/messages`;
       await axiosInstance.post(url, {
+        forwarded: true,
         text: message.text || "",
         image: message.image || undefined,
         file: message.file

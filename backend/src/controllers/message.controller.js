@@ -163,7 +163,7 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, file, replyTo, viewOnce } = req.body;
+    const { text, image, file, replyTo, viewOnce, forwarded } = req.body;
     const poll = sanitizePoll(req.body.poll);
     const contact = await buildContact(req.body.contactUserId);
     const { id: receiverId } = req.params;
@@ -217,6 +217,7 @@ export const sendMessage = async (req, res) => {
       viewOnceUrl: viewOnce && imageUrl && !fileAttachment ? imageUrl : undefined,
       file: fileAttachment,
       replyTo: replyTo || null,
+      forwarded: forwarded === true,
       delivered: isDelivered,
       deliveredAt: isDelivered ? new Date() : null,
     });
