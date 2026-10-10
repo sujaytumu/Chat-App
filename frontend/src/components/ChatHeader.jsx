@@ -18,6 +18,21 @@ const iconBtn =
 
 const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
 
+const pad2 = (n) => String(n).padStart(2, "0");
+// WhatsApp style: "last seen today at 14:05" / "yesterday at …" / "on 09/10/2026 at …"
+const lastSeenText = (iso) => {
+  if (!iso) return "offline";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "offline";
+  const now = new Date();
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const y = new Date(now);
+  y.setDate(now.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) return `last seen today at ${hm}`;
+  if (d.toDateString() === y.toDateString()) return `last seen yesterday at ${hm}`;
+  return `last seen ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} at ${hm}`;
+};
+
 const ChatHeader = () => {
   const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked } = useChatStore();
   const { onlineUsers, authUser } = useAuthStore();
@@ -45,6 +60,22 @@ const ChatHeader = () => {
     };
   }, [showMenu]);
 
+  const peerId = selectedChat?.type === "direct" ? selectedChat.data._id : null;
+  const peerOnline = !!peerId && onlineUsers.includes(peerId);
+  // remember the moment someone drops offline while we're looking at them
+  const [wentOffline, setWentOffline] = useState(null);
+  const wasOnline = useRef(false);
+  const lastPeer = useRef(null);
+  useEffect(() => {
+    if (lastPeer.current !== peerId) {
+      lastPeer.current = peerId;
+      wasOnline.current = false;
+      setWentOffline(null);
+    }
+    if (peerOnline) setWentOffline(null);
+    else if (wasOnline.current) setWentOffline(new Date().toISOString());
+    wasOnline.current = peerOnline;
+  }, [peerOnline, peerId]);
   if (!selectedChat) return null;
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -57,7 +88,7 @@ const ChatHeader = () => {
       : `${data.members.length} members`
     : onlineUsers.includes(data._id)
     ? "online"
-    : "offline";
+    : lastSeenText(wentOffline || data.lastSeen);
   const isOnline = !isGroup && status === "online";
   const isArchived = (authUser?.archivedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
 

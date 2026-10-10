@@ -597,6 +597,7 @@ io.on("connection", (socket) => {
     // The user still has another live socket (reload, second tab, quick
     // reconnect) — they're not gone, so don't tear anything down.
     if (isOnline(userId)) return;
+    User.findByIdAndUpdate(userId, { lastSeen: new Date() }).catch(() => {});
 
     // If this user stays gone (tab closed, network died) while a call
     // involving them is active or ringing, the other side would otherwise

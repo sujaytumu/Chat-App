@@ -45,6 +45,8 @@ const userSchema = new mongoose.Schema(
       backupCodes: { type: [String], select: false, default: undefined }, // sha256 hashes
       lastStep: { type: Number, select: false, default: 0 },
     },
+    // When this person was last connected (shown as "last seen" unless they hide it).
+    lastSeen: { type: Date, default: null },
     // Privacy: what other people can see about me. Defaults are all on.
     privacy: {
       readReceipts: { type: Boolean, default: true },
