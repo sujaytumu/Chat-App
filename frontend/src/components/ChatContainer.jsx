@@ -18,6 +18,7 @@ import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
+import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
 import ContactCard from "./ContactCard";
 import toast from "react-hot-toast";
@@ -452,6 +453,8 @@ const ChatContainer = () => {
                     <LocationCard location={location} />
                   ) : (
                     message.text && (
+                      <>
+                      {!message.deletedForEveryone && !message.viewOnce && firstLink(message.text) && <LinkPreview url={firstLink(message.text)} />}
                       <span className="text-[13px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
                         {message.mentions?.length ? <MentionText text={message.text} mentions={message.mentions} members={data.members} /> : message.text}
                         {/* reserves room so the last line never runs under the time */}
@@ -460,6 +463,7 @@ const ChatContainer = () => {
                           className={`inline-block ${isMe ? "w-[66px]" : "w-[44px]"}`}
                         />
                       </span>
+                      </>
                     )
                   )}
                   <span

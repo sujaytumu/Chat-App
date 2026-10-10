@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
 import DirectChatSetting, { pairKey } from "../models/directChatSetting.model.js";
+import { getLinkPreview } from "../lib/linkPreview.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
@@ -1010,5 +1011,16 @@ export const setDirectDisappearing = async (req, res) => {
   } catch (error) {
     console.log("Error in setDirectDisappearing controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const linkPreview = async (req, res) => {
+  try {
+    const url = String(req.query.url || "").slice(0, 2000);
+    const data = url ? await getLinkPreview(url) : null;
+    res.set("Cache-Control", "private, max-age=3600");
+    res.status(200).json(data || {});
+  } catch (error) {
+    res.status(200).json({});
   }
 };
