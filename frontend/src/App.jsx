@@ -117,8 +117,10 @@ const App = () => {
 
   if (isCheckingAuth && !authUser)
     return (
-      <div className="flex items-center justify-center h-[100dvh] bg-wa-bg">
-        <Loader className="size-10 animate-spin text-[#25D366]" />
+      <div className="splash">
+        <img src="/icon-v2-192.png" alt="" />
+        <b>Talkies</b>
+        <i />
       </div>
     );
 

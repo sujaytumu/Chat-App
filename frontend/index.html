@@ -31,10 +31,19 @@
     <style>
       html, body, #root { margin: 0; min-height: 100%; background: #FFFFFF; }
       html.wa-dark, html.wa-dark body, html.wa-dark #root { background: #0B141A; }
+      /* Branded loading screen: shown by the page itself, then by the app while it signs in. */
+      .splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #FFFFFF; color: #111B21; font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      html.wa-dark .splash { background: #0B141A; color: #E9EDEF; }
+      .splash img { width: 84px; height: 84px; border-radius: 22px; box-shadow: 0 14px 34px -12px rgba(0,168,132,.55); animation: splash-pop 1.6s ease-in-out infinite; }
+      .splash b { font-size: 22px; letter-spacing: .5px; font-weight: 600; }
+      .splash i { display: block; width: 120px; height: 3px; border-radius: 3px; background: rgba(120,140,150,.25); overflow: hidden; position: relative; }
+      .splash i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; border-radius: 3px; background: #00A884; animation: splash-bar 1.1s ease-in-out infinite; }
+      @keyframes splash-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+      @keyframes splash-bar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div class="splash"><img src="/icon-v2-192.png" alt="" /><b>Talkies</b><i></i></div></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
