@@ -21,7 +21,7 @@ export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
-      .select("-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
+      .select("-password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([
@@ -681,6 +681,10 @@ export const searchMessages = async (req, res) => {
       match = { $or: [{ text: rx }, { "file.name": rx }] };
     }
 
+    // Locked chats never show up in the all-chats search (only inside the chat itself)
+    const scoped = chatType === "direct" || chatType === "group";
+    const lockedSet = scoped ? null : new Set((await User.findById(myId).select("lockedChats").lean())?.lockedChats || []);
+
     const found = await Message.find({
       $and: [scope, match],
       deletedFor: { $ne: myId },
@@ -691,8 +695,15 @@ export const searchMessages = async (req, res) => {
       .select("text image file.name file.type senderId receiverId groupId createdAt")
       .lean();
 
+    const visible = lockedSet
+      ? found.filter((msg) => {
+          const other = msg.groupId ? `g:${msg.groupId}` : `d:${String(msg.senderId) === String(myId) ? msg.receiverId : msg.senderId}`;
+          return !lockedSet.has(other);
+        })
+      : found;
+
     res.status(200).json(
-      found.map((msg) => ({
+      visible.map((msg) => ({
         _id: msg._id,
         text: msg.text,
         image: msg.image || "",

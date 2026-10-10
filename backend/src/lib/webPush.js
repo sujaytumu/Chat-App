@@ -30,11 +30,18 @@ export async function sendPushToUser(userId, payload, options = {}, muteKey) {
 export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
   if (!configured || !userIds?.length) return;
   try {
-    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions mutedChats").lean();
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions mutedChats lockedChats").lean();
     await Promise.all(
       users
         .filter((u) => !(muteKey && (u.mutedChats || []).includes(muteKey)))
-        .map((u) => pushToSubscriptions(u, payload, options))
+        .map((u) => {
+          // Locked chats never reveal who wrote or what was said on the lock screen
+          const locked = muteKey && payload?.title && (u.lockedChats || []).includes(muteKey);
+          const safe = locked
+            ? { title: "Talkies", body: "You have a new message", icon: "/icon-v2-192.png", tag: "locked-chat", data: { url: "/", messageId: payload.data?.messageId } }
+            : payload;
+          return pushToSubscriptions(u, safe, options);
+        })
     );
   } catch (error) {
     console.log("Error in sendPushToUsers:", error.message);
