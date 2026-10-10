@@ -32,6 +32,8 @@ const SENDER_COLORS = ["#25D366", "#53BDEB", "#E8A33D", "#B794F6", "#F472B6", "#
 const colorForId = (id = "") =>
   SENDER_COLORS[[...String(id)].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % SENDER_COLORS.length];
 
+const READ_MORE_AT = 700; // longer messages fold up with a "Read more" link
+
 const ChatContainer = () => {
   const {
     messages: allMessages,
@@ -123,6 +125,7 @@ const ChatContainer = () => {
     swipe.current = { x: 0, y: 0, on: false, dx: 0 };
   };
   const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
+  const [expandedIds, setExpandedIds] = useState(() => new Set());
   // "N unread messages" divider: remembered when the chat is opened, before they are marked read.
   const [unreadMark, setUnreadMark] = useState({ key: null, id: null, count: 0 });
   useEffect(() => {
@@ -577,7 +580,27 @@ const ChatContainer = () => {
                       <>
                       {!message.deletedForEveryone && !message.viewOnce && firstLink(message.text) && <LinkPreview url={firstLink(message.text)} />}
                       <span className="text-[13px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
-                        {message.mentions?.length ? <MentionText text={message.text} mentions={message.mentions} members={data.members} /> : message.text}
+                        {(() => {
+                          const long = message.text.length > READ_MORE_AT && !expandedIds.has(message._id);
+                          const shown = long ? `${message.text.slice(0, READ_MORE_AT).trimEnd()}…` : message.text;
+                          return (
+                            <>
+                              {message.mentions?.length ? <MentionText text={shown} mentions={message.mentions} members={data.members} /> : shown}
+                              {long && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setExpandedIds((prev) => new Set(prev).add(message._id));
+                                  }}
+                                  className="block mt-0.5 text-[13px] text-[#53BDEB]"
+                                >
+                                  Read more
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
                         {/* reserves room so the last line never runs under the time */}
                         <span
                           aria-hidden="true"
