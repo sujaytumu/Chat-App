@@ -69,6 +69,8 @@ const Sidebar = () => {
     setChatArchived,
     setChatPinned,
     setChatMuted,
+    setChatMarkedUnread,
+    markChatRead,
     setChatLists,
     deleteChat,
     searchMessages,
@@ -86,6 +88,8 @@ const Sidebar = () => {
       setChatArchived: st.setChatArchived,
       setChatPinned: st.setChatPinned,
       setChatMuted: st.setChatMuted,
+      setChatMarkedUnread: st.setChatMarkedUnread,
+      markChatRead: st.markChatRead,
       setChatLists: st.setChatLists,
       deleteChat: st.deleteChat,
       searchMessages: st.searchMessages,
@@ -198,6 +202,7 @@ const Sidebar = () => {
   const pinnedKeys = authUser?.pinnedChats;
   const pinnedSet = useMemo(() => new Set(pinnedKeys || []), [pinnedKeys]);
   const mutedKeys = authUser?.mutedChats;
+  const unreadMarkedSet = useMemo(() => new Set(authUser?.markedUnread || []), [authUser?.markedUnread]);
   const mutedSet = useMemo(() => new Set(mutedKeys || []), [mutedKeys]);
 
   // Favourites (built in) + the user's own lists, kept on the account.
@@ -225,6 +230,7 @@ const Sidebar = () => {
         archived: archivedSet.has(`d:${u._id}`),
         pinned: pinnedSet.has(`d:${u._id}`),
         muted: mutedSet.has(`d:${u._id}`),
+        markedUnread: unreadMarkedSet.has(`d:${u._id}`),
         name: u.fullName,
         avatar: u.profilePic,
         online: onlineUsers.includes(u._id),
@@ -242,6 +248,7 @@ const Sidebar = () => {
         archived: archivedSet.has(`g:${g._id}`),
         pinned: pinnedSet.has(`g:${g._id}`),
         muted: mutedSet.has(`g:${g._id}`),
+        markedUnread: unreadMarkedSet.has(`g:${g._id}`),
         name: g.name,
         avatar: g.groupPic,
         online: false,
@@ -262,7 +269,7 @@ const Sidebar = () => {
         return true;
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, showArchived, activeKeys]);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, activeKeys]);
 
   const selectedItems = items.filter((i) => selected.has(i.key));
   const allPinned = selectedItems.length > 0 && selectedItems.every((i) => i.pinned);
@@ -371,6 +378,24 @@ const Sidebar = () => {
                   }}
                 >
                   Select all
+                </button>
+                <button
+                  className={menuItem}
+                  onClick={async () => {
+                    setShowSelMenu(false);
+                    const targets = selectedItems;
+                    const makeRead = targets.every((i) => i.markedUnread || i.unreadCount > 0);
+                    clearSelected();
+                    for (const i of targets) {
+                      if (makeRead) {
+                        if (i.markedUnread) await setChatMarkedUnread(chatOf(i), false, { silent: true });
+                        if (i.unreadCount > 0) await markChatRead(chatOf(i));
+                      } else await setChatMarkedUnread(chatOf(i), true, { silent: true });
+                    }
+                    toast(makeRead ? "Marked as read" : "Marked as unread");
+                  }}
+                >
+                  {selectedItems.length > 0 && selectedItems.every((i) => i.markedUnread || i.unreadCount > 0) ? "Mark as read" : "Mark as unread"}
                 </button>
                 <button
                   className={menuItem}
@@ -594,7 +619,7 @@ const Sidebar = () => {
                   <span className="text-[14.5px] lg:text-[13.5px] leading-[22px] text-wa-text truncate">{item.name}</span>
                   {item.lastMessage && (
                     <span
-                      className={`text-[10px] lg:text-[10.5px] leading-none shrink-0 ${hasUnread ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
+                      className={`text-[10px] lg:text-[10.5px] leading-none shrink-0 ${(hasUnread || item.markedUnread) ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
                     >
                       {formatChatListTime(item.lastMessage.createdAt)}
                     </span>
@@ -630,6 +655,8 @@ const Sidebar = () => {
                       >
                         {item.unreadCount > 99 ? "99+" : item.unreadCount}
                       </span>
+                    ) : item.markedUnread ? (
+                      <span className="size-3 rounded-full bg-[#25D366]" aria-label="Marked as unread" />
                     ) : (
                       item.pinned && <WaPinSolid size={18} />
                     )}

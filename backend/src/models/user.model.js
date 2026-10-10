@@ -36,6 +36,8 @@ const userSchema = new mongoose.Schema(
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
+    // Chats the person flagged "Mark as unread" (shows a green dot until opened).
+    markedUnread: { type: [String], default: [] },
     // Two-step verification (authenticator app). Secrets are never returned by
     // default queries (select:false) — only the 2FA endpoints ask for them.
     twoFactor: {

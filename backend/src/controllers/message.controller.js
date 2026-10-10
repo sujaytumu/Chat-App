@@ -484,6 +484,7 @@ const makeChatListToggle = (field, event, max) => async (req, res) => {
 };
 export const setChatPinned = makeChatListToggle("pinnedChats", "pinnedChats", 3);
 export const setChatMuted = makeChatListToggle("mutedChats", "mutedChats", 0);
+export const setChatMarkedUnread = makeChatListToggle("markedUnread", "markedUnread", 0);
 
 // Replace the user's chat lists (Favourites + custom lists) in one go.
 // Body: { lists: [{ id, name, chats: ["d:<id>" | "g:<id>"] }] }
