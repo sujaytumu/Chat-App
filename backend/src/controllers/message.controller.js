@@ -39,6 +39,7 @@ export const getUsersForSidebar = async (req, res) => {
             },
             text: { $first: "$text" },
             image: { $first: "$image" },
+            viewOnce: { $first: "$viewOnce" },
             file: { $first: "$file" },
             createdAt: { $first: "$createdAt" },
             senderId: { $first: "$senderId" },
@@ -68,6 +69,7 @@ export const getUsersForSidebar = async (req, res) => {
           ? {
               text: lm.text,
               image: lm.image,
+              viewOnce: !!lm.viewOnce,
               file: lm.file,
               createdAt: lm.createdAt,
               senderId: lm.senderId,
@@ -138,7 +140,7 @@ export const getMessages = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, file, replyTo } = req.body;
+    const { text, image, file, replyTo, viewOnce } = req.body;
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
@@ -181,7 +183,9 @@ export const sendMessage = async (req, res) => {
       senderId,
       receiverId,
       text: text?.trim() || "",
-      image: imageUrl,
+      image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
+      viewOnce: !!(viewOnce && imageUrl && !fileAttachment),
+      viewOnceUrl: viewOnce && imageUrl && !fileAttachment ? imageUrl : undefined,
       file: fileAttachment,
       replyTo: replyTo || null,
       delivered: isDelivered,
@@ -189,6 +193,7 @@ export const sendMessage = async (req, res) => {
     });
 
     await newMessage.save();
+    newMessage.set("viewOnceUrl", undefined); // never send the hidden picture's address to anyone
     await newMessage.populate("replyTo", "text image file senderId");
 
     if (receiverSocketId) {
@@ -673,6 +678,33 @@ export const searchMessages = async (req, res) => {
     );
   } catch (error) {
     console.log("Error in searchMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Open a view-once photo: only the receiver, only once. The picture is handed
+// over in this response and then removed from the server.
+export const openViewOnce = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const message = await Message.findOne({ _id: id, receiverId: req.user._id, viewOnce: true, viewOnceOpened: false })
+      .select("+viewOnceUrl senderId receiverId");
+    if (!message || !message.viewOnceUrl) return res.status(404).json({ error: "This photo has already been opened" });
+    const url = message.viewOnceUrl;
+    // claim it atomically so two devices can't both open it
+    const claimed = await Message.findOneAndUpdate(
+      { _id: id, viewOnceOpened: false },
+      { $set: { viewOnceOpened: true }, $unset: { viewOnceUrl: 1 } }
+    );
+    if (!claimed) return res.status(404).json({ error: "This photo has already been opened" });
+    [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+      const socketId = getReceiverSocketId(uid);
+      if (socketId) io.to(socketId).emit("messageViewOnce", { _id: id });
+    });
+    res.status(200).json({ image: url });
+  } catch (error) {
+    console.log("Error in openViewOnce controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

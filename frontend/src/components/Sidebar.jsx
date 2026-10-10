@@ -48,7 +48,7 @@ const FILTERS = [
 
 const lastMessagePreview = (lastMessage) => {
   if (!lastMessage) return "No messages yet";
-  if (lastMessage.image && !lastMessage.text) return "📷 Photo";
+  if ((lastMessage.image || lastMessage.viewOnce) && !lastMessage.text) return "📷 Photo";
   if (lastMessage.file && !lastMessage.text) return `📎 ${lastMessage.file.name || "File"}`;
   return lastMessage.text || "";
 };

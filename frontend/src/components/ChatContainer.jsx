@@ -47,6 +47,7 @@ const ChatContainer = () => {
     clearPendingJump,
     isFetchingMessages,
     reactToMessage,
+    openViewOnce,
   } = useChatStore();
   const { authUser } = useAuthStore();
   const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
@@ -401,6 +402,22 @@ const ChatContainer = () => {
                       <span className="text-[11.5px] text-wa-icon line-clamp-2 break-all">
                         {message.replyTo.image ? "📷 Photo" : message.replyTo.file ? `📎 ${message.replyTo.file.name}` : message.replyTo.text}
                       </span>
+                    </button>
+                  )}
+                  {message.viewOnce && (
+                    <button
+                      type="button"
+                      disabled={message.viewOnceOpened || isMe}
+                      onClick={async () => {
+                        const url = await openViewOnce(message._id);
+                        if (url) setLightboxSrc(url);
+                      }}
+                      className={`flex items-center gap-2.5 py-1 pr-3 text-[13px] ${message.viewOnceOpened ? "text-wa-muted" : "text-wa-text"}`}
+                    >
+                      <span className="size-9 rounded-full border-2 border-current flex items-center justify-center text-[13px] font-bold">
+                        {message.viewOnceOpened ? "✓" : "1"}
+                      </span>
+                      <span>{message.viewOnceOpened ? "Opened" : isMe ? "Photo" : "Tap to view photo"}</span>
                     </button>
                   )}
                   {message.image && (

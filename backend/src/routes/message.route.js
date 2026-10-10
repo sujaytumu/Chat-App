@@ -22,6 +22,7 @@ import {
   searchMessages,
   reactToMessage,
   editMessage,
+  openViewOnce,
   setChatMarkedUnread,
   getChatMedia,
 } from "../controllers/message.controller.js";
@@ -34,6 +35,7 @@ router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
 router.get("/search/all", protectRoute, searchMessages);
 router.put("/react/:id", protectRoute, reactToMessage);
 router.put("/edit/:id", protectRoute, editMessage);
+router.post("/view-once/:id", protectRoute, openViewOnce);
 router.get("/storage-usage", protectRoute, getStorageUsage);
 router.get("/export", protectRoute, exportChats);
 router.get("/:id", protectRoute, getMessages);

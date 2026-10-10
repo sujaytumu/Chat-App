@@ -135,6 +135,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 {isStarred ? <Star size={20} className="text-yellow-400" /> : <StarOutline size={20} />}
                 {isStarred ? "Unstar" : "Star"}
               </button>
+              {!message.viewOnce && (
               <button
                 onClick={() => {
                   onForward();
@@ -145,6 +146,7 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 <Forward size={20} />
                 Forward
               </button>
+              )}
               <button
                 onClick={() => {
                   onInfo();
