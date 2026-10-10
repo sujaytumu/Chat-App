@@ -36,6 +36,10 @@ const userSchema = new mongoose.Schema(
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
+    // Chat lock: chats hidden behind the person's PIN ("d:<id>" / "g:<id>").
+    // The PIN is stored only as a bcrypt hash and never returned by queries.
+    lockedChats: { type: [String], default: [] },
+    chatLockPin: { type: String, select: false },
     // Chats the person flagged "Mark as unread" (shows a green dot until opened).
     markedUnread: { type: [String], default: [] },
     // Two-step verification (authenticator app). Secrets are never returned by

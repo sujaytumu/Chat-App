@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Eraser, Info, Phone, Video, X, Search, Palette, Ban } from "lucide-react";
+import { Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
+import { useChatLockStore } from "../store/useChatLockStore";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
@@ -99,6 +100,7 @@ const ChatHeader = () => {
     : lastSeenText(wentOffline || data.lastSeen);
   const isOnline = !isGroup && status === "online";
   const isArchived = (authUser?.archivedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
+  const isLocked = (authUser?.lockedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
 
   const callBusy = callStatus !== "idle" || groupCallStatus !== "idle";
   const placeGroupCall = (type) =>
@@ -222,6 +224,18 @@ const ChatHeader = () => {
               >
                 <WaArchive size={20} up={isArchived} className="text-wa-icon" />
                 {isArchived ? "Unarchive chat" : "Archive chat"}
+              </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  const { requestLock, requestRemoveLock } = useChatLockStore.getState();
+                  if (isLocked) requestRemoveLock(selectedChat);
+                  else requestLock(selectedChat, () => setSelectedChat(null));
+                }}
+              >
+                {isLocked ? <LockOpen size={20} className="text-wa-icon" /> : <Lock size={20} className="text-wa-icon" />}
+                {isLocked ? "Remove chat lock" : "Lock chat"}
               </button>
               <button
                 className={menuItem}

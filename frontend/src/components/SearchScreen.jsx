@@ -82,10 +82,11 @@ const SearchScreen = ({ onClose }) => {
   }, [term, kind, searchMessages]);
 
   const lc = term.toLowerCase();
+  const lockedKeys = authUser?.lockedChats;
   const chats = useMemo(() => {
     if (!lc || kind) return [];
     const mk = (type, c) => ({ type, data: c, name: type === "group" ? c.name : c.fullName, pic: type === "group" ? c.groupPic : c.profilePic, last: c.lastMessage });
-    return [...users.filter((u) => u.lastMessage).map((u) => mk("direct", u)), ...groups.map((g) => mk("group", g))].filter((c) => c.name?.toLowerCase().includes(lc));
+    return [...users.filter((u) => u.lastMessage).map((u) => mk("direct", u)), ...groups.map((g) => mk("group", g))].filter((c) => c.name?.toLowerCase().includes(lc) && !(lockedKeys || []).includes(`${c.type === "group" ? "g" : "d"}:${c.data._id}`));
   }, [users, groups, lc, kind]);
   const people = useMemo(() => (!lc || kind ? [] : users.filter((u) => !u.lastMessage && u.fullName?.toLowerCase().includes(lc))), [users, lc, kind]);
 
