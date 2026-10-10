@@ -187,7 +187,13 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
     setIsPosting(true);
     try {
       let content = kind === "text" ? text.trim() : media.data;
-      if (kind === "image" && editorRef.current) content = (await editorRef.current.exportImage()) || content;
+      if (kind === "image" && editorRef.current) {
+        try {
+          content = (await editorRef.current.exportImage()) || content;
+        } catch {
+          /* send the original photo if flattening fails */
+        }
+      }
       const body = {
         type: kind,
         content,
@@ -198,12 +204,16 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         ...(song ? { song: { data: song.data, name: song.name, size: song.size } } : {}),
         ...(place ? { location: place } : {}),
       };
-      await axiosInstance.post("/status", body);
+      await axiosInstance.post("/status", body, { timeout: 180000 });
       toast.success("Status posted");
       onCreated();
       onClose();
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to post status");
+      const st = error.response?.status;
+      toast.error(
+        error.response?.data?.error ||
+          (st === 413 ? "That file is too large for a status" : st ? `Couldn't post status (error ${st})` : "Couldn't reach the server — check your connection and try again")
+      );
     } finally {
       setIsPosting(false);
     }
