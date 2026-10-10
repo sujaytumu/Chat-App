@@ -18,6 +18,7 @@ import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
+import ReactionsSheet from "./ReactionsSheet";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
@@ -125,6 +126,7 @@ const ChatContainer = () => {
     swipe.current = { x: 0, y: 0, on: false, dx: 0 };
   };
   const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
+  const [reactionsFor, setReactionsFor] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   // "N unread messages" divider: remembered when the chat is opened, before they are marked read.
   const [unreadMark, setUnreadMark] = useState({ key: null, id: null, count: 0 });
@@ -630,20 +632,20 @@ const ChatContainer = () => {
             </div>
             {message.reactions?.length > 0 && !message.deletedForEveryone && (
               <div className={`relative z-10 flex -mt-1.5 mb-1.5 px-2 ${isMe ? "justify-end" : isGroup ? "justify-start pl-10" : "justify-start"}`}>
-                <div className="flex items-center gap-1 bg-wa-surface border border-wa-bg rounded-full px-1.5 py-0.5 shadow-sm">
+                <button
+                  onClick={() => setReactionsFor(message._id)}
+                  className="flex items-center gap-1 bg-wa-surface border border-wa-bg rounded-full px-1.5 py-0.5 shadow-sm"
+                  aria-label="See who reacted"
+                >
                   {Object.entries(
                     message.reactions.reduce((acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] || 0) + 1 }), {})
                   ).map(([emoji, count]) => (
-                    <button
-                      key={emoji}
-                      onClick={() => reactToMessage(message._id, emoji)}
-                      className="text-[12px] leading-none flex items-center gap-0.5"
-                    >
+                    <span key={emoji} className="text-[12px] leading-none flex items-center gap-0.5">
                       {emoji}
                       {count > 1 && <span className="text-[9.4px] text-wa-muted">{count}</span>}
-                    </button>
+                    </span>
                   ))}
-                </div>
+                </button>
               </div>
             )}
             </div>
@@ -684,6 +686,19 @@ const ChatContainer = () => {
         <MessageInput />
       )}
 
+      {reactionsFor && (() => {
+        const rm = allMessages.find((m) => m._id === reactionsFor);
+        if (!rm || !rm.reactions?.length) return null;
+        return (
+          <ReactionsSheet
+            message={rm}
+            meId={authUser._id}
+            resolveUser={(id) => (String(id) === String(authUser._id) ? authUser : isGroup ? membersById[id] : data)}
+            onRemove={(emoji) => reactToMessage(rm._id, emoji)}
+            onClose={() => setReactionsFor(null)}
+          />
+        );
+      })()}
       <ImageLightbox src={lightboxSrc} gallery={galleryImages} onClose={() => setLightboxSrc(null)} />
       {forwardingMessage && (
         <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
