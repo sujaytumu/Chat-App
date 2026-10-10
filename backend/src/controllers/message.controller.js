@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
 import { sanitizePoll } from "../lib/poll.js";
+import { buildContact } from "../lib/contactCard.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 
 import cloudinary from "../lib/cloudinary.js";
@@ -143,10 +144,11 @@ export const sendMessage = async (req, res) => {
   try {
     const { text, image, file, replyTo, viewOnce } = req.body;
     const poll = sanitizePoll(req.body.poll);
+    const contact = await buildContact(req.body.contactUserId);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
 
-    if (!text?.trim() && !image && !file && !poll) {
+    if (!text?.trim() && !image && !file && !poll && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -184,8 +186,9 @@ export const sendMessage = async (req, res) => {
     const newMessage = new Message({
       senderId,
       receiverId,
-      text: poll ? `📊 ${poll.question}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
+      contact: contact || undefined,
       image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
       viewOnce: !!(viewOnce && imageUrl && !fileAttachment),
       viewOnceUrl: viewOnce && imageUrl && !fileAttachment ? imageUrl : undefined,

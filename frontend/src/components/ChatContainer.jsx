@@ -19,6 +19,7 @@ import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
 import PollCard from "./PollCard";
+import ContactCard from "./ContactCard";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
@@ -39,6 +40,7 @@ const ChatContainer = () => {
     deleteMessage,
     setReplyingTo,
     setEditingMessage,
+    setSelectedChat,
     toggleStarMessage,
     hasMoreMessages,
     isLoadingOlder,
@@ -300,7 +302,7 @@ const ChatContainer = () => {
           // The first bubble of a run from the same person gets a tail and a
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
-          const hasText = !!message.text && !location && !message.poll;
+          const hasText = !!message.text && !location && !message.poll && !message.contact;
 
           const menuProps = {
             message,
@@ -434,7 +436,17 @@ const ChatContainer = () => {
                     />
                   )}
                   {message.file && <AttachmentContent file={message.file} onMediaLoaded={handleMediaLoaded} />}
-                  {message.poll ? (
+                  {message.contact ? (
+                    <ContactCard
+                      contact={message.contact}
+                      isMe={isMe}
+                      onMessage={() => {
+                        const u = useChatStore.getState().users.find((x) => x._id === message.contact.userId);
+                        if (u && u._id !== authUser._id) setSelectedChat({ type: "direct", data: u });
+                        else toast("That's you");
+                      }}
+                    />
+                  ) : message.poll ? (
                     <PollCard message={message} authUserId={authUser._id} onVote={(ids) => votePoll(message._id, ids)} />
                   ) : location ? (
                     <LocationCard location={location} />
