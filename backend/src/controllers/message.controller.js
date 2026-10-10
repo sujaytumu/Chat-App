@@ -531,17 +531,21 @@ export const deleteChatForMe = async (req, res) => {
   try {
     const { chatType, chatId } = req.params;
     const myId = req.user._id;
+    // "Clear chat" can keep the messages I starred.
+    const keepStarred = req.query.keepStarred === "1";
+    const unstarred = keepStarred ? { starredBy: { $ne: myId } } : {};
     if (!["direct", "group"].includes(chatType) || !mongoose.isValidObjectId(chatId)) {
       return res.status(400).json({ error: "Invalid chat" });
     }
     if (chatType === "group") {
       const isMember = await Group.exists({ _id: chatId, members: myId });
       if (!isMember) return res.status(403).json({ error: "You are not a member of this group" });
-      await Message.updateMany({ groupId: chatId }, { $addToSet: { deletedFor: myId } });
+      await Message.updateMany({ groupId: chatId, ...unstarred }, { $addToSet: { deletedFor: myId } });
     } else {
       await Message.updateMany(
         {
           groupId: null,
+          ...unstarred,
           $or: [
             { senderId: myId, receiverId: chatId },
             { senderId: chatId, receiverId: myId },

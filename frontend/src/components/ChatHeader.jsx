@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Info, Phone, Video, X, Search, Palette, Ban } from "lucide-react";
+import { Eraser, Info, Phone, Video, X, Search, Palette, Ban } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
@@ -34,7 +34,7 @@ const lastSeenText = (iso) => {
 };
 
 const ChatHeader = () => {
-  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked } = useChatStore();
+  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked, clearChat } = useChatStore();
   const { onlineUsers, authUser } = useAuthStore();
   const { startCall, callStatus } = useCallStore();
   const groupCallStatus = useGroupCallStore((st) => st.status);
@@ -45,6 +45,9 @@ const ChatHeader = () => {
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
+  const [showClear, setShowClear] = useState(false);
+  const [keepStarred, setKeepStarred] = useState(true);
+  useBackToClose(showClear, () => setShowClear(false));
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -219,6 +222,15 @@ const ChatHeader = () => {
                 className={menuItem}
                 onClick={() => {
                   setShowMenu(false);
+                  setShowClear(true);
+                }}
+              >
+                <Eraser size={18} className="text-wa-icon" /> Clear chat
+              </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
                   setSelectedChat(null);
                 }}
               >
@@ -233,6 +245,30 @@ const ChatHeader = () => {
         <Suspense fallback={null}>
           <WallpaperPicker scope={`${selectedChat.type}:${data._id}`} chatName={name} onClose={() => setShowWallpaper(false)} />
         </Suspense>
+      )}
+      {showClear && (
+        <div className="fixed inset-0 z-[130] bg-black/60 flex items-center justify-center p-6" onClick={() => setShowClear(false)}>
+          <div className="w-full max-w-sm rounded-3xl bg-wa-pop p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[17px] text-wa-text mb-2">Clear this chat?</h3>
+            <p className="text-[14px] text-wa-muted mb-4">All messages will be removed from your side only. {isGroup ? "Other members keep theirs." : `${data.fullName} keeps theirs.`}</p>
+            <label className="flex items-center gap-3 mb-5 text-[14px] text-wa-text cursor-pointer">
+              <input type="checkbox" checked={keepStarred} onChange={(e) => setKeepStarred(e.target.checked)} className="size-4 accent-[#25D366]" />
+              Keep starred messages
+            </label>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowClear(false)} className="h-10 px-5 rounded-full text-[14px] text-[#25D366]">Cancel</button>
+              <button
+                onClick={async () => {
+                  setShowClear(false);
+                  if (await clearChat(selectedChat, keepStarred)) toast("Chat cleared");
+                }}
+                className="h-10 px-5 rounded-full bg-[#25D366] text-wa-bg text-[14px] font-medium"
+              >
+                Clear chat
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {showGroupInfo && isGroup && (
         <Suspense fallback={null}>
