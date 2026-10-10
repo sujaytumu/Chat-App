@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
-import { X, Eye, Trash2, Loader2, ChevronUp, Music, MapPin, Headphones, FileText, Download } from "lucide-react";
+import { X, Eye, Trash2, Loader2, ChevronUp, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -45,6 +45,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const mediaEl = useRef(null);
   const songEl = useRef(null);
   const [songBlocked, setSongBlocked] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [replyFocus, setReplyFocus] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
   useBackToClose(true, onClose);
 
   // Mark as seen when someone else's update comes up.
@@ -62,7 +65,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
 
   // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
-  const stop = paused || showViewers || confirmDelete;
+  const stop = paused || showViewers || confirmDelete || replyFocus;
   const last = useRef(0);
   useEffect(() => {
     if (!current || stop) return;
@@ -101,6 +104,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
   useEffect(() => {
     const onKey = (e) => {
+      if (e.target?.tagName === "INPUT") return; // typing a reply
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
@@ -108,6 +112,24 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  const sendReply = async (e) => {
+    e?.preventDefault();
+    const t = replyText.trim();
+    if (!t || sendingReply) return;
+    setSendingReply(true);
+    try {
+      await axiosInstance.post(`/messages/send/${user._id}`, { text: t, statusId: current._id });
+      setReplyText("");
+      setReplyFocus(false);
+      document.activeElement?.blur?.();
+      toast.success("Reply sent");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Couldn't send the reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -260,13 +282,36 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
         {/* Caption */}
         {current.caption && (
-          <p className={`absolute inset-x-0 ${isOwn ? "bottom-16" : "bottom-0 pb-[calc(16px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
+          <p className={`absolute inset-x-0 ${isOwn ? "bottom-16" : "bottom-[calc(64px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
             {linkify(current.caption)}
           </p>
         )}
         <button className="absolute left-0 top-24 bottom-24 w-1/3" onClick={prev} aria-label="Previous" />
         <button className="absolute right-0 top-24 bottom-24 w-1/3" onClick={next} aria-label="Next" />
       </div>
+
+      {/* Viewer: reply to this status (arrives in the chat with its owner) */}
+      {!isOwn && (
+        <form
+          onSubmit={sendReply}
+          className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto flex items-center gap-2 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent"
+        >
+          <input
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onFocus={() => setReplyFocus(true)}
+            onBlur={() => setReplyFocus(false)}
+            maxLength={500}
+            placeholder="Reply"
+            className="flex-1 h-11 rounded-full bg-white/15 backdrop-blur px-4 text-[14px] text-white placeholder:text-white/70 outline-none"
+          />
+          {replyText.trim() && (
+            <button type="submit" disabled={sendingReply} className="size-11 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0" aria-label="Send reply">
+              <Send size={20} />
+            </button>
+          )}
+        </form>
+      )}
 
       {/* Owner: who has seen it */}
       {isOwn && (

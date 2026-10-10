@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
 import DirectChatSetting, { pairKey } from "../models/directChatSetting.model.js";
+import { buildStatusReply } from "../lib/statusReply.js";
 import { getLinkPreview } from "../lib/linkPreview.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { buildContact } from "../lib/contactCard.js";
@@ -167,6 +168,7 @@ export const sendMessage = async (req, res) => {
     const poll = sanitizePoll(req.body.poll);
     const contact = await buildContact(req.body.contactUserId);
     const { id: receiverId } = req.params;
+    const statusReply = await buildStatusReply(req.body.statusId, receiverId);
     const senderId = req.user._id;
 
     if (!text?.trim() && !image && !file && !poll && !contact) {
@@ -218,6 +220,7 @@ export const sendMessage = async (req, res) => {
       file: fileAttachment,
       replyTo: replyTo || null,
       forwarded: forwarded === true,
+      statusReply: statusReply || undefined,
       delivered: isDelivered,
       deliveredAt: isDelivered ? new Date() : null,
     });
