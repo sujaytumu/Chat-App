@@ -501,6 +501,20 @@ const ChatContainer = () => {
                       <Pin size={10} /> Pinned
                     </span>
                   )}
+                  {message.statusReply && (
+                    <div className="flex items-stretch w-full mb-1.5 rounded-lg bg-black/25 border-l-4 border-[#25D366] overflow-hidden">
+                      <div className="flex-1 min-w-0 px-2.5 py-1.5">
+                        <span className="block text-[11.5px] font-medium text-[#25D366]">{isMe ? "Status" : "Replied to your status"}</span>
+                        <span className="block text-[11.5px] text-wa-icon line-clamp-2 break-words">
+                          {message.statusReply.kind === "image" ? "📷 Photo" : message.statusReply.kind === "text" ? message.statusReply.preview : message.statusReply.preview || "Status"}
+                        </span>
+                      </div>
+                      {message.statusReply.kind === "image" && message.statusReply.preview && (
+                        <img src={optimizeImage(message.statusReply.preview, 120)} alt="" className="size-12 object-cover shrink-0" loading="lazy" />
+                      )}
+                      {message.statusReply.kind === "text" && <span className="w-1.5 shrink-0" style={{ background: message.statusReply.color || "#00A884" }} />}
+                    </div>
+                  )}
                   {message.replyTo && (
                     <button
                       onClick={() => scrollToMessage(message.replyTo._id)}

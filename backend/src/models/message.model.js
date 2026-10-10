@@ -82,6 +82,11 @@ const messageSchema = new mongoose.Schema(
       waveform: { type: [Number], default: undefined },
     },
     editedAt: { type: Date, default: null },
+    // Reply to someone's status: a small quote of it above the message.
+    statusReply: {
+      type: { kind: String, preview: String, color: String },
+      default: undefined,
+    },
     // Shown as "Forwarded" above the message.
     forwarded: { type: Boolean, default: false },
     // Shared contact card (another Talkies user).
