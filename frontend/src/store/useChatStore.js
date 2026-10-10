@@ -924,6 +924,10 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
+    socket.on("statusLiked", ({ user }) => {
+      toast(`${user?.fullName || "Someone"} liked your status`, { icon: "❤️" });
+    });
+
     socket.on("groupCreated", (group) => {
       set((state) => {
         if (state.groups.some((g) => g._id === group._id)) return {};
@@ -970,6 +974,7 @@ export const useChatStore = create((set, get) => ({
       "groupTyping",
       "groupStopTyping",
       "groupCreated",
+      "statusLiked",
       "groupUpdated",
       "removedFromGroup",
       "archivedChats",
