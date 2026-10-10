@@ -1,4 +1,5 @@
 import express from "express";
+import { lockStatus, setLockPin, verifyLockPin, setChatLocked, resetChatLock } from "../controllers/chatlock.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 import {
   getMessages,
@@ -44,6 +45,11 @@ router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);
 router.put("/archive", protectRoute, setChatArchived);
+router.get("/lock/status", protectRoute, lockStatus);
+router.post("/lock/pin", protectRoute, setLockPin);
+router.post("/lock/verify", protectRoute, verifyLockPin);
+router.put("/lock", protectRoute, setChatLocked);
+router.post("/lock/reset", protectRoute, resetChatLock);
 router.post("/ack-delivered", protectRoute, ackDelivered);
 router.put("/pin-chat", protectRoute, setChatPinned);
 router.put("/mute-chat", protectRoute, setChatMuted);

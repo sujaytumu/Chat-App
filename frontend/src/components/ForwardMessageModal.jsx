@@ -2,16 +2,18 @@ import { useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { X, Send } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 
 const ForwardMessageModal = ({ message, onClose }) => {
   const { users, groups, forwardMessage } = useChatStore();
   const [selected, setSelected] = useState(null);
   const [sending, setSending] = useState(false);
 
+  const lockedChats = useAuthStore((st) => st.authUser?.lockedChats) || [];
   const items = [
     ...users.map((u) => ({ type: "direct", data: u, key: `d-${u._id}`, name: u.fullName, avatar: u.profilePic })),
     ...groups.map((g) => ({ type: "group", data: g, key: `g-${g._id}`, name: g.name, avatar: g.groupPic })),
-  ];
+  ].filter((i) => !lockedChats.includes(`${i.type === "group" ? "g" : "d"}:${i.data._id}`));
 
   const handleSend = async () => {
     if (!selected) return;
