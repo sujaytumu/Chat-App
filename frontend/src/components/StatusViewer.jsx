@@ -44,6 +44,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const [mediaMs, setMediaMs] = useState(0); // length of the current video / audio
   const mediaEl = useRef(null);
   const songEl = useRef(null);
+  const [songBlocked, setSongBlocked] = useState(false);
   useBackToClose(true, onClose);
 
   // Mark as seen when someone else's update comes up.
@@ -91,7 +92,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
     for (const el of [mediaEl.current, songEl.current]) {
       if (!el) continue;
       if (stop) el.pause();
-      else el.play?.().catch(() => {});
+      else {
+        const pr = el.play?.();
+        if (pr && pr.catch) pr.catch(() => { if (el === songEl.current) setSongBlocked(true); });
+      }
     }
   }, [stop, current?._id, mediaMs]);
 
@@ -180,7 +184,11 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       <div
         className="w-full h-full max-w-md relative flex items-center justify-center"
         onPointerDown={() => setPaused(true)}
-        onPointerUp={() => setPaused(false)}
+        onPointerUp={() => {
+          setPaused(false);
+          const a = songEl.current;
+          if (a && a.paused) a.play().then(() => setSongBlocked(false)).catch(() => {});
+        }}
         onPointerLeave={() => setPaused(false)}
         onPointerCancel={() => setPaused(false)}
       >
@@ -239,7 +247,16 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             </a>
           </div>
         )}
-        {current.song?.url && <audio ref={songEl} src={current.song.url} autoPlay loop />}
+        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} autoPlay loop preload="auto" onPlaying={() => setSongBlocked(false)} />}
+        {current.song?.url && songBlocked && (
+          <button
+            onClick={(e) => { e.stopPropagation(); songEl.current?.play?.().then(() => setSongBlocked(false)).catch(() => {}); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute z-30 bottom-28 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full bg-black/70 text-white px-4 py-2 text-[12.5px]"
+          >
+            <Music size={16} /> Tap to play song
+          </button>
+        )}
 
         {/* Caption */}
         {current.caption && (

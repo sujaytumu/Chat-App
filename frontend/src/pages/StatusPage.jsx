@@ -26,8 +26,9 @@ const StatusPage = () => {
   const loadFeed = useCallback(() => {
     setIsLoading(true);
     axiosInstance
-      .get("/status")
-      .then((res) => setFeed(res.data))
+      .get("/status", { params: { t: Date.now() } })
+      .then((res) => setFeed({ myStatuses: res.data?.myStatuses || [], others: res.data?.others || [] }))
+      .catch(() => {})
       .finally(() => setIsLoading(false));
   }, []);
 
