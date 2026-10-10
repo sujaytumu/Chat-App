@@ -82,6 +82,10 @@ const messageSchema = new mongoose.Schema(
       waveform: { type: [Number], default: undefined },
     },
     editedAt: { type: Date, default: null },
+    // View-once photo: the picture lives in viewOnceUrl (never sent in lists) until the receiver opens it once.
+    viewOnce: { type: Boolean, default: false },
+    viewOnceOpened: { type: Boolean, default: false },
+    viewOnceUrl: { type: String, select: false },
     // Group @mentions: the members tagged in this message.
     mentions: { type: [mongoose.Schema.Types.ObjectId], default: undefined },
     pinned: {

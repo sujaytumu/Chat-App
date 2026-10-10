@@ -455,6 +455,17 @@ export const useChatStore = create((set, get) => ({
     get().applyEdit(res.data);
     set({ editingMessage: null });
   },
+  openViewOnce: async (messageId) => {
+    try {
+      const res = await axiosInstance.post(`/messages/view-once/${messageId}`);
+      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, viewOnceOpened: true } : m)) }));
+      return res.data.image;
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't open photo");
+      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, viewOnceOpened: true } : m)) }));
+      return null;
+    }
+  },
   applyEdit: ({ _id, text, editedAt }) => {
     const patch = (m) => (m && m._id === _id ? { ...m, text, editedAt } : m);
     set((state) => ({
@@ -744,6 +755,9 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("messageEdited", (m) => get().applyEdit(m));
+    socket.on("messageViewOnce", ({ _id }) =>
+      set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, viewOnceOpened: true } : m)) }))
+    );
 
     socket.on("messageReacted", ({ _id, reactions }) => {
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, reactions } : m)) }));
@@ -876,6 +890,8 @@ export const useChatStore = create((set, get) => ({
       "privacy",
       "groupReceipts",
       "messageReacted",
+      "messageEdited",
+      "messageViewOnce",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });
   },

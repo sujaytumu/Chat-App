@@ -49,6 +49,7 @@ const MessageInput = () => {
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
   const authUser = useAuthStore((st) => st.authUser);
+  const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
   const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
   const attachMenuRef = useRef(null);
@@ -77,6 +78,7 @@ const MessageInput = () => {
     setImagePreview(null);
     setImageFallback(null);
     setFilePreview(null);
+    setViewOnce(false);
     [photoInputRef, cameraInputRef, documentInputRef, audioInputRef].forEach((ref) => {
       if (ref.current) ref.current.value = "";
     });
@@ -378,7 +380,10 @@ const MessageInput = () => {
         const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
         if (tagged.length) payload.mentions = tagged.map((m) => m._id);
       }
-      if (imagePreview) payload.image = imagePreview;
+      if (imagePreview) {
+        payload.image = imagePreview;
+        if (viewOnce && selectedChat?.type === "direct") payload.viewOnce = true;
+      }
       else if (imageFallback) payload.image = imageFallback.data;
       if (filePreview) {
         payload.file = {
@@ -527,6 +532,17 @@ const MessageInput = () => {
               <X className="size-3" />
             </button>
           </div>
+          {selectedChat?.type === "direct" && (
+            <button
+              type="button"
+              onClick={() => setViewOnce((v) => !v)}
+              className={`h-9 px-3 rounded-full flex items-center gap-2 text-[13px] ${viewOnce ? "bg-[#25D366] text-wa-bg font-medium" : "bg-wa-field text-wa-text2"}`}
+              aria-pressed={viewOnce}
+            >
+              <span className={`size-5 rounded-full border-2 border-current text-[10px] font-bold flex items-center justify-center`}>1</span>
+              View once
+            </button>
+          )}
         </div>
       )}
 
