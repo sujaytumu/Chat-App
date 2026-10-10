@@ -54,6 +54,11 @@ export const useChatStore = create((set, get) => ({
 
   // Active conversation: { type: "direct" | "group", data: user|group }
   selectedChat: null,
+  // Long-press selection of messages (WhatsApp's multi-select bar)
+  selectedMsgIds: [],
+  toggleSelectMessage: (id) =>
+    set((state) => ({ selectedMsgIds: state.selectedMsgIds.includes(id) ? state.selectedMsgIds.filter((x) => x !== id) : [...state.selectedMsgIds, id] })),
+  clearMsgSelection: () => set({ selectedMsgIds: [] }),
 
   messages: [],
   hasMoreMessages: false,
@@ -286,6 +291,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   setSelectedChat: (chat) => {
+    if (get().selectedMsgIds.length) set({ selectedMsgIds: [] });
     if (!chat) {
       set({ selectedChat: null, messages: [], hasMoreMessages: false, chatSearchOpen: false, pendingJump: null });
       return;

@@ -36,6 +36,8 @@ const ChatContainer = () => {
     messages: allMessages,
     isMessagesLoading,
     selectedChat,
+    selectedMsgIds,
+    toggleSelectMessage,
     typingUsers,
     togglePinMessage,
     deleteMessage,
@@ -72,7 +74,19 @@ const ChatContainer = () => {
   );
   // Swipe a message to the right to reply, like WhatsApp.
   const swipe = useRef({ x: 0, y: 0, on: false, dx: 0 });
-  const swipeStart = (e) => {
+  const lp = useRef({ timer: null, fired: false });
+  const lpCancel = () => clearTimeout(lp.current.timer);
+  const swipeStart = (e, id) => {
+    lp.current.fired = false;
+    lpCancel();
+    if (id) {
+      lp.current.timer = setTimeout(() => {
+        lp.current.fired = true;
+        navigator.vibrate?.(15);
+        if (!useChatStore.getState().selectedMsgIds.includes(id)) useChatStore.getState().toggleSelectMessage(id);
+      }, 450);
+    }
+    if (useChatStore.getState().selectedMsgIds.length) return;
     const t = e.touches[0];
     swipe.current = { x: t.clientX, y: t.clientY, on: false, dx: 0 };
     e.currentTarget.style.transition = "none";
@@ -82,6 +96,8 @@ const ChatContainer = () => {
     const sw = swipe.current;
     const dx = t.clientX - sw.x;
     const dy = t.clientY - sw.y;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) lpCancel();
+    if (lp.current.fired || useChatStore.getState().selectedMsgIds.length) return;
     if (!sw.on) {
       if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return void (sw.x = Infinity);
       if (dx > 12 && dx > Math.abs(dy) * 1.5) sw.on = true;
@@ -92,6 +108,8 @@ const ChatContainer = () => {
     e.currentTarget.style.translate = `${Math.max(sw.dx, 0) * 0.8}px 0`;
   };
   const swipeEnd = (e, onReply) => {
+    lpCancel();
+    if (lp.current.fired) return;
     const el = e.currentTarget;
     const sw = swipe.current;
     el.style.transition = "translate .2s cubic-bezier(.2,.8,.2,1)";
@@ -378,16 +396,31 @@ const ChatContainer = () => {
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`flex items-end group rounded-lg transition-colors duration-700 ${
-                highlightId === message._id ? "bg-[#25D366]/20" : ""
+              className={`msg-row flex items-end group rounded-lg transition-colors duration-700 ${
+                highlightId === message._id || selectedMsgIds.includes(message._id) ? "bg-[#25D366]/20" : ""
               } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
               onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
               style={{ touchAction: "pan-y" }}
-              onTouchStart={message.deletedForEveryone ? undefined : (e) => swipeStart(e)}
-              onTouchMove={message.deletedForEveryone ? undefined : (e) => swipeMove(e)}
-              onTouchEnd={message.deletedForEveryone ? undefined : (e) => swipeEnd(e, () => setReplyingTo(message))}
-              onTouchCancel={message.deletedForEveryone ? undefined : (e) => swipeEnd(e)}
+              onTouchStart={(e) => swipeStart(e, message._id)}
+              onTouchMove={swipeMove}
+              onTouchEnd={(e) => swipeEnd(e, message.deletedForEveryone ? undefined : () => setReplyingTo(message))}
+              onTouchCancel={(e) => swipeEnd(e)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (!selectedMsgIds.includes(message._id)) toggleSelectMessage(message._id);
+              }}
+              onClickCapture={(e) => {
+                if (lp.current.fired) {
+                  lp.current.fired = false;
+                  e.preventDefault();
+                  e.stopPropagation();
+                } else if (selectedMsgIds.length) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleSelectMessage(message._id);
+                }
+              }}
             >
               {isGroup && !isMe &&
                 (isFirstInGroup ? (
