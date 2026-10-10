@@ -608,7 +608,7 @@ const ChatContainer = () => {
                     message.text && (
                       <>
                       {!message.deletedForEveryone && !message.viewOnce && firstLink(message.text) && <LinkPreview url={firstLink(message.text)} />}
-                      <span className="text-[13px] leading-[21px] lg:text-[15.5px] lg:leading-[23px]" style={{ whiteSpace: "pre-wrap" }}>
+                      <span className="msg-text text-[13px] leading-[21px] lg:text-[15.5px] lg:leading-[23px]" style={{ whiteSpace: "pre-wrap" }}>
                         {(() => {
                           const long = message.text.length > READ_MORE_AT && !expandedIds.has(message._id);
                           const shown = long ? `${message.text.slice(0, READ_MORE_AT).trimEnd()}…` : message.text;

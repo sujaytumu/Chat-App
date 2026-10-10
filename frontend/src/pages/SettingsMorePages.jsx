@@ -11,7 +11,7 @@ import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
 import { clearChatCache } from "../lib/chatCache";
 import { checkForUpdateNow, currentBuildId } from "../lib/versionCheck";
-import { getReduceMotion, setReduceMotion, getHaptics, setHaptics, getEnterSends, setEnterSends } from "../lib/uiSettings";
+import { getReduceMotion, setReduceMotion, getHaptics, setHaptics, getEnterSends, setEnterSends, getFontSize, setFontSize, FONT_SIZES } from "../lib/uiSettings";
 import { formatChatListTime } from "../lib/utils";
 
 const card = "rounded-xl bg-wa-surface p-4";
@@ -516,6 +516,7 @@ export const PrivacyPage = () => {
 /* ---------------- Chats: archive / unarchive everything ---------------- */
 export const ChatsSettingsPage = () => {
   const [enterSends, setEnter] = useState(getEnterSends());
+  const [fontSize, setFont] = useState(getFontSize());
   const { authUser } = useAuthStore();
   const { users, groups, setChatArchived } = useChatStore();
   const [busy, setBusy] = useState(false);
@@ -546,6 +547,27 @@ export const ChatsSettingsPage = () => {
           setEnterSends(v);
         }}
       />
+      <div className={card}>
+        <p className="text-[13.5px] text-wa-text">Font size</p>
+        <p className="text-[11.5px] text-wa-muted mt-0.5 mb-3">Size of the text inside message bubbles</p>
+        <div className="grid grid-cols-4 gap-2">
+          {FONT_SIZES.map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => {
+                setFont(k);
+                setFontSize(k);
+              }}
+              className={`h-10 rounded-xl text-[12px] ${fontSize === k ? "bg-[#00A884]/20 text-[#00A884] font-medium ring-1 ring-[#00A884]" : "bg-wa-field text-wa-text hover:bg-wa-hover"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 rounded-xl bg-wa-out px-3 py-2 w-fit ml-auto">
+          <span className="msg-text text-[13px] leading-[21px]">Preview of how your messages look</span>
+        </div>
+      </div>
       <div className={card}>
         <p className="text-[13.5px] text-wa-text">Chat history</p>
         <p className="text-[11.5px] text-wa-muted mt-0.5">Download a copy of all your chats, or pick one in Storage and data.</p>
