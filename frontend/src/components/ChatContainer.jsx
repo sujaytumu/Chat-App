@@ -347,7 +347,7 @@ const ChatContainer = () => {
         ref={scrollRef}
         onScroll={handleScroll}
         style={{ overflowAnchor: "none" }}
-        className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[6%] lg:px-[8%] py-3"
+        className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[5%] lg:px-8 py-3 lg:py-5 lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto"
       >
         {hasMoreMessages && (
           <div className="flex justify-center pb-3">
@@ -401,7 +401,7 @@ const ChatContainer = () => {
           };
 
           return (
-            <div key={message._id} className={`${isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}${isFreshMsg(message._id) ? " msg-in" : ""}`}>
+            <div key={message._id} className={`${isFirstInGroup && !showDateDivider ? "mt-2 lg:mt-3.5" : "mt-0.5 lg:mt-1"}${isFreshMsg(message._id) ? " msg-in" : ""}`}>
             {unreadDividerId === message._id && unreadMark.count > 0 && (
               <div className="flex justify-center my-3">
                 <span className="px-3 py-1 rounded-lg bg-wa-surface/90 text-wa-muted text-[11.5px] uppercase tracking-wide">
@@ -410,8 +410,8 @@ const ChatContainer = () => {
               </div>
             )}
             {showDateDivider && (
-              <div className="flex justify-center my-3">
-                <span className="bg-wa-surface/95 text-wa-muted text-[10.5px] px-3 py-1 rounded-lg shadow-sm">
+              <div className="flex justify-center my-3 lg:my-5">
+                <span className="bg-wa-surface/95 text-wa-muted text-[10.5px] lg:text-[13px] px-3 py-1 lg:px-3.5 lg:py-1.5 rounded-lg shadow-sm">
                   {formatDateDivider(message.createdAt)}
                 </span>
               </div>
@@ -480,7 +480,7 @@ const ChatContainer = () => {
                 </div>
               ) : (
                 <div
-                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[60%] px-2.5 pt-1.5 pb-1.5 rounded-xl break-words shadow-sm flex flex-col text-wa-text ${
+                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[68%] px-2.5 pt-1.5 pb-1.5 lg:px-3.5 lg:pt-2 lg:pb-2 rounded-xl break-words shadow-sm flex flex-col text-wa-text ${
                     isMe ? "bg-wa-out" : "bg-wa-surface"
                   } ${
                     isFirstInGroup ? (isMe ? "rounded-tr-none bubble-tail-out" : "rounded-tl-none bubble-tail-in") : ""
@@ -579,7 +579,7 @@ const ChatContainer = () => {
                     message.text && (
                       <>
                       {!message.deletedForEveryone && !message.viewOnce && firstLink(message.text) && <LinkPreview url={firstLink(message.text)} />}
-                      <span className="text-[13px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
+                      <span className="text-[13px] leading-[21px] lg:text-[15.5px] lg:leading-[23px]" style={{ whiteSpace: "pre-wrap" }}>
                         {(() => {
                           const long = message.text.length > READ_MORE_AT && !expandedIds.has(message._id);
                           const shown = long ? `${message.text.slice(0, READ_MORE_AT).trimEnd()}…` : message.text;
@@ -612,8 +612,8 @@ const ChatContainer = () => {
                   )}
                   <span
                     className={`${
-                      hasText || (message.viewOnce && !message.image) ? "absolute bottom-1 right-2" : "self-end mt-0.5"
-                    } text-[9.4px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
+                      hasText || (message.viewOnce && !message.image) ? "absolute bottom-1 right-2 lg:bottom-1.5 lg:right-3" : "self-end mt-0.5"
+                    } text-[9.4px] lg:text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
                   >
                     {message.editedAt && <span>Edited</span>}
                     {formatMessageTime(message.createdAt)}
@@ -628,7 +628,7 @@ const ChatContainer = () => {
               {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
             </div>
             {message.reactions?.length > 0 && !message.deletedForEveryone && (
-              <div className={`flex -mt-1.5 px-2 ${isMe ? "justify-end" : isGroup ? "justify-start pl-10" : "justify-start"}`}>
+              <div className={`relative z-10 flex -mt-1.5 mb-1.5 px-2 ${isMe ? "justify-end" : isGroup ? "justify-start pl-10" : "justify-start"}`}>
                 <div className="flex items-center gap-1 bg-wa-surface border border-wa-bg rounded-full px-1.5 py-0.5 shadow-sm">
                   {Object.entries(
                     message.reactions.reduce((acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] || 0) + 1 }), {})
