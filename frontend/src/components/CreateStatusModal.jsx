@@ -235,6 +235,51 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         </button>
         <h3 className="text-[16px] flex-1">{kind === "text" ? "" : "Add status"}</h3>
         {kind === "text" && (
+          <>
+            <button
+              onClick={() => setFont((f) => (f + 1) % STATUS_FONTS.length)}
+              aria-label="Change font"
+              className="size-11 rounded-full flex items-center justify-center active:bg-white/15 text-[20px]"
+              style={{ fontFamily: STATUS_FONTS[font].css, fontWeight: STATUS_FONTS[font].weight }}
+            >
+              T
+            </button>
+            <button
+              onClick={() => setBgColor((c) => COLORS[(COLORS.indexOf(c) + 1) % COLORS.length])}
+              aria-label="Change background colour"
+              className="size-11 rounded-full flex items-center justify-center active:bg-white/15"
+            >
+              <Palette size={22} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {isMedia && kind === "image" && (
+        <StatusPhotoEditor
+          ref={editorRef}
+          src={media.url}
+          onClose={onClose}
+          onMusic={() => songRef.current?.click()}
+          hasSong={!!song}
+          onRotated={(d) => setMedia((m) => ({ ...m, url: d, data: d }))}
+        />
+      )}
+      {isMedia && kind === "video" && (
+        <div className="relative flex-1 min-h-0 bg-black flex items-center justify-center">
+          <video src={media.url} controls playsInline className="max-w-full max-h-full" />
+          <div className="absolute top-0 inset-x-0 flex items-center gap-2 px-3 pt-[calc(8px+env(safe-area-inset-top))] pb-6 bg-gradient-to-b from-black/60 to-transparent">
+            <button onClick={onClose} aria-label="Close" className="size-12 rounded-full bg-black/45 text-white flex items-center justify-center text-[22px]">✕</button>
+            <div className="flex-1" />
+            <button onClick={() => songRef.current?.click()} aria-label="Add music" className={`size-12 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-black/45 text-white"}`}>
+              <Music size={22} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className={`flex-1 min-h-0 overflow-y-auto px-4 pb-3 ${isMedia ? "hidden" : ""}`}>
+        {kind === "text" && (
           <div className="h-full min-h-[50vh] flex items-center justify-center">
             <textarea
               value={text}
@@ -253,8 +298,6 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
             />
           </div>
         )}
-        {kind === "image" && media && <img src={media.url} alt="Status preview" className="w-full max-h-[48vh] object-contain rounded-2xl bg-black/30" />}
-        {kind === "video" && media && <video src={media.url} controls className="w-full max-h-[48vh] rounded-2xl bg-black" />}
         {kind === "audio" && media && (
           <div className="rounded-2xl bg-wa-field p-5 flex flex-col items-center gap-3">
             <span className="size-16 rounded-full bg-[#ff8f4d] flex items-center justify-center">
