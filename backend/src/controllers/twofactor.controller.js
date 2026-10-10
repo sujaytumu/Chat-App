@@ -73,6 +73,7 @@ export const loginWithTwoFactor = async (req, res) => {
       archivedChats: user.archivedChats || [],
       pinnedChats: user.pinnedChats || [],
       mutedChats: user.mutedChats || [],
+      markedUnread: user.markedUnread || [],
       chatLists: user.chatLists || [],
       privacy: user.privacy,
       blockedUsers: user.blockedUsers || [],

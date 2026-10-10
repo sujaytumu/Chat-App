@@ -22,6 +22,7 @@ import {
   searchMessages,
   reactToMessage,
   editMessage,
+  setChatMarkedUnread,
   getChatMedia,
 } from "../controllers/message.controller.js";
 
@@ -42,6 +43,7 @@ router.put("/archive", protectRoute, setChatArchived);
 router.post("/ack-delivered", protectRoute, ackDelivered);
 router.put("/pin-chat", protectRoute, setChatPinned);
 router.put("/mute-chat", protectRoute, setChatMuted);
+router.put("/mark-unread", protectRoute, setChatMarkedUnread);
 router.put("/chat-lists", protectRoute, setChatLists);
 router.put("/privacy", protectRoute, updatePrivacy);
 router.put("/block-user", protectRoute, setUserBlocked);

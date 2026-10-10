@@ -37,6 +37,7 @@ const chatKeyOf = (chat) => `${chat.type === "group" ? "g" : "d"}:${chat.data._i
 const FLAG_API = {
   archivedChats: { url: "/messages/archive", body: (v) => ({ archived: v }), on: "Chat archived", off: "Chat unarchived", icon: "🗄️" },
   pinnedChats: { url: "/messages/pin-chat", body: (v) => ({ value: v }), on: "Chat pinned", off: "Chat unpinned", icon: "📌" },
+  markedUnread: { url: "/messages/mark-unread", body: (v) => ({ value: v }), on: "Marked as unread", off: "Marked as read", icon: "🟢" },
   mutedChats: { url: "/messages/mute-chat", body: (v) => ({ value: v }), on: "Notifications muted", off: "Notifications on", icon: "🔕" },
 };
 let usersInFlight = null;
@@ -150,6 +151,21 @@ export const useChatStore = create((set, get) => ({
 
   setChatArchived: (chat, archived, opts) => get().setChatFlag("archivedChats", chat, archived, opts),
   setChatPinned: (chat, pinned, opts) => get().setChatFlag("pinnedChats", chat, pinned, opts),
+  // Mark a chat's real unread messages as read without opening it.
+  markChatRead: async (chat) => {
+    try {
+      if (chat.type === "direct") await axiosInstance.put(`/messages/seen/${chat.data._id}`);
+      else await axiosInstance.get(`/groups/${chat.data._id}/messages`, { params: { limit: 1 } });
+    } catch {
+      return;
+    }
+    set((state) =>
+      chat.type === "direct"
+        ? { users: state.users.map((u) => (u._id === chat.data._id ? { ...u, unreadCount: 0 } : u)) }
+        : { groups: state.groups.map((g) => (g._id === chat.data._id ? { ...g, unreadCount: 0 } : g)) }
+    );
+  },
+  setChatMarkedUnread: (chat, v, opts) => get().setChatFlag("markedUnread", chat, v, opts),
   setChatMuted: (chat, muted, opts) => get().setChatFlag("mutedChats", chat, muted, opts),
 
   // Favourites + custom lists: [{ id, name, chats: ["d:<id>"|"g:<id>"] }].
@@ -239,6 +255,7 @@ export const useChatStore = create((set, get) => ({
     const userId = useAuthStore.getState().authUser?._id;
     const cached = msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [];
     set({ selectedChat: chat, messages: cached, hasMoreMessages: false, chatSearchOpen: false });
+    if (useAuthStore.getState().authUser?.markedUnread?.includes(key)) get().setChatMarkedUnread(chat, false, { silent: true });
     get().getMessages();
   },
 
@@ -796,7 +813,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     // Archive list changed on another device (or this one) — keep in sync.
-    ["archivedChats", "pinnedChats", "mutedChats", "chatLists", "blockedUsers", "privacy"].forEach((field) => {
+    ["archivedChats", "pinnedChats", "mutedChats", "markedUnread", "chatLists", "blockedUsers", "privacy"].forEach((field) => {
       socket.on(field, (list) => {
         useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, [field]: list } } : {}));
       });
@@ -853,6 +870,7 @@ export const useChatStore = create((set, get) => ({
       "archivedChats",
       "pinnedChats",
       "mutedChats",
+      "markedUnread",
       "chatLists",
       "blockedUsers",
       "privacy",
