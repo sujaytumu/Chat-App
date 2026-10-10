@@ -59,6 +59,23 @@ export const getUsersForSidebar = async (req, res) => {
     const lastMessageByUser = new Map(lastMessages.map((m) => [m._id.toString(), m]));
     const unreadByUser = new Map(unreadCounts.map((u) => [u._id.toString(), u.count]));
 
+    // People who haven't connected since "last seen" was introduced have no
+    // saved time yet: fall back to their latest sent message, then account activity.
+    const noSeen = filteredUsers.filter((u) => !u.lastSeen).map((u) => u._id);
+    const lastSent = noSeen.length
+      ? new Map(
+          (
+            await Message.aggregate([
+              { $match: { senderId: { $in: noSeen } } },
+              { $group: { _id: "$senderId", at: { $max: "$createdAt" } } },
+            ])
+          ).map((r) => [String(r._id), r.at])
+        )
+      : new Map();
+    for (const u of filteredUsers) {
+      if (!u.lastSeen) u.lastSeen = lastSent.get(String(u._id)) || u.updatedAt || u.createdAt || null;
+    }
+
     const iHideReceipts = req.user.privacy?.readReceipts === false;
     const usersWithMeta = filteredUsers.map(({ privacy, blockedUsers, ...user }) => {
       const lm = lastMessageByUser.get(user._id.toString());
