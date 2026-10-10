@@ -26,7 +26,7 @@ const DownloadFallbackCard = ({ file, label }) => (
 // downloadable document card. Falls back to a download card if the
 // browser can't actually play the video/audio format (common across
 // different browsers/devices for recorded voice notes and videos).
-const AttachmentContent = ({ file, onMediaLoaded }) => {
+const AttachmentContent = ({ file, onMediaLoaded, incoming }) => {
   const [videoFailed, setVideoFailed] = useState(false);
   const [audioFailed, setAudioFailed] = useState(false);
 
@@ -48,7 +48,7 @@ const AttachmentContent = ({ file, onMediaLoaded }) => {
 
   if (file.type === "audio") {
     if (audioFailed) return <DownloadFallbackCard file={file} label="Voice message" />;
-    return <VoiceMessagePlayer file={file} onError={() => setAudioFailed(true)} />;
+    return <VoiceMessagePlayer file={file} autoNext={!!incoming} onError={() => setAudioFailed(true)} />;
   }
 
   const kind = fileIconKind(file.name);
