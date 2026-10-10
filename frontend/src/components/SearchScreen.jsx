@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { FileText, Link2, Image as ImageIcon, X } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -26,6 +27,19 @@ const hostOf = (text) => {
   }
 };
 
+// Matched part bright, the rest dimmed (WhatsApp's "Name is also in this group" line).
+const Lit = ({ text, q }) => {
+  const i = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (i < 0) return <span className="text-wa-muted">{text}</span>;
+  return (
+    <>
+      <span className="text-wa-muted">{text.slice(0, i)}</span>
+      <span className="text-wa-text">{text.slice(i, i + q.length)}</span>
+      <span className="text-wa-muted">{text.slice(i + q.length)}</span>
+    </>
+  );
+};
+
 // WhatsApp's full-screen search: pill bar, Documents / Links / Photos chips,
 // then Chats, People and Messages (with "From ~ person" chips).
 const SearchScreen = ({ onClose }) => {
@@ -41,6 +55,8 @@ const SearchScreen = ({ onClose }) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
+  const scrollRef = useRef(null);
+  const msgHeadRef = useRef(null);
   useBackToClose(true, onClose);
 
   const term = q.trim();
@@ -73,6 +89,17 @@ const SearchScreen = ({ onClose }) => {
   }, [users, groups, lc, kind]);
   const people = useMemo(() => (!lc || kind ? [] : users.filter((u) => !u.lastMessage && u.fullName?.toLowerCase().includes(lc))), [users, lc, kind]);
 
+  // Groups that one of the matching people is also in: "Sowmya is also in this group"
+  const common = useMemo(() => {
+    if (!lc || kind) return [];
+    const hit = users.filter((u) => u.fullName?.toLowerCase().includes(lc));
+    if (!hit.length) return [];
+    return groups
+      .map((g) => ({ g, who: hit.find((u) => (g.members || []).some((m) => String(m._id ?? m) === String(u._id))) }))
+      .filter((x) => x.who)
+      .slice(0, 8);
+  }, [groups, users, lc, kind]);
+
   // "From ~ name" chips: people matching the query
   const senders = useMemo(() => {
     if (!lc || kind) return [];
@@ -89,9 +116,9 @@ const SearchScreen = ({ onClose }) => {
     onClose();
   };
 
-  return (
-    <div className="absolute inset-0 z-40 bg-wa-bg flex flex-col">
-      <div className="px-3 pt-[calc(12px+env(safe-area-inset-top))] pb-2 shrink-0">
+  return createPortal(
+    <div className="fixed inset-x-0 top-0 h-[100dvh] z-[140] bg-wa-bg text-wa-text flex flex-col lg:left-[72px] lg:right-auto lg:w-[400px] xl:w-[420px] lg:border-r lg:border-white/5">
+      <div className="px-3 pt-[env(safe-area-inset-top)] pb-2 shrink-0">
         <div className="flex items-center h-12 rounded-full bg-wa-surface pl-2 pr-3">
           <button onClick={onClose} className="size-10 flex items-center justify-center text-wa-text" aria-label="Back">
             <ArrowLeft size={24} />
@@ -104,7 +131,17 @@ const SearchScreen = ({ onClose }) => {
               setFrom(null);
             }}
             placeholder="Search"
-            className="flex-1 min-w-0 bg-transparent px-2 text-[16px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+            type="search"
+            enterKeyHint="search"
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              // Keyboard "search" key: hide the keyboard and jump to the message results
+              e.currentTarget.blur();
+              setTimeout(() => {
+                if (msgHeadRef.current && scrollRef.current) scrollRef.current.scrollTo({ top: msgHeadRef.current.offsetTop - 4, behavior: "smooth" });
+              }, 120);
+            }}
+            className="flex-1 min-w-0 bg-transparent px-2 text-[16px] [&::-webkit-search-cancel-button]:hidden text-wa-text placeholder:text-wa-muted focus:outline-none"
           />
           {q && (
             <button onClick={() => setQ("")} className="size-8 flex items-center justify-center text-wa-muted" aria-label="Clear">
@@ -129,7 +166,7 @@ const SearchScreen = ({ onClose }) => {
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pb-6">
         {chats.length > 0 && (
           <>
             <Heading>Chats</Heading>
@@ -164,7 +201,24 @@ const SearchScreen = ({ onClose }) => {
           </>
         )}
 
-        {(shown.length > 0 || (kind && !loading) || (term.length >= 2 && !loading && results.length > 0)) && <Heading>{kind ? KINDS.find((k) => k.id === kind).label : "Messages"}</Heading>}
+        {common.length > 0 && (
+          <>
+            <Heading>Groups in common</Heading>
+            {common.map(({ g, who }) => (
+              <button key={g._id} onClick={() => open({ type: "group", data: g })} className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-wa-surface">
+                <Avatar src={g.groupPic} name={g.name} isGroup size="size-12" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[16px] text-wa-text truncate">{g.name}</p>
+                  <p className="text-[14px] truncate">
+                    <Lit text={`${who.fullName} is also in this group`} q={term} />
+                  </p>
+                </div>
+              </button>
+            ))}
+          </>
+        )}
+
+        {(shown.length > 0 || (kind && !loading) || (term.length >= 2 && !loading && results.length > 0)) && <div ref={msgHeadRef}><Heading>{kind ? KINDS.find((k) => k.id === kind).label : "Messages"}</Heading></div>}
 
         {senders.length > 0 && results.length > 0 && !kind && (
           <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar bg-wa-surface/40">
@@ -237,7 +291,8 @@ const SearchScreen = ({ onClose }) => {
           <p className="text-center text-wa-muted py-10 text-[14px]">{term ? `No results for “${term}”` : "Nothing here yet"}</p>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
