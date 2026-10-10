@@ -267,3 +267,11 @@ html[data-chat-color="teal"] { --wa-out: 204 244 240; --wa-tint: 204 244 240; --
 html[data-chat-color="teal"].wa-dark { --wa-out: 16 84 80; --wa-tint: 14 62 59; --wa-tinttext: 204 244 240; }
 html[data-chat-color="graphite"] { --wa-out: 226 229 233; --wa-tint: 226 229 233; --wa-tinttext: 31 41 55; }
 html[data-chat-color="graphite"].wa-dark { --wa-out: 55 65 81; --wa-tint: 38 46 58; --wa-tinttext: 226 229 233; }
+
+/* double-tap ❤️ on a message */
+@keyframes m-heart {
+  0% { opacity: 0; scale: .3; translate: -50% -40%; }
+  25% { opacity: 1; scale: 1.25; translate: -50% -50%; }
+  60% { opacity: 1; scale: 1; translate: -50% -60%; }
+  100% { opacity: 0; scale: 1; translate: -50% -140%; }
+}

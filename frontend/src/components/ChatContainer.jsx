@@ -78,10 +78,20 @@ const ChatContainer = () => {
   );
   // Swipe a message to the right to reply, like WhatsApp.
   const swipe = useRef({ x: 0, y: 0, on: false, dx: 0 });
-  const lp = useRef({ timer: null, fired: false });
+  const lp = useRef({ timer: null, fired: false, moved: false });
+  const lastTap = useRef({ id: null, t: 0 });
+  const [heartFor, setHeartFor] = useState(null);
+  // Double-tap a message to ❤️ it.
+  const heartMessage = (m) => {
+    if (m.deletedForEveryone || useChatStore.getState().selectedMsgIds.length) return;
+    setHeartFor(m._id);
+    setTimeout(() => setHeartFor((id) => (id === m._id ? null : id)), 750);
+    if (!m.reactions?.some((r) => String(r.user) === String(authUser._id) && r.emoji === "❤️")) reactToMessage(m._id, "❤️");
+  };
   const lpCancel = () => clearTimeout(lp.current.timer);
   const swipeStart = (e, id) => {
     lp.current.fired = false;
+    lp.current.moved = false;
     lpCancel();
     if (id) {
       lp.current.timer = setTimeout(() => {
@@ -100,7 +110,10 @@ const ChatContainer = () => {
     const sw = swipe.current;
     const dx = t.clientX - sw.x;
     const dy = t.clientY - sw.y;
-    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) lpCancel();
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+      lpCancel();
+      lp.current.moved = true;
+    }
     if (lp.current.fired || useChatStore.getState().selectedMsgIds.length) return;
     if (!sw.on) {
       if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) return void (sw.x = Infinity);
@@ -111,9 +124,16 @@ const ChatContainer = () => {
     sw.dx = Math.min(dx, 90);
     e.currentTarget.style.translate = `${Math.max(sw.dx, 0) * 0.8}px 0`;
   };
-  const swipeEnd = (e, onReply) => {
+  const swipeEnd = (e, onReply, onDoubleTap, id) => {
     lpCancel();
     if (lp.current.fired) return;
+    if (onDoubleTap && id && !lp.current.moved && e.type === "touchend") {
+      const now = Date.now();
+      if (lastTap.current.id === id && now - lastTap.current.t < 300) {
+        lastTap.current = { id: null, t: 0 };
+        onDoubleTap();
+      } else lastTap.current = { id, t: now };
+    }
     const el = e.currentTarget;
     const sw = swipe.current;
     el.style.transition = "translate .2s cubic-bezier(.2,.8,.2,1)";
@@ -421,7 +441,7 @@ const ChatContainer = () => {
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`msg-row flex items-end group rounded-lg transition-colors duration-700 ${
+              className={`msg-row relative flex items-end group rounded-lg transition-colors duration-700 ${
                 highlightId === message._id || selectedMsgIds.includes(message._id) ? "bg-[#25D366]/20" : ""
               } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
@@ -429,7 +449,8 @@ const ChatContainer = () => {
               style={{ touchAction: "pan-y" }}
               onTouchStart={(e) => swipeStart(e, message._id)}
               onTouchMove={swipeMove}
-              onTouchEnd={(e) => swipeEnd(e, message.deletedForEveryone ? undefined : () => setReplyingTo(message))}
+              onTouchEnd={(e) => swipeEnd(e, message.deletedForEveryone ? undefined : () => setReplyingTo(message), () => heartMessage(message), message._id)}
+              onDoubleClick={() => heartMessage(message)}
               onTouchCancel={(e) => swipeEnd(e)}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -462,6 +483,11 @@ const ChatContainer = () => {
 
               {isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
 
+              {heartFor === message._id && (
+                <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 text-[44px] leading-none" style={{ animation: "m-heart .75s ease-out forwards" }}>
+                  ❤️
+                </span>
+              )}
               {message.deletedForEveryone ? (
                 <div
                   className={`relative max-w-[82%] sm:max-w-[65%] px-3 py-1.5 rounded-xl italic text-wa-muted text-[12.5px] flex items-center gap-1.5 ${
