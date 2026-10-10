@@ -508,7 +508,7 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
-    <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full">
+<div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 lg:px-8 lg:pt-2 lg:pb-4 w-full lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto">
       {showContacts && (
         <ContactPicker
           onClose={() => setShowContacts(false)}
