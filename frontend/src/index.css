@@ -248,3 +248,9 @@ button[class*="size-"]:not(:disabled):active, .btn:not(:disabled):active { scale
 /* Long-press to select a message (touch screens): no text-selection / callout popup fighting it. */
 .msg-row { -webkit-touch-callout: none; }
 @media (pointer: coarse) { .msg-row { -webkit-user-select: none; user-select: none; } }
+
+@keyframes heartpop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}

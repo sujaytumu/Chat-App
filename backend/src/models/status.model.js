@@ -35,6 +35,14 @@ const statusSchema = new mongoose.Schema(
         at: { type: Date, default: Date.now },
       },
     ],
+    // Hearts (WhatsApp-style "like" on a status); the owner sees who liked it
+    likes: [
+      {
+        _id: false,
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     expiresAt: { type: Date, required: true },
   },
   { timestamps: true }

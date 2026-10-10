@@ -1,6 +1,8 @@
 import Status from "../models/status.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { uploadFileAttachment } from "../lib/uploadFile.js";
+import { io, getReceiverSocketId } from "../lib/socket.js";
+import { sendPushToUser } from "../lib/webPush.js";
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
@@ -91,7 +93,10 @@ export const getStatusFeed = async (req, res) => {
     const myDocs = byUser.get(myId.toString())?.statuses || [];
     byUser.delete(myId.toString());
     // Only the owner sees who viewed their status.
-    await Status.populate(myDocs, { path: "views.user", select: "fullName profilePic" });
+    await Status.populate(myDocs, [
+      { path: "views.user", select: "fullName profilePic" },
+      { path: "likes.user", select: "fullName profilePic" },
+    ]);
     const myStatuses = myDocs.map((d) => d.toObject());
 
     const others = Array.from(byUser.values()).map((entry) => ({
@@ -100,8 +105,10 @@ export const getStatusFeed = async (req, res) => {
       statuses: entry.statuses.map((s) => {
         const o = s.toObject();
         o.seen = s.viewedBy.some((v) => v.equals(myId));
+        o.liked = (s.likes || []).some((l) => l.user.equals(myId)); // only my own heart
         delete o.viewedBy;
         delete o.views;
+        delete o.likes;
         return o;
       }),
     }));
@@ -145,6 +152,49 @@ export const deleteStatus = async (req, res) => {
     res.status(200).json({ message: "Status deleted" });
   } catch (error) {
     console.log("Error in deleteStatus controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Heart / un-heart someone else's status. The owner is told when it's liked.
+export const likeStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+    const liked = req.body?.liked !== false;
+
+    const status = await Status.findOne({ _id: id, expiresAt: { $gt: new Date() } }).select("userId");
+    if (!status) return res.status(404).json({ error: "Status not found" });
+    if (status.userId.equals(myId)) return res.status(400).json({ error: "You can't like your own status" });
+
+    if (liked) {
+      const result = await Status.updateOne(
+        { _id: id, "likes.user": { $ne: myId } },
+        { $push: { likes: { user: myId, at: new Date() } } }
+      );
+      if (result.modifiedCount > 0) {
+        const ownerId = status.userId.toString();
+        const socketId = getReceiverSocketId(ownerId);
+        if (socketId) {
+          io.to(socketId).emit("statusLiked", {
+            statusId: id,
+            user: { _id: myId.toString(), fullName: req.user.fullName, profilePic: req.user.profilePic },
+          });
+        }
+        sendPushToUser(ownerId, {
+          title: "Talkies",
+          body: `❤️ ${req.user.fullName} liked your status`,
+          icon: req.user.profilePic || "/icon-v2-192.png",
+          tag: `status-like-${id}`,
+          data: { url: "/status" },
+        });
+      }
+    } else {
+      await Status.updateOne({ _id: id }, { $pull: { likes: { user: myId } } });
+    }
+    res.status(200).json({ liked });
+  } catch (error) {
+    console.log("Error in likeStatus controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
