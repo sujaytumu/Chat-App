@@ -25,6 +25,7 @@ import { Lock } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import { useDraftStore } from "../store/useDraftStore";
+import { groupTypingLabel } from "../lib/typingLabel";
 import {
   WaBack,
   WaKebab,
@@ -701,7 +702,7 @@ const Sidebar = () => {
                 </div>
                 <div className="flex items-center justify-between gap-3 mt-[3px]">
                   {isTyping || isRecordingNow ? (
-                    <span className="min-w-0 truncate text-[13px] text-[#25D366]">{isRecordingNow && !isTyping ? "recording audio…" : "typing…"}</span>
+                    <span className="min-w-0 truncate text-[13px] text-[#25D366]">{isRecordingNow && !isTyping ? "recording audio…" : item.type === "group" ? groupTypingLabel(typingUsers[`group:${item.data._id}`], item.data.members, true) : "typing…"}</span>
                   ) : (
                   <span
                     className={`flex items-center gap-1 min-w-0 text-[12.5px] lg:text-[12px] leading-5 ${
