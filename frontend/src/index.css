@@ -254,3 +254,16 @@ button[class*="size-"]:not(:disabled):active, .btn:not(:disabled):active { scale
   60% { transform: scale(1.35); }
   100% { transform: scale(1); }
 }
+/* ---- Chat colour (Settings → Appearance) ---- */
+html[data-chat-color="ocean"] { --wa-out: 205 232 255; --wa-tint: 205 232 255; --wa-tinttext: 12 74 140; }
+html[data-chat-color="ocean"].wa-dark { --wa-out: 18 62 105; --wa-tint: 14 45 78; --wa-tinttext: 205 232 255; }
+html[data-chat-color="violet"] { --wa-out: 228 217 255; --wa-tint: 228 217 255; --wa-tinttext: 76 29 149; }
+html[data-chat-color="violet"].wa-dark { --wa-out: 61 38 110; --wa-tint: 44 28 80; --wa-tinttext: 228 217 255; }
+html[data-chat-color="rose"] { --wa-out: 255 217 228; --wa-tint: 255 217 228; --wa-tinttext: 157 23 77; }
+html[data-chat-color="rose"].wa-dark { --wa-out: 110 34 62; --wa-tint: 80 26 46; --wa-tinttext: 255 217 228; }
+html[data-chat-color="sunset"] { --wa-out: 255 229 204; --wa-tint: 255 229 204; --wa-tinttext: 154 52 18; }
+html[data-chat-color="sunset"].wa-dark { --wa-out: 112 56 20; --wa-tint: 82 42 16; --wa-tinttext: 255 229 204; }
+html[data-chat-color="teal"] { --wa-out: 204 244 240; --wa-tint: 204 244 240; --wa-tinttext: 17 94 89; }
+html[data-chat-color="teal"].wa-dark { --wa-out: 16 84 80; --wa-tint: 14 62 59; --wa-tinttext: 204 244 240; }
+html[data-chat-color="graphite"] { --wa-out: 226 229 233; --wa-tint: 226 229 233; --wa-tinttext: 31 41 55; }
+html[data-chat-color="graphite"].wa-dark { --wa-out: 55 65 81; --wa-tint: 38 46 58; --wa-tinttext: 226 229 233; }

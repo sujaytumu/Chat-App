@@ -5,8 +5,10 @@ import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { useThemeStore, applyTheme } from "./store/useThemeStore";
 import { applyUiSettings } from "./lib/uiSettings";
+import { applyChatColor } from "./lib/chatColor";
 
 applyUiSettings();
+applyChatColor();
 applyTheme(useThemeStore.getState().theme);
 
 // Wrapper to provide global theme

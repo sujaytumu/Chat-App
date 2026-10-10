@@ -23,6 +23,8 @@
         var d = ["dark","night","dracula","forest","business","luxury","black","synthwave"].indexOf(t) > -1;
         if (d) document.documentElement.classList.add("wa-dark");
         document.documentElement.setAttribute("data-theme", t);
+        var cc = localStorage.getItem("talkies-chat-color");
+        if (cc) document.documentElement.setAttribute("data-chat-color", cc);
         document.querySelector('meta[name="theme-color"]').setAttribute("content", d ? "#111B21" : "#FFFFFF");
       } catch (e) {}
     </script>
