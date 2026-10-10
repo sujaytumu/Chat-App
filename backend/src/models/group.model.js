@@ -26,6 +26,8 @@ const groupSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    // Anyone signed in with this code can join (admins can reset it).
+    inviteCode: { type: String, index: true, sparse: true, select: false },
     // Disappearing messages: new messages vanish this many seconds after being sent (0 = off).
     disappearAfter: { type: Number, default: 0 },
     // Who may do what. Defaults keep the original behaviour.

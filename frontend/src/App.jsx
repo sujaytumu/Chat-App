@@ -10,7 +10,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { syncPreferences } from "./lib/prefsSync";
-import { useEffect, useRef, lazy, Suspense } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { startVersionWatcher } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
 
@@ -47,6 +47,8 @@ const ProfilePage = lazy(loaders.ProfilePage);
 const CallsPage = lazy(loaders.CallsPage);
 const StatusPage = lazy(loaders.StatusPage);
 
+const JoinGroupDialog = lazy(() => import("./components/JoinGroupDialog"));
+
 const RouteFallback = () => (
   <div className="flex items-center justify-center h-[60dvh]">
     <Loader className="size-8 animate-spin text-[#25D366]" />
@@ -58,6 +60,19 @@ const App = () => {
   const { theme } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
+  // Invite link: …/?join=CODE (remembered through sign-in)
+  const [joinCode, setJoinCode] = useState(() => {
+    try {
+      const c = new URLSearchParams(window.location.search).get("join");
+      if (c) sessionStorage.setItem("talkies-join", c);
+      return sessionStorage.getItem("talkies-join");
+    } catch {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (authUser && joinCode) try { sessionStorage.removeItem("talkies-join"); } catch { /* ignore */ }
+  }, [authUser, joinCode]);
   const pathRef = useRef(location.pathname);
   pathRef.current = location.pathname;
   const isChatScreen = (["/", "/calls", "/status", "/profile", "/starred"].includes(location.pathname) || location.pathname.startsWith("/settings")) && authUser;
@@ -138,6 +153,17 @@ const App = () => {
           Sidebar has its own compact profile/settings/logout icons instead */}
       {!isChatScreen && <Navbar />}
 
+      {authUser && joinCode && (
+        <Suspense fallback={null}>
+          <JoinGroupDialog
+            code={joinCode}
+            onDone={() => {
+              setJoinCode(null);
+              window.history.replaceState(null, "", window.location.pathname);
+            }}
+          />
+        </Suspense>
+      )}
       {authUser && <NotificationManager />}
       {authUser && (
         <ErrorBoundary silent>

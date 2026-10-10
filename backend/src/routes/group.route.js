@@ -14,9 +14,14 @@ import {
   reportGroup,
 } from "../controllers/group.controller.js";
 
+import { getInvite, previewInvite, joinByInvite } from "../controllers/groupInvite.controller.js";
+
 const router = express.Router();
 
 router.get("/", protectRoute, getUserGroups);
+router.get("/join/:code", protectRoute, previewInvite);
+router.post("/join/:code", protectRoute, joinByInvite);
+router.post("/:id/invite", protectRoute, getInvite);
 router.post("/", protectRoute, createGroup);
 router.get("/:id/messages", protectRoute, getGroupMessages);
 router.post("/:id/messages", protectRoute, sendGroupMessage);
