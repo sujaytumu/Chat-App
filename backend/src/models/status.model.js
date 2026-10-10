@@ -25,6 +25,7 @@ const statusSchema = new mongoose.Schema(
       lng: { type: Number },
     },
     backgroundColor: { type: String, default: "#00A884" }, // for text statuses
+    font: { type: Number, default: 0, min: 0, max: 4 }, // text-status font style
     viewedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     // Who viewed it and when (shown to the owner only)
     views: [

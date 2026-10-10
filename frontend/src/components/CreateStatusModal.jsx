@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { X, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation } from "lucide-react";
+import { X, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
+import { STATUS_FONTS } from "../lib/statusFonts";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
@@ -118,6 +119,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [kind, setKind] = useState("text"); // text | image | video | audio | file
   const [text, setText] = useState("");
   const [bgColor, setBgColor] = useState(COLORS[0]);
+  const [font, setFont] = useState(0);
   const [media, setMedia] = useState(null); // { data, url(preview), name, size, mime, duration }
   const [caption, setCaption] = useState("");
   const [song, setSong] = useState(null); // { data, name, size }
@@ -186,6 +188,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         type: kind,
         content: kind === "text" ? text.trim() : media.data,
         backgroundColor: bgColor,
+        font,
         caption: kind === "text" ? "" : caption,
         ...(kind !== "text" && kind !== "image" ? { file: { name: media.name, size: media.size, mime: media.mime, duration: media.duration } } : {}),
         ...(song ? { song: { data: song.data, name: song.name, size: song.size } } : {}),
@@ -216,41 +219,33 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   );
 
   return (
-    <div className="wa-dark fixed inset-0 z-[150] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10">
-      <div className="flex items-center gap-5 px-4 h-14 shrink-0">
-        <button onClick={onClose} aria-label="Close">
+    <div
+      className={`wa-dark fixed inset-0 z-[150] text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10 transition-colors ${kind === "text" ? "" : "bg-wa-bg"}`}
+      style={kind === "text" ? { backgroundColor: bgColor } : undefined}
+    >
+      <div className="flex items-center gap-2 px-2 pt-[env(safe-area-inset-top)] h-[calc(56px+env(safe-area-inset-top))] shrink-0">
+        <button onClick={onClose} aria-label="Close" className="size-11 rounded-full flex items-center justify-center active:bg-white/15">
           <X size={24} />
         </button>
-        <h3 className="text-[16px] flex-1">Add status</h3>
-      </div>
-
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-3">
-        {/* The status itself */}
+        <h3 className="text-[16px] flex-1">{kind === "text" ? "" : "Add status"}</h3>
         {kind === "text" && (
-          <>
-            <div className="rounded-2xl min-h-[260px] flex items-center justify-center p-5 mb-3" style={{ backgroundColor: bgColor }}>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Type a status… (you can paste a link)"
-                autoFocus={startWith !== "image"}
-                maxLength={700}
-                rows={5}
-                className="bg-transparent text-white text-[20.5px] text-center placeholder:text-white/60 resize-none focus:outline-none w-full"
-              />
-            </div>
-            <div className="flex gap-2.5 justify-center mb-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setBgColor(c)}
-                  className={`size-8 rounded-full ${bgColor === c ? "ring-2 ring-white" : ""}`}
-                  style={{ backgroundColor: c }}
-                  aria-label={`Background ${c}`}
-                />
-              ))}
-            </div>
-          </>
+          <div className="h-full min-h-[50vh] flex items-center justify-center">
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Type a status"
+              autoFocus={startWith !== "image"}
+              maxLength={700}
+              rows={Math.min(10, Math.max(2, Math.ceil(text.length / 18)))}
+              className="bg-transparent text-white text-center placeholder:text-white/60 resize-none focus:outline-none w-full"
+              style={{
+                fontFamily: STATUS_FONTS[font].css,
+                fontWeight: STATUS_FONTS[font].weight,
+                fontSize: text.length > 220 ? 20 : text.length > 90 ? 26 : 34,
+                lineHeight: 1.25,
+              }}
+            />
+          </div>
         )}
         {kind === "image" && media && <img src={media.url} alt="Status preview" className="w-full max-h-[48vh] object-contain rounded-2xl bg-black/30" />}
         {kind === "video" && media && <video src={media.url} controls className="w-full max-h-[48vh] rounded-2xl bg-black" />}
@@ -311,7 +306,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       </div>
 
       {/* Tools + send */}
-      <div className="shrink-0 border-t border-white/10 px-3 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] flex items-end gap-1.5">
+      <div className={`shrink-0 px-3 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] flex items-end gap-1.5 ${kind === "text" ? "bg-black/20" : "border-t border-white/10"}`}>
         <div className="flex-1 flex items-start justify-start gap-0.5 overflow-x-auto no-scrollbar">
           {tool(Type, "Text", () => setKind("text"), kind === "text")}
           {tool(ImageIcon, "Photo", () => mediaRef.current?.click(), kind === "image" || kind === "video")}
