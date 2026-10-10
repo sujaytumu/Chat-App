@@ -674,6 +674,40 @@ export const searchMessages = async (req, res) => {
   }
 };
 
+// Edit your own text message within 15 minutes (like WhatsApp).
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+export const editMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const text = String(req.body?.text ?? "").trim();
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    if (!text || text.length > 5000) return res.status(400).json({ error: "Message can't be empty" });
+    const message = await Message.findById(id);
+    if (!message || message.deletedForEveryone) return res.status(404).json({ error: "Message not found" });
+    if (String(message.senderId) !== String(req.user._id)) return res.status(403).json({ error: "You can only edit your own messages" });
+    if (message.file?.url) return res.status(400).json({ error: "This message can't be edited" });
+    if (Date.now() - new Date(message.createdAt).getTime() > EDIT_WINDOW_MS)
+      return res.status(400).json({ error: "You can only edit a message within 15 minutes" });
+    if (message.text === text) return res.status(200).json({ _id: message._id, text, editedAt: message.editedAt });
+    message.text = text;
+    message.editedAt = new Date();
+    await message.save();
+    const payload = { _id: message._id, text, editedAt: message.editedAt, senderId: message.senderId, receiverId: message.receiverId, groupId: message.groupId };
+    if (message.groupId) {
+      io.to(message.groupId.toString()).emit("messageEdited", payload);
+    } else {
+      [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+        const socketId = getReceiverSocketId(uid);
+        if (socketId) io.to(socketId).emit("messageEdited", payload);
+      });
+    }
+    res.status(200).json(payload);
+  } catch (error) {
+    console.log("Error in editMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // React to a message with one emoji (sending the same emoji again, or null, removes it).
 export const reactToMessage = async (req, res) => {
   try {

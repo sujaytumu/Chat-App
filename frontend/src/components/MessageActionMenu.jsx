@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, StarOutline, Forward, Info, Languages } from "./icons/WaGlyphs";
+import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, StarOutline, Forward, Info, Languages, Pencil } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 
 // Hover trigger + dropdown for per-message actions, matching WhatsApp's
 // long-press/hover message menu.
-const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo, onTranslate, onReact }) => {
+const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo, onTranslate, onReact, onEdit }) => {
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const menuRef = useRef(null);
@@ -82,6 +82,18 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 <Reply size={20} />
                 Reply
               </button>
+              {onEdit && (
+                <button
+                  onClick={() => {
+                    onEdit();
+                    close();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
+                >
+                  <Pencil size={20} />
+                  Edit
+                </button>
+              )}
               {message.text && (
                 <button
                   onClick={handleCopy}

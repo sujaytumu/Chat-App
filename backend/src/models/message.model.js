@@ -81,6 +81,7 @@ const messageSchema = new mongoose.Schema(
       duration: { type: Number },
       waveform: { type: [Number], default: undefined },
     },
+    editedAt: { type: Date, default: null },
     pinned: {
       type: Boolean,
       default: false,
