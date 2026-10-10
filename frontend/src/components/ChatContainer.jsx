@@ -70,6 +70,16 @@ const ChatContainer = () => {
     () => (hasExpiring ? allMessages.filter((m) => !m.expiresAt || new Date(m.expiresAt).getTime() > nowTick) : allMessages),
     [allMessages, hasExpiring, nowTick]
   );
+  // Bubbles that arrive while the chat is open ease in; the ones already there don't animate.
+  const freshRef = useRef({ key: null, ids: new Set() });
+  const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
+  if (freshRef.current.key !== chatKeyNow) freshRef.current = { key: chatKeyNow, ids: new Set(messages.map((m) => m._id)) };
+  const seenIds = freshRef.current.ids;
+  const isFreshMsg = (id) => seenIds.size > 0 && !seenIds.has(id);
+  useEffect(() => {
+    const t = setTimeout(() => messages.forEach((m) => seenIds.add(m._id)), 400);
+    return () => clearTimeout(t);
+  }, [messages, seenIds]);
   // Phone Back closes the in-chat search bar first (before leaving the chat).
   useBackToClose(chatSearchOpen, () => useChatStore.getState().setChatSearchOpen(false));
   const messageEndRef = useRef(null);
@@ -325,7 +335,7 @@ const ChatContainer = () => {
           };
 
           return (
-            <div key={message._id} className={isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}>
+            <div key={message._id} className={`${isFirstInGroup && !showDateDivider ? "mt-2" : "mt-0.5"}${isFreshMsg(message._id) ? " msg-in" : ""}`}>
             {showDateDivider && (
               <div className="flex justify-center my-3">
                 <span className="bg-wa-surface/95 text-wa-muted text-[10.5px] px-3 py-1 rounded-lg shadow-sm">

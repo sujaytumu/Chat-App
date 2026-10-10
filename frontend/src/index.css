@@ -215,3 +215,32 @@ html.no-wallpaper .chat-wallpaper {
 .auth-form .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px rgb(18 140 126 / .8); }
 .auth-logo { background: linear-gradient(135deg, #25d366, #128c7e); box-shadow: 0 12px 30px -10px rgb(18 140 126 / .7); }
 @media (prefers-reduced-motion: reduce) { .auth-orb, .auth-bubble { animation: none; opacity: 1; transform: none; } }
+
+/* ---- Motion polish: everything eases in instead of just appearing ---------
+   Uses the individual `scale` / `translate` properties so it never clashes
+   with Tailwind's own transforms (e.g. -translate-x-1/2). */
+@keyframes m-pop { from { opacity: 0; scale: .92; } to { opacity: 1; scale: 1; } }
+@keyframes m-sheet { from { opacity: .6; translate: 0 28%; } to { opacity: 1; translate: 0 0; } }
+@keyframes m-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes m-bubble { from { opacity: 0; translate: 0 10px; scale: .96; } to { opacity: 1; translate: 0 0; scale: 1; } }
+
+/* dropdown menus */
+.absolute.bg-wa-pop.shadow-2xl, .absolute.bg-wa-pop.shadow-xl, .absolute.bg-wa-pop.shadow-lg {
+  animation: m-pop .16s cubic-bezier(.2, .9, .3, 1.15);
+  transform-origin: top right;
+}
+/* centred dialogs */
+.fixed .rounded-2xl.bg-wa-pop, .fixed .rounded-3xl.bg-wa-pop, .fixed .rounded-\[28px\].bg-wa-pop {
+  animation: m-pop .2s cubic-bezier(.2, .9, .3, 1.1);
+}
+/* bottom sheets */
+.rounded-t-3xl { animation: m-sheet .28s cubic-bezier(.2, .8, .2, 1); }
+/* dimmed backdrops */
+.fixed.inset-0[class*="bg-black/"] { animation: m-fade .18s ease-out; }
+/* new chat bubbles */
+.msg-in { animation: m-bubble .24s cubic-bezier(.2, .8, .2, 1); }
+/* tactile icon buttons */
+button[class*="size-"], .btn { transition: scale .12s ease, background-color .15s ease, opacity .15s ease; }
+button[class*="size-"]:not(:disabled):active, .btn:not(:disabled):active { scale: .92; }
+/* chat / contact rows glide on hover and press */
+.chat-row { transition: background-color .15s ease; }
