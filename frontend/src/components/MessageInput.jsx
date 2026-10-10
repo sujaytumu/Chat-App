@@ -22,6 +22,7 @@ import Avatar from "./Avatar";
 import PollModal from "./PollModal";
 import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
+import { createPortal } from "react-dom";
 import { compressImage } from "../lib/imageUtils";
 import { getEnterSends } from "../lib/uiSettings";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
@@ -192,6 +193,58 @@ const MessageInput = () => {
       toast.error("Could not read that audio file");
     } finally {
       setIsProcessingAttachment(false);
+    }
+  };
+
+  // Paste a picture / drop a file straight into the chat (laptops).
+  const ingestFile = (file) => {
+    if (!file) return;
+    const fake = { target: { files: [file] } };
+    const isMedia = file.type.startsWith("image/") || file.type.startsWith("video/");
+    if (isMedia) handlePhotoOrVideoChange(fake);
+    else if (file.type.startsWith("audio/")) handleAudioChange(fake);
+    else handleDocumentChange(fake);
+  };
+  const ingestRef = useRef(null);
+  ingestRef.current = ingestFile;
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+    const enter = (e) => {
+      if (!hasFiles(e)) return;
+      depth += 1;
+      setDragging(true);
+    };
+    const over = (e) => hasFiles(e) && e.preventDefault();
+    const leave = (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) setDragging(false);
+    };
+    const drop = (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      ingestRef.current?.(e.dataTransfer.files[0]);
+    };
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
+  const handlePaste = (e) => {
+    const file = Array.from(e.clipboardData?.files || [])[0];
+    if (file) {
+      e.preventDefault();
+      ingestFile(file);
     }
   };
 
@@ -509,6 +562,16 @@ const MessageInput = () => {
 
   return (
 <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 lg:px-8 lg:pt-2 lg:pb-4 w-full lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto">
+      {dragging &&
+        createPortal(
+          <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center pointer-events-none" style={{ animation: "m-fade .15s ease-out" }}>
+            <div className="rounded-3xl border-2 border-dashed border-[#25D366] bg-wa-panel/90 px-10 py-8 text-center text-wa-text">
+              <p className="text-[18px] font-medium">Drop to send</p>
+              <p className="text-[12.5px] text-wa-muted mt-1">Photos, videos and files</p>
+            </div>
+          </div>,
+          document.body
+        )}
       {showContacts && (
         <ContactPicker
           onClose={() => setShowContacts(false)}
@@ -802,6 +865,7 @@ const MessageInput = () => {
               value={text}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Type a message"
               spellCheck={false}
               autoComplete="off"
