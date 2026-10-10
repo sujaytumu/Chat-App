@@ -156,7 +156,7 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image, file, replyTo, mentions } = req.body;
+    const { text, image, file, replyTo, mentions, forwarded } = req.body;
     const poll = sanitizePoll(req.body.poll);
     const contact = await buildContact(req.body.contactUserId);
     const { id: groupId } = req.params;
@@ -219,6 +219,7 @@ export const sendGroupMessage = async (req, res) => {
       image: imageUrl,
       file: fileAttachment,
       replyTo: replyTo || null,
+      forwarded: forwarded === true,
       mentions: mentionIds.length ? mentionIds : undefined,
       seenBy: [senderId],
       expiresAt: group.disappearAfter > 0 ? new Date(Date.now() + group.disappearAfter * 1000) : null,
