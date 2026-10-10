@@ -26,6 +26,8 @@ import { compressImage } from "../lib/imageUtils";
 import { getEnterSends } from "../lib/uiSettings";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
 
+import { useDraftStore, draftKey } from "../store/useDraftStore";
+
 const EmojiStickerPicker = lazy(() => import("./EmojiStickerPicker"));
 
 const MessageInput = () => {
@@ -457,6 +459,26 @@ const MessageInput = () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat]);
+
+  // Drafts: what you typed and didn't send is kept per chat, and comes back when you return.
+  useEffect(() => {
+    const key = draftKey(selectedChat);
+    if (!key || useChatStore.getState().editingMessage) return;
+    setText(useDraftStore.getState().drafts[key] || "");
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.style.height = "40px";
+        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+      }
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat?.type, selectedChat?.data?._id]);
+  useEffect(() => {
+    if (editingMessage) return;
+    useDraftStore.getState().setDraft(draftKey(selectedChat), text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
 
   // Edit mode: the message text goes back into the box; send saves the change.
   useEffect(() => {
