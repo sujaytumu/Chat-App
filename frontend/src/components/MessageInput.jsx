@@ -460,6 +460,18 @@ const MessageInput = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat]);
 
+  // Tell the other person while a voice note is being recorded.
+  useEffect(() => {
+    if (!isRecording) return;
+    const st = useChatStore.getState();
+    st.emitRecording(true);
+    const again = setInterval(() => useChatStore.getState().emitRecording(true), 5000);
+    return () => {
+      clearInterval(again);
+      st.emitRecording(false);
+    };
+  }, [isRecording, selectedChat?.data?._id]);
+
   // Drafts: what you typed and didn't send is kept per chat, and comes back when you return.
   useEffect(() => {
     const key = draftKey(selectedChat);

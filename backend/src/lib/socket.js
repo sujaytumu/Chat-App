@@ -196,6 +196,17 @@ io.on("connection", (socket) => {
     }
   });
 
+  // ---- "recording audio…" (1:1) — same rules as typing ----
+  socket.on("recording", ({ toUserId }) => {
+    if (privacyCache.get(userId)?.typing === false || !canSignal(userId, String(toUserId))) return;
+    const receiverSocketId = roomFor(toUserId);
+    if (receiverSocketId) io.to(receiverSocketId).emit("recording", { fromUserId: userId });
+  });
+  socket.on("stopRecording", ({ toUserId }) => {
+    const receiverSocketId = roomFor(toUserId);
+    if (receiverSocketId) io.to(receiverSocketId).emit("stopRecording", { fromUserId: userId });
+  });
+
   // ---- Typing indicators (group) ----
   socket.on("groupTyping", ({ groupId }) => {
     if (!socket.rooms.has(String(groupId))) return;

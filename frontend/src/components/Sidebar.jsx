@@ -620,6 +620,7 @@ const Sidebar = () => {
           const hasUnread = item.unreadCount > 0;
           const draftText = !isSelected ? drafts[`${item.type === "group" ? "g" : "d"}:${item.data._id}`] : "";
           const sentByMe = item.lastMessage && item.lastMessage.senderId === authUser?._id;
+          const isRecordingNow = item.type === "direct" && (typingUsers[`rec:${item.data._id}`]?.size ?? 0) > 0;
           const isTyping =
             (typingUsers[item.type === "group" ? `group:${item.data._id}` : item.data._id]?.size ?? 0) > 0;
 
@@ -671,8 +672,8 @@ const Sidebar = () => {
                   )}
                 </div>
                 <div className="flex items-center justify-between gap-3 mt-[3px]">
-                  {isTyping ? (
-                    <span className="min-w-0 truncate text-[13px] text-[#25D366]">typing…</span>
+                  {isTyping || isRecordingNow ? (
+                    <span className="min-w-0 truncate text-[13px] text-[#25D366]">{isRecordingNow && !isTyping ? "recording audio…" : "typing…"}</span>
                   ) : (
                   <span
                     className={`flex items-center gap-1 min-w-0 text-[12.5px] lg:text-[12px] leading-5 ${

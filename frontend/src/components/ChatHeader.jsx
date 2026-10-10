@@ -105,6 +105,8 @@ const ChatHeader = () => {
     ? groupTypingCount > 0
       ? "typing…"
       : `${data.members.length} members`
+    : typingUsers[`rec:${data._id}`]?.size
+    ? "recording audio…"
     : onlineUsers.includes(data._id)
     ? "online"
     : lastSeenText(wentOffline || data.lastSeen);
@@ -136,7 +138,7 @@ const ChatHeader = () => {
         <Avatar src={isGroup ? data.groupPic : data.profilePic} name={name} isGroup={isGroup} size="size-11" textSize="text-xl" />
         <div className="min-w-0">
           <h3 className="text-[16px] leading-6 font-medium text-wa-text truncate">{name}</h3>
-          <p className={`text-[11px] leading-4 truncate ${isOnline || status === "typing…" ? "text-[#25D366]" : "text-wa-muted"}`}>
+          <p className={`text-[11px] leading-4 truncate ${isOnline || status === "typing…" || status === "recording audio…" ? "text-[#25D366]" : "text-wa-muted"}`}>
             {status.startsWith("last seen") ? <LastSeenLine text={status} /> : status}
           </p>
         </div>

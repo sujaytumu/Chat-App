@@ -686,6 +686,14 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // "recording audio…" for the other person in a 1:1 chat
+  emitRecording: (on) => {
+    const socket = useAuthStore.getState().socket;
+    const { selectedChat } = get();
+    if (!socket || selectedChat?.type !== "direct") return;
+    socket.emit(on ? "recording" : "stopRecording", { toUserId: selectedChat.data._id });
+  },
+
   emitStopTyping: () => {
     const socket = useAuthStore.getState().socket;
     const { selectedChat } = get();
@@ -854,6 +862,22 @@ export const useChatStore = create((set, get) => ({
         return { typingUsers: rest };
       });
     });
+
+    const recTimers = {};
+    const clearRec = (fromUserId) => {
+      clearTimeout(recTimers[fromUserId]);
+      set((state) => {
+        const rest = { ...state.typingUsers };
+        delete rest[`rec:${fromUserId}`];
+        return { typingUsers: rest };
+      });
+    };
+    socket.on("recording", ({ fromUserId }) => {
+      set((state) => ({ typingUsers: { ...state.typingUsers, [`rec:${fromUserId}`]: new Set([fromUserId]) } }));
+      clearTimeout(recTimers[fromUserId]); // sender pings every 5s; if they vanish, stop showing it
+      recTimers[fromUserId] = setTimeout(() => clearRec(fromUserId), 9000);
+    });
+    socket.on("stopRecording", ({ fromUserId }) => clearRec(fromUserId));
 
     socket.on("groupTyping", ({ fromUserId, groupId }) => {
       set((state) => {
