@@ -3,13 +3,14 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
-import { useThemeStore, applyTheme } from "./store/useThemeStore";
+import { useThemeStore, applyTheme, watchAutoTheme } from "./store/useThemeStore";
 import { applyUiSettings } from "./lib/uiSettings";
 import { applyChatColor } from "./lib/chatColor";
 
 applyUiSettings();
 applyChatColor();
 applyTheme(useThemeStore.getState().theme);
+watchAutoTheme();
 
 // Wrapper to provide global theme
 const RootWrapper = () => {
