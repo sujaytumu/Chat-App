@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
+import { STATUS_FONTS } from "../lib/statusFonts";
 import { X, Eye, Trash2, Loader2, ChevronUp, Music, MapPin, Headphones, FileText, Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -184,7 +185,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       >
         {current.type === "text" && (
           <div className="w-full h-full flex items-center justify-center p-8" style={{ backgroundColor: current.backgroundColor }}>
-            <p className="text-white text-[24px] leading-snug text-center break-words whitespace-pre-wrap">{linkify(current.content)}</p>
+            <p
+              className="text-white leading-snug text-center break-words whitespace-pre-wrap"
+              style={{ fontFamily: STATUS_FONTS[current.font || 0].css, fontWeight: STATUS_FONTS[current.font || 0].weight, fontSize: current.content.length > 220 ? 20 : current.content.length > 90 ? 26 : 34 }}
+            >{linkify(current.content)}</p>
           </div>
         )}
         {current.type === "image" && <img src={optimizeImage(current.content, 1080)} decoding="async" alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
