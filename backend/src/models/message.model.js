@@ -82,6 +82,15 @@ const messageSchema = new mongoose.Schema(
       waveform: { type: [Number], default: undefined },
     },
     editedAt: { type: Date, default: null },
+    // Poll: question + options; each option keeps the ids of the people who chose it.
+    poll: {
+      type: {
+        question: String,
+        multiple: { type: Boolean, default: false },
+        options: [{ text: String, votes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }] }],
+      },
+      default: undefined,
+    },
     // View-once photo: the picture lives in viewOnceUrl (never sent in lists) until the receiver opens it once.
     viewOnce: { type: Boolean, default: false },
     viewOnceOpened: { type: Boolean, default: false },
