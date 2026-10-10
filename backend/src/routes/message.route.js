@@ -27,6 +27,8 @@ import {
   openViewOnce,
   setChatMarkedUnread,
   getChatMedia,
+  getDirectDisappearing,
+  setDirectDisappearing,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -39,6 +41,8 @@ router.put("/react/:id", protectRoute, reactToMessage);
 router.put("/edit/:id", protectRoute, editMessage);
 router.put("/poll/:id/vote", protectRoute, votePoll);
 router.post("/view-once/:id", protectRoute, openViewOnce);
+router.get("/disappearing/:id", protectRoute, getDirectDisappearing);
+router.put("/disappearing/:id", protectRoute, setDirectDisappearing);
 router.get("/storage-usage", protectRoute, getStorageUsage);
 router.get("/export", protectRoute, exportChats);
 router.get("/:id", protectRoute, getMessages);

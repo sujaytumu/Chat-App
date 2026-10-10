@@ -123,6 +123,25 @@ export const useChatStore = create((set, get) => ({
   // Per-account chat flags (archived / pinned / muted), synced across devices by
   // the server. Updates the list optimistically and rolls back if the call fails.
   // Returns true when it worked. `silent` skips the toast (bulk actions).
+  // Disappearing-message timer per 1:1 chat: { [otherUserId]: seconds }
+  directDisappear: {},
+  loadDirectDisappear: async (userId) => {
+    try {
+      const res = await axiosInstance.get(`/messages/disappearing/${userId}`);
+      set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: res.data.seconds || 0 } }));
+    } catch {
+      /* keep what we had */
+    }
+  },
+  setDirectDisappearing: async (userId, seconds) => {
+    try {
+      const res = await axiosInstance.put(`/messages/disappearing/${userId}`, { seconds });
+      set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: res.data.seconds || 0 } }));
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't change disappearing messages");
+    }
+  },
+
   setChatFlag: async (field, chat, value, { silent = false } = {}) => {
     const api = FLAG_API[field];
     const key = chatKeyOf(chat);
@@ -790,6 +809,9 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("messageEdited", (m) => get().applyEdit(m));
+    socket.on("directDisappearing", ({ userId, seconds }) =>
+      set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: seconds || 0 } }))
+    );
     socket.on("messagePoll", ({ _id, poll }) =>
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, poll } : m)) }))
     );
