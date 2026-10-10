@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { X, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
@@ -218,7 +219,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
     </button>
   );
 
-  return (
+  return createPortal(
     <div
       className={`wa-dark fixed inset-0 z-[150] text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10 transition-colors ${kind === "text" ? "" : "bg-wa-bg"}`}
       style={kind === "text" ? { backgroundColor: bgColor } : undefined}
@@ -339,7 +340,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
