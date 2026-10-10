@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -16,6 +16,7 @@ import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const GroupEmojiPhoto = lazy(() => import("./GroupEmojiPhoto"));
+const GroupInviteSheet = lazy(() => import("./GroupInviteSheet"));
 
 const GroupInfoModal = ({ group, onClose }) => {
   const { users, addMembersToGroup, removeMemberFromGroup, leaveGroup, updateGroupInfo, setChatSearchOpen } = useChatStore();
@@ -50,6 +51,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const canEdit = isAdmin || perms.editInfo === "all";
   const canAddMembers = isAdmin || perms.addMembers === "all";
   const [showPerms, setShowPerms] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
   const memberIds = new Set(group.members.map((m) => m._id || m));
@@ -289,6 +291,16 @@ const GroupInfoModal = ({ group, onClose }) => {
             </span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowInvite(true)}
+              className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
+            >
+              <Link2 size={22} className="text-wa-muted" />
+              <span className="flex-1 text-[13.5px]">Invite to group via link</span>
+              <ChevronRight size={18} className="text-wa-muted" />
+            </button>
+          )}
           <button
             onClick={() => setShowPerms(true)}
             className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
@@ -398,6 +410,11 @@ const GroupInfoModal = ({ group, onClose }) => {
         />
       )}
       {showDisappear && <DisappearingPanel group={group} isAdmin={isAdmin} onClose={() => setShowDisappear(false)} />}
+      {showInvite && (
+        <Suspense fallback={null}>
+          <GroupInviteSheet group={group} onClose={() => setShowInvite(false)} />
+        </Suspense>
+      )}
       {showPerms && <GroupPermissionsPanel group={group} isAdmin={isAdmin} onClose={() => setShowPerms(false)} />}
       {showStarred && (
         <ChatStarredPanel
