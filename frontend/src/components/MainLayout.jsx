@@ -159,7 +159,7 @@ const MainLayout = ({ children }) => {
         onTouchEnd={onTouchEnd}
         onTouchCancel={onTouchEnd}
       >
-        <div ref={track} className="relative h-full w-full flex will-change-transform">
+        <div ref={track} className="relative h-full w-full flex">
           {children}
           {peek !== null && (
             <div
