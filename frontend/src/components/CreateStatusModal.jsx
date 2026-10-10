@@ -2,6 +2,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
 import { X, Pencil, Mic, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
+import StatusPhotoEditor from "./StatusPhotoEditor";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
@@ -120,6 +121,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [kind, setKind] = useState("text"); // text | image | video | audio | file
   // "pick" = WhatsApp's Add status sheet (Text / Music / Voice + Camera / Gallery); "compose" = the editor
   const [step, setStep] = useState(startWith === "text" ? "compose" : "pick");
+  const editorRef = useRef(null);
   const cameraRef = useRef(null);
   const voiceRef = useRef(null);
   const [text, setText] = useState("");
@@ -184,9 +186,11 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
     if (!canPost) return toast.error(kind === "text" ? "Write something first" : "Add a file first");
     setIsPosting(true);
     try {
+      let content = kind === "text" ? text.trim() : media.data;
+      if (kind === "image" && editorRef.current) content = (await editorRef.current.exportImage()) || content;
       const body = {
         type: kind,
-        content: kind === "text" ? text.trim() : media.data,
+        content,
         backgroundColor: bgColor,
         font,
         caption: kind === "text" ? "" : caption,
@@ -204,6 +208,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       setIsPosting(false);
     }
   };
+
+  const isMedia = (kind === "image" || kind === "video") && !!media;
 
   const tool = (Icon, label, onClick, active) => (
     <button
@@ -223,7 +229,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       className={`wa-dark fixed inset-x-0 top-0 z-[150] h-[100dvh] text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10 transition-colors ${kind === "text" ? "" : "bg-wa-bg"}`}
       style={kind === "text" ? { backgroundColor: bgColor } : undefined}
     >
-      <div className="flex items-center gap-2 px-2 pt-[env(safe-area-inset-top)] h-[calc(56px+env(safe-area-inset-top))] shrink-0">
+      <div className={`${isMedia ? "hidden" : "flex"} items-center gap-2 px-2 pt-[env(safe-area-inset-top)] h-[calc(56px+env(safe-area-inset-top))] shrink-0`}>
         <button onClick={onClose} aria-label="Close" className="size-11 rounded-full flex items-center justify-center active:bg-white/15">
           <X size={24} />
         </button>
@@ -305,8 +311,57 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         )}
       </div>
 
+      {isMedia && (
+        <div className="shrink-0 bg-black px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] space-y-2.5">
+          {(song || place) && (
+            <div className="flex flex-wrap gap-2">
+              {song && (
+                <span className="flex items-center gap-1.5 rounded-full bg-white/15 pl-3 pr-1.5 py-1.5 text-[12px] text-white max-w-full">
+                  <Music size={14} className="text-[#21C063] shrink-0" />
+                  <span className="truncate">{song.name}</span>
+                  <button onClick={() => setSong(null)} className="size-5 rounded-full flex items-center justify-center text-white/70" aria-label="Remove song"><X size={13} /></button>
+                </span>
+              )}
+              {place && (
+                <span className="flex items-center gap-1.5 rounded-full bg-white/15 pl-3 pr-1.5 py-1.5 text-[12px] text-white max-w-full">
+                  <MapPin size={14} className="text-[#F15C6D] shrink-0" />
+                  <span className="truncate">{place.name}</span>
+                  <button onClick={() => setPlace(null)} className="size-5 rounded-full flex items-center justify-center text-white/70" aria-label="Remove location"><X size={13} /></button>
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex items-center gap-3 h-12 rounded-full bg-[#1f2c34] px-4">
+            <ImageIcon size={22} className="text-white/80 shrink-0" />
+            <input
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder="Add a caption…"
+              maxLength={700}
+              className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/60 text-[15px] focus:outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="h-11 px-4 rounded-full bg-[#1f2c34] text-white text-[14px] flex items-center gap-2" onClick={() => toast("Your status goes to all your contacts")}>
+              <span className="size-4 rounded-full border-2 border-white/80" /> Status (Contacts)
+            </button>
+            <button onClick={() => setShowPlaces(true)} aria-label="Add location" className={`size-11 rounded-full flex items-center justify-center ${place ? "bg-[#21C063] text-black" : "bg-[#1f2c34] text-white"}`}>
+              <MapPin size={20} />
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={post}
+              disabled={isPosting}
+              className="size-14 rounded-full bg-[#21C063] disabled:opacity-60 text-black flex items-center justify-center active:scale-95"
+              aria-label="Post status"
+            >
+              {isPosting ? <Loader2 className="animate-spin" size={22} /> : <Send size={24} />}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Tools + send */}
-      <div className={`shrink-0 px-3 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] flex items-end gap-1.5 ${kind === "text" ? "bg-black/20" : "border-t border-white/10"}`}>
+      <div className={`${isMedia ? "hidden" : "flex"} shrink-0 px-3 pt-3 pb-[calc(12px+env(safe-area-inset-bottom))] items-end gap-1.5 ${kind === "text" ? "bg-black/20" : "border-t border-white/10"}`}>
         <div className="flex-1 flex items-start justify-start gap-0.5 overflow-x-auto no-scrollbar">
           {tool(Type, "Text", () => setKind("text"), kind === "text")}
           {tool(ImageIcon, "Photo", () => mediaRef.current?.click(), kind === "image" || kind === "video")}
