@@ -74,6 +74,7 @@ export const createStatus = async (req, res) => {
 export const getStatusFeed = async (req, res) => {
   try {
     const myId = req.user._id;
+    res.set("Cache-Control", "no-store");
 
     const statuses = await Status.find({ expiresAt: { $gt: new Date() } })
       .populate("userId", "fullName profilePic")
@@ -81,6 +82,7 @@ export const getStatusFeed = async (req, res) => {
 
     const byUser = new Map();
     for (const s of statuses) {
+      if (!s.userId) continue; // owner account was deleted
       const uid = s.userId._id.toString();
       if (!byUser.has(uid)) byUser.set(uid, { user: s.userId, statuses: [] });
       byUser.get(uid).statuses.push(s);
