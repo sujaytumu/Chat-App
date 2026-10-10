@@ -1,6 +1,6 @@
 import { THEMES } from "../constants";
 import { CHAT_COLORS, getChatColor, setChatColor } from "../lib/chatColor";
-import { useThemeStore } from "../store/useThemeStore";
+import { useThemeStore, getThemeAuto, setThemeAuto } from "../store/useThemeStore";
 import { Download, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
@@ -60,6 +60,7 @@ export const AppearancePage = () => {
   const [wallpaper, setWall] = useState(getWallpaper());
   const [picking, setPicking] = useState(false);
   const [color, setColor] = useState(getChatColor());
+  const [auto, setAuto] = useState(getThemeAuto());
   const chatCount = useWallpaperStore((s) => Object.keys(s.chats).length);
   const clearAllChats = useWallpaperStore((s) => s.clearAllChatWallpapers);
 
@@ -113,6 +114,16 @@ export const AppearancePage = () => {
         </div>
       </div>
 
+      <ToggleRow
+        title="Match device"
+        sub="Switch between light and dark automatically with your phone or computer"
+        checked={auto}
+        onChange={(v) => {
+          setAuto(v);
+          setThemeAuto(v);
+        }}
+      />
+
       <div className="flex flex-col gap-1 pt-2">
         <h2 className="text-lg font-semibold">Theme</h2>
         <p className="text-sm text-wa-muted">Choose a theme for your chat interface</p>
@@ -126,7 +137,11 @@ export const AppearancePage = () => {
               group flex flex-col items-center gap-1.5 p-2 rounded-lg transition-colors
               ${theme === t ? "ring-2 ring-offset-2 ring-offset-wa-bg ring-[#25D366]" : "hover:bg-white/5"}
             `}
-            onClick={() => setTheme(t)}
+            onClick={() => {
+              setThemeAuto(false);
+              setAuto(false);
+              setTheme(t);
+            }}
             data-theme={t}
           >
             <div className="relative h-8 w-full rounded-md overflow-hidden">

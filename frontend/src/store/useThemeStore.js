@@ -48,3 +48,33 @@ export const useThemeStore = create((set) => ({
     set({ theme });
   },
 }));
+
+// "Match device": follow the phone / computer's light or dark setting automatically.
+const AUTO_KEY = "talkies-theme-auto";
+export const getThemeAuto = () => {
+  try {
+    return localStorage.getItem(AUTO_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+export const setThemeAuto = (on) => {
+  try {
+    if (on) localStorage.setItem(AUTO_KEY, "1");
+    else localStorage.removeItem(AUTO_KEY);
+  } catch {
+    /* private mode */
+  }
+  if (on) syncAutoTheme();
+};
+export function syncAutoTheme() {
+  if (!getThemeAuto() || !window.matchMedia) return;
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = dark ? "dark" : "light";
+  if (useThemeStore.getState().theme !== next) useThemeStore.getState().setTheme(next);
+}
+export function watchAutoTheme() {
+  if (!window.matchMedia) return;
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", syncAutoTheme);
+  syncAutoTheme();
+}
