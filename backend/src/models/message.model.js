@@ -82,6 +82,8 @@ const messageSchema = new mongoose.Schema(
       waveform: { type: [Number], default: undefined },
     },
     editedAt: { type: Date, default: null },
+    // Group @mentions: the members tagged in this message.
+    mentions: { type: [mongoose.Schema.Types.ObjectId], default: undefined },
     pinned: {
       type: Boolean,
       default: false,

@@ -154,7 +154,7 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image, file, replyTo } = req.body;
+    const { text, image, file, replyTo, mentions } = req.body;
     const { id: groupId } = req.params;
     const senderId = req.user._id;
 
@@ -175,6 +175,15 @@ export const sendGroupMessage = async (req, res) => {
     if (group.permissions?.sendMessages === "admins" && !group.admins.some((a) => a.equals(senderId))) {
       return res.status(403).json({ error: "Only admins can send messages in this group" });
     }
+
+    // @mentions: only real members of this group, at most 20
+    const mentionIds = [
+      ...new Set(
+        (Array.isArray(mentions) ? mentions : [])
+          .map(String)
+          .filter((id) => group.members.some((m) => m.toString() === id) && id !== String(senderId))
+      ),
+    ].slice(0, 20);
 
     let imageUrl;
     if (image) {
@@ -204,6 +213,7 @@ export const sendGroupMessage = async (req, res) => {
       image: imageUrl,
       file: fileAttachment,
       replyTo: replyTo || null,
+      mentions: mentionIds.length ? mentionIds : undefined,
       seenBy: [senderId],
       expiresAt: group.disappearAfter > 0 ? new Date(Date.now() + group.disappearAfter * 1000) : null,
     });
@@ -213,8 +223,23 @@ export const sendGroupMessage = async (req, res) => {
 
     // Push to every other member (one DB query for all of them) so they're
     // notified even with the app closed
+    // People tagged with @ are told even if they muted the group (like WhatsApp).
+    const mentioned = new Set(mentionIds);
+    if (mentioned.size) {
+      sendPushToUsers(
+        group.members.filter((m) => mentioned.has(m.toString())),
+        {
+          title: `${req.user.fullName} mentioned you in ${group.name}`,
+          body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
+          icon: group.groupPic || "/icon-v2-192.png",
+          tag: `group-${groupId}`,
+          data: { url: "/", chatType: "group", chatId: groupId.toString(), messageId: newMessage._id.toString() },
+        },
+        {}
+      );
+    }
     sendPushToUsers(
-      group.members.filter((memberId) => !memberId.equals(senderId)),
+      group.members.filter((memberId) => !memberId.equals(senderId) && !mentioned.has(memberId.toString())),
       {
         title: `${req.user.fullName} in ${group.name}`,
         body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,

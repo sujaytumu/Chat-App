@@ -17,6 +17,7 @@ import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/uti
 import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
+import MentionText from "./MentionText";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
@@ -419,7 +420,7 @@ const ChatContainer = () => {
                   ) : (
                     message.text && (
                       <span className="text-[13px] leading-[21px]" style={{ whiteSpace: "pre-wrap" }}>
-                        {message.text}
+                        {message.mentions?.length ? <MentionText text={message.text} mentions={message.mentions} members={data.members} /> : message.text}
                         {/* reserves room so the last line never runs under the time */}
                         <span
                           aria-hidden="true"

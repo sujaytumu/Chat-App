@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
+import Avatar from "./Avatar";
+import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import { getEnterSends } from "../lib/uiSettings";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
@@ -46,6 +48,9 @@ const MessageInput = () => {
   const documentInputRef = useRef(null);
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
+  const authUser = useAuthStore((st) => st.authUser);
+  const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
+  const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
   const attachMenuRef = useRef(null);
   const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore();
 
@@ -369,6 +374,10 @@ const MessageInput = () => {
     setIsSending(true);
     try {
       const payload = { text: text.trim() };
+      if (isGroupChat) {
+        const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
+        if (tagged.length) payload.mentions = tagged.map((m) => m._id);
+      }
       if (imagePreview) payload.image = imagePreview;
       else if (imageFallback) payload.image = imageFallback.data;
       if (filePreview) {
@@ -381,6 +390,8 @@ const MessageInput = () => {
       }
       await sendMessage(payload);
 
+      setMentionIds([]);
+      setMentionQuery(null);
       setText("");
       clearAttachments();
       if (textareaRef.current) textareaRef.current.style.height = "40px";
@@ -391,7 +402,28 @@ const MessageInput = () => {
     }
   };
 
+  const isGroupChat = selectedChat?.type === "group";
+  const mentionCandidates = isGroupChat && mentionQuery !== null
+    ? (selectedChat.data.members || [])
+        .filter((m) => m._id !== authUser?._id && m.fullName?.toLowerCase().includes(mentionQuery.toLowerCase()))
+        .slice(0, 6)
+    : [];
+  const pickMention = (m) => {
+    const el = textareaRef.current;
+    const pos = el?.selectionStart ?? text.length;
+    const before = text.slice(0, pos).replace(/@[^\s@]*$/, `@${m.fullName} `);
+    setText(before + text.slice(pos));
+    setMentionIds((ids) => [...new Set([...ids, m._id])]);
+    setMentionQuery(null);
+    setTimeout(() => el?.focus(), 0);
+  };
+
   const handleChange = (e) => {
+    if (isGroupChat) {
+      const v = e.target.value;
+      const m = v.slice(0, e.target.selectionStart ?? v.length).match(/(?:^|\s)@([^\s@]*)$/);
+      setMentionQuery(m ? m[1] : null);
+    }
     setText(e.target.value);
     resizeTextarea();
     handleTyping();
@@ -432,6 +464,22 @@ const MessageInput = () => {
 
   return (
     <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full">
+      {mentionCandidates.length > 0 && (
+        <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
+          {mentionCandidates.map((m) => (
+            <button
+              key={m._id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pickMention(m)}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left active:bg-wa-hover hover:bg-wa-hover"
+            >
+              <Avatar src={m.profilePic} name={m.fullName} size="size-8" textSize="text-sm" />
+              <span className="text-[14px] text-wa-text truncate">{m.fullName}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {editingMessage && (
         <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
