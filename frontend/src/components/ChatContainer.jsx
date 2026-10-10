@@ -151,6 +151,7 @@ const ChatContainer = () => {
   const messageEndRef = useRef(null);
   const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const galleryImages = useMemo(() => messages.filter((m) => m.image && !m.viewOnce && !m.deletedForEveryone).map((m) => m.image), [messages]);
   const [hoveredId, setHoveredId] = useState(null);
   const [forwardingMessage, setForwardingMessage] = useState(null);
   const [infoMessage, setInfoMessage] = useState(null);
@@ -683,7 +684,7 @@ const ChatContainer = () => {
         <MessageInput />
       )}
 
-      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      <ImageLightbox src={lightboxSrc} gallery={galleryImages} onClose={() => setLightboxSrc(null)} />
       {forwardingMessage && (
         <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
       )}
