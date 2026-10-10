@@ -36,6 +36,7 @@ const ChatContainer = () => {
     togglePinMessage,
     deleteMessage,
     setReplyingTo,
+    setEditingMessage,
     toggleStarMessage,
     hasMoreMessages,
     isLoadingOlder,
@@ -309,6 +310,10 @@ const ChatContainer = () => {
             onForward: () => setForwardingMessage(message),
             onInfo: () => setInfoMessage(message),
             onReact: (emoji) => reactToMessage(message._id, emoji),
+            onEdit:
+              isMe && hasText && !message.file && !message.deletedForEveryone && Date.now() - new Date(message.createdAt).getTime() < 15 * 60 * 1000
+                ? () => setEditingMessage(message)
+                : undefined,
             onTranslate: hasText ? () => translateAndToast(message.text) : undefined,
           };
 
@@ -428,6 +433,7 @@ const ChatContainer = () => {
                       hasText ? "absolute bottom-1 right-2" : "self-end mt-0.5"
                     } text-[9.4px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/60`}
                   >
+                    {message.editedAt && <span>Edited</span>}
                     {formatMessageTime(message.createdAt)}
                     {isMe && !isGroup && <MessageTicks message={message} />}
                     {isMe && isGroup && (

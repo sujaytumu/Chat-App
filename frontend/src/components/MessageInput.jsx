@@ -47,7 +47,7 @@ const MessageInput = () => {
   const audioInputRef = useRef(null);
   const textareaRef = useRef(null);
   const attachMenuRef = useRef(null);
-  const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo } = useChatStore();
+  const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore();
 
   const typingTimeoutRef = useRef(null);
 
@@ -346,6 +346,21 @@ const MessageInput = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
+    if (editingMessage) {
+      const next = text.trim();
+      if (!next) return;
+      setIsSending(true);
+      try {
+        await editMessage(editingMessage._id, next);
+        setText("");
+        if (textareaRef.current) textareaRef.current.style.height = "40px";
+      } catch (err) {
+        toast.error(err?.response?.data?.error || "Couldn't edit message");
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
     if ((!text.trim() && !imagePreview && !imageFallback && !filePreview) || isSending) return;
 
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -400,10 +415,41 @@ const MessageInput = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat]);
 
+  // Edit mode: the message text goes back into the box; send saves the change.
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.text || "");
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [editingMessage]);
+  useEffect(() => {
+    // leaving the chat cancels an edit
+    clearEditingMessage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat]);
+
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
     <div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 w-full">
+      {editingMessage && (
+        <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
+          <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
+            <p className="text-xs font-medium text-[#00A884]">Edit message</p>
+            <p className="text-xs text-wa-muted truncate">{editingMessage.text}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              clearEditingMessage();
+              setText("");
+            }}
+            className="text-wa-muted hover:text-wa-text shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
       {replyingTo && (
         <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">

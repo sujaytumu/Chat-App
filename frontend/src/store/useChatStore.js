@@ -59,6 +59,7 @@ export const useChatStore = create((set, get) => ({
   pendingJump: null, // { id } — a search result to scroll to once its chat/messages are loaded
   chatSearchOpen: false,
   isMessagesLoading: false,
+  editingMessage: null, // message being edited (text goes back into the input)
   replyingTo: null, // message currently being replied to (shown above the input)
 
   // userId (direct) / groupId (group) -> Set of typing userIds
@@ -430,7 +431,22 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  setReplyingTo: (message) => set({ replyingTo: message }),
+  setEditingMessage: (message) => set({ editingMessage: message, replyingTo: null }),
+  clearEditingMessage: () => set({ editingMessage: null }),
+  editMessage: async (messageId, text) => {
+    const res = await axiosInstance.put(`/messages/edit/${messageId}`, { text });
+    get().applyEdit(res.data);
+    set({ editingMessage: null });
+  },
+  applyEdit: ({ _id, text, editedAt }) => {
+    const patch = (m) => (m && m._id === _id ? { ...m, text, editedAt } : m);
+    set((state) => ({
+      messages: state.messages.map(patch),
+      users: state.users.map((u) => (u.lastMessage?._id === _id ? { ...u, lastMessage: patch(u.lastMessage) } : u)),
+      groups: state.groups.map((g) => (g.lastMessage?._id === _id ? { ...g, lastMessage: patch(g.lastMessage) } : g)),
+    }));
+  },
+  setReplyingTo: (message) => set({ replyingTo: message, editingMessage: null }),
   clearReplyingTo: () => set({ replyingTo: null }),
 
   toggleStarMessage: async (messageId) => {
@@ -709,6 +725,8 @@ export const useChatStore = create((set, get) => ({
         ),
       }));
     });
+
+    socket.on("messageEdited", (m) => get().applyEdit(m));
 
     socket.on("messageReacted", ({ _id, reactions }) => {
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, reactions } : m)) }));
