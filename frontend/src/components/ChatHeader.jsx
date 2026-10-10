@@ -21,6 +21,7 @@ const iconBtn =
 const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
 
 import LastSeenLine from "./LastSeenLine";
+import MessageSelectionBar from "./MessageSelectionBar";
 
 const pad2 = (n) => String(n).padStart(2, "0");
 // WhatsApp style: "last seen today at 14:05" / "yesterday at …" / "on 09/10/2026 at …"
@@ -54,6 +55,7 @@ const ChatHeader = () => {
   const [showWallpaper, setShowWallpaper] = useState(false);
   const [showClear, setShowClear] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
+  const selecting = useChatStore((st) => st.selectedMsgIds.length > 0);
   useBackToClose(showDisappear, () => setShowDisappear(false));
   const directId = selectedChat?.type === "direct" ? selectedChat.data._id : null;
   const directSecs = useChatStore((st) => (directId ? st.directDisappear[directId] || 0 : 0));
@@ -115,6 +117,8 @@ const ChatHeader = () => {
     groupCallState?.active
       ? joinGroupCall(data._id, { name: data.name, groupPic: data.groupPic })
       : startGroupCall(data, type);
+
+  if (selecting) return <MessageSelectionBar />;
 
   return (
     <>

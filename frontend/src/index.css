@@ -244,3 +244,7 @@ button[class*="size-"], .btn { transition: scale .12s ease, background-color .15
 button[class*="size-"]:not(:disabled):active, .btn:not(:disabled):active { scale: .92; }
 /* chat / contact rows glide on hover and press */
 .chat-row { transition: background-color .15s ease; }
+
+/* Long-press to select a message (touch screens): no text-selection / callout popup fighting it. */
+.msg-row { -webkit-touch-callout: none; }
+@media (pointer: coarse) { .msg-row { -webkit-user-select: none; user-select: none; } }

@@ -4,7 +4,7 @@ import { X, Send } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 
-const ForwardMessageModal = ({ message, onClose }) => {
+const ForwardMessageModal = ({ message, messages, onClose }) => {
   const { users, groups, forwardMessage } = useChatStore();
   const [selected, setSelected] = useState(null);
   const [sending, setSending] = useState(false);
@@ -18,7 +18,7 @@ const ForwardMessageModal = ({ message, onClose }) => {
   const handleSend = async () => {
     if (!selected) return;
     setSending(true);
-    await forwardMessage(message, selected);
+    for (const m of messages || [message]) await forwardMessage(m, selected);
     setSending(false);
     onClose();
   };
