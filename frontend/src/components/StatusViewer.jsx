@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
-import { X, Eye, Trash2, Loader2, ChevronUp, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { X, Eye, Trash2, Loader2, ChevronUp, Heart, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -48,6 +48,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const [replyText, setReplyText] = useState("");
   const [replyFocus, setReplyFocus] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
+  const [heartPop, setHeartPop] = useState(0); // bumps to replay the little pop animation
   useBackToClose(true, onClose);
 
   // Mark as seen when someone else's update comes up.
@@ -113,6 +114,21 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  // Heart / un-heart (optimistic; rolls back if the request fails)
+  const toggleLike = async () => {
+    if (!current || isOwn) return;
+    const next = !current.liked;
+    const id = current._id;
+    setList((l) => l.map((s) => (s._id === id ? { ...s, liked: next } : s)));
+    if (next) setHeartPop((n) => n + 1);
+    try {
+      await axiosInstance.put(`/status/${id}/like`, { liked: next });
+    } catch {
+      setList((l) => l.map((s) => (s._id === id ? { ...s, liked: !next } : s)));
+      toast.error("Couldn't update your like");
+    }
+  };
+
   const sendReply = async (e) => {
     e?.preventDefault();
     const t = replyText.trim();
@@ -152,6 +168,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
   const views = (current.views || []).filter((v) => v.user).sort((a, b) => new Date(b.at) - new Date(a.at));
   const viewCount = Math.max(views.length, current.viewedBy?.length || 0);
+  const likers = new Set((current.likes || []).filter((l) => l.user).map((l) => l.user._id));
+  const likeCount = likers.size;
 
   return createPortal(
     <div className="wa-dark fixed inset-0 z-[150] bg-black flex items-center justify-center select-none">
@@ -305,6 +323,22 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             placeholder="Reply"
             className="flex-1 h-11 rounded-full bg-white/15 backdrop-blur px-4 text-[14px] text-white placeholder:text-white/70 outline-none"
           />
+          {!replyText.trim() && (
+            <button
+              type="button"
+              onClick={toggleLike}
+              className="size-11 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+              aria-label={current.liked ? "Unlike status" : "Like status"}
+              aria-pressed={!!current.liked}
+            >
+              <Heart
+                key={heartPop}
+                size={22}
+                className={`${current.liked ? "text-[#FF3B5C] animate-[heartpop_0.35s_ease-out]" : "text-white"}`}
+                fill={current.liked ? "currentColor" : "none"}
+              />
+            </button>
+          )}
           {replyText.trim() && (
             <button type="submit" disabled={sendingReply} className="size-11 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0" aria-label="Send reply">
               <Send size={20} />
@@ -322,6 +356,11 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
           <ChevronUp size={20} className="text-white/80" />
           <span className="flex items-center gap-1.5 text-[13px]">
             <Eye size={18} /> {viewCount}
+            {likeCount > 0 && (
+              <span className="flex items-center gap-1 ml-3 text-[#FF8FA3]">
+                <Heart size={16} fill="currentColor" /> {likeCount}
+              </span>
+            )}
           </span>
         </button>
       )}
@@ -354,6 +393,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
                       <p className="text-[13.5px] text-wa-text truncate">{v.user.fullName}</p>
                       <p className="text-[11.5px] text-wa-muted">{ago(v.at)}</p>
                     </div>
+                    {likers.has(v.user._id) && (
+                      <Heart size={20} fill="currentColor" className="ml-auto text-[#FF3B5C] shrink-0" aria-label="Liked" />
+                    )}
                   </div>
                 ))
               )}
