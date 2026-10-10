@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
 
-const DURATION_MS = 5000; // how long a picture / text stays up, like WhatsApp
+const DURATION_MS = 15000; // how long a picture / text stays up, like WhatsApp
 
 const sizeLabel = (b) => (!b ? "" : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
