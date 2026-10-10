@@ -215,6 +215,26 @@ export const useChatStore = create((set, get) => ({
   },
 
   // Delete a chat for me (the other side keeps theirs).
+  // Clear chat: empties the conversation but keeps it in the list. Starred
+  // messages can be kept, like WhatsApp.
+  clearChat: async (chat, keepStarred) => {
+    try {
+      await axiosInstance.delete(`/messages/chat/${chat.type}/${chat.data._id}`, { params: keepStarred ? { keepStarred: 1 } : {} });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't clear chat");
+      return false;
+    }
+    msgCache.delete(chatKeyOf(chat));
+    writeChatCache(useAuthStore.getState().authUser?._id, `msgs-${chatKeyOf(chat)}`, []);
+    await get().getMessages();
+    const left = get().messages;
+    const last = left[left.length - 1] || null;
+    set((state) => ({
+      users: chat.type === "direct" ? state.users.map((u) => (u._id === chat.data._id ? { ...u, lastMessage: last, unreadCount: 0 } : u)) : state.users,
+      groups: chat.type === "group" ? state.groups.map((g) => (g._id === chat.data._id ? { ...g, lastMessage: last, unreadCount: 0 } : g)) : state.groups,
+    }));
+    return true;
+  },
   deleteChat: async (chat) => {
     try {
       await axiosInstance.delete(`/messages/chat/${chat.type}/${chat.data._id}`);
