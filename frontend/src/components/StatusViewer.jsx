@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
@@ -126,7 +127,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const views = (current.views || []).filter((v) => v.user).sort((a, b) => new Date(b.at) - new Date(a.at));
   const viewCount = Math.max(views.length, current.viewedBy?.length || 0);
 
-  return (
+  return createPortal(
     <div className="wa-dark fixed inset-0 z-[150] bg-black flex items-center justify-center select-none">
       {/* Progress bars */}
       <div className="absolute top-0 inset-x-0 flex gap-1 px-2 pt-[calc(8px+env(safe-area-inset-top))] z-20">
@@ -316,7 +317,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
