@@ -22,17 +22,20 @@ import LastSeenLine from "./LastSeenLine";
 
 const pad2 = (n) => String(n).padStart(2, "0");
 // WhatsApp style: "last seen today at 14:05" / "yesterday at …" / "on 09/10/2026 at …"
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+// Today: "last seen today at 14:05" (the words then slide away, leaving the time).
+// Yesterday: "last seen yesterday". Up to 6 days back: the weekday ("last seen Tuesday").
+// Older: just the date ("last seen 03/10/2026").
 const lastSeenText = (iso) => {
   if (!iso) return "offline";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "offline";
-  const now = new Date();
-  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  const y = new Date(now);
-  y.setDate(now.getDate() - 1);
-  if (d.toDateString() === now.toDateString()) return `last seen today at ${hm}`;
-  if (d.toDateString() === y.toDateString()) return `last seen yesterday at ${hm}`;
-  return `last seen ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()} at ${hm}`;
+  const startOf = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOf(new Date()) - startOf(d)) / 86400000);
+  if (days <= 0) return `last seen today at ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  if (days === 1) return "last seen yesterday";
+  if (days < 7) return `last seen ${DAYS[d.getDay()]}`;
+  return `last seen ${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
 const ChatHeader = () => {
