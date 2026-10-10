@@ -52,7 +52,7 @@ const StatusPage = () => {
               onClick={() =>
                 feed.myStatuses.length > 0
                   ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
-                  : setShowCreate("text")
+                  : setShowCreate("image")
               }
               className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface"
             >
@@ -67,7 +67,7 @@ const StatusPage = () => {
                 <span
                   onClick={(e) => {
                     e.stopPropagation();
-                    setShowCreate("text");
+                    setShowCreate("image");
                   }}
                   className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#00A884] border-2 border-wa-bg flex items-center justify-center text-white"
                 >

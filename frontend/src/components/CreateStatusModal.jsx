@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { X, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
+import { X, Pencil, Mic, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -118,6 +118,10 @@ const LocationSheet = ({ onPick, onClose }) => {
 
 const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [kind, setKind] = useState("text"); // text | image | video | audio | file
+  // "pick" = WhatsApp's Add status sheet (Text / Music / Voice + Camera / Gallery); "compose" = the editor
+  const [step, setStep] = useState(startWith === "text" ? "compose" : "pick");
+  const cameraRef = useRef(null);
+  const voiceRef = useRef(null);
   const [text, setText] = useState("");
   const [bgColor, setBgColor] = useState(COLORS[0]);
   const [font, setFont] = useState(0);
@@ -133,11 +137,6 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const songRef = useRef(null);
   useBackToClose(true, onClose);
 
-  useEffect(() => {
-    if (startWith === "image") mediaRef.current?.click();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const take = async (e, as) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -147,18 +146,18 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       if (as === "media" && file.type.startsWith("image/")) {
         const data = await compressImage(file, { maxDimension: 1080, quality: 0.8 });
         setMedia({ data, url: data, name: file.name, size: file.size, mime: file.type });
-        setKind("image");
+        setKind("image"); setStep("compose");
       } else if (as === "media" && file.type.startsWith("video/")) {
         const duration = await mediaDuration(file, "video");
         setMedia({ data: await readFileAsBase64(file), url: URL.createObjectURL(file), name: file.name, size: file.size, mime: file.type, duration });
-        setKind("video");
+        setKind("video"); setStep("compose");
       } else if (as === "audio") {
         const duration = await mediaDuration(file, "audio");
         setMedia({ data: await readFileAsBase64(file), url: URL.createObjectURL(file), name: file.name, size: file.size, mime: file.type || "audio/mpeg", duration });
-        setKind("audio");
+        setKind("audio"); setStep("compose");
       } else if (as === "file") {
         setMedia({ data: await readFileAsBase64(file), name: file.name, size: file.size, mime: file.type || "application/octet-stream" });
-        setKind("file");
+        setKind("file"); setStep("compose");
       } else {
         return toast.error("Choose a photo or a video");
       }
@@ -221,7 +220,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
 
   return createPortal(
     <div
-      className={`wa-dark fixed inset-0 z-[150] text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10 transition-colors ${kind === "text" ? "" : "bg-wa-bg"}`}
+      className={`wa-dark fixed inset-x-0 top-0 z-[150] h-[100dvh] text-wa-text flex flex-col sm:max-w-md sm:mx-auto sm:border-x sm:border-white/10 transition-colors ${kind === "text" ? "" : "bg-wa-bg"}`}
       style={kind === "text" ? { backgroundColor: bgColor } : undefined}
     >
       <div className="flex items-center gap-2 px-2 pt-[env(safe-area-inset-top)] h-[calc(56px+env(safe-area-inset-top))] shrink-0">
@@ -235,7 +234,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Type a status"
-              autoFocus={startWith !== "image"}
+              autoFocus
               maxLength={700}
               rows={Math.min(10, Math.max(2, Math.ceil(text.length / 18)))}
               className="bg-transparent text-white text-center placeholder:text-white/60 resize-none focus:outline-none w-full"
@@ -326,6 +325,48 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         </button>
       </div>
 
+      {step === "pick" && (
+        <div className="absolute inset-0 z-10 bg-wa-bg flex flex-col rounded-t-3xl overflow-hidden">
+          <div className="flex justify-center pt-3 shrink-0">
+            <span className="w-10 h-1 rounded-full bg-wa-muted/50" />
+          </div>
+          <div className="relative flex items-center justify-center h-16 shrink-0">
+            <button onClick={onClose} aria-label="Close" className="absolute left-3 size-11 rounded-full flex items-center justify-center active:bg-white/15">
+              <X size={24} />
+            </button>
+            <h3 className="text-[18px]">Add status</h3>
+          </div>
+          <div className="flex gap-3 px-4 pb-4 overflow-x-auto no-scrollbar shrink-0">
+            {[
+              { Icon: Pencil, label: "Text", on: () => { setKind("text"); setStep("compose"); } },
+              { Icon: Music, label: "Music", on: () => audioRef.current?.click() },
+              { Icon: Mic, label: "Voice", on: () => voiceRef.current?.click() },
+              { Icon: FileText, label: "File", on: () => fileRef.current?.click() },
+              { Icon: MapPin, label: "Location", on: () => { setKind("text"); setStep("compose"); setShowPlaces(true); } },
+            ].map(({ Icon, label, on }) => (
+              <button key={label} onClick={on} className="flex flex-col items-center gap-2 shrink-0 w-[76px]">
+                <span className="w-[76px] h-14 rounded-full bg-wa-field flex items-center justify-center">
+                  <Icon size={24} />
+                </span>
+                <span className="text-[13px] text-wa-text2">{label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="px-5 pb-2 text-[16px] text-wa-muted shrink-0">Recents</p>
+          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 auto-rows-[33vw] sm:auto-rows-[120px] gap-px bg-wa-bg content-start">
+            <button onClick={() => cameraRef.current?.click()} className="bg-wa-surface flex flex-col items-center justify-center gap-2 text-wa-text2 active:opacity-70">
+              <Camera size={30} className="text-[#21C063]" />
+              <span className="text-[15px]">Camera</span>
+            </button>
+            <button onClick={() => mediaRef.current?.click()} className="bg-wa-surface flex flex-col items-center justify-center gap-2 text-wa-text2 active:opacity-70">
+              <Images size={30} className="text-[#21C063]" />
+              <span className="text-[15px]">Gallery</span>
+            </button>
+          </div>
+        </div>
+      )}
+      <input ref={cameraRef} type="file" accept="image/*,video/*" capture="environment" className="hidden" onChange={(e) => take(e, "media")} />
+      <input ref={voiceRef} type="file" accept="audio/*" capture className="hidden" onChange={(e) => take(e, "audio")} />
       <input ref={mediaRef} type="file" accept="image/*,video/*" className="hidden" onChange={(e) => take(e, "media")} />
       <input ref={audioRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={(e) => take(e, "audio")} />
       <input ref={fileRef} type="file" className="hidden" onChange={(e) => take(e, "file")} />
