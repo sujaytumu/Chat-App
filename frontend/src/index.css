@@ -198,3 +198,20 @@ html.no-wallpaper .chat-wallpaper {
 @keyframes tab-in-left { from { transform: translateX(-28%); opacity: 0.2; } to { transform: none; opacity: 1; } }
 .tab-slide-from-right { animation: tab-in-right 0.22s ease-out; }
 .tab-slide-from-left { animation: tab-in-left 0.22s ease-out; }
+
+/* ---- Premium auth screens ------------------------------------------------ */
+.auth-hero { background: radial-gradient(120% 120% at 20% 0%, #0f3d36 0%, #08201d 45%, #050f0e 100%); }
+.auth-orb { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: .55; animation: auth-float 14s ease-in-out infinite; }
+.auth-orb-a { width: 380px; height: 380px; background: #25d366; top: -90px; left: -80px; }
+.auth-orb-b { width: 320px; height: 320px; background: #14b8a6; bottom: -80px; right: -60px; animation-delay: -5s; }
+.auth-orb-c { width: 220px; height: 220px; background: #6366f1; top: 45%; left: 55%; opacity: .35; animation-delay: -9s; }
+.auth-grid { position: absolute; inset: 0; opacity: .08; background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 44px 44px; mask-image: radial-gradient(circle at center, #000 30%, transparent 75%); }
+.auth-bubble { opacity: 0; transform: translateY(14px); animation: auth-rise .7s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes auth-rise { to { opacity: 1; transform: none; } }
+@keyframes auth-float { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-24px) scale(1.08); } }
+.auth-form .input { border-radius: .85rem; transition: box-shadow .2s, border-color .2s; }
+.auth-form .input:focus { box-shadow: 0 0 0 4px rgb(37 211 102 / .18); border-color: #25d366; outline: none; }
+.auth-form .btn-primary { border-radius: .85rem; border: 0; background: linear-gradient(135deg, #25d366, #128c7e); color: #fff; box-shadow: 0 10px 24px -10px rgb(18 140 126 / .7); transition: transform .15s, box-shadow .2s; }
+.auth-form .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px rgb(18 140 126 / .8); }
+.auth-logo { background: linear-gradient(135deg, #25d366, #128c7e); box-shadow: 0 12px 30px -10px rgb(18 140 126 / .7); }
+@media (prefers-reduced-motion: reduce) { .auth-orb, .auth-bubble { animation: none; opacity: 1; transform: none; } }
