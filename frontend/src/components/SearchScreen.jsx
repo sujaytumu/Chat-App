@@ -87,7 +87,7 @@ const SearchScreen = ({ onClose }) => {
     if (!lc || kind) return [];
     const mk = (type, c) => ({ type, data: c, name: type === "group" ? c.name : c.fullName, pic: type === "group" ? c.groupPic : c.profilePic, last: c.lastMessage });
     return [...users.filter((u) => u.lastMessage).map((u) => mk("direct", u)), ...groups.map((g) => mk("group", g))].filter((c) => c.name?.toLowerCase().includes(lc) && !(lockedKeys || []).includes(`${c.type === "group" ? "g" : "d"}:${c.data._id}`));
-  }, [users, groups, lc, kind]);
+  }, [users, groups, lc, kind, lockedKeys]);
   const people = useMemo(() => (!lc || kind ? [] : users.filter((u) => !u.lastMessage && u.fullName?.toLowerCase().includes(lc))), [users, lc, kind]);
 
   // Groups that one of the matching people is also in: "Sowmya is also in this group"
