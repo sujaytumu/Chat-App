@@ -15,6 +15,8 @@ import groupRoutes from "./routes/group.route.js";
 import pushRoutes from "./routes/push.route.js";
 import callRoutes from "./routes/call.route.js";
 import statusRoutes from "./routes/status.route.js";
+import scheduledRoutes from "./routes/scheduled.route.js";
+import { startScheduler } from "./lib/scheduler.js";
 import { app, server } from "./lib/socket.js";
 import { configureWebPush } from "./lib/webPush.js";
 
@@ -81,6 +83,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/status", statusRoutes);
+app.use("/api/scheduled", scheduledRoutes);
 
 // Tiny wake-up / keep-alive endpoint (no database, no auth).
 app.get("/api/health", (req, res) => {
@@ -116,5 +119,5 @@ if (process.env.NODE_ENV === "production") {
 
 server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);
-  connectDB();
+  connectDB().then(() => startScheduler());
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Timer, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
+import { Clock, Timer, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -15,6 +15,7 @@ const WallpaperPicker = lazy(() => import("./WallpaperPicker"));
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
 const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
+const ScheduledPanel = lazy(() => import("./ScheduledPanel"));
 
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
@@ -53,6 +54,7 @@ const ChatHeader = () => {
   const joinGroupCall = useGroupCallStore((st) => st.joinCall);
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
+  const [showScheduled, setShowScheduled] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
@@ -253,6 +255,15 @@ const ChatHeader = () => {
                 {isLocked ? <LockOpen size={20} className="text-wa-icon" /> : <Lock size={20} className="text-wa-icon" />}
                 {isLocked ? "Remove chat lock" : "Lock chat"}
               </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowScheduled(true);
+                }}
+              >
+                <Clock size={18} className="text-wa-icon" /> Scheduled messages
+              </button>
               {selectedChat.type === "direct" && (
                 <button
                   className={menuItem}
@@ -325,6 +336,11 @@ const ChatHeader = () => {
             </div>
           </div>
         </div>
+      )}
+      {showScheduled && (
+        <Suspense fallback={null}>
+          <ScheduledPanel chat={selectedChat} onClose={() => setShowScheduled(false)} />
+        </Suspense>
       )}
       {showContactInfo && !isGroup && (
         <Suspense fallback={null}>

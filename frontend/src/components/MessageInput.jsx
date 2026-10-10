@@ -28,6 +28,8 @@ import { getEnterSends } from "../lib/uiSettings";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
 
 import { useDraftStore, draftKey } from "../store/useDraftStore";
+import ScheduleSheet, { fmtWhen } from "./ScheduleSheet";
+import { axiosInstance } from "../lib/axios";
 
 const EmojiStickerPicker = lazy(() => import("./EmojiStickerPicker"));
 
@@ -193,6 +195,46 @@ const MessageInput = () => {
       toast.error("Could not read that audio file");
     } finally {
       setIsProcessingAttachment(false);
+    }
+  };
+
+  // Long-press Send (or right-click it) to schedule the message for later.
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const schedTimer = useRef(null);
+  const schedFired = useRef(false);
+  const canSchedule = !!text.trim() && !(imagePreview || imageFallback || filePreview) && !editingMessage;
+  const sendPressStart = () => {
+    schedFired.current = false;
+    clearTimeout(schedTimer.current);
+    if (!canSchedule) return;
+    schedTimer.current = setTimeout(() => {
+      schedFired.current = true;
+      navigator.vibrate?.(15);
+      setShowSchedule(true);
+    }, 550);
+  };
+  const sendPressEnd = () => clearTimeout(schedTimer.current);
+  const doSchedule = async (date) => {
+    if (!selectedChat) return;
+    setScheduling(true);
+    try {
+      await axiosInstance.post("/scheduled", {
+        chatType: selectedChat.type,
+        chatId: selectedChat.data._id,
+        text: text.trim(),
+        sendAt: date.toISOString(),
+      });
+      toast.success(`Scheduled for ${fmtWhen(date)}`);
+      setText("");
+      setMentionIds([]);
+      setMentionQuery(null);
+      setShowSchedule(false);
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Couldn't schedule the message");
+    } finally {
+      setScheduling(false);
     }
   };
 
@@ -572,6 +614,7 @@ const MessageInput = () => {
           </div>,
           document.body
         )}
+      {showSchedule && <ScheduleSheet text={text.trim()} busy={scheduling} onPick={doSchedule} onClose={() => setShowSchedule(false)} />}
       {showContacts && (
         <ContactPicker
           onClose={() => setShowContacts(false)}
@@ -894,6 +937,22 @@ const MessageInput = () => {
             type="submit"
             className="size-10 mb-0 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all"
             disabled={isSending}
+            onPointerDown={sendPressStart}
+            onPointerUp={sendPressEnd}
+            onPointerLeave={sendPressEnd}
+            onPointerCancel={sendPressEnd}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (canSchedule) setShowSchedule(true);
+            }}
+            onClickCapture={(e) => {
+              if (schedFired.current) {
+                schedFired.current = false;
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            title="Send (hold to schedule)"
             aria-label="Send"
           >
             {isSending ? <Loader2 size={20} className="animate-spin" /> : <WhatsAppSendIcon size={20} className="ml-0.5" />}
