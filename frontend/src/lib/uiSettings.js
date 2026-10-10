@@ -29,7 +29,35 @@ export const getHaptics = () => !read(KEYS.hapticsOff);
 export const getEnterSends = () => !read(KEYS.enterNewline);
 export const setEnterSends = (on) => write(KEYS.enterNewline, !on);
 
+// Message text size: "small" | "default" | "large" | "huge"
+export const FONT_SIZES = [
+  ["small", "Small"],
+  ["default", "Default"],
+  ["large", "Large"],
+  ["huge", "Extra large"],
+];
+export const getFontSize = () => {
+  try {
+    const v = localStorage.getItem("talkies-font-size");
+    return FONT_SIZES.some(([k]) => k === v) ? v : "default";
+  } catch {
+    return "default";
+  }
+};
+export const setFontSize = (v) => {
+  try {
+    if (v === "default") localStorage.removeItem("talkies-font-size");
+    else localStorage.setItem("talkies-font-size", v);
+  } catch {
+    /* storage unavailable */
+  }
+  applyUiSettings();
+};
+
 export function applyUiSettings() {
+  const fs = getFontSize();
+  if (fs === "default") document.documentElement.removeAttribute("data-font");
+  else document.documentElement.setAttribute("data-font", fs);
   const cl = document.documentElement.classList;
   cl.toggle("reduce-motion", getReduceMotion());
   cl.toggle("no-wallpaper", !getWallpaper());

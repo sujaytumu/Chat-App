@@ -275,3 +275,13 @@ html[data-chat-color="graphite"].wa-dark { --wa-out: 55 65 81; --wa-tint: 38 46 
   60% { opacity: 1; scale: 1; translate: -50% -60%; }
   100% { opacity: 0; scale: 1; translate: -50% -140%; }
 }
+
+/* Message text size (Settings → Chats → Font size) */
+html[data-font="small"] .msg-text { font-size: 12px; line-height: 19px; }
+html[data-font="large"] .msg-text { font-size: 15.5px; line-height: 23px; }
+html[data-font="huge"] .msg-text { font-size: 18px; line-height: 26px; }
+@media (min-width: 1024px) {
+  html[data-font="small"] .msg-text { font-size: 14px; line-height: 21px; }
+  html[data-font="large"] .msg-text { font-size: 17.5px; line-height: 26px; }
+  html[data-font="huge"] .msg-text { font-size: 20px; line-height: 29px; }
+}
