@@ -505,8 +505,8 @@ const Sidebar = () => {
         {[
           ...FILTERS.slice(0, 3),
           ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name })),
-          { id: "__new" },
           ...FILTERS.slice(3),
+          { id: "__new" },
         ].map(({ id, label }) => {
           if (id === "__new") return (
         <button key="__new"
