@@ -19,6 +19,7 @@ import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
+import { renderFormatted } from "../lib/richText";
 import { useChatColorStore } from "../store/useChatColorStore";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
@@ -649,7 +650,7 @@ const ChatContainer = () => {
                           const shown = long ? `${message.text.slice(0, READ_MORE_AT).trimEnd()}…` : message.text;
                           return (
                             <>
-                              {message.mentions?.length ? <MentionText text={shown} mentions={message.mentions} members={data.members} /> : shown}
+                              {message.mentions?.length ? <MentionText text={shown} mentions={message.mentions} members={data.members} /> : renderFormatted(shown)}
                               {long && (
                                 <button
                                   type="button"
