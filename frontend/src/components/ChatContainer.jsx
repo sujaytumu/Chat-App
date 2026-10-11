@@ -16,7 +16,6 @@ import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
-import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
@@ -499,7 +498,6 @@ const ChatContainer = () => {
                   <Forward size={17} />
                 </button>
               )}
-              {isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
 
               {heartFor === message._id && (
                 <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 text-[44px] leading-none" style={{ animation: "m-heart .75s ease-out forwards" }}>
@@ -691,7 +689,6 @@ const ChatContainer = () => {
                 </div>
               )}
 
-              {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
               {!isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && (
                 <button
                   type="button"
