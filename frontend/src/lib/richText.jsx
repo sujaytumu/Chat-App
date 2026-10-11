@@ -43,7 +43,7 @@ const links = (text, base) =>
     )
   );
 
-export function renderFormatted(text) {
+function formatRaw(text) {
   if (!text) return text;
   // fast path: nothing special in the message
   if (!/[*_~`]|https?:\/\//i.test(text)) return text;
@@ -66,5 +66,19 @@ export function renderFormatted(text) {
       out.push(...inline(p, `p${i}`));
     }
   });
+  return out;
+}
+
+// Chat lists re-render often; formatting the same text again and again is
+// wasted work, so remember the result (React elements are immutable, so reuse is safe).
+const cache = new Map();
+export function renderFormatted(text) {
+  if (!text || typeof text !== "string") return text;
+  if (!/[*_~`]|https?:\/\//i.test(text)) return text;
+  const hit = cache.get(text);
+  if (hit) return hit;
+  const out = formatRaw(text);
+  cache.set(text, out);
+  if (cache.size > 400) cache.delete(cache.keys().next().value);
   return out;
 }

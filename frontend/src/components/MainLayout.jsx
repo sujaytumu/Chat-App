@@ -56,6 +56,7 @@ const MainLayout = ({ children }) => {
     if (!el) return;
     el.style.transition = animate ? "transform 220ms cubic-bezier(.2,.8,.2,1)" : "none";
     el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
+    el.style.willChange = x || animate ? "transform" : "";
   };
 
   // New page is in place: put everything back at rest.
