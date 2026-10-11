@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import SpeedVideo from "./SpeedVideo";
 import { ArrowLeft, FileText, Link2, Play, Download, X } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -141,7 +142,7 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
           <button className="absolute top-4 right-4 text-white" aria-label="Close">
             <X size={26} />
           </button>
-          <video src={video} controls autoPlay className="max-h-full max-w-full" onClick={(e) => e.stopPropagation()} />
+          <SpeedVideo src={video} controls autoPlay className="max-h-[90vh] max-w-full" onClick={(e) => e.stopPropagation()} />
         </div>
       )}
     </div>
