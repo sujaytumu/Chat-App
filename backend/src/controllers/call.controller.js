@@ -36,6 +36,17 @@ export const getIceConfig = (req, res) => {
       credential: process.env.TURN_CREDENTIAL,
     });
   }
+  if (iceServers.length === 2) {
+    // No private TURN configured: fall back to the free public relay so calls
+    // between different networks (mobile data <-> Wi-Fi) still carry audio.
+    // Best-effort only — set TURN_URLS / TURN_USERNAME / TURN_CREDENTIAL for a reliable one.
+    iceServers.push({
+      urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turns:openrelay.metered.ca:443?transport=tcp"],
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    });
+    return res.status(200).json({ iceServers, hasTurn: true });
+  }
   res.status(200).json({ iceServers, hasTurn: iceServers.length > 2 });
 };
 

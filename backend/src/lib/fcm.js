@@ -1,0 +1,147 @@
+import crypto from "crypto";
+import User from "../models/user.model.js";
+
+// Firebase Cloud Messaging (HTTP v1) without extra dependencies.
+// This is what lets the Android app ring for calls and show message
+// notifications even when it is fully closed (Web Push does not work inside
+// an Android WebView). Configure with ONE env var:
+//   FCM_SERVICE_ACCOUNT = the service-account JSON from Firebase
+//   (Project settings → Service accounts → Generate new private key),
+//   pasted as-is or base64-encoded.
+let account = null;
+let loaded = false;
+let cached = { token: null, exp: 0 };
+
+function load() {
+  if (loaded) return account;
+  loaded = true;
+  let raw = process.env.FCM_SERVICE_ACCOUNT;
+  if (!raw) {
+    console.log("FCM not configured (missing FCM_SERVICE_ACCOUNT) — Android background calls/notifications are off.");
+    return null;
+  }
+  try {
+    raw = raw.trim();
+    if (!raw.startsWith("{")) raw = Buffer.from(raw, "base64").toString("utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed.client_email && parsed.private_key && parsed.project_id) {
+      parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+      account = parsed;
+    }
+  } catch (e) {
+    console.log("FCM_SERVICE_ACCOUNT could not be read:", e.message);
+  }
+  return account;
+}
+
+export const fcmEnabled = () => !!load();
+
+const b64url = (b) => Buffer.from(b).toString("base64url");
+
+async function accessToken() {
+  const acc = load();
+  if (!acc) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (cached.token && cached.exp - 60 > now) return cached.token;
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64url(
+    JSON.stringify({
+      iss: acc.client_email,
+      scope: "https://www.googleapis.com/auth/firebase.messaging",
+      aud: "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+    })
+  );
+  const sig = crypto.createSign("RSA-SHA256").update(`${header}.${claim}`).sign(acc.private_key);
+  const jwt = `${header}.${claim}.${b64url(sig)}`;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  });
+  const json = await res.json();
+  if (!json.access_token) throw new Error(json.error_description || "no access token");
+  cached = { token: json.access_token, exp: now + (json.expires_in || 3600) };
+  return cached.token;
+}
+
+// Data-only, high priority: the app's own service builds the notification /
+// call screen, so it can ring and show Answer / Decline.
+function toData(payload) {
+  const d = payload?.data || {};
+  const out = {
+    title: payload?.title || "Talkies",
+    body: payload?.body || "",
+    icon: payload?.icon || "",
+    tag: payload?.tag || "",
+    isCall: payload?.isCall ? "1" : "0",
+    chatId: d.chatId ? String(d.chatId) : "",
+    chatType: d.chatType || "direct",
+    callerId: d.callerId ? String(d.callerId) : "",
+    messageId: d.messageId ? String(d.messageId) : "",
+    url: d.url || "/",
+    cancel: payload?.cancel ? "1" : "0",
+  };
+  return out;
+}
+
+async function sendOne(token, payload, isCall) {
+  const acc = load();
+  const at = await accessToken();
+  const res = await fetch(`https://fcm.googleapis.com/v1/projects/${acc.project_id}/messages:send`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${at}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: {
+        token,
+        data: toData(payload),
+        android: { priority: "HIGH", ttl: isCall ? "45s" : "86400s" },
+      },
+    }),
+  });
+  if (res.ok) return "ok";
+  let code = "";
+  try {
+    const j = await res.json();
+    code = j?.error?.details?.find?.((x) => x.errorCode)?.errorCode || j?.error?.status || "";
+  } catch {
+    /* ignore */
+  }
+  return code || String(res.status);
+}
+
+// Pushes to every Android install this user has registered. Dead tokens are pruned.
+export async function sendFcmToUser(user, payload) {
+  try {
+    if (!load() || !user?.fcmTokens?.length) return;
+    const isCall = !!payload?.isCall;
+    const dead = [];
+    await Promise.all(
+      user.fcmTokens.map(async ({ token }) => {
+        try {
+          const r = await sendOne(token, payload, isCall);
+          if (r === "UNREGISTERED" || r === "INVALID_ARGUMENT" || r === "NOT_FOUND") dead.push(token);
+          else if (r !== "ok") console.log("FCM send:", r);
+        } catch (e) {
+          console.log("FCM error:", e.message);
+        }
+      })
+    );
+    if (dead.length) await User.updateOne({ _id: user._id }, { $pull: { fcmTokens: { token: { $in: dead } } } });
+  } catch (e) {
+    console.log("Error in sendFcmToUser:", e.message);
+  }
+}
+
+// Stop the ringing on this user's Android phone(s) — the call was answered /
+// declined elsewhere. Android only (the web app is told through its socket).
+export async function sendFcmCancelCall(userId, callerId) {
+  try {
+    if (!load()) return;
+    const user = await User.findById(userId).select("fcmTokens").lean();
+    await sendFcmToUser(user, { cancel: true, tag: `incoming-call-${callerId}`, isCall: false });
+  } catch (e) {
+    console.log("Error in sendFcmCancelCall:", e.message);
+  }
+}

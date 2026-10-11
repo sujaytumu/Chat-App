@@ -83,6 +83,13 @@ const userSchema = new mongoose.Schema(
     },
     // Web Push subscriptions (one per browser/device the user has granted
     // notification permission on)
+    // Android app installs (Firebase Cloud Messaging) — background calls & messages
+    fcmTokens: [
+      {
+        token: { type: String, required: true },
+        at: { type: Date, default: Date.now },
+      },
+    ],
     pushSubscriptions: [
       {
         endpoint: { type: String, required: true },

@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import User from "../models/user.model.js";
+import { sendFcmToUser } from "./fcm.js";
 
 let configured = false;
 
@@ -28,9 +29,9 @@ export async function sendPushToUser(userId, payload, options = {}, muteKey) {
 // Same, for several users with ONE database query (group chats).
 // muteKey ("d:<senderId>" / "g:<groupId>"): members who muted that chat get no push.
 export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
-  if (!configured || !userIds?.length) return;
+  if (!userIds?.length) return;
   try {
-    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions mutedChats lockedChats").lean();
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats").lean();
     await Promise.all(
       users
         .filter((u) => !(muteKey && (u.mutedChats || []).includes(muteKey)))
@@ -40,7 +41,7 @@ export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
           const safe = locked
             ? { title: "Talkies", body: "You have a new message", icon: "/icon-v2-192.png", tag: "locked-chat", data: { url: "/", messageId: payload.data?.messageId } }
             : payload;
-          return pushToSubscriptions(u, safe, options);
+          return Promise.all([configured ? pushToSubscriptions(u, safe, options) : null, sendFcmToUser(u, safe)]);
         })
     );
   } catch (error) {
