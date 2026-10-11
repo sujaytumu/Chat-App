@@ -161,6 +161,7 @@ const ChatContainer = () => {
   const [showJump, setShowJump] = useState(false);
   const [newWhileAway, setNewWhileAway] = useState(0);
   const [highlightId, setHighlightId] = useState(null);
+  const [heartPopId, setHeartPopId] = useState(null); // message that just got a double-tap heart
   const jumpTries = useRef(0);
   const prependRef = useRef(null); // scroll position to restore after older messages are added on top
 
@@ -480,6 +481,17 @@ const ChatContainer = () => {
                 </div>
               ) : (
                 <div
+                  // Double-tap / double-click a message to heart it
+                  onDoubleClick={() => {
+                    if (message.deletedForEveryone) return;
+                    const mine = (message.reactions || []).find((r) => String(r.user) === String(authUser._id));
+                    if (mine?.emoji !== "❤️") reactToMessage(message._id, "❤️"); // never un-hearts by accident
+                    setHeartPopId(message._id);
+                    setTimeout(() => setHeartPopId((cur) => (cur === message._id ? null : cur)), 750);
+                  }}
+                  onMouseDown={(e) => {
+                    if (e.detail > 1) e.preventDefault(); // no word-selection flash on the 2nd click
+                  }}
                   className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[68%] px-2.5 pt-1.5 pb-1.5 lg:px-3.5 lg:pt-2 lg:pb-2 rounded-xl break-words shadow-sm flex flex-col text-wa-text ${
                     isMe ? "bg-wa-out" : "bg-wa-surface"
                   } ${
@@ -492,6 +504,14 @@ const ChatContainer = () => {
                       style={{ color: colorForId(message.senderId) }}
                     >
                       {sender?.fullName || "Unknown"}
+                    </span>
+                  )}
+                  {heartPopId === message._id && (
+                    <span
+                      className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center text-5xl animate-[heartpop_0.5s_ease-out]"
+                      aria-hidden="true"
+                    >
+                      ❤️
                     </span>
                   )}
                   {message.forwarded && (
