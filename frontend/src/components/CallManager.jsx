@@ -177,6 +177,27 @@ const CallManager = () => {
     }
   }, [remoteStream, callType, isMinimized, callStatus]);
 
+  // Keep the call audible: while connected, if the browser paused / muted the
+  // playback element (tab switch, Bluetooth change, autoplay policy), start it again.
+  useEffect(() => {
+    if (callStatus !== "in-call" || !remoteStream) return undefined;
+    const heal = () => {
+      [remoteAudioRef.current, remoteVideoRef.current].forEach((el) => {
+        if (!el || !el.srcObject) return;
+        if (el.volume !== 1) el.volume = 1;
+        if (el.paused) el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
+      });
+    };
+    const t = setInterval(heal, 1500);
+    remoteStream.getAudioTracks().forEach((tr) => tr.addEventListener("unmute", heal));
+    document.addEventListener("visibilitychange", heal);
+    return () => {
+      clearInterval(t);
+      remoteStream.getAudioTracks().forEach((tr) => tr.removeEventListener("unmute", heal));
+      document.removeEventListener("visibilitychange", heal);
+    };
+  }, [callStatus, remoteStream]);
+
   const unblockAudio = () => {
     [remoteAudioRef.current, remoteVideoRef.current].forEach((el) => el?.play().catch(() => {}));
     setAudioBlocked(false);
