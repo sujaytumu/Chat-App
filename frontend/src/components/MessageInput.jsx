@@ -537,7 +537,31 @@ const MessageInput = () => {
     handleTyping();
   };
 
+  const [hasSel, setHasSel] = useState(false);
+  const checkSel = () => {
+    const t = textareaRef.current;
+    setHasSel(!!t && t.selectionEnd > t.selectionStart);
+  };
+  const wrapSelection = (mark) => {
+    const t = textareaRef.current;
+    if (!t || t.selectionEnd <= t.selectionStart) return;
+    const { selectionStart: a, selectionEnd: b } = t;
+    const sel = text.slice(a, b);
+    const next = text.slice(0, a) + mark + sel + mark + text.slice(b);
+    setText(next);
+    setHasSel(false);
+    requestAnimationFrame(() => {
+      t.focus();
+      t.setSelectionRange(a + mark.length, b + mark.length);
+    });
+  };
+
   const handleKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && ["b", "i"].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      wrapSelection(e.key.toLowerCase() === "b" ? "*" : "_");
+      return;
+    }
     const enterSends = getEnterSends();
     if (e.key === "Enter" && !e.shiftKey && (enterSends || e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -765,7 +789,7 @@ const MessageInput = () => {
             <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
           </div>
         ) : (
-          <div className="flex-1 min-w-0 flex items-end gap-0.5">
+          <div className="relative flex-1 min-w-0 flex items-end gap-0.5">
             <div className="relative" ref={attachMenuRef}>
               {showAttachMenu && (
                 <div className="absolute bottom-full left-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
@@ -902,6 +926,22 @@ const MessageInput = () => {
               )}
             </div>
 
+            {hasSel && (
+              <div className="absolute left-12 -top-11 z-30 flex items-center gap-0.5 rounded-full bg-wa-panel shadow-lg ring-1 ring-black/10 px-1.5 py-1 fmt-pop">
+                {[["B", "*", "font-bold"], ["I", "_", "italic"], ["S", "~", "line-through"], ["M", "`", "font-mono"]].map(([l, m, c]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => wrapSelection(m)}
+                    className={`size-8 rounded-full text-[14px] text-wa-text hover:bg-white/10 active:bg-white/15 ${c}`}
+                    aria-label={`Format ${l}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            )}
             <textarea
               ref={textareaRef}
               rows={1}
@@ -909,6 +949,8 @@ const MessageInput = () => {
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
+              onSelect={checkSel}
+              onBlur={() => setTimeout(() => setHasSel(false), 150)}
               placeholder="Type a message"
               spellCheck={false}
               autoComplete="off"
