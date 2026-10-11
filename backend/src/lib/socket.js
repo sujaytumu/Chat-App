@@ -7,6 +7,7 @@ import Message from "../models/message.model.js";
 import CallLog from "../models/callLog.model.js";
 import User from "../models/user.model.js";
 import { sendPushToUser, sendPushToUsers } from "./webPush.js";
+import { sendFcmCancelCall } from "./fcm.js";
 import { markGroupDelivered } from "./groupReceipts.js";
 
 const app = express();
@@ -315,6 +316,7 @@ io.on("connection", (socket) => {
 
   socket.on("answerCall", ({ toUserId, answer }, ack) => {
     socket.to(userId).emit("callEnded"); // stop ringing on my other devices
+    sendFcmCancelCall(userId, toUserId); // ...and on my Android phone
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callAnswered", { answer });
@@ -380,6 +382,7 @@ io.on("connection", (socket) => {
 
   socket.on("rejectCall", ({ toUserId }) => {
     socket.to(userId).emit("callEnded"); // stop ringing on my other devices
+    sendFcmCancelCall(userId, toUserId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callRejected");
