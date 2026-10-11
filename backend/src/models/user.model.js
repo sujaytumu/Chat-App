@@ -41,6 +41,8 @@ const userSchema = new mongoose.Schema(
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },
     mutedChats: { type: [String], default: [] },
+    // Timed mutes ("8 hours", "1 week"): the chat is un-muted automatically at `until`.
+    mutedUntil: { type: [{ _id: false, key: String, until: Date }], default: [] },
     // Chat lock: chats hidden behind the person's PIN ("d:<id>" / "g:<id>").
     // The PIN is stored only as a bcrypt hash and never returned by queries.
     lockedChats: { type: [String], default: [] },

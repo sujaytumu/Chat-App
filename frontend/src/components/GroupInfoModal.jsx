@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2 } from "lucide-react";
+import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2, Bell, BellOff } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -13,6 +13,7 @@ import ReportGroupDialog from "./ReportGroupDialog";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
+import MuteSheet from "./MuteSheet";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const GroupEmojiPhoto = lazy(() => import("./GroupEmojiPhoto"));
@@ -52,6 +53,8 @@ const GroupInfoModal = ({ group, onClose }) => {
   const canAddMembers = isAdmin || perms.addMembers === "all";
   const [showPerms, setShowPerms] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
+  const [showMute, setShowMute] = useState(false);
+  const muted = (authUser.mutedChats || []).includes(`g:${group._id}`);
   const [showReport, setShowReport] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
   const memberIds = new Set(group.members.map((m) => m._id || m));
@@ -291,6 +294,16 @@ const GroupInfoModal = ({ group, onClose }) => {
             </span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
+          <button
+            onClick={() => (muted ? useChatStore.getState().setChatMuted({ type: "group", data: group }, false) : setShowMute(true))}
+            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
+          >
+            {muted ? <BellOff size={22} className="text-wa-muted" /> : <Bell size={22} className="text-wa-muted" />}
+            <span className="flex-1 text-[13.5px]">Mute notifications</span>
+            <span className={`relative w-10 h-6 rounded-full transition-colors ${muted ? "bg-[#00A884]" : "bg-wa-field"}`} aria-hidden="true">
+              <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${muted ? "left-[18px]" : "left-0.5"}`} />
+            </span>
+          </button>
           {isAdmin && (
             <button
               onClick={() => setShowInvite(true)}
@@ -410,6 +423,16 @@ const GroupInfoModal = ({ group, onClose }) => {
         />
       )}
       {showDisappear && <DisappearingPanel group={group} isAdmin={isAdmin} onClose={() => setShowDisappear(false)} />}
+      {showMute && (
+        <MuteSheet
+          name={group.name}
+          onClose={() => setShowMute(false)}
+          onPick={(until) => {
+            setShowMute(false);
+            useChatStore.getState().setChatMuted({ type: "group", data: group }, true, { until });
+          }}
+        />
+      )}
       {showInvite && (
         <Suspense fallback={null}>
           <GroupInviteSheet group={group} onClose={() => setShowInvite(false)} />

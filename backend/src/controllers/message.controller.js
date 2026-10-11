@@ -521,7 +521,24 @@ const makeChatListToggle = (field, event, max) => async (req, res) => {
   }
 };
 export const setChatPinned = makeChatListToggle("pinnedChats", "pinnedChats", 3);
-export const setChatMuted = makeChatListToggle("mutedChats", "mutedChats", 0);
+const toggleMuted = makeChatListToggle("mutedChats", "mutedChats", 0);
+// Mute / un-mute; with `until` (a future time up to a year ahead) the mute ends by itself.
+export const setChatMuted = async (req, res) => {
+  try {
+    const { chatType, chatId, value, until } = req.body || {};
+    if (["direct", "group"].includes(chatType) && mongoose.isValidObjectId(chatId)) {
+      const key = `${chatType === "group" ? "g" : "d"}:${chatId}`;
+      const when = value && until ? new Date(until) : null;
+      await User.updateOne({ _id: req.user._id }, { $pull: { mutedUntil: { key } } });
+      if (when && when.getTime() > Date.now() + 60000 && when.getTime() < Date.now() + 366 * 24 * 3600 * 1000) {
+        await User.updateOne({ _id: req.user._id }, { $push: { mutedUntil: { key, until: when } } });
+      }
+    }
+  } catch (error) {
+    console.log("Error saving timed mute:", error.message);
+  }
+  return toggleMuted(req, res);
+};
 export const setChatMarkedUnread = makeChatListToggle("markedUnread", "markedUnread", 0);
 
 // Replace the user's chat lists (Favourites + custom lists) in one go.

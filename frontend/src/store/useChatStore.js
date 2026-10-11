@@ -147,7 +147,7 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  setChatFlag: async (field, chat, value, { silent = false } = {}) => {
+  setChatFlag: async (field, chat, value, { silent = false, until = null } = {}) => {
     const api = FLAG_API[field];
     const key = chatKeyOf(chat);
     const authUser = useAuthStore.getState().authUser;
@@ -160,6 +160,7 @@ export const useChatStore = create((set, get) => ({
         chatType: chat.type,
         chatId: chat.data._id,
         ...api.body(value),
+        ...(until ? { until } : {}),
       });
       useAuthStore.setState((state) => ({
         authUser: state.authUser ? { ...state.authUser, [field]: res.data[field] } : state.authUser,
