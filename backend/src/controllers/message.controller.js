@@ -17,12 +17,32 @@ import { sendPushToUser } from "../lib/webPush.js";
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
+// Delivery receipts are cumulative, like WhatsApp: once a device has received
+// (or opened) anything from someone, every earlier message from them to this
+// user has reached it too. Flips them all to "delivered" and tells the senders.
+export async function markDirectDelivered(receiverId, extra = {}) {
+  try {
+    const filter = { receiverId, groupId: null, delivered: false, ...extra };
+    const pending = await Message.find(filter).select("_id senderId").lean();
+    if (!pending.length) return;
+    await Message.updateMany({ _id: { $in: pending.map((m) => m._id) } }, { $set: { delivered: true, deliveredAt: new Date() } });
+    const senders = [...new Set(pending.map((m) => String(m.senderId)))];
+    senders.forEach((sid) => {
+      const room = getReceiverSocketId(sid);
+      if (room) io.to(room).emit("messagesDelivered", { by: String(receiverId) });
+    });
+  } catch (e) {
+    console.log("Error in markDirectDelivered:", e.message);
+  }
+}
+
 // Sidebar: direct-message contacts, each with last message + unread count.
 // Uses two aggregations (not one query per contact) so this stays fast
 // regardless of how many contacts/messages exist.
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
+    markDirectDelivered(loggedInUserId); // opening the app = all waiting messages have arrived
     const filteredUsers = await User.find({ _id: { $ne: loggedInUserId }, deleted: { $ne: true } })
       .select("-tokenVersion -deleted -password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
       .lean();
@@ -479,14 +499,10 @@ export const ackDelivered = async (req, res) => {
       if (member) await markGroupDelivered(io, req.user._id, { messageIds: [messageId] });
       return res.status(200).json({ ok: true });
     }
-    const msg = await Message.findOneAndUpdate(
-      { _id: messageId, receiverId: req.user._id, delivered: false },
-      { $set: { delivered: true, deliveredAt: new Date() } },
-      { new: true }
-    ).select("senderId");
-    if (msg) {
-      const senderRoom = getReceiverSocketId(msg.senderId.toString());
-      if (senderRoom) io.to(senderRoom).emit("messagesDelivered", { by: req.user._id.toString() });
+    const probeDirect = await Message.findOne({ _id: messageId, receiverId: req.user._id }).select("senderId createdAt").lean();
+    if (probeDirect) {
+      // this message AND everything earlier from the same person
+      await markDirectDelivered(req.user._id, { senderId: probeDirect.senderId, createdAt: { $lte: probeDirect.createdAt } });
     }
     res.status(200).json({ ok: true });
   } catch (error) {
