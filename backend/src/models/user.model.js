@@ -32,6 +32,11 @@ const userSchema = new mongoose.Schema(
     // browser, installed app, Android app — shows the same thing. Whitelisted
     // keys only; values are strings.
     preferences: { type: Object, default: {} },
+    // Bumped to sign the account out everywhere ("Log out of all devices", password change, account deletion).
+    // Every login token carries the value it was issued with.
+    tokenVersion: { type: Number, default: 0 },
+    // Set when the person deletes their account (the record stays only so old messages still resolve).
+    deleted: { type: Boolean, default: false },
     // Same key format: chats pinned to the top (max 3) and chats whose
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },

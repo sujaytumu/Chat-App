@@ -23,8 +23,8 @@ const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } })
-      .select("-password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId }, deleted: { $ne: true } })
+      .select("-tokenVersion -deleted -password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([

@@ -23,6 +23,12 @@ export const protectRoute = async (req, res, next) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Signed out everywhere / account deleted since this token was issued
+    if (user.deleted || (decoded.tv || 0) !== (user.tokenVersion || 0)) {
+      res.cookie("jwt", "", { maxAge: 0 });
+      return res.status(401).json({ message: "Unauthorized - Session ended" });
+    }
+
     req.user = user;
 
     next();
