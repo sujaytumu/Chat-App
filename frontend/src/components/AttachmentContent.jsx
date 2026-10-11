@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { FileText, Download, AlertCircle } from "lucide-react";
 import VoiceMessagePlayer from "./VoiceMessagePlayer";
+import SpeedVideo from "./SpeedVideo";
 import { formatFileSize, fileIconKind } from "../lib/fileUtils";
 
 const DownloadFallbackCard = ({ file, label }) => (
@@ -35,13 +36,14 @@ const AttachmentContent = ({ file, onMediaLoaded, incoming }) => {
   if (file.type === "video") {
     if (videoFailed) return <DownloadFallbackCard file={file} label="Video" />;
     return (
-      <video
+      <SpeedVideo
+        wrapperClassName="mb-1 max-w-[240px]"
         src={file.url}
         controls
         preload="metadata"
         onError={() => setVideoFailed(true)}
         onLoadedMetadata={onMediaLoaded}
-        className="max-w-[240px] rounded-md mb-1 bg-black"
+        className="max-w-[240px] rounded-md bg-black"
       />
     );
   }
