@@ -17,6 +17,9 @@ public class MainActivity extends BridgeActivity {
 
     private void showOverLockScreenIfCall(Intent intent) {
         if (intent != null && intent.getBooleanExtra("tk_isCall", false)) {
+            // The app takes over from the notification: stop its ringtone / vibration.
+            String caller = intent.getStringExtra("tk_callerId");
+            if (caller != null && !caller.isEmpty()) NotificationHelper.cancel(this, "incoming-call-" + caller);
             // Incoming-call full-screen intent: show over the lock screen and wake the display
             if (Build.VERSION.SDK_INT >= 27) {
                 setShowWhenLocked(true);
