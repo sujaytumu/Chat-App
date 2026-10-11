@@ -36,6 +36,18 @@ jobs:
           npm ci
           npx cap sync android
 
+      - name: Firebase config (optional secret)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          # Needed for background calls / notifications. Either commit
+          # mobile/android/app/google-services.json, or add it as a repository
+          # secret named GOOGLE_SERVICES_JSON (the file's contents).
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > mobile/android/app/google-services.json
+          fi
+          if [ -f mobile/android/app/google-services.json ]; then echo "Firebase config found"; else echo "No Firebase config - push is disabled in this build"; fi
+
       - name: Build debug APK
         working-directory: mobile/android
         run: |

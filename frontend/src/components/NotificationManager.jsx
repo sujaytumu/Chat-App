@@ -6,6 +6,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { requestNotificationPermission, registerPushSubscription, primeAudio } from "../lib/notificationSound";
 import { loadCustomTone } from "../lib/soundSettings";
 import { axiosInstance } from "../lib/axios";
+import { registerNativePush } from "../lib/nativePush";
 
 const BASE_TITLE = "Talkies";
 
@@ -18,6 +19,12 @@ const NotificationManager = () => {
   const groups = useChatStore((s) => s.groups);
   const archivedChats = useAuthStore((s) => s.authUser?.archivedChats);
   const navigate = useNavigate();
+
+  // Android app: register for Firebase push (background calls / messages).
+  const myId = useAuthStore((s) => s.authUser?._id);
+  useEffect(() => {
+    if (myId) registerNativePush(myId, () => navigate("/"));
+  }, [myId, navigate]);
 
   // Taps on message / call notifications (Answer, open chat).
   useEffect(() => startNotificationActionListener(() => navigate("/")), [navigate]);

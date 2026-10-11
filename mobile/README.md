@@ -24,7 +24,27 @@ cd android && ./gradlew assembleDebug   # -> app/build/outputs/apk/debug/app-deb
 ```
 
 ## Notes
-- Web Push notifications don't work inside an Android WebView; use the
+
   installed PWA (Chrome → Install app) for background notifications, or add
   Firebase Cloud Messaging to this app.
 - Screen sharing streams ~8 fps JPEG frames to the page; portrait works best.
+
+## Calls & notifications when the app is closed (Firebase)
+
+Web Push doesn't work inside an Android WebView, so the app uses Firebase
+Cloud Messaging: the server sends a high-priority push, and the app itself
+rings (system ringtone, full-screen call screen over the lock screen with
+Answer / Decline) or shows the message notification.
+
+One-time setup (free):
+1. https://console.firebase.google.com → create a project → **Add app → Android**
+   with package name `com.sujaytumu.talkies` → download `google-services.json`.
+2. Put that file at `mobile/android/app/google-services.json` and commit it
+   (or add its contents as a GitHub secret named `GOOGLE_SERVICES_JSON`).
+3. Firebase → Project settings → **Service accounts → Generate new private key**.
+   On Render, add an environment variable `FCM_SERVICE_ACCOUNT` with the JSON
+   file's contents (or its base64).
+4. Rebuild the APK, install it, open it once and log in (allow notifications).
+
+On Android 14+ also allow **full-screen notifications** for Talkies when asked
+(App settings → Notifications), so calls can take over a locked screen.

@@ -1,5 +1,6 @@
 package com.sujaytumu.talkies;
 
+import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -11,12 +12,48 @@ import androidx.activity.OnBackPressedCallback;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    /** True while the app is on screen (pushes then leave the ringing / beeping to the page). */
+    static volatile boolean visible = false;
+
+    private void showOverLockScreenIfCall(Intent intent) {
+        if (intent != null && intent.getBooleanExtra("tk_isCall", false)) {
+            // Incoming-call full-screen intent: show over the lock screen and wake the display
+            if (Build.VERSION.SDK_INT >= 27) {
+                setShowWhenLocked(true);
+                setTurnScreenOn(true);
+            }
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        showOverLockScreenIfCall(intent);
+        TalkiesPushPlugin.handleIntent(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        visible = true;
+    }
+
+    @Override
+    public void onPause() {
+        visible = false;
+        super.onPause();
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // Custom plugins must be registered before super.onCreate
         registerPlugin(ScreenSharePlugin.class);
         registerPlugin(AppChromePlugin.class);
+        registerPlugin(TalkiesPushPlugin.class);
+        showOverLockScreenIfCall(getIntent());
         super.onCreate(savedInstanceState);
+        TalkiesPushPlugin.handleIntent(getIntent());
 
         // Make the page render exactly as it does in Chrome: ignore the system
         // font-size scaling, no forced dark mode, no overscroll glow/scrollbars.

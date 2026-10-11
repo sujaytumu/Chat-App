@@ -114,6 +114,7 @@ export const useAuthStore = create((set, get) => ({
   cancelTwoFactor: () => set({ pendingTwoFactor: null }),
 
   logout: async () => {
+    if (window.Capacitor?.isNativePlatform?.()) await import("../lib/nativePush").then((m) => m.unregisterNativePush()).catch(() => {});
     try {
       await axiosInstance.post("/auth/logout");
       clearChatCache();
