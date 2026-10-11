@@ -19,6 +19,7 @@ import { Pin, X, ChevronDown } from "lucide-react";
 import MessageActionMenu from "./MessageActionMenu";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
+import { useChatColorStore } from "../store/useChatColorStore";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
@@ -146,6 +147,7 @@ const ChatContainer = () => {
     swipe.current = { x: 0, y: 0, on: false, dx: 0 };
   };
   const chatKeyNow = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : null;
+  const ownColor = useChatColorStore((s) => (selectedChat ? s.map[`${selectedChat.type === "group" ? "g" : "d"}:${selectedChat.data._id}`] : undefined));
   const [reactionsFor, setReactionsFor] = useState(null);
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   // "N unread messages" divider: remembered when the chat is opened, before they are marked read.
@@ -336,7 +338,7 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0" style={wallpaperStyle}>
+    <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0" style={wallpaperStyle} data-chat-color={ownColor || undefined}>
       <ChatHeader />
       {chatSearchOpen && <ChatSearchBar />}
 

@@ -16,6 +16,7 @@ const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
 const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
 const ScheduledPanel = lazy(() => import("./ScheduledPanel"));
+const ChatColorSheet = lazy(() => import("./ChatColorSheet"));
 
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
@@ -55,6 +56,7 @@ const ChatHeader = () => {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showColor, setShowColor] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
@@ -259,6 +261,15 @@ const ChatHeader = () => {
                 className={menuItem}
                 onClick={() => {
                   setShowMenu(false);
+                  setShowColor(true);
+                }}
+              >
+                <Palette size={18} className="text-wa-icon" /> Chat colour
+              </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
                   setShowScheduled(true);
                 }}
               >
@@ -336,6 +347,11 @@ const ChatHeader = () => {
             </div>
           </div>
         </div>
+      )}
+      {showColor && (
+        <Suspense fallback={null}>
+          <ChatColorSheet chatKey={`${isGroup ? "g" : "d"}:${data._id}`} chatName={name} onClose={() => setShowColor(false)} />
+        </Suspense>
       )}
       {showScheduled && (
         <Suspense fallback={null}>
