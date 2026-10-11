@@ -5,7 +5,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import { translateAndToast } from "../lib/translate";
 import { WaBack } from "./icons/WaIcons";
-import { Reply, Star, StarOutline, Trash2, Forward, MoreVertical, Info, Copy, Pin, PinOff, Languages } from "./icons/WaGlyphs";
+import { Reply, Star, StarOutline, Trash2, Forward, MoreVertical, Info, Copy, Pin, PinOff, Languages, Pencil } from "./icons/WaGlyphs";
 import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
 
@@ -34,6 +34,8 @@ const MessageSelectionBar = () => {
   const canForward = live.length > 0 && live.every((m) => !m.viewOnce && !m.poll);
   const texts = live.filter((m) => m.text).map((m) => m.text);
   const isGroup = selectedChat?.type === "group";
+  const canEdit =
+    !!single && single.senderId === authUser._id && !!single.text && !single.file && !single.image && !single.poll && !single.contact && !single.deletedForEveryone && Date.now() - new Date(single.createdAt).getTime() < 15 * 60 * 1000;
 
   const doStar = () => {
     const st = useChatStore.getState();
@@ -96,6 +98,18 @@ const MessageSelectionBar = () => {
                     }}
                   >
                     <Info size={20} className="text-wa-icon" /> Info
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    className={item}
+                    onClick={() => {
+                      setMenu(false);
+                      useChatStore.getState().setEditingMessage(single);
+                      clear();
+                    }}
+                  >
+                    <Pencil size={20} className="text-wa-icon" /> Edit
                   </button>
                 )}
                 {texts.length > 0 && (

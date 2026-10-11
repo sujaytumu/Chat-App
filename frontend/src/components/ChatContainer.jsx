@@ -484,6 +484,19 @@ const ChatContainer = () => {
                   <div className="w-7 mr-3 shrink-0" />
                 ))}
 
+              {isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setForwardingMessage(message);
+                  }}
+                  className="self-center shrink-0 mx-1.5 size-8 rounded-full bg-black/35 text-white flex items-center justify-center active:scale-90 transition-transform"
+                  aria-label="Forward"
+                >
+                  <Forward size={17} />
+                </button>
+              )}
               {isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
 
               {heartFor === message._id && (
@@ -677,6 +690,19 @@ const ChatContainer = () => {
               )}
 
               {!isMe && !message.deletedForEveryone && <MessageActionMenu {...menuProps} />}
+              {!isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setForwardingMessage(message);
+                  }}
+                  className="self-center shrink-0 mx-1.5 size-8 rounded-full bg-black/35 text-white flex items-center justify-center active:scale-90 transition-transform"
+                  aria-label="Forward"
+                >
+                  <Forward size={17} />
+                </button>
+              )}
             </div>
             {message.reactions?.length > 0 && !message.deletedForEveryone && (
               <div className={`relative z-10 flex -mt-1.5 mb-1.5 px-2 ${isMe ? "justify-end" : isGroup ? "justify-start pl-10" : "justify-start"}`}>
