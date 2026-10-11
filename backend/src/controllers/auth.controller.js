@@ -3,6 +3,9 @@ import { generateToken } from "../lib/utils.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
+import Status from "../models/status.model.js";
+import Group from "../models/group.model.js";
+import { io } from "../lib/socket.js";
 
 export const signup = async (req, res) => {
   const { fullName, email, password } = req.body;
@@ -34,7 +37,7 @@ export const signup = async (req, res) => {
 
     if (newUser) {
       // generate jwt token here
-      generateToken(newUser._id, res);
+      generateToken(newUser._id, res, newUser.tokenVersion || 0);
       await newUser.save();
 
       res.status(201).json({
@@ -83,7 +86,7 @@ export const login = async (req, res) => {
       return res.status(200).json({ twoFactorRequired: true, ticket });
     }
 
-    generateToken(user._id, res);
+    generateToken(user._id, res, user.tokenVersion || 0);
 
     res.status(200).json({
       _id: user._id,
@@ -176,7 +179,10 @@ export const changePassword = async (req, res) => {
 
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(newPassword, salt);
+    user.tokenVersion = (user.tokenVersion || 0) + 1; // every other device must sign in again
     await user.save();
+    generateToken(user._id, res, user.tokenVersion);
+    endOtherSessions(user._id);
 
     res.status(200).json({ message: "Password changed" });
   } catch (error) {
@@ -233,6 +239,75 @@ export const updatePreferences = async (req, res) => {
     res.status(200).json(merged);
   } catch (error) {
     console.log("Error in updatePreferences controller: ", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Drop every live connection of this account. Each device then re-checks its
+// login: the one that just acted holds the new token and reconnects, the rest
+// are signed out.
+async function endOtherSessions(userId) {
+  try {
+    const room = String(userId);
+    io.to(room).emit("forceLogout");
+    const sockets = await io.in(room).fetchSockets();
+    sockets.forEach((s) => s.disconnect(true));
+  } catch (error) {
+    console.log("Error ending sessions:", error.message);
+  }
+}
+
+// "Log out of all devices": invalidates every login token except the one used now.
+export const logoutAllDevices = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(req.user._id, { $inc: { tokenVersion: 1 } }, { new: true }).select("tokenVersion");
+    generateToken(req.user._id, res, user.tokenVersion);
+    endOtherSessions(req.user._id);
+    res.status(200).json({ message: "Logged out of all other devices" });
+  } catch (error) {
+    console.log("Error in logoutAllDevices controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Permanently close the account (password required). Removes the person from
+// groups and deletes their statuses; their profile is wiped and they vanish
+// from everyone's contact list. Messages already sent stay in other people's chats.
+export const deleteAccount = async (req, res) => {
+  try {
+    const { password } = req.body || {};
+    if (typeof password !== "string" || !password) return res.status(400).json({ message: "Enter your password" });
+
+    const user = await User.findById(req.user._id);
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({ message: "That password isn't right" });
+    }
+
+    const uid = user._id;
+    await Status.deleteMany({ userId: uid });
+    await Group.updateMany({ members: uid }, { $pull: { members: uid, admins: uid } });
+    await Group.deleteMany({ members: { $size: 0 } });
+
+    const salt = await bcrypt.genSalt(10);
+    user.fullName = "Deleted account";
+    user.email = `deleted-${uid}@deleted.invalid`;
+    user.password = await bcrypt.hash(`${uid}-${Date.now()}-${Math.random()}`, salt);
+    user.profilePic = "";
+    user.about = "";
+    user.pushSubscriptions = [];
+    user.uiPrefs = {};
+    user.archivedChats = [];
+    user.pinnedChats = [];
+    user.mutedChats = [];
+    user.deleted = true;
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    await endOtherSessions(uid);
+    res.cookie("jwt", "", { maxAge: 0 });
+    res.status(200).json({ message: "Account deleted" });
+  } catch (error) {
+    console.log("Error in deleteAccount controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

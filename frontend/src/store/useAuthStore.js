@@ -181,6 +181,13 @@ export const useAuthStore = create((set, get) => ({
       }
     });
 
+    // Another device used "Log out of all devices" / changed the password / the
+    // account was deleted: re-check this device's login (valid -> reconnects, else signed out).
+    socket.on("forceLogout", () => {
+      get().disconnectSocket();
+      get().checkAuth();
+    });
+
     socket.on("getOnlineUsers", (userIds) => {
       set({ onlineUsers: userIds });
     });
