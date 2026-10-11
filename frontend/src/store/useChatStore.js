@@ -800,7 +800,7 @@ export const useChatStore = create((set, get) => ({
     socket.on("messagesSeen", ({ by }) => {
       const { selectedChat, messages } = get();
       if (selectedChat?.type === "direct" && selectedChat.data._id === by) {
-        set({ messages: messages.map((m) => ({ ...m, seen: true, delivered: true })) });
+        set({ messages: messages.map((m) => (m.receiverId === by ? { ...m, seen: true, delivered: true } : m)) });
       }
       // Keep the ticks in the chat list in sync too.
       set((state) => ({
