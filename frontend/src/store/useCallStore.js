@@ -67,6 +67,48 @@ function attachConnectionWatchdog(peerConnection, get) {
       useCallStore.setState({ isReconnecting });
     }
   };
+  // "Connected but silent" guard: signalling can be fine while no audio packets
+  // actually arrive (a dead relay path, a stuck NAT binding). Every 3 s compare
+  // the bytes received; if nothing arrives for ~9 s, kick ICE (one fresh path
+  // search) and keep watching. This is what turns a silent call into a working one.
+  let lastBytes = -1;
+  let stalls = 0;
+  let kicked = false;
+  const statsTimer = setInterval(async () => {
+    if (peerConnection.signalingState === "closed" || peerConnection.connectionState === "closed") {
+      clearInterval(statsTimer);
+      return;
+    }
+    if (peerConnection.iceConnectionState !== "connected" && peerConnection.iceConnectionState !== "completed") return;
+    try {
+      const stats = await peerConnection.getStats();
+      let bytes = 0;
+      stats.forEach((r) => {
+        if (r.type === "inbound-rtp" && !r.isRemote) bytes += r.bytesReceived || 0;
+      });
+      if (bytes > lastBytes) {
+        stalls = 0;
+        if (kicked) {
+          kicked = false;
+          setReconnecting(false);
+        }
+      } else if (lastBytes >= 0) {
+        stalls += 1;
+        if (stalls >= 3 && !kicked && peerConnection.restartIce) {
+          kicked = true;
+          stalls = 0;
+          setReconnecting(true);
+          peerConnection.restartIce();
+        } else if (stalls >= 5 && kicked) {
+          setReconnecting(true); // still nothing: the UI keeps showing "Reconnecting…"
+        }
+      }
+      lastBytes = bytes;
+    } catch {
+      /* stats unavailable — ignore */
+    }
+  }, 3000);
+
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
     if (state === "failed") {
@@ -152,6 +194,27 @@ function remoteStreamFor(event, get) {
   const stream = get().remoteStream || new MediaStream();
   if (!stream.getTracks().includes(event.track)) stream.addTrack(event.track);
   return stream;
+}
+
+// Opus tuned for phone networks: forward-error-correction on (survives packet
+// loss without crackle), mono voice at a steady 32 kbps.
+function tuneOpus(desc) {
+  if (!desc?.sdp) return desc;
+  const m = desc.sdp.match(/a=rtpmap:(\d+) opus\/48000/i);
+  if (!m) return desc;
+  const pt = m[1];
+  const re = new RegExp(`(a=fmtp:${pt} )([^\\r\\n]*)`);
+  let sdp = desc.sdp;
+  if (re.test(sdp)) {
+    sdp = sdp.replace(re, (_, head, params) => {
+      const set = new Map(params.split(";").filter(Boolean).map((kv) => kv.split("=")));
+      set.set("useinbandfec", "1");
+      set.set("maxaveragebitrate", "32000");
+      set.set("stereo", "0");
+      return head + [...set].map(([k, v]) => (v === undefined ? k : `${k}=${v}`)).join(";");
+    });
+  }
+  return { type: desc.type, sdp };
 }
 
 const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
@@ -252,7 +315,7 @@ export const useCallStore = create((set, get) => ({
         set({ isRemoteRinging: true });
       }
 
-      pc = new RTCPeerConnection(await getIceConfig());
+      pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
@@ -279,7 +342,7 @@ export const useCallStore = create((set, get) => ({
         }
       };
 
-      const offer = await pc.createOffer();
+      const offer = tuneOpus(await pc.createOffer());
       if (isStale()) {
         get().resetCall();
         return;
@@ -321,7 +384,7 @@ export const useCallStore = create((set, get) => ({
       });
       set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now() });
 
-      pc = new RTCPeerConnection(await getIceConfig());
+      pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
@@ -353,7 +416,7 @@ export const useCallStore = create((set, get) => ({
       pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
       pendingCandidates = [];
 
-      const answer = await pc.createAnswer();
+      const answer = tuneOpus(await pc.createAnswer());
       await pc.setLocalDescription(answer);
       initialNegotiationDone = true;
 
