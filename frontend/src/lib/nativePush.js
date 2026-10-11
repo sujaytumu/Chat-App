@@ -1,0 +1,62 @@
+// Android app only (the Capacitor shell): register this phone for Firebase push
+// so calls ring and messages arrive even when the app is closed, and route
+// notification taps (Answer / open chat) into the app.
+import { axiosInstance } from "./axios";
+import { handleNotificationAction } from "./notificationActions";
+
+const plugin = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesPush : null);
+
+export const isNativeApp = () => !!plugin();
+
+let registeredFor = null;
+let listening = false;
+
+export async function registerNativePush(userId, goHome) {
+  const p = plugin();
+  if (!p) return;
+  try {
+    await p.requestPermission?.();
+  } catch {
+    /* ignore */
+  }
+  try {
+    const { token } = await p.getToken();
+    if (token && registeredFor !== `${userId}:${token}`) {
+      await axiosInstance.post("/push/fcm-register", { token });
+      registeredFor = `${userId}:${token}`;
+    }
+  } catch {
+    /* Firebase isn't configured in this build */
+  }
+
+  const deliver = (intent) => {
+    if (!intent) return;
+    handleNotificationAction({ action: intent.action || "open", data: intent }, goHome);
+  };
+  try {
+    const { intent } = (await p.getLaunchIntent?.()) || {};
+    deliver(intent);
+  } catch {
+    /* ignore */
+  }
+  try {
+    if (!listening) {
+      listening = true;
+      p.addListener?.("nativeIntent", deliver);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function unregisterNativePush() {
+  const p = plugin();
+  if (!p) return;
+  try {
+    const { token } = await p.getToken();
+    if (token) await axiosInstance.post("/push/fcm-unregister", { token });
+  } catch {
+    /* ignore */
+  }
+  registeredFor = null;
+}
