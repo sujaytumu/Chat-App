@@ -8,6 +8,8 @@ import { WaBack } from "./icons/WaIcons";
 import { Reply, Star, StarOutline, Trash2, Forward, MoreVertical, Info, Copy, Pin, PinOff, Languages, Pencil } from "./icons/WaGlyphs";
 import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
+import SecurityCodeModal from "./SecurityCodeModal";
+import { ShieldCheck } from "lucide-react";
 
 const btn = "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
 const item = "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
@@ -22,6 +24,7 @@ const MessageSelectionBar = () => {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [forwarding, setForwarding] = useState(null);
   const [info, setInfo] = useState(null);
+  const [secCode, setSecCode] = useState(false);
 
   const clear = () => useChatStore.getState().clearMsgSelection();
   useBackToClose(true, clear);
@@ -88,7 +91,18 @@ const MessageSelectionBar = () => {
           {menu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 w-52 bg-wa-pop rounded-2xl shadow-2xl py-2 z-40 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2 z-40 overflow-hidden">
+                {!isGroup && selectedChat?.data?._id && (
+                  <button
+                    className={item}
+                    onClick={() => {
+                      setMenu(false);
+                      setSecCode(true);
+                    }}
+                  >
+                    <ShieldCheck size={20} className="text-wa-icon" /> Verify security code
+                  </button>
+                )}
                 {single && (
                   <button
                     className={item}
@@ -185,6 +199,14 @@ const MessageSelectionBar = () => {
             setForwarding(null);
             clear();
           }}
+        />
+      )}
+      {secCode && (
+        <SecurityCodeModal
+          myId={authUser._id}
+          otherId={selectedChat.data._id}
+          otherName={selectedChat.data.fullName || "them"}
+          onClose={() => setSecCode(false)}
         />
       )}
       {info && <MessageInfoModal message={info} members={isGroup ? selectedChat.data.members : undefined} onClose={() => setInfo(null)} />}
