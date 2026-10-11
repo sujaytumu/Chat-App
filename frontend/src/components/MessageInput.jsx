@@ -592,7 +592,20 @@ const MessageInput = () => {
   }, [isRecording, selectedChat?.data?._id]);
 
   // Drafts: what you typed and didn't send is kept per chat, and comes back when you return.
+  // Saving a draft on EVERY keystroke re-rendered the chat list and rewrote
+  // localStorage each time (typing lag). Now it's saved ~0.4 s after you pause.
+  const draftPending = useRef(null);
+  const flushDraft = () => {
+    const p = draftPending.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    draftPending.current = null;
+    useDraftStore.getState().setDraft(p.key, p.text);
+  };
+  useEffect(() => flushDraft, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
+    flushDraft(); // finish saving the chat we're leaving
     const key = draftKey(selectedChat);
     if (!key || useChatStore.getState().editingMessage) return;
     setText(useDraftStore.getState().drafts[key] || "");
@@ -607,7 +620,24 @@ const MessageInput = () => {
   }, [selectedChat?.type, selectedChat?.data?._id]);
   useEffect(() => {
     if (editingMessage) return;
-    useDraftStore.getState().setDraft(draftKey(selectedChat), text);
+    const key = draftKey(selectedChat);
+    if (!key) return;
+    if (!text.trim()) {
+      // cleared / sent: update the list right away
+      if (draftPending.current) {
+        clearTimeout(draftPending.current.timer);
+        draftPending.current = null;
+      }
+      useDraftStore.getState().setDraft(key, text);
+      return;
+    }
+    if (draftPending.current) clearTimeout(draftPending.current.timer);
+    const pending = { key, text, timer: null };
+    pending.timer = setTimeout(() => {
+      if (draftPending.current === pending) draftPending.current = null;
+      useDraftStore.getState().setDraft(key, text);
+    }, 400);
+    draftPending.current = pending;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
 
