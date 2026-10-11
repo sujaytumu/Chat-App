@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import compression from "compression";
 import helmet from "helmet";
+import { fcmEnabled } from "./lib/fcm.js";
 import rateLimit from "express-rate-limit";
 import path from "path";
 
@@ -89,6 +90,16 @@ app.use("/api/scheduled", scheduledRoutes);
 app.get("/api/health", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
   res.status(200).send("ok");
+});
+
+// Is background push set up on the server? (no secrets, just yes/no)
+app.get("/api/health/push", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    webPush: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+    androidPush: fcmEnabled(),
+    privateTurn: !!(process.env.TURN_URLS && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL),
+  });
 });
 
 if (process.env.NODE_ENV === "production") {
