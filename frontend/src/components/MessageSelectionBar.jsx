@@ -5,14 +5,13 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import { translateAndToast } from "../lib/translate";
 import { WaBack } from "./icons/WaIcons";
-import { Reply, Star, StarOutline, Trash2, Forward, MoreVertical, Info, Copy, Pin, PinOff, Languages, Pencil } from "./icons/WaGlyphs";
+import { Reply, Star, StarOutline, Trash2, Forward, MoreVertical } from "./icons/WaGlyphs";
 import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
 import SecurityCodeModal from "./SecurityCodeModal";
-import { ShieldCheck } from "lucide-react";
 
 const btn = "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
-const item = "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
+const item = "w-full flex items-center px-5 py-3.5 text-[16px] text-wa-text hover:bg-white/5 active:bg-white/10 text-left whitespace-nowrap";
 
 // WhatsApp's top bar while messages are selected: count + Reply / Star / Delete / Forward / ⋮.
 const MessageSelectionBar = () => {
@@ -91,7 +90,7 @@ const MessageSelectionBar = () => {
           {menu && (
             <>
               <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2 z-40 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 min-w-[15rem] bg-wa-pop rounded-2xl shadow-2xl py-2 z-40 overflow-hidden">
                 {!isGroup && selectedChat?.data?._id && (
                   <button
                     className={item}
@@ -99,8 +98,7 @@ const MessageSelectionBar = () => {
                       setMenu(false);
                       setSecCode(true);
                     }}
-                  >
-                    <ShieldCheck size={20} className="text-wa-icon" /> Verify security code
+                  >Verify security code
                   </button>
                 )}
                 {single && (
@@ -110,8 +108,7 @@ const MessageSelectionBar = () => {
                       setMenu(false);
                       setInfo(single);
                     }}
-                  >
-                    <Info size={20} className="text-wa-icon" /> Info
+                  >Info
                   </button>
                 )}
                 {texts.length > 0 && (
@@ -125,8 +122,7 @@ const MessageSelectionBar = () => {
                       );
                       clear();
                     }}
-                  >
-                    <Copy size={20} className="text-wa-icon" /> Copy
+                  >Copy
                   </button>
                 )}
                 {canEdit && (
@@ -137,8 +133,7 @@ const MessageSelectionBar = () => {
                       useChatStore.getState().setEditingMessage(single);
                       clear();
                     }}
-                  >
-                    <Pencil size={20} className="text-wa-icon" /> Edit
+                  >Edit
                   </button>
                 )}
                 {single && !single.deletedForEveryone && (
@@ -150,7 +145,7 @@ const MessageSelectionBar = () => {
                       clear();
                     }}
                   >
-                    {single.pinned ? <PinOff size={20} className="text-wa-icon" /> : <Pin size={20} className="text-wa-icon" />}
+                    
                     {single.pinned ? "Unpin" : "Pin"}
                   </button>
                 )}
@@ -162,8 +157,7 @@ const MessageSelectionBar = () => {
                       translateAndToast(single.text);
                       clear();
                     }}
-                  >
-                    <Languages size={20} className="text-wa-icon" /> Translate
+                  >Translate
                   </button>
                 )}
               </div>
