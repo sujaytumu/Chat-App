@@ -30,6 +30,39 @@ export const AccountPage = () => {
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [savingPw, setSavingPw] = useState(false);
+  const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [delPw, setDelPw] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const logoutAll = async () => {
+    setLoggingOutAll(true);
+    try {
+      await axiosInstance.post("/auth/logout-all");
+      toast.success("Signed out of all other devices");
+      setConfirmLogoutAll(false);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not sign out other devices");
+    } finally {
+      setLoggingOutAll(false);
+    }
+  };
+
+  const deleteAccount = async (e) => {
+    e.preventDefault();
+    setDeleting(true);
+    try {
+      await axiosInstance.delete("/auth/account", { data: { password: delPw } });
+      useAuthStore.getState().disconnectSocket();
+      clearChatCache();
+      useAuthStore.setState({ authUser: null });
+      toast.success("Your account was deleted");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Could not delete the account");
+      setDeleting(false);
+    }
+  };
 
   const dirty = name.trim() !== (authUser?.fullName || "") || about.trim() !== (authUser?.about || "");
 
@@ -119,6 +152,63 @@ export const AccountPage = () => {
           </button>
         </div>
       </form>
+
+      <div className={card}>
+        <p className="text-[13.5px] text-wa-text">Log out of all other devices</p>
+        <p className="text-[11.5px] text-wa-muted mt-0.5">
+          Signs you out everywhere else (browsers, installed apps, the Android app). You stay signed in here.
+        </p>
+        {confirmLogoutAll ? (
+          <div className="flex justify-end gap-2 mt-3">
+            <button type="button" className="px-4 h-10 rounded-full text-wa-muted hover:bg-wa-pop" onClick={() => setConfirmLogoutAll(false)}>
+              Cancel
+            </button>
+            <button type="button" className={primaryBtn} disabled={loggingOutAll} onClick={logoutAll}>
+              {loggingOutAll ? <Loader2 className="animate-spin" size={18} /> : "Log them out"}
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end mt-3">
+            <button type="button" className={primaryBtn} onClick={() => setConfirmLogoutAll(true)}>
+              Log out other devices
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className={card}>
+        <p className="text-[13.5px] text-red-500 font-medium">Delete account</p>
+        <p className="text-[11.5px] text-wa-muted mt-0.5">
+          Permanently removes your profile, statuses and group memberships. Messages you already sent stay in other
+          people&apos;s chats. This can&apos;t be undone.
+        </p>
+        {showDelete ? (
+          <form onSubmit={deleteAccount} className="mt-3">
+            <input
+              className={field}
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password to confirm"
+              value={delPw}
+              onChange={(e) => setDelPw(e.target.value)}
+            />
+            <div className="flex justify-end gap-2 mt-3">
+              <button type="button" className="px-4 h-10 rounded-full text-wa-muted hover:bg-wa-pop" onClick={() => { setShowDelete(false); setDelPw(""); }}>
+                Cancel
+              </button>
+              <button type="submit" disabled={!delPw || deleting} className="px-4 h-10 rounded-full bg-red-500 text-white font-medium disabled:opacity-50">
+                {deleting ? <Loader2 className="animate-spin" size={18} /> : "Delete my account"}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex justify-end mt-3">
+            <button type="button" className="px-4 h-10 rounded-full text-red-500 hover:bg-red-500/10 font-medium" onClick={() => setShowDelete(true)}>
+              Delete account…
+            </button>
+          </div>
+        )}
+      </div>
     </SettingsShell>
   );
 };

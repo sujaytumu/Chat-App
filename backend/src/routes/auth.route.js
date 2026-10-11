@@ -1,5 +1,5 @@
 import express from "express";
-import { changePassword, checkAuth, login, logout, signup, updateProfile, getPreferences, updatePreferences } from "../controllers/auth.controller.js";
+import { changePassword, checkAuth, login, logout, signup, updateProfile, getPreferences, updatePreferences, logoutAllDevices, deleteAccount } from "../controllers/auth.controller.js";
 import {
   loginWithTwoFactor,
   setupTwoFactor,
@@ -24,6 +24,8 @@ router.post("/2fa/backup-codes", protectRoute, regenerateBackupCodes);
 
 router.put("/update-profile", protectRoute, updateProfile);
 router.put("/change-password", protectRoute, changePassword);
+router.post("/logout-all", protectRoute, logoutAllDevices);
+router.delete("/account", protectRoute, deleteAccount);
 
 router.get("/check", protectRoute, checkAuth);
 router.get("/preferences", protectRoute, getPreferences);
