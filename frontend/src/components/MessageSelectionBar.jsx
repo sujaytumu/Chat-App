@@ -114,18 +114,6 @@ const MessageSelectionBar = () => {
                     <Info size={20} className="text-wa-icon" /> Info
                   </button>
                 )}
-                {canEdit && (
-                  <button
-                    className={item}
-                    onClick={() => {
-                      setMenu(false);
-                      useChatStore.getState().setEditingMessage(single);
-                      clear();
-                    }}
-                  >
-                    <Pencil size={20} className="text-wa-icon" /> Edit
-                  </button>
-                )}
                 {texts.length > 0 && (
                   <button
                     className={item}
@@ -139,6 +127,18 @@ const MessageSelectionBar = () => {
                     }}
                   >
                     <Copy size={20} className="text-wa-icon" /> Copy
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    className={item}
+                    onClick={() => {
+                      setMenu(false);
+                      useChatStore.getState().setEditingMessage(single);
+                      clear();
+                    }}
+                  >
+                    <Pencil size={20} className="text-wa-icon" /> Edit
                   </button>
                 )}
                 {single && !single.deletedForEveryone && (
