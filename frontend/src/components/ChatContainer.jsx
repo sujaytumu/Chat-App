@@ -420,6 +420,7 @@ const ChatContainer = () => {
             onForward: () => setForwardingMessage(message),
             onInfo: () => setInfoMessage(message),
             onReact: (emoji) => reactToMessage(message._id, emoji),
+            onSelect: () => toggleSelectMessage(message._id),
             onEdit:
               isMe && hasText && !message.file && !message.deletedForEveryone && Date.now() - new Date(message.createdAt).getTime() < 15 * 60 * 1000
                 ? () => setEditingMessage(message)
