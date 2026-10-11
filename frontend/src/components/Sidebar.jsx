@@ -26,6 +26,7 @@ import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import { useDraftStore } from "../store/useDraftStore";
 import { groupTypingLabel } from "../lib/typingLabel";
+import MuteSheet from "./MuteSheet";
 import {
   WaBack,
   WaKebab,
@@ -338,8 +339,15 @@ const Sidebar = () => {
     }
     bulk((i) => setChatPinned(chatOf(i), !allPinned, { silent: true }), () => (allPinned ? "Chat unpinned" : "Chat pinned"));
   };
-  const onMute = () =>
-    bulk((i) => setChatMuted(chatOf(i), !allMuted, { silent: true }), () => (allMuted ? "Notifications on" : "Notifications muted"));
+  const [muteSheet, setMuteSheet] = useState(false);
+  const onMute = () => {
+    if (!allMuted) return setMuteSheet(true);
+    bulk((i) => setChatMuted(chatOf(i), false, { silent: true }), () => "Notifications on");
+  };
+  const doMute = (until) => {
+    setMuteSheet(false);
+    bulk((i) => setChatMuted(chatOf(i), true, { silent: true, until }), () => "Notifications muted");
+  };
   const onArchive = () =>
     bulk((i) => setChatArchived(chatOf(i), !showArchived, { silent: true }), (n) =>
       showArchived ? `${n} chat${n > 1 ? "s" : ""} unarchived` : `${n} chat${n > 1 ? "s" : ""} archived`
@@ -804,6 +812,7 @@ const Sidebar = () => {
         )}
       </div>
 
+      {muteSheet && <MuteSheet name={selectedItems.length === 1 ? selectedItems[0].name : "these chats"} onClose={() => setMuteSheet(false)} onPick={doMute} />}
       {searchOpen && <SearchScreen onClose={() => setSearchOpen(false)} />}
 
       {/* Floating action button */}

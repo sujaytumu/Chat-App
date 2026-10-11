@@ -9,6 +9,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 import ImageLightbox from "./ImageLightbox";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
+import MuteSheet from "./MuteSheet";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const row = "w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10";
@@ -23,6 +24,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
   const [viewPhoto, setViewPhoto] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
+  const [showMute, setShowMute] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
   const starred = useStarredCount("direct", user._id);
   const mediaData = useChatMedia("direct", user._id);
@@ -102,7 +104,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
             <span className="text-wa-muted">{starred?.length || ""}</span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
-          <button onClick={() => setChatMuted(chat, !muted)} className={row}>
+          <button onClick={() => (muted ? setChatMuted(chat, false) : setShowMute(true))} className={row}>
             {muted ? <BellOff size={22} className="text-wa-muted" /> : <Bell size={22} className="text-wa-muted" />}
             <span className="flex-1 text-[13.5px]">Mute notifications</span>
             <span
@@ -141,6 +143,16 @@ const ContactInfoModal = ({ user, status, onClose }) => {
         </div>
       </div>
 
+      {showMute && (
+        <MuteSheet
+          name={user.fullName}
+          onClose={() => setShowMute(false)}
+          onPick={(until) => {
+            setShowMute(false);
+            setChatMuted(chat, true, { until });
+          }}
+        />
+      )}
       {showDisappear && (
         <DisappearingPanel
           direct={{ current: secs, onPick: (s) => useChatStore.getState().setDirectDisappearing(user._id, s) }}
