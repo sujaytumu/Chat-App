@@ -291,3 +291,7 @@ html[data-font="huge"] .msg-text { font-size: 18px; line-height: 26px; }
 @keyframes fmtpop{from{opacity:0;translate:0 6px;scale:.92}to{opacity:1;translate:0 0;scale:1}}
 .fmt-pop{animation:fmtpop .14s ease-out}
 html.reduce-motion .fmt-pop{animation:none}
+
+@keyframes selpop{from{opacity:0;translate:0 -8px;scale:.9}to{opacity:1;translate:0 0;scale:1}}
+.sel-pop{animation:selpop .16s ease-out}
+html.reduce-motion .sel-pop{animation:none}

@@ -164,6 +164,24 @@ const MessageSelectionBar = () => {
             </>
           )}
         </div>
+      {single && !single.deletedForEveryone && !menu && (
+        <div className="absolute left-3 right-3 top-[calc(100%+4px)] z-20 flex justify-center pointer-events-none">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full bg-wa-pop shadow-xl px-2 py-1.5 sel-pop">
+            {["👍", "❤️", "😂", "😮", "😢", "🙏"].map((e) => (
+              <button
+                key={e}
+                className="size-10 rounded-full text-[24px] leading-none hover:bg-white/10 active:scale-90 transition-transform"
+                onClick={() => {
+                  useChatStore.getState().reactToMessage(single._id, e);
+                  clear();
+                }}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       </div>
 
       {confirmDelete && (
