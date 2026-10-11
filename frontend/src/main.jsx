@@ -6,9 +6,11 @@ import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
 import { useThemeStore, applyTheme, watchAutoTheme } from "./store/useThemeStore";
 import { applyUiSettings } from "./lib/uiSettings";
+import { applyAppFont } from "./lib/appFont";
 import { applyChatColor } from "./lib/chatColor";
 
 applyUiSettings();
+applyAppFont();
 applyChatColor();
 applyTheme(useThemeStore.getState().theme);
 watchAutoTheme();

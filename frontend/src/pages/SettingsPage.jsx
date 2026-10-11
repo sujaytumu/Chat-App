@@ -2,13 +2,14 @@ import { THEMES } from "../constants";
 import { CHAT_COLORS, getChatColor, setChatColor } from "../lib/chatColor";
 import { useThemeStore, getThemeAuto, setThemeAuto } from "../store/useThemeStore";
 import { Download, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import { getWallpaper, setWallpaper } from "../lib/uiSettings";
 import { useWallpaperStore } from "../lib/wallpaper";
 import WallpaperPicker from "../components/WallpaperPicker";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
 import toast from "react-hot-toast";
+import { APP_FONTS, getAppFont, setAppFont, preloadAllFonts } from "../lib/appFont";
 
 export const InstallAppControl = () => {
   const { isInstalled, promptInstall } = useInstallPrompt();
@@ -114,6 +115,8 @@ export const AppearancePage = () => {
         </div>
       </div>
 
+      <FontStyleCard />
+
       <ToggleRow
         title="Match device"
         sub="Switch between light and dark automatically with your phone or computer"
@@ -163,3 +166,35 @@ export const AppearancePage = () => {
 };
 
 export default AppearancePage;
+
+function FontStyleCard() {
+  const [font, setFont] = useState(getAppFont());
+  useEffect(() => {
+    preloadAllFonts();
+  }, []);
+  return (
+    <div className="rounded-xl bg-wa-surface p-4">
+      <span className="block text-[13.5px]">Font style</span>
+      <span className="block text-[11.5px] text-wa-muted mb-3">The typeface used across the whole app</span>
+      <div className="grid grid-cols-2 gap-2">
+        {APP_FONTS.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => {
+              setFont(f.id);
+              setAppFont(f.id);
+            }}
+            aria-pressed={font === f.id}
+            className={`h-12 px-3 rounded-xl text-left text-[14px] truncate ${font === f.id ? "bg-[#00A884]/20 text-[#00A884] ring-1 ring-[#00A884]" : "bg-wa-field text-wa-text hover:bg-wa-hover"}`}
+            style={{ fontFamily: f.css }}
+          >
+            {f.name}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 rounded-xl bg-wa-out px-3 py-2 w-fit ml-auto" style={{ fontFamily: APP_FONTS.find((f) => f.id === font)?.css }}>
+        <span className="text-[14px] leading-[21px]">Hey! This is how Talkies will look 👋</span>
+      </div>
+    </div>
+  );
+}

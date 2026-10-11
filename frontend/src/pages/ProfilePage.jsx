@@ -129,10 +129,6 @@ const ProfilePage = () => {
       >
         {!query && (
           <div className="relative">
-            <div
-              className="chat-wallpaper absolute inset-x-0 top-0 h-[300px] opacity-90 pointer-events-none"
-              style={{ WebkitMaskImage: "linear-gradient(to bottom, #000 55%, transparent)", maskImage: "linear-gradient(to bottom, #000 55%, transparent)" }}
-            />
             <div className="relative flex flex-col items-center pt-6 pb-6">
               {authUser?.about && (
                 <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-wa-surface px-5 py-3 text-[13.5px] text-wa-text text-center">
