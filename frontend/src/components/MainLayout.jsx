@@ -122,6 +122,19 @@ const MainLayout = ({ children }) => {
     }
   };
 
+  // Download the other tabs' code while the phone is idle, so the first swipe
+  // never waits on the network (that wait was the hitch at the start of a drag).
+  useEffect(() => {
+    const load = () => {
+      import("../pages/HomePage");
+      import("../pages/StatusPage");
+      import("../pages/CallsPage");
+      import("../pages/ProfilePage");
+    };
+    const id = window.requestIdleCallback ? window.requestIdleCallback(load, { timeout: 4000 }) : setTimeout(load, 2500);
+    return () => (window.cancelIdleCallback ? window.cancelIdleCallback(id) : clearTimeout(id));
+  }, []);
+
   useEffect(() => {
     const vv = window.visualViewport;
     const apply = () => {
