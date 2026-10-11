@@ -173,3 +173,56 @@ form:focus-within .rounded-full.bg-wa-surface { box-shadow: 0 10px 28px -10px rg
 .btn-primary { background-image: linear-gradient(135deg, #25D366, #00A884); border: 0; color: #fff; box-shadow: 0 10px 22px -10px rgb(0 168 132 / .7); }
 .btn { border-radius: 14px; }
 .badge { border-radius: 9999px; }
+
+/* ==========================================================================
+   Round 3 — more effects (all purely visual)
+   ========================================================================== */
+
+/* Brand title: gradient ink */
+h1.font-bold.tracking-tight.text-wa-text {
+  background: linear-gradient(100deg, rgb(var(--wa-text)) 0%, #00A884 55%, #25D366 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent;
+}
+
+/* Green buttons: gradient glides on hover */
+.bg-\[\#00A884\], .bg-\[\#21C063\] { background-size: 180% 180%; background-position: 0% 50%; transition: background-position .5s ease, filter .15s ease, translate .15s ease, scale .12s ease; }
+.bg-\[\#00A884\]:hover, .bg-\[\#21C063\]:hover { background-position: 100% 50%; }
+
+/* Send button springs in when text appears */
+button[type="submit"].bg-\[\#00A884\] { animation: send-in .3s cubic-bezier(.2, 1.5, .4, 1) both; }
+@keyframes send-in { from { scale: .4; rotate: -35deg; opacity: 0; } to { scale: 1; rotate: 0deg; opacity: 1; } }
+
+/* Recording dot: radiating ring */
+.animate-pulse.bg-red-500.rounded-full { box-shadow: 0 0 0 0 rgb(239 68 68 / .6); animation: rec-ring 1.3s ease-out infinite; }
+@keyframes rec-ring { 0% { box-shadow: 0 0 0 0 rgb(239 68 68 / .6); } 100% { box-shadow: 0 0 0 10px rgb(239 68 68 / 0); } }
+
+/* Scroll-to-bottom button & other floating round buttons: float + shadow */
+button.rounded-full.shadow-lg, button.rounded-full.shadow-md { box-shadow: var(--sh-2), var(--ring); animation: float-in .25s cubic-bezier(.2, 1.3, .4, 1) both; }
+@keyframes float-in { from { scale: .6; opacity: 0; translate: 0 10px; } to { scale: 1; opacity: 1; translate: 0 0; } }
+
+/* Skeleton shimmer sweep */
+.skeleton { position: relative; overflow: hidden; background-image: linear-gradient(100deg, transparent 25%, rgb(255 255 255 / .22) 50%, transparent 75%); background-size: 220% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { from { background-position: 160% 0; } to { background-position: -60% 0; } }
+
+/* Avatars: tactile */
+.avatar, img.rounded-full { transition: scale .2s cubic-bezier(.2, 1.2, .4, 1), box-shadow .2s ease; }
+@media (hover: hover) { button:hover > .relative > img.rounded-full, button:hover img.rounded-full.size-12 { scale: 1.06; } }
+
+/* Message reactions: pop in */
+.msg-row .rounded-full.shadow-sm { animation: m-pop .22s cubic-bezier(.2, 1.5, .4, 1) both; }
+
+/* Hovered links inside messages glow */
+.msg-row a { text-underline-offset: 2px; transition: opacity .15s ease; }
+.msg-row a:hover { opacity: .8; }
+
+/* Toggles & checkboxes: springy */
+.toggle { transition: background-color .2s ease, box-shadow .2s ease; }
+.toggle:checked { box-shadow: 0 0 12px -2px rgb(37 211 102 / .6); }
+
+/* Settings rows & list buttons: soft press */
+a.flex.items-center:active, button.w-full.text-left:active { background-color: rgb(var(--wa-surface) / .9); }
+
+/* Subtle animated aurora behind empty-state / no-chat screen */
+@keyframes aurora { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.bg-wa-surface.flex-1.flex-col.items-center { background-image: radial-gradient(60% 50% at 30% 20%, rgb(37 211 102 / .10), transparent 70%), radial-gradient(50% 50% at 75% 80%, rgb(0 168 132 / .10), transparent 70%); }
+
