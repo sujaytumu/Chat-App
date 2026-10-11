@@ -1,0 +1,103 @@
+/* ==========================================================================
+   Visual polish layer — loaded after index.css. Purely cosmetic: colours,
+   depth, blur, motion and typography. No layout or behaviour is changed.
+   ========================================================================== */
+
+:root {
+  --accent: 0 168 132;
+  --accent-2: 37 211 102;
+  /* a touch cooler / cleaner than flat grey */
+  --wa-surface: 241 244 246;
+  --wa-field: 235 240 242;
+  --wa-hover: 228 234 237;
+  --wa-wallpaper: #EDE8DF;
+  --sh-1: 0 1px 1.5px rgb(11 20 26 / .13);
+  --sh-2: 0 6px 18px -6px rgb(11 20 26 / .22), 0 2px 6px -2px rgb(11 20 26 / .12);
+  --sh-3: 0 24px 56px -14px rgb(11 20 26 / .38), 0 8px 20px -8px rgb(11 20 26 / .2);
+  --ring: 0 0 0 1px rgb(11 20 26 / .06);
+}
+.wa-dark {
+  --wa-bg: 9 17 22;
+  --wa-panel: 15 25 31;
+  --wa-surface: 28 41 49;
+  --wa-pop: 33 47 55;
+  --wa-field: 38 53 62;
+  --sh-1: 0 1px 1.5px rgb(0 0 0 / .4);
+  --sh-2: 0 8px 22px -6px rgb(0 0 0 / .55), 0 2px 6px -2px rgb(0 0 0 / .4);
+  --sh-3: 0 28px 64px -14px rgb(0 0 0 / .75), 0 8px 22px -8px rgb(0 0 0 / .5);
+  --ring: 0 0 0 1px rgb(255 255 255 / .07);
+}
+
+/* Typography: crisp native UI font on every platform */
+body, button, input, textarea, select {
+  font-family: system-ui, -apple-system, "Segoe UI Variable", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Wallpaper: soft vignette so bubbles pop */
+.chat-wallpaper {
+  background-image:
+    radial-gradient(120% 80% at 50% 0%, rgb(255 255 255 / .10), transparent 60%),
+    radial-gradient(120% 90% at 50% 100%, rgb(0 0 0 / .05), transparent 55%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='%23ffffff' stroke-opacity='0.055' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='30' cy='32' r='9'/%3E%3Cpath d='M208 52c-12-9-18-17-12-24 5-6 12-3 12 3 0-6 7-9 12-3 6 7 0 15-12 24z'/%3E%3Crect x='38' y='100' width='26' height='22' rx='6' transform='rotate(-14 51 111)'/%3E%3Cpath d='M112 116q8-14 16 0t16 0t16 0'/%3E%3Cpath d='M30 186v18M21 195h18'/%3E%3Cpath d='M118 178a16 16 0 1 0 14 24a13 13 0 0 1-14-24z'/%3E%3Ccircle cx='84' cy='60' r='2'/%3E%3Ccircle cx='160' cy='150' r='2'/%3E%3Ccircle cx='232' cy='88' r='2'/%3E%3C/svg%3E");
+  background-size: auto, auto, 260px 260px;
+}
+html:not(.wa-dark) .chat-wallpaper {
+  background-image:
+    radial-gradient(120% 80% at 50% 0%, rgb(255 255 255 / .35), transparent 60%),
+    radial-gradient(120% 90% at 50% 100%, rgb(0 0 0 / .05), transparent 55%);
+  background-size: auto;
+}
+html.no-wallpaper .chat-wallpaper { background-image: none; }
+
+/* Message bubbles: gentle depth */
+.msg-row .bg-wa-out, .msg-row .bg-wa-surface { box-shadow: var(--sh-1); }
+.msg-row .bg-wa-out { background-image: linear-gradient(160deg, rgb(255 255 255 / .10), rgb(255 255 255 / 0) 55%); }
+.wa-dark .msg-row .bg-wa-out { background-image: linear-gradient(160deg, rgb(255 255 255 / .06), rgb(255 255 255 / 0) 55%); }
+/* tail must not repeat the sheen */
+.bubble-tail-out::before, .bubble-tail-in::before { background-image: none; }
+
+/* Brand-green actions get a living gradient + glow */
+.bg-\[\#00A884\] {
+  background-image: linear-gradient(135deg, #25D366 0%, #00A884 100%);
+  box-shadow: 0 6px 16px -6px rgb(0 168 132 / .65);
+}
+.bg-\[\#00A884\]:hover { filter: brightness(1.05); }
+button.bg-\[\#00A884\]:active { filter: brightness(.95); }
+.text-\[\#00A884\] { color: rgb(0 156 122); }
+.wa-dark .text-\[\#00A884\] { color: #25D366; }
+
+/* Overlays: frosted backdrops, deeper floating surfaces */
+.fixed.inset-0[class*="bg-black/"] { -webkit-backdrop-filter: blur(4px) saturate(1.1); backdrop-filter: blur(4px) saturate(1.1); }
+.bg-wa-pop.shadow-2xl, .bg-wa-pop.shadow-xl, .bg-wa-pop.shadow-lg { box-shadow: var(--sh-3), var(--ring); }
+.rounded-t-3xl { border-top-left-radius: 28px; border-top-right-radius: 28px; box-shadow: 0 -12px 40px -10px rgb(0 0 0 / .35); }
+.fixed .rounded-3xl.bg-wa-pop, .fixed .rounded-2xl.bg-wa-pop { border-radius: 24px; }
+
+/* Date / system pills: frosted glass */
+.bg-wa-surface\/90, .bg-wa-surface\/95 { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: var(--sh-1); }
+
+/* Top bars & composer: subtle depth line instead of flat rule */
+.border-b.border-white\/5.bg-wa-bg, .border-b.border-white\/5.bg-wa-panel { box-shadow: 0 1px 0 rgb(0 0 0 / .04), 0 6px 14px -12px rgb(0 0 0 / .3); }
+
+/* Lists: rounded hover wash, calmer press */
+.chat-row, button.hover\:bg-wa-surface\/70 { transition: background-color .18s ease, box-shadow .18s ease; }
+@media (hover: hover) {
+  button.hover\:bg-wa-surface\/70:hover { background-color: rgb(var(--wa-surface) / .85); }
+}
+
+/* Form fields: clear, branded focus */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):focus-visible,
+textarea:focus-visible, select:focus-visible { outline: none; }
+.input:focus, .textarea:focus, .select:focus { border-color: rgb(var(--accent)); box-shadow: 0 0 0 3px rgb(var(--accent) / .18); outline: none; }
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; border-radius: 10px; }
+
+/* Avatars & images: soft ring */
+img.rounded-full, .avatar img { box-shadow: 0 0 0 1px rgb(0 0 0 / .06); }
+
+/* Toasts */
+[role="status"] > div, .go3958317564 { border-radius: 14px !important; box-shadow: var(--sh-2) !important; }
+
+/* Smooth theme change */
+body { transition: background-color .25s ease, color .25s ease; }
