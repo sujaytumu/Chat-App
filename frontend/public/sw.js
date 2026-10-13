@@ -165,7 +165,7 @@ self.addEventListener("push", (event) => {
         // Answer / Decline right on the notification.
         requireInteraction: !!isCall,
         vibrate,
-        actions: isCall && Array.isArray(actions) ? actions : undefined,
+        actions: Array.isArray(actions) ? actions : undefined,
       });
 
       // The message reached this device: tell the server so the sender gets
@@ -196,6 +196,47 @@ self.addEventListener("notificationclick", (event) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ callerId: data.callerId }),
       }).catch(() => {})
+    );
+    return;
+  }
+
+  // Quick reply typed right in the notification (no need to open the app).
+  if (action === "reply" && typeof event.reply === "string" && event.reply.trim() && data.chatId) {
+    const text = event.reply.trim();
+    const url = data.chatType === "group" ? `/api/groups/${data.chatId}/messages` : `/api/messages/send/${data.chatId}`;
+    const title = event.notification.title;
+    const tag = event.notification.tag;
+    event.waitUntil(
+      (async () => {
+        let ok = false;
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text }),
+          });
+          ok = res.ok;
+        } catch {
+          ok = false;
+        }
+        // Chrome expects the notification to be replaced after an inline reply.
+        await self.registration.showNotification(title || "Talkies", {
+          body: ok ? `You: ${text}` : "Couldn't send — tap to open Talkies",
+          icon: "/icon-v2-192.png",
+          badge: "/icon-v2-192.png",
+          tag,
+          data,
+          silent: true,
+          renotify: false,
+        });
+        if (ok) {
+          setTimeout(async () => {
+            const open = await self.registration.getNotifications({ tag });
+            open.forEach((n) => n.close());
+          }, 4000);
+        }
+      })()
     );
     return;
   }

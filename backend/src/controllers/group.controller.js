@@ -240,6 +240,8 @@ export const sendGroupMessage = async (req, res) => {
           body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
           icon: group.groupPic || "/icon-v2-192.png",
           tag: `group-${groupId}`,
+        actions: [{ action: "reply", type: "text", title: "Reply", placeholder: "Type a reply…" }],
+          actions: [{ action: "reply", type: "text", title: "Reply", placeholder: "Type a reply…" }],
           data: { url: "/", chatType: "group", chatId: groupId.toString(), messageId: newMessage._id.toString() },
         },
         {}
@@ -252,6 +254,7 @@ export const sendGroupMessage = async (req, res) => {
         body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
         icon: group.groupPic || "/icon-v2-192.png",
         tag: `group-${groupId}`,
+        actions: [{ action: "reply", type: "text", title: "Reply", placeholder: "Type a reply…" }],
         data: {
           url: "/",
           chatType: "group",
