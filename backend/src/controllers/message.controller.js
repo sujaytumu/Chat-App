@@ -262,6 +262,7 @@ export const sendMessage = async (req, res) => {
       body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
       icon: req.user.profilePic || "/icon-v2-192.png",
       tag: `dm-${senderId}`,
+      actions: [{ action: "reply", type: "text", title: "Reply", placeholder: "Type a reply…" }],
       data: {
         url: "/",
         chatType: "direct",
