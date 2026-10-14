@@ -218,3 +218,24 @@ a.flex.items-center:active, button.w-full.text-left:active { background-color: r
 }
 /* Cheaper shadows while the user is dragging / scrolling is handled by the browser; keep them small */
 .bg-wa-pop.shadow-2xl, .bg-wa-pop.shadow-xl, .bg-wa-pop.shadow-lg { box-shadow: 0 10px 28px -10px rgb(0 0 0 / .4); }
+
+/* ==========================================================================
+   Accent colour — re-tints every brand-green surface (only when one is chosen)
+   ========================================================================== */
+html[data-accent] .bg-\[\#25D366\],
+html[data-accent] .bg-\[\#21C063\],
+html[data-accent] .bg-\[\#00A884\] { background-image: linear-gradient(135deg, var(--ac1), var(--ac2)); background-color: var(--ac2); box-shadow-color: var(--ac2); }
+html[data-accent] button.bg-\[\#21C063\] { box-shadow: 0 14px 28px -10px color-mix(in srgb, var(--ac2) 75%, transparent) !important; }
+html[data-accent] button.bg-\[\#00A884\] { box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--ac2) 65%, transparent); }
+html[data-accent] .text-\[\#25D366\],
+html[data-accent] .text-\[\#21C063\],
+html[data-accent] .text-\[\#00A884\] { color: var(--ac2); }
+html[data-accent].wa-dark .text-\[\#25D366\],
+html[data-accent].wa-dark .text-\[\#21C063\],
+html[data-accent].wa-dark .text-\[\#00A884\] { color: var(--ac1); }
+html[data-accent] .border-\[\#25D366\], html[data-accent] .border-\[\#00A884\] { border-color: var(--ac2); }
+html[data-accent] .ring-\[\#00A884\] { --tw-ring-color: var(--ac2); }
+html[data-accent] .bg-\[\#00A884\]\/20 { background-color: color-mix(in srgb, var(--ac2) 20%, transparent); background-image: none; }
+html[data-accent] .border-\[\#25D366\] { border-color: var(--ac2); }
+html[data-accent] ::selection { background: color-mix(in srgb, var(--ac1) 35%, transparent); }
+html[data-accent] .toggle:checked { box-shadow: 0 0 12px -2px color-mix(in srgb, var(--ac1) 60%, transparent); }
