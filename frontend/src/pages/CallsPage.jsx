@@ -82,6 +82,17 @@ const CallsPage = () => {
   }, [calls, query, authUser]);
 
   const pickable = useMemo(() => users.filter((u) => !u.isGroup && u._id), [users]);
+  const clearLog = async () => {
+    setMenuOpen(false);
+    if (!calls.length || !window.confirm("Clear your whole call log?")) return;
+    try {
+      await axiosInstance.delete("/calls");
+      setCalls([]);
+      toast("Call log cleared");
+    } catch {
+      toast.error("Couldn't clear the call log");
+    }
+  };
   const soon = (what) => toast(`${what} isn't available yet`);
 
   return (
@@ -113,6 +124,9 @@ const CallsPage = () => {
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
                 <div className="absolute right-0 top-11 z-40 min-w-[180px] rounded-xl bg-wa-pop shadow-xl py-2">
+                  <button onClick={clearLog} className="w-full text-left px-5 py-2.5 text-[13px] text-wa-text hover:bg-wa-hover">
+                    Clear call log
+                  </button>
                   <button onClick={() => navigate("/settings/privacy")} className="w-full text-left px-5 py-2.5 text-[13px] text-wa-text hover:bg-wa-hover">
                     Settings
                   </button>
