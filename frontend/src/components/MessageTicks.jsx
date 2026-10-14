@@ -1,8 +1,9 @@
-import { Check, CheckCheck } from "lucide-react";
+import { Check, CheckCheck, Clock } from "lucide-react";
 
 // WhatsApp-style receipt ticks for direct messages:
 // single gray = sent, double gray = delivered, double blue = seen
 const MessageTicks = ({ message }) => {
+  if (message.pending) return <Clock size={13} className="opacity-70" />;
   if (message.seen) return <CheckCheck size={15} className="text-[#53BDEB]" />;
   if (message.delivered) return <CheckCheck size={15} className="opacity-80" />;
   return <Check size={15} className="opacity-80" />;
@@ -23,6 +24,7 @@ export const receiptsFor = (message, members = [], senderId) => {
 };
 
 export const GroupMessageTicks = ({ message, members, senderId }) => {
+  if (message.pending) return <Clock size={13} className="opacity-70" />;
   const { others, seen, delivered } = receiptsFor(message, members, senderId);
   if (others.length > 0 && seen.length === others.length) return <CheckCheck size={15} className="text-[#53BDEB]" />;
   if (others.length > 0 && delivered.length === others.length) return <CheckCheck size={15} className="opacity-80" />;

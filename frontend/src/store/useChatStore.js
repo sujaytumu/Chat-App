@@ -416,8 +416,42 @@ export const useChatStore = create((set, get) => ({
           ? `/messages/send/${selectedChat.data._id}`
           : `/groups/${selectedChat.data._id}/messages`;
       const payload = replyingTo ? { ...messageData, replyTo: replyingTo._id } : messageData;
-      const res = await axiosInstance.post(url, payload);
-      set({ messages: [...messages, res.data], replyingTo: null });
+
+      // Plain text shows up in the chat at once (with a clock) and is swapped
+      // for the real message when the server confirms — no waiting on the network.
+      const me = useAuthStore.getState().authUser;
+      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.contactUserId && !messageData.statusId;
+      const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      if (simple && me) {
+        const temp = {
+          _id: tmpId,
+          pending: true,
+          senderId: me._id,
+          ...(selectedChat.type === "direct" ? { receiverId: selectedChat.data._id } : { groupId: selectedChat.data._id }),
+          text: messageData.text,
+          replyTo: replyingTo ? { _id: replyingTo._id, text: replyingTo.text, image: replyingTo.image, file: replyingTo.file, senderId: replyingTo.senderId } : null,
+          createdAt: new Date().toISOString(),
+          delivered: false,
+          seen: false,
+        };
+        set({ messages: [...messages, temp], replyingTo: null });
+      }
+      let res;
+      try {
+        res = await axiosInstance.post(url, payload);
+      } catch (err) {
+        if (simple) set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
+        throw err;
+      }
+      if (simple && me) {
+        set((state) => ({ messages: state.messages.map((m) => (m._id === tmpId ? res.data : m)) }));
+      } else {
+        set((state) =>
+          state.selectedChat?.data?._id === selectedChat.data._id
+            ? { messages: [...state.messages, res.data], replyingTo: null }
+            : { replyingTo: null }
+        );
+      }
 
       // Bump this chat to the top of the sidebar and refresh its preview
       // immediately — don't wait for a refetch.

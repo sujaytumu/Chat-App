@@ -163,7 +163,7 @@ const MainLayout = ({ children }) => {
   return (
     <div
       className="fixed inset-x-0 top-0 bg-wa-bg flex overflow-hidden"
-      style={{ height: "var(--app-height, 100dvh)" }}
+      style={{ top: "var(--call-bar, 0px)", height: "calc(var(--app-height, 100dvh) - var(--call-bar, 0px))" }}
     >
       <MainNav />
       <ChatLockHost />

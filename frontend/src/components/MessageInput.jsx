@@ -476,6 +476,23 @@ const MessageInput = () => {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     emitStopTyping();
 
+    // Plain text: clear the box and let the message appear right away; the send
+    // finishes in the background (and the text comes back if it fails).
+    if (text.trim() && !imagePreview && !imageFallback && !filePreview) {
+      const sentText = text;
+      const payload = { text: text.trim() };
+      if (isGroupChat) {
+        const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
+        if (tagged.length) payload.mentions = tagged.map((m) => m._id);
+      }
+      setMentionIds([]);
+      setMentionQuery(null);
+      setText("");
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+      sendMessage(payload).catch(() => setText((cur) => cur || sentText));
+      return;
+    }
+
     setIsSending(true);
     try {
       const payload = { text: text.trim() };
