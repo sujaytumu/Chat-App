@@ -5,10 +5,10 @@ import { compressImage } from "../lib/imageUtils";
 import Avatar from "./Avatar";
 import toast from "react-hot-toast";
 
-const CreateGroupModal = ({ onClose, onCreated }) => {
+const CreateGroupModal = ({ onClose, onCreated, initialMemberIds = [] }) => {
   const { users, createGroup } = useChatStore();
   const [name, setName] = useState("");
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(initialMemberIds);
   const [groupPic, setGroupPic] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
   const fileInputRef = useRef(null);
