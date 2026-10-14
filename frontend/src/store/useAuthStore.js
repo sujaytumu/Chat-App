@@ -221,10 +221,29 @@ export const useAuthStore = create((set, get) => ({
     // Force an immediate reconnect attempt as soon as the tab is visible
     // again, instead of waiting on that backoff timer to catch up.
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && socket && !socket.connected) {
+      if (document.visibilityState !== "visible" || !socket) return;
+      if (!socket.connected) {
         socket.connect();
+        return;
       }
+      // Looks connected — but after a signal drop it can be a dead ("zombie") link that
+      // swallows incoming calls and messages. Probe it; if the server doesn't answer
+      // within 2.5 s, rebuild the connection right now.
+      let answered = false;
+      socket.volatile.emit("clientPing", () => {
+        answered = true;
+      });
+      setTimeout(() => {
+        if (!answered && socket.connected) {
+          socket.disconnect();
+          socket.connect();
+        }
+      }, 2500);
     };
+    window.addEventListener("online", () => {
+      if (socket && !socket.connected) socket.connect();
+      else handleVisibilityChange();
+    });
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("focus", handleVisibilityChange);
   },
