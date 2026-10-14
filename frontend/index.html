@@ -59,7 +59,22 @@
         window.addEventListener("error", function (e) {
           if (e.target && e.target.tagName === "SCRIPT") recover("script failed: " + (e.target.src || ""));
         }, true);
-        window.addEventListener("unhandledrejection", function () {});
+        // Remember the last error so a blank screen can say why.
+        var lastErr = "";
+        window.addEventListener("error", function (e) { if (!(e.target && e.target.tagName)) lastErr = String(e.message || "") + (e.filename ? " @" + e.filename.split("/").pop() + ":" + e.lineno : ""); });
+        window.addEventListener("unhandledrejection", function (e) { lastErr = "promise: " + String((e.reason && e.reason.message) || e.reason || ""); });
+        // Started, but nothing is on screen (a crash that left an empty page): show the reason + a Reload button.
+        function checkBlank() {
+          var r = document.getElementById("root");
+          if (!r || !window.__talkiesBooted) return;
+          var empty = !r.firstElementChild || (r.innerText.trim() === "" && !r.querySelector("img,video,canvas,svg,input"));
+          if (empty) {
+            window.__talkiesBooted = false;
+            showFail(lastErr || "the screen is empty");
+          }
+        }
+        setTimeout(checkBlank, 10000);
+        setTimeout(checkBlank, 30000);
         setTimeout(function () { recover("app did not start in time"); }, 15000);
       })();
     </script>

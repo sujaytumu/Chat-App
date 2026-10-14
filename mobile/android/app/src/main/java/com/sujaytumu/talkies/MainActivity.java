@@ -64,6 +64,18 @@ public class MainActivity extends BridgeActivity {
             }
 
             @Override
+            public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+                // The page's process was killed (low memory etc.): reload it instead of leaving a blank screen.
+                retryHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isFinishing() && !isDestroyed()) recreate();
+                    }
+                });
+                return true;
+            }
+
+            @Override
             public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
                 super.onReceivedHttpError(view, request, response);
                 if (request != null && request.isForMainFrame() && response != null && response.getStatusCode() >= 500) {
