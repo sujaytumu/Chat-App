@@ -47,6 +47,15 @@ const MainLayout = ({ children }) => {
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const tabIndex = TABS.indexOf(pathname);
   const swipeable = tabIndex !== -1 && !(pathname === "/" && hasOpenChat);
+  // Opened straight on Calls / Updates / You (app reopened, reload, link): there is no
+  // history behind it, so Back would leave the app. Put Chats underneath, like WhatsApp.
+  useEffect(() => {
+    if (pathname !== "/" && TABS.includes(pathname) && (window.history.state?.idx ?? 0) === 0) {
+      navigate("/", { replace: true });
+      navigate(pathname);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const track = useRef(null);
   const drag = useRef(null);
   const [peek, setPeek] = useState(null); // index of the neighbour tab being revealed
