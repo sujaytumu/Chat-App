@@ -233,6 +233,12 @@ const stopLocalTracks = (stream) => {
   stream?.getTracks().forEach((track) => track.stop());
 };
 
+let handoffUntil = 0;
+// A 1:1 call being turned into a group call: the "call ended" that follows is not a real hang-up.
+export const markCallHandoff = () => {
+  handoffUntil = Date.now() + 6000;
+};
+
 export const useCallStore = create((set, get) => ({
   // "idle" | "calling" (outgoing, ringing) | "incoming" | "in-call"
   callStatus: "idle",
@@ -907,6 +913,7 @@ export const useCallStore = create((set, get) => ({
     });
 
     socket.on("callEnded", () => {
+      if (Date.now() < handoffUntil) return;
       toast("Call ended", { icon: "📴" });
       get().resetCall();
     });

@@ -9,7 +9,10 @@ import {
   Minimize2,
   Lock,
   SwitchCamera,
+  UserPlus,
 } from "lucide-react";
+import AddParticipantModal from "./AddParticipantModal";
+import { useGroupCallStore } from "../store/useGroupCallStore";
 import { isPhoneLike } from "../lib/device";
 import { Phone, PhoneEnd, Video, VideoOff, Mic, MicOff, Volume2 } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
@@ -146,6 +149,7 @@ const CallManager = () => {
   // Phone Back button shrinks the call to the green bar instead of leaving the app.
   useBackToClose(callStatus !== "idle" && callStatus !== "incoming" && !isMinimized, () => setIsMinimized(true));
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const callDuration = useCallDuration(callStartedAt);
   useCallWakeLock(callStatus === "calling" || callStatus === "in-call");
@@ -258,6 +262,16 @@ const CallManager = () => {
     return (
       <>
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
+      {adding && (
+        <AddParticipantModal
+          excludeIds={[remoteUser?._id]}
+          onClose={() => setAdding(false)}
+          onAdd={(ids) => {
+            setAdding(false);
+            useGroupCallStore.getState().upgradeFromCall(ids);
+          }}
+        />
+      )}
       <CallReturnBar
         video={callType === "video"}
         onClick={() => setIsMinimized(false)}
@@ -330,17 +344,28 @@ const CallManager = () => {
             </p>
           )}
         </div>
-        {canFlip ? (
-          <button
-            onClick={flipCamera}
-            className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
-            aria-label="Switch camera"
-          >
-            <SwitchCamera size={20} />
-          </button>
-        ) : (
-          <span className="size-11" aria-hidden />
-        )}
+        <div className="flex items-center gap-1">
+          {canFlip && (
+            <button
+              onClick={flipCamera}
+              className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
+              aria-label="Switch camera"
+            >
+              <SwitchCamera size={20} />
+            </button>
+          )}
+          {callStatus === "in-call" ? (
+            <button
+              onClick={() => setAdding(true)}
+              className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
+              aria-label="Add participant"
+            >
+              <UserPlus size={20} />
+            </button>
+          ) : (
+            !canFlip && <span className="size-11" aria-hidden />
+          )}
+        </div>
       </div>
 
       {isVideo ? (
