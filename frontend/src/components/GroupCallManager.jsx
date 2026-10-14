@@ -1,7 +1,9 @@
 import toast from "react-hot-toast";
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Users, Lock } from "lucide-react";
+import { Minimize2, Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Users, Lock } from "lucide-react";
 import { isPhoneLike } from "../lib/device";
+import CallReturnBar from "./CallReturnBar";
+import { useBackToClose } from "../lib/useBackToClose";
 import { useGroupCallStore, canShareScreen, MAX_GROUP_CALL } from "../store/useGroupCallStore";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -238,6 +240,11 @@ const Active = () => {
   const users = useChatStore((s) => s.users);
   const [showPeople, setShowPeople] = useState(false);
   const elapsed = useElapsed(startedAt);
+  const [minimized, setMinimized] = useState(false);
+  useBackToClose(status !== "idle" && !minimized, () => setMinimized(true));
+  useEffect(() => {
+    if (status === "idle") setMinimized(false);
+  }, [status]);
 
   if (status === "idle") return null;
 
@@ -279,7 +286,16 @@ const Active = () => {
   const canShare = canShareScreen() || isPhoneLike();
 
   return (
-    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col">
+    <>
+    {minimized && (
+      <CallReturnBar
+        video={cameraOn}
+        onClick={() => setMinimized(false)}
+        detail={status === "joining" ? "Connecting…" : `${fmt(elapsed)} · ${count} in call`}
+      />
+    )}
+    {/* Kept mounted while minimized so everyone stays audible */}
+    <div className={`wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col ${minimized ? "opacity-0 pointer-events-none" : ""}`} aria-hidden={minimized}>
       {/* Top bar: name + lock + timer in the middle, switch-camera on the right */}
       <div className="relative flex items-center justify-center px-14 pt-[calc(14px+env(safe-area-inset-top))] pb-2 shrink-0">
         <div className="text-center min-w-0">
@@ -289,6 +305,13 @@ const Active = () => {
             {status === "joining" ? "Connecting…" : `${fmt(elapsed)} · ${count} in call`}
           </p>
         </div>
+        <button
+          onClick={() => setMinimized(true)}
+          className="absolute left-3 top-[calc(10px+env(safe-area-inset-top))] size-11 rounded-full flex items-center justify-center text-wa-text bg-white/10 active:bg-white/20"
+          aria-label="Minimise call"
+        >
+          <Minimize2 size={20} />
+        </button>
         {isPhoneLike() && cameraOn && !isScreenSharing ? (
           <button
             onClick={flipCamera}
@@ -347,6 +370,7 @@ const Active = () => {
 
       {showPeople && <ParticipantsSheet groupId={groupId} onClose={() => setShowPeople(false)} />}
     </div>
+    </>
   );
 };
 

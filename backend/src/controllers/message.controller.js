@@ -182,10 +182,15 @@ export const sendMessage = async (req, res) => {
   try {
     const { text, image, file, replyTo, viewOnce, forwarded } = req.body;
     const poll = sanitizePoll(req.body.poll);
-    const contact = await buildContact(req.body.contactUserId);
     const { id: receiverId } = req.params;
-    const statusReply = await buildStatusReply(req.body.statusId, receiverId);
     const senderId = req.user._id;
+    // Independent lookups run together instead of one after another.
+    const [contact, statusReply, receiver, dSetting] = await Promise.all([
+      buildContact(req.body.contactUserId),
+      buildStatusReply(req.body.statusId, receiverId),
+      User.findById(receiverId).select("blockedUsers").lean(),
+      DirectChatSetting.findOne({ key: pairKey(senderId, receiverId) }).select("disappearAfter").lean(),
+    ]);
 
     if (!text?.trim() && !image && !file && !poll && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
@@ -213,7 +218,6 @@ export const sendMessage = async (req, res) => {
 
     // If the receiver currently has an active socket, the message will land
     // instantly, so we can mark it delivered right away.
-    const receiver = await User.findById(receiverId).select("blockedUsers").lean();
     if ((req.user.blockedUsers || []).some((b) => String(b) === String(receiverId))) {
       return res.status(403).json({ error: "You blocked this contact. Unblock them to send messages." });
     }
@@ -225,7 +229,6 @@ export const sendMessage = async (req, res) => {
     // looks connected — e.g. the phone just lost signal — must not count.
     const isDelivered = false;
 
-    const dSetting = await DirectChatSetting.findOne({ key: pairKey(senderId, receiverId) }).select("disappearAfter").lean();
     const newMessage = new Message({
       senderId,
       receiverId,
@@ -246,7 +249,7 @@ export const sendMessage = async (req, res) => {
 
     await newMessage.save();
     newMessage.set("viewOnceUrl", undefined); // never send the hidden picture's address to anyone
-    await newMessage.populate("replyTo", "text image file senderId");
+    if (replyTo) await newMessage.populate("replyTo", "text image file senderId");
 
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);

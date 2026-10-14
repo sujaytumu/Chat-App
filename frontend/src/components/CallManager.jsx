@@ -1,3 +1,5 @@
+import CallReturnBar from "./CallReturnBar";
+import { useBackToClose } from "../lib/useBackToClose";
 import { useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { useCallStore } from "../store/useCallStore";
@@ -141,6 +143,8 @@ const CallManager = () => {
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  // Phone Back button shrinks the call to the green bar instead of leaving the app.
+  useBackToClose(callStatus !== "idle" && callStatus !== "incoming" && !isMinimized, () => setIsMinimized(true));
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const callDuration = useCallDuration(callStartedAt);
@@ -254,22 +258,19 @@ const CallManager = () => {
     return (
       <>
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
-      <button
+      <CallReturnBar
+        video={callType === "video"}
         onClick={() => setIsMinimized(false)}
-        className="fixed top-4 left-1/2 -translate-x-1/2 z-[200] bg-wa-surface rounded-full pl-2 pr-4 py-2 flex items-center gap-2 shadow-2xl"
-      >
-        <CallAvatar user={remoteUser} size="size-8" />
-        <span className="text-wa-text text-sm font-medium">{remoteUser?.fullName}</span>
-        <span className="text-[#00A884] text-xs">
-          {callStatus === "calling"
+        detail={
+          callStatus === "calling"
             ? isRemoteRinging
               ? "Ringing…"
               : "Calling…"
             : isReconnecting
               ? "Reconnecting…"
-              : callDuration || "In call"}
-        </span>
-      </button>
+              : callDuration || "In call"
+        }
+      />
       </>
     );
   }
