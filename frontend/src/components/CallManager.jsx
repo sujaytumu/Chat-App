@@ -24,6 +24,24 @@ const colorForName = (name = "") => {
   return AVATAR_COLORS[code % AVATAR_COLORS.length];
 };
 
+// Full-screen backdrop for a call: the other person's photo, sharp and edge to edge
+// (fitted to the screen, not stretched or blurred), with a dark gradient so the
+// name, timer and buttons stay readable. Without a photo: a plain dark gradient.
+const CallBackdrop = ({ user }) => (
+  <div className="absolute inset-0 -z-10 overflow-hidden bg-[#0b141a]" aria-hidden>
+    {user?.profilePic && (
+      <img
+        src={optimizeImage(user.profilePic, 1080)}
+        alt=""
+        decoding="async"
+        draggable={false}
+        className="absolute inset-0 w-full h-full object-cover object-center"
+      />
+    )}
+    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/25 to-black/75" />
+  </div>
+);
+
 // Big avatar with a colored-letter fallback (matches WhatsApp's style when
 // a contact has no photo) instead of a generic silhouette.
 const CallAvatar = ({ user, size = "size-28" }) => {
@@ -262,6 +280,7 @@ const CallManager = () => {
     return (
       <>
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
+      {(!isVideo || !remoteStream) && <CallBackdrop user={remoteUser} />}
       {adding && (
         <AddParticipantModal
           excludeIds={[remoteUser?._id]}
@@ -369,7 +388,7 @@ const CallManager = () => {
       </div>
 
       {isVideo ? (
-        <div className="relative flex-1 bg-black">
+        <div className={`relative flex-1 ${remoteStream ? "bg-black" : ""}`}>
           <video
             id="call-remote-video"
             ref={remoteVideoRef}
@@ -386,7 +405,7 @@ const CallManager = () => {
             </div>
           )}
           {!remoteStream && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white drop-shadow">
               <div className="relative mb-4">
                 {callStatus === "calling" && (
                   <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
