@@ -394,7 +394,7 @@ const CallManager = () => {
                 <CallAvatar user={remoteUser} />
               </div>
               <p className="text-lg font-medium">{remoteUser?.fullName}</p>
-              <p className="text-sm text-wa-muted mt-1">{statusText}</p>
+              <p className="text-sm text-wa-muted mt-1 tabular-nums">{statusText}</p>
             </div>
           )}
           <video
@@ -416,7 +416,7 @@ const CallManager = () => {
             <CallAvatar user={remoteUser} />
           </div>
           <h3 className="text-xl font-semibold">{remoteUser?.fullName}</h3>
-          <p className="text-sm text-white/70 mt-1">{statusText}</p>
+          <p className="text-sm text-white/70 mt-1 tabular-nums">{statusText}</p>
         </div>
       )}
 

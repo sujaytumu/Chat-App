@@ -32,6 +32,8 @@ public class CallKeepAlivePlugin extends Plugin {
         i.putExtra("title", call.getString("title", "Talkies call"));
         i.putExtra("text", call.getString("text", "Call in progress"));
         i.putExtra("video", Boolean.TRUE.equals(call.getBoolean("video", false)));
+        Double started = call.getDouble("startedAt", 0.0);
+        i.putExtra("startedAt", started == null ? 0L : started.longValue());
         MainActivity.callActive = true;
         try {
             ContextCompat.startForegroundService(c, i);

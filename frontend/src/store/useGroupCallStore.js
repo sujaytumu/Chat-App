@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { useCallStore, getIceConfig, markCallHandoff } from "./useCallStore";
 import { startRingtone, stopRingtoneSound, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
+import { tuneAudioSenders } from "../lib/audioTune";
 import { setGroupCallBusy } from "../lib/callBusy";
 
 // Group calls (up to MAX people): every participant connects straight to every
@@ -34,7 +35,7 @@ const gum = (constraints) => navigator.mediaDevices.getUserMedia(constraints);
 
 async function getMedia(callType) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error("Calls need a secure (https) connection");
-  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  const audio = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
   if (callType === "video") {
     try {
       return await gum({ audio, video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } } });
@@ -168,7 +169,10 @@ export const useGroupCallStore = create((set, get) => {
     };
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
-      if (st === "connected") patchTile(userId, { connected: true });
+      if (st === "connected") {
+        patchTile(userId, { connected: true });
+        tuneAudioSenders(pc, 32000);
+      }
       else if (st === "failed") {
         patchTile(userId, { connected: false });
         if (!rec.restarted) {

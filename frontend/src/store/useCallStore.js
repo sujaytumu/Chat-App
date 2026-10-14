@@ -1,3 +1,4 @@
+import { tuneAudioSenders } from "../lib/audioTune";
 import { canCaptureScreen, getScreenTrack, noScreenShareMessage } from "../lib/screenCapture";
 import { create } from "zustand";
 import toast from "react-hot-toast";
@@ -111,6 +112,7 @@ function attachConnectionWatchdog(peerConnection, get) {
 
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
+    if (state === "connected" || state === "completed") tuneAudioSenders(peerConnection);
     if (state === "failed") {
       if (!restartAttempted && peerConnection.restartIce) {
         restartAttempted = true;
@@ -217,7 +219,7 @@ function tuneOpus(desc) {
   return { type: desc.type, sdp };
 }
 
-const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+const AUDIO_CONSTRAINTS = { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 };
 
 const sendMediaState = (get) => {
   const socket = useAuthStore.getState().socket;
