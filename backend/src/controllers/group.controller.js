@@ -336,6 +336,36 @@ export const removeMember = async (req, res) => {
   }
 };
 
+// Admins make other members admins, or dismiss them. A group always keeps at least one admin.
+export const setGroupAdmin = async (req, res) => {
+  try {
+    const { id: groupId, memberId } = req.params;
+    const myId = req.user._id;
+    const makeAdmin = !!req.body?.admin;
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ error: "Group not found" });
+    if (!group.admins.some((a) => a.equals(myId))) {
+      return res.status(403).json({ error: "Only admins can change who is an admin" });
+    }
+    if (!group.members.some((m) => m.equals(memberId))) {
+      return res.status(404).json({ error: "That person isn't in this group" });
+    }
+    const isAdmin = group.admins.some((a) => a.equals(memberId));
+    if (makeAdmin && !isAdmin) group.admins.push(memberId);
+    if (!makeAdmin && isAdmin) {
+      if (group.admins.length <= 1) return res.status(400).json({ error: "A group needs at least one admin" });
+      group.admins = group.admins.filter((a) => !a.equals(memberId));
+    }
+    await group.save();
+    const populatedGroup = await Group.findById(groupId).populate("members", "-password -pushSubscriptions -archivedChats -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled");
+    io.to(groupId.toString()).emit("groupUpdated", populatedGroup);
+    res.status(200).json(populatedGroup);
+  } catch (error) {
+    console.log("Error in setGroupAdmin controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const leaveGroup = async (req, res) => {
   try {
     const { id: groupId } = req.params;

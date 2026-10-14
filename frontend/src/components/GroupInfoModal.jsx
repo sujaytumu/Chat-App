@@ -55,7 +55,7 @@ const Toggle = ({ on }) => (
 );
 
 const GroupInfoModal = ({ group, onClose }) => {
-  const { users, addMembersToGroup, removeMemberFromGroup, leaveGroup, updateGroupInfo, setChatSearchOpen } = useChatStore();
+  const { users, addMembersToGroup, removeMemberFromGroup, setGroupAdmin, leaveGroup, updateGroupInfo, setChatSearchOpen } = useChatStore();
   const startGroupCall = useGroupCallStore((st) => st.startCall);
   const joinGroupCall = useGroupCallStore((st) => st.joinCall);
   const groupCallActive = useGroupCallStore((st) => !!st.states[group._id]?.active);
@@ -80,6 +80,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
   const [showPerms, setShowPerms] = useState(false);
+  const [memberMenu, setMemberMenu] = useState(null);
   const [showInvite, setShowInvite] = useState(false);
   const [showMute, setShowMute] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -471,14 +472,41 @@ const GroupInfoModal = ({ group, onClose }) => {
                       <span className="text-[13px] px-2.5 py-1 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
                     )}
                     {isAdmin && !isYou && (
-                      <button
-                        onClick={() => confirm(`Remove ${member.fullName} from the group?`) && removeMemberFromGroup(group._id, member._id)}
-                        className="p-2 text-[#F15C6D] shrink-0"
-                        title="Remove member"
-                        aria-label={`Remove ${member.fullName}`}
-                      >
-                        <UserMinus size={20} />
-                      </button>
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={() => setMemberMenu((m) => (m === member._id ? null : member._id))}
+                          className="p-2 text-wa-muted"
+                          title="Member options"
+                          aria-label={`Options for ${member.fullName}`}
+                        >
+                          <MoreVertical size={20} />
+                        </button>
+                        {memberMenu === member._id && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setMemberMenu(null)} />
+                            <div className="absolute right-0 top-full z-40 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2">
+                              <button
+                                className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5"
+                                onClick={() => {
+                                  setMemberMenu(null);
+                                  setGroupAdmin(group._id, member._id, !memberIsAdmin);
+                                }}
+                              >
+                                {memberIsAdmin ? "Dismiss as admin" : "Make group admin"}
+                              </button>
+                              <button
+                                className="w-full text-left px-5 py-3 text-[15px] text-[#F15C6D] hover:bg-white/5 flex items-center gap-2"
+                                onClick={() => {
+                                  setMemberMenu(null);
+                                  confirm(`Remove ${member.fullName} from the group?`) && removeMemberFromGroup(group._id, member._id);
+                                }}
+                              >
+                                <UserMinus size={18} /> Remove from group
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
