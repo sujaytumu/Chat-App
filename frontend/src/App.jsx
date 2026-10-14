@@ -3,6 +3,14 @@ import HomePage from "./pages/HomePage";
 import MainLayout from "./components/MainLayout";
 import NotificationManager from "./components/NotificationManager";
 import ErrorBoundary from "./components/ErrorBoundary";
+
+// Tells index.html's safety net that the app started fine.
+window.__talkiesBooted = true;
+try {
+  sessionStorage.removeItem("talkies-recover");
+} catch {
+  /* ignore */
+}
 import GroupCallManager from "./components/GroupCallManager";
 import CallKeepAlive from "./components/CallKeepAlive";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection

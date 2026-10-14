@@ -28,6 +28,41 @@
         document.querySelector('meta[name="theme-color"]').setAttribute("content", d ? "#111B21" : "#FFFFFF");
       } catch (e) {}
     </script>
+    <!-- Safety net: if the app never starts (stale cached files after an update, a failed script, a crash before anything draws), clear the saved copy and reload once; if it still can't start, say so with a Reload button instead of leaving a blank page. -->
+    <script>
+      (function () {
+        var KEY = "talkies-recover";
+        function showFail(why) {
+          var r = document.getElementById("root");
+          if (!r || window.__talkiesBooted) return;
+          r.innerHTML =
+            '<div class="splash" style="text-align:center;padding:24px"><b>Talkies</b>' +
+            '<span style="font-size:15px;opacity:.8">Couldn\u2019t start. Check your connection and try again.</span>' +
+            '<button id="tk-reload" style="padding:10px 22px;border:0;border-radius:999px;background:#00A884;color:#fff;font-size:15px">Reload</button>' +
+            '<span style="font-size:11px;opacity:.5;max-width:300px;word-break:break-word">' + String(why || "").slice(0, 160) + "</span></div>";
+          document.getElementById("tk-reload").onclick = function () {
+            try { sessionStorage.removeItem(KEY); } catch (e) {}
+            location.reload();
+          };
+        }
+        function recover(why) {
+          if (window.__talkiesBooted) return;
+          var done = false;
+          try { done = !!sessionStorage.getItem(KEY); sessionStorage.setItem(KEY, "1"); } catch (e) {}
+          if (done) return showFail(why);
+          var jobs = [];
+          try { jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (x) { return x.unregister(); })); })); } catch (e) {}
+          try { jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })); } catch (e) {}
+          Promise.all(jobs).catch(function () {}).then(function () { location.reload(); });
+        }
+        window.__talkiesRecover = recover;
+        window.addEventListener("error", function (e) {
+          if (e.target && e.target.tagName === "SCRIPT") recover("script failed: " + (e.target.src || ""));
+        }, true);
+        window.addEventListener("unhandledrejection", function () {});
+        setTimeout(function () { recover("app did not start in time"); }, 15000);
+      })();
+    </script>
     <style>
       html, body, #root { margin: 0; min-height: 100%; background: #FFFFFF; }
       html.wa-dark, html.wa-dark body, html.wa-dark #root { background: #0B141A; }
