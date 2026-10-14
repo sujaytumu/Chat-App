@@ -7,6 +7,7 @@ import {
   sendGroupMessage,
   addMembers,
   removeMember,
+  setGroupAdmin,
   leaveGroup,
   updateGroupInfo,
   updateGroupPermissions,
@@ -31,6 +32,7 @@ router.put("/:id/disappearing", protectRoute, setDisappearing);
 router.put("/:id/permissions", protectRoute, updateGroupPermissions);
 router.post("/:id/members", protectRoute, addMembers);
 router.delete("/:id/members/:memberId", protectRoute, removeMember);
+router.put("/:id/admins/:memberId", protectRoute, setGroupAdmin);
 router.post("/:id/leave", protectRoute, leaveGroup);
 
 export default router;

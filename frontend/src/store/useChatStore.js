@@ -693,6 +693,22 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  setGroupAdmin: async (groupId, memberId, admin) => {
+    try {
+      const res = await axiosInstance.put(`/groups/${groupId}/admins/${memberId}`, { admin });
+      set((state) => ({
+        groups: state.groups.map((g) => (g._id === groupId ? { ...g, ...res.data } : g)),
+        selectedChat:
+          state.selectedChat?.type === "group" && state.selectedChat.data._id === groupId
+            ? { type: "group", data: res.data }
+            : state.selectedChat,
+      }));
+      toast.success(admin ? "Made group admin" : "Dismissed as admin");
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't change admin");
+    }
+  },
+
   leaveGroup: async (groupId) => {
     try {
       await axiosInstance.post(`/groups/${groupId}/leave`);
