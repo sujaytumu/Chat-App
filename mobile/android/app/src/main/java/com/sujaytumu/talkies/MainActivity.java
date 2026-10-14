@@ -1,6 +1,7 @@
 package com.sujaytumu.talkies;
 
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -22,6 +23,14 @@ public class MainActivity extends BridgeActivity {
     static volatile boolean visible = false;
     /** True while a call is connected: the page must keep running when the app is in the background. */
     static volatile boolean callActive = false;
+
+    /**
+     * Older site builds call plugin.addListener(...).then(...), but on this Capacitor version
+     * the call returns a plain handle, which crashed the page right after login. Make it
+     * always return a promise so any version of the site works.
+     */
+    private static final String ADD_LISTENER_PATCH =
+            "(function(){if(window.__tkAddListenerPatch)return;window.__tkAddListenerPatch=1;var names=['TalkiesCall','TalkiesPush','ScreenShare'];var n=0;function patch(){try{var P=window.Capacitor&&window.Capacitor.Plugins;if(!P)return;names.forEach(function(k){var p=P[k];if(!p||typeof p.addListener!=='function'||p.__tkp)return;var orig=p.addListener;try{Object.defineProperty(p,'__tkp',{value:1,enumerable:false,configurable:true});}catch(e){return;}try{p.addListener=function(){var r=orig.apply(this,arguments);if(r&&typeof r.then==='function')return r;return Promise.resolve(r||{remove:function(){}});};}catch(e){}});}catch(e){}}patch();var t=setInterval(function(){patch();if(++n>1000)clearInterval(t);},10);})();";
 
     private final Handler retryHandler = new Handler(Looper.getMainLooper());
     private boolean retryPending = false;
@@ -55,6 +64,12 @@ public class MainActivity extends BridgeActivity {
     private void installLoadFailureHandler() {
         if (getBridge() == null || getBridge().getWebView() == null) return;
         getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                view.evaluateJavascript(ADD_LISTENER_PATCH, null);
+            }
+
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
