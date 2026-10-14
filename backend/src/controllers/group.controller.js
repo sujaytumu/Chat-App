@@ -203,11 +203,9 @@ export const sendGroupMessage = async (req, res) => {
       fileAttachment = await uploadFileAttachment(file);
     }
 
-    // Members who are online right now receive it instantly -> already "delivered"
-    const now = new Date();
-    const deliveredTo = group.members
-      .filter((m) => !m.equals(senderId) && getReceiverSocketId(m.toString()))
-      .map((m) => ({ user: m, at: now }));
+    // Recorded when each member's device confirms receipt (see "messageReceived"), not merely
+    // because their socket looks open.
+    const deliveredTo = [];
 
     let newMessage = await Message.create({
       senderId,
