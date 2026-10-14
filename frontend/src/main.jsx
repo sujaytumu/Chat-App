@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./polish.css";
 import App from "./App.jsx";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { BrowserRouter } from "react-router-dom";
 import { useThemeStore, applyTheme, watchAutoTheme } from "./store/useThemeStore";
 import { applyUiSettings } from "./lib/uiSettings";
@@ -30,9 +31,11 @@ const RootWrapper = () => {
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <ErrorBoundary showError>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>
 );
 
