@@ -31,19 +31,38 @@ const CallKeepAlive = () => {
   useEffect(() => {
     const p = plugin();
     if (!p) return;
-    if (active) p.start({ title, text, video, startedAt }).catch(() => {});
-    else p.stop().catch(() => {});
+    try {
+      Promise.resolve(active ? p.start({ title, text, video, startedAt }) : p.stop()).catch(() => {});
+    } catch {
+      /* ignore */
+    }
   }, [active, video, title, text, startedAt]);
 
   useEffect(() => {
     const p = plugin();
     if (!p?.addListener) return;
     let handle;
-    p.addListener("hangup", () => {
-      if (useCallStore.getState().callStatus !== "idle") useCallStore.getState().endCall();
-      if (useGroupCallStore.getState().status !== "idle") useGroupCallStore.getState().leave();
-    }).then((h) => (handle = h));
-    return () => handle?.remove?.();
+    let gone = false;
+    try {
+      // addListener may return a promise or the handle itself depending on the Capacitor version.
+      Promise.resolve(
+        p.addListener("hangup", () => {
+          if (useCallStore.getState().callStatus !== "idle") useCallStore.getState().endCall();
+          if (useGroupCallStore.getState().status !== "idle") useGroupCallStore.getState().leave();
+        })
+      )
+        .then((h) => {
+          handle = h;
+          if (gone) h?.remove?.();
+        })
+        .catch(() => {});
+    } catch {
+      /* no native listener — the notification's Hang up simply won't reach the page */
+    }
+    return () => {
+      gone = true;
+      handle?.remove?.();
+    };
   }, []);
 
   return null;
