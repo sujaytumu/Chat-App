@@ -275,10 +275,35 @@ io.on("connection", (socket) => {
       });
     void logPromise;
 
+    // Keep the call alive on the server until the callee's device confirms it is ringing
+    // (or they answer / decline / the caller hangs up). If their socket was a zombie, the
+    // call is then handed to them the moment they reconnect, and the push wakes the phone.
+    const holdForCallee = () => {
+      const timeout = setTimeout(() => {
+        pendingCalls.delete(toUserId);
+        socket.emit("callFailed", { reason: "No answer" });
+        sendPushToUser(toUserId, {
+          title: fromUser?.fullName || "Someone",
+          body: `Missed ${callType === "video" ? "video" : "voice"} call`,
+          icon: fromUser?.profilePic || "/icon-v2-192.png",
+          tag: `incoming-call-${userId}`,
+          data: { url: "/", chatType: "direct", chatId: userId },
+        });
+        const logId = activeCallLogs.get(pairKey(userId, toUserId));
+        if (logId) {
+          CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+        }
+        activeCallLogs.delete(pairKey(userId, toUserId));
+      }, CALL_GRACE_PERIOD_MS);
+
+      pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
+    };
+
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
       if (typeof ack === "function") ack({ delivered: true });
+      holdForCallee(); // dropped again as soon as their device confirms it is ringing
       // Also push a system-level notification. Browsers block Web Audio
       // playback until a user gesture has happened on the page, so if the
       // person hasn't tapped/clicked recently, the in-app ringtone can be
@@ -311,30 +336,14 @@ io.on("connection", (socket) => {
       data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true },
     }, CALL_PUSH_OPTIONS);
 
-    const timeout = setTimeout(() => {
-      pendingCalls.delete(toUserId);
-      socket.emit("callFailed", { reason: "No answer" });
-      sendPushToUser(toUserId, {
-        title: fromUser?.fullName || "Someone",
-        body: `Missed ${callType === "video" ? "video" : "voice"} call`,
-        icon: fromUser?.profilePic || "/icon-v2-192.png",
-        tag: `incoming-call-${userId}`,
-        data: { url: "/", chatType: "direct", chatId: userId },
-      });
-      const logId = activeCallLogs.get(pairKey(userId, toUserId));
-      if (logId) {
-        CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
-      }
-      activeCallLogs.delete(pairKey(userId, toUserId));
-    }, CALL_GRACE_PERIOD_MS);
-
-    pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
+    holdForCallee();
     socket.emit("callRinging", { reason: "Waiting for them to come online" });
   });
 
   socket.on("answerCall", ({ toUserId, answer }, ack) => {
     socket.to(userId).emit("callEnded"); // stop ringing on my other devices
     sendFcmCancelCall(userId, toUserId); // ...and on my Android phone
+    clearHeldCall(userId, toUserId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callAnswered", { answer });
@@ -353,6 +362,7 @@ io.on("connection", (socket) => {
   // "Calling…" to "Ringing…", mirroring the sent → delivered distinction
   // used for message ticks.
   socket.on("callRingingAck", ({ toUserId }) => {
+    clearHeldCall(userId, toUserId);
     const callerSocketId = roomFor(toUserId);
     if (callerSocketId) {
       io.to(callerSocketId).emit("remoteDeviceRinging");
@@ -401,6 +411,7 @@ io.on("connection", (socket) => {
   socket.on("rejectCall", ({ toUserId }) => {
     socket.to(userId).emit("callEnded"); // stop ringing on my other devices
     sendFcmCancelCall(userId, toUserId);
+    clearHeldCall(userId, toUserId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callRejected");
@@ -414,6 +425,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("endCall", async ({ toUserId }) => {
+    clearHeldCall(toUserId, userId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callEnded");
@@ -728,6 +740,15 @@ io.on("connection", (socket) => {
     })();
   }
 });
+
+// Drop the held call for `calleeId` from `callerId` (it was answered, declined, cancelled or confirmed ringing).
+function clearHeldCall(calleeId, callerId) {
+  const p = pendingCalls.get(String(calleeId));
+  if (p && String(p.fromUserId) === String(callerId)) {
+    clearTimeout(p.timeout);
+    pendingCalls.delete(String(calleeId));
+  }
+}
 
 // "Decline" pressed on an incoming-call notification while the app is closed
 // (so there is no socket to emit rejectCall on). Same effect as rejectCall.
