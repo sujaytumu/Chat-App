@@ -13,6 +13,8 @@ const callLogSchema = new mongoose.Schema(
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date, default: null },
     durationSeconds: { type: Number, default: 0 },
+    // People who cleared this entry from their own call list (the other side keeps it).
+    hiddenFor: { type: [mongoose.Schema.Types.ObjectId], default: [], select: false },
   },
   { timestamps: true }
 );

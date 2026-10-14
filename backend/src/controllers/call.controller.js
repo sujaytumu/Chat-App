@@ -4,7 +4,7 @@ import { declineCallFor } from "../lib/socket.js";
 export const getCallHistory = async (req, res) => {
   try {
     const myId = req.user._id;
-    const calls = await CallLog.find({ $or: [{ callerId: myId }, { calleeId: myId }] })
+    const calls = await CallLog.find({ $or: [{ callerId: myId }, { calleeId: myId }], hiddenFor: { $ne: myId } })
       .populate("callerId", "fullName profilePic")
       .populate("calleeId", "fullName profilePic")
       .sort({ createdAt: -1 })
@@ -13,6 +13,18 @@ export const getCallHistory = async (req, res) => {
     res.status(200).json(calls.filter((c) => c.callerId && c.calleeId));
   } catch (error) {
     console.log("Error in getCallHistory controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// "Clear call log": hides every entry from MY list only.
+export const clearCallHistory = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    await CallLog.updateMany({ $or: [{ callerId: myId }, { calleeId: myId }] }, { $addToSet: { hiddenFor: myId } });
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in clearCallHistory controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
