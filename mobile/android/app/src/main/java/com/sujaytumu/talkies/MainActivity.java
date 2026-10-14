@@ -85,6 +85,11 @@ public class MainActivity extends BridgeActivity {
             if (Build.VERSION.SDK_INT >= 29 && Build.VERSION.SDK_INT < 33) {
                 web.getSettings().setForceDark(WebSettings.FORCE_DARK_OFF);
             }
+            // Keep the page's renderer at foreground priority so call audio isn't cut
+            // when the app goes to the background.
+            if (Build.VERSION.SDK_INT >= 26) {
+                web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+            }
             web.setOverScrollMode(View.OVER_SCROLL_NEVER);
             web.setVerticalScrollBarEnabled(false);
             web.setHorizontalScrollBarEnabled(false);
