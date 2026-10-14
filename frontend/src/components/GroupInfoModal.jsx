@@ -81,6 +81,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [showStarred, setShowStarred] = useState(false);
   const [showPerms, setShowPerms] = useState(false);
   const [memberMenu, setMemberMenu] = useState(null);
+  const [memberMenuUp, setMemberMenuUp] = useState(false);
   const [showInvite, setShowInvite] = useState(false);
   const [showMute, setShowMute] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -474,7 +475,12 @@ const GroupInfoModal = ({ group, onClose }) => {
                     {isAdmin && !isYou && (
                       <div className="relative shrink-0">
                         <button
-                          onClick={() => setMemberMenu((m) => (m === member._id ? null : member._id))}
+                          onClick={(e) => {
+                            // Open the menu upwards when there is no room below (last members in the list).
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setMemberMenuUp(window.innerHeight - r.bottom < 170);
+                            setMemberMenu((m) => (m === member._id ? null : member._id));
+                          }}
                           className="p-2 text-wa-muted"
                           title="Member options"
                           aria-label={`Options for ${member.fullName}`}
@@ -484,7 +490,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                         {memberMenu === member._id && (
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setMemberMenu(null)} />
-                            <div className="absolute right-0 top-full z-40 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2">
+                            <div className={`absolute right-0 ${memberMenuUp ? "bottom-full mb-1" : "top-full"} z-40 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2`}>
                               <button
                                 className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5"
                                 onClick={() => {
