@@ -221,6 +221,11 @@ io.on("connection", (socket) => {
     socket.to(groupId).emit("groupStopTyping", { fromUserId: userId, groupId });
   });
 
+  // Liveness probe from the app (after it was in the background / signal came back).
+  socket.on("clientPing", (cb) => {
+    if (typeof cb === "function") cb();
+  });
+
   // The device confirms a message actually arrived -> sender gets the double tick.
   socket.on("messageReceived", async ({ messageId, groupId } = {}) => {
     try {
