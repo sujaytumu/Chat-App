@@ -79,7 +79,7 @@ const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
 const pairKey = (a, b) => [a, b].sort().join("_");
 
 // ---- Group call state (see the "groupCall:*" handlers) ----
-const MAX_GROUP_CALL = 6;
+const MAX_GROUP_CALL = 10;
 const groupCalls = new Map(); // groupId -> { callType, startedBy, startedAt, participants: Map<userId, profile> }
 
 const groupCallPublic = (groupId) => {
@@ -94,9 +94,25 @@ const groupCallPublic = (groupId) => {
     participants: [...c.participants.values()],
   };
 };
-const broadcastGroupCall = (groupId) => io.to(groupId).emit("groupCall:state", groupCallPublic(groupId));
+const isAdhoc = (groupId) => typeof groupId === "string" && groupId.startsWith("adhoc:");
+
+// Ad-hoc calls come from adding people to a 1:1 call: they have no Group document,
+// only the list of people invited (stored on the live call itself).
+const broadcastGroupCall = (groupId) => {
+  const call = groupCalls.get(groupId);
+  if (isAdhoc(groupId)) {
+    const state = groupCallPublic(groupId);
+    for (const id of call?.adhoc?.members || []) {
+      const room = roomFor(id);
+      if (room) io.to(room).emit("groupCall:state", state);
+    }
+    return;
+  }
+  io.to(groupId).emit("groupCall:state", groupCallPublic(groupId));
+};
 
 async function isGroupMember(groupId, userId) {
+  if (isAdhoc(groupId)) return !!groupCalls.get(groupId)?.adhoc?.members.has(userId);
   try {
     return !!(await Group.exists({ _id: groupId, members: userId }));
   } catch {
@@ -132,7 +148,17 @@ function removeFromGroupCall(groupId, userId) {
     const room = roomFor(id);
     if (room) io.to(room).emit("groupCall:left", { groupId, userId });
   }
-  if (call.participants.size === 0) groupCalls.delete(groupId);
+  if (call.participants.size === 0) {
+    if (call.adhoc) {
+      // Tell everyone invited that it's over (stops any ringing).
+      for (const id of call.adhoc.members) {
+        const room = roomFor(id);
+        if (room) io.to(room).emit("groupCall:state", { groupId, active: false, participants: [] });
+      }
+    }
+    groupCalls.delete(groupId);
+    if (call.adhoc) return;
+  }
   broadcastGroupCall(groupId);
 }
 
@@ -540,15 +566,27 @@ io.on("connection", (socket) => {
     if (typeof groupId !== "string" || !Array.isArray(userIds)) return reply({ ok: false, error: "Invalid request" });
     const call = groupCalls.get(groupId);
     if (!call || !call.participants.has(userId)) return reply({ ok: false, error: "You're not in this call" });
-    const group = await Group.findOne({ _id: groupId, members: userId }).select("name groupPic members").lean().catch(() => null);
-    if (!group) return reply({ ok: false, error: "You're not in this group" });
-
-    const memberSet = new Set(group.members.map(String));
+    let group;
+    let memberSet;
+    if (call.adhoc) {
+      // Anyone the caller may call can be added to an ad-hoc call.
+      const found = await User.find({ _id: { $in: userIds.filter((id) => typeof id === "string").slice(0, MAX_GROUP_CALL) } })
+        .select("_id")
+        .lean()
+        .catch(() => []);
+      memberSet = new Set(found.map((u) => String(u._id)).filter((id) => canSignal(userId, id)));
+      group = { name: call.adhoc.name, groupPic: "" };
+      memberSet.forEach((id) => call.adhoc.members.add(id));
+    } else {
+      group = await Group.findOne({ _id: groupId, members: userId }).select("name groupPic members").lean().catch(() => null);
+      if (!group) return reply({ ok: false, error: "You're not in this group" });
+      memberSet = new Set(group.members.map(String));
+    }
     const now = Date.now();
     const targets = [...new Set(userIds.filter((id) => typeof id === "string"))]
       .filter((id) => id !== userId && memberSet.has(id) && !call.participants.has(id))
       .filter((id) => now - (lastRung.get(`${groupId}:${id}`) || 0) > 20000) // don't spam the same person
-      .slice(0, MAX_GROUP_CALL);
+      .slice(0, Math.max(0, MAX_GROUP_CALL - call.participants.size));
     if (!targets.length) return reply({ ok: true, rung: [] });
 
     targets.forEach((id) => {
@@ -578,6 +616,37 @@ io.on("connection", (socket) => {
       `g:${groupId}`
     );
     reply({ ok: true, rung: targets });
+  });
+
+  // Turn the 1:1 call I'm in into a group call (WhatsApp's "Add participant").
+  // The other person is moved over automatically; the extra people are rung.
+  socket.on("groupCall:upgrade", async (payload, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+    const { withUserId, callType, name } = payload || {};
+    if (typeof withUserId !== "string" || withUserId === userId || !canSignal(userId, withUserId)) {
+      return reply({ ok: false, error: "Can't add people to this call" });
+    }
+    const groupId = `adhoc:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const type = callType === "video" ? "video" : "audio";
+    const title = (typeof name === "string" && name.trim().slice(0, 60)) || "Group call";
+    const call = {
+      callType: type,
+      startedBy: userId,
+      startedAt: Date.now(),
+      participants: new Map(),
+      adhoc: { name: title, members: new Set([userId, withUserId]) },
+    };
+    groupCalls.set(groupId, call);
+    // Nobody ended up joining (e.g. the app closed mid-switch): don't leave it lingering.
+    setTimeout(() => {
+      const c = groupCalls.get(groupId);
+      if (c && c.participants.size === 0) {
+        groupCalls.delete(groupId);
+      }
+    }, 45000);
+    const room = roomFor(withUserId);
+    if (room) io.to(room).emit("groupCall:upgrade", { groupId, name: title, callType: type, from: socket.data.profile });
+    reply({ ok: true, groupId, name: title, callType: type });
   });
 
   socket.on("groupCall:join", async (payload, ack) => {

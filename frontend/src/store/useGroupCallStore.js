@@ -2,7 +2,7 @@ import { canCaptureScreen, getScreenTrack, noScreenShareMessage } from "../lib/s
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
-import { useCallStore, getIceConfig } from "./useCallStore";
+import { useCallStore, getIceConfig, markCallHandoff } from "./useCallStore";
 import { startRingtone, stopRingtoneSound, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
 import { setGroupCallBusy } from "../lib/callBusy";
 
@@ -12,7 +12,7 @@ import { setGroupCallBusy } from "../lib/callBusy";
 // "perfect negotiation" pattern, so anyone can add or drop camera / screen
 // share at any moment without the two sides talking over each other.
 
-export const MAX_GROUP_CALL = 6;
+export const MAX_GROUP_CALL = 10;
 const RING_MS = 40_000;
 const NO_ONE_JOINED_MS = 60_000;
 
@@ -375,7 +375,7 @@ export const useGroupCallStore = create((set, get) => {
           groupId,
           groupName: meta.name || inc?.groupName || "Group call",
           groupPic: meta.groupPic || inc?.groupPic || "",
-          callType: st?.callType || inc?.callType || "audio",
+          callType: meta.callType || st?.callType || inc?.callType || "audio",
         },
         "groupCall:join",
         { groupId }
@@ -392,6 +392,29 @@ export const useGroupCallStore = create((set, get) => {
       if (!inc) return;
       socketOf()?.emit("groupCall:decline", { groupId: inc.groupId });
       dismissIncoming();
+    },
+
+    // WhatsApp's "Add participant" on a 1:1 call: the call becomes a group call, the
+    // other person is moved over automatically and the new people are rung.
+    upgradeFromCall: async (extraIds = []) => {
+      const cs = useCallStore.getState();
+      const socket = socketOf();
+      if (!socket || cs.callStatus !== "in-call" || !cs.remoteUser || get().status !== "idle") return;
+      const me = useAuthStore.getState().authUser;
+      const first = (n = "") => n.trim().split(" ")[0];
+      const res = await emitAck(socket, "groupCall:upgrade", {
+        withUserId: cs.remoteUser._id,
+        callType: cs.callType,
+        name: `${first(me?.fullName)}, ${first(cs.remoteUser.fullName)}`,
+      });
+      if (!res?.ok) {
+        toast.error(res?.error || "Couldn't add people to this call");
+        return;
+      }
+      markCallHandoff();
+      useCallStore.getState().endCall();
+      await get().joinCall(res.groupId, { name: res.name, callType: res.callType });
+      if (extraIds.length && get().status === "active") get().ringMembers(extraIds);
     },
 
     // Ring other group members to join this call. Resolves to the ids actually rung.
@@ -497,6 +520,15 @@ export const useGroupCallStore = create((set, get) => {
         ringTimer = setTimeout(dismissIncoming, RING_MS);
       });
 
+      // The person I'm on a 1:1 call with added someone: follow them into the group call.
+      socket.on("groupCall:upgrade", ({ groupId, name, callType, from }) => {
+        const cs = useCallStore.getState();
+        if (get().status !== "idle" || cs.callStatus !== "in-call" || cs.remoteUser?._id !== from?._id) return;
+        markCallHandoff();
+        cs.resetCall();
+        get().joinCall(groupId, { name, callType });
+      });
+
       socket.on("groupCall:dismiss", ({ groupId }) => {
         if (get().incoming?.groupId === groupId) dismissIncoming();
       });
@@ -548,6 +580,7 @@ export const useGroupCallStore = create((set, get) => {
       const socket = socketOf();
       [
         "groupCall:incoming",
+        "groupCall:upgrade",
         "groupCall:dismiss",
         "groupCall:state",
         "groupCall:states",

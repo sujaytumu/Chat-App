@@ -135,11 +135,20 @@ const ParticipantsSheet = ({ groupId, onClose }) => {
   const ringMembers = useGroupCallStore((s) => s.ringMembers);
   const onlineUsers = useAuthStore((s) => s.onlineUsers);
   const [ringing, setRinging] = useState({}); // userId -> true while we wait for them
-  const full = inCall.length >= MAX_GROUP_CALL;
+  const users = useChatStore((s) => s.users);
+  const adhoc = String(groupId).startsWith("adhoc:");
+  const full = Math.max(inCall.length, Object.keys(tiles).length + 1) >= MAX_GROUP_CALL;
 
   const joinedIds = new Set([authUser._id, ...inCall.map((p) => p._id), ...Object.keys(tiles)]);
-  const members = (group?.members || []).filter((m) => (m._id || m) !== undefined && typeof m === "object");
-  const joined = members.filter((m) => joinedIds.has(m._id));
+  // A real group offers its members; a call that grew out of a 1:1 offers all your contacts.
+  const members = adhoc
+    ? users.filter((u) => !u.isGroup && u._id)
+    : (group?.members || []).filter((m) => (m._id || m) !== undefined && typeof m === "object");
+  const known = new Set(members.map((m) => m._id));
+  const extra = [...inCall, ...Object.values(tiles).map((t) => t.profile).filter(Boolean)].filter(
+    (p, i, arr) => p && !known.has(p._id) && arr.findIndex((x) => x?._id === p._id) === i
+  );
+  const joined = [...members.filter((m) => joinedIds.has(m._id)), ...extra];
   const rest = members.filter((m) => !joinedIds.has(m._id));
 
   const ring = async (ids) => {
@@ -281,7 +290,7 @@ const Active = () => {
   const count = all.length;
 
   const gridCls =
-    count <= 1 ? "grid-cols-1" : count === 2 ? "grid-cols-1 md:grid-cols-2" : count <= 4 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3";
+    count <= 1 ? "grid-cols-1" : count === 2 ? "grid-cols-1 md:grid-cols-2" : count <= 4 ? "grid-cols-2" : count <= 6 ? "grid-cols-2 md:grid-cols-3" : "grid-cols-3 md:grid-cols-4";
   const renderTile = (t, small) => <Tile key={t.id} {...t} small={small} />;
   const canShare = canShareScreen() || isPhoneLike();
 
