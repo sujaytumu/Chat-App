@@ -10,6 +10,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.os.Build;
 import android.os.IBinder;
 import android.os.PowerManager;
@@ -28,6 +31,46 @@ public class CallKeepAliveService extends Service {
     private static final int NOTIFICATION_ID = 4712;
 
     private PowerManager.WakeLock wakeLock;
+    private AudioFocusRequest focusRequest;
+    private int prevAudioMode = AudioManager.MODE_NORMAL;
+    private boolean audioHeld = false;
+
+    /** Tell Android this is a voice call so the other person stays audible with the app in the background. */
+    private void holdCallAudio() {
+        if (audioHeld) return;
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) return;
+        try {
+            prevAudioMode = am.getMode();
+            am.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            if (Build.VERSION.SDK_INT >= 26) {
+                focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                        .setAudioAttributes(new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                                .build())
+                        .setOnAudioFocusChangeListener(change -> { })
+                        .build();
+                am.requestAudioFocus(focusRequest);
+            }
+            audioHeld = true;
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void releaseCallAudio() {
+        if (!audioHeld) return;
+        AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        try {
+            if (am != null) {
+                if (Build.VERSION.SDK_INT >= 26 && focusRequest != null) am.abandonAudioFocusRequest(focusRequest);
+                am.setMode(prevAudioMode);
+            }
+        } catch (Exception ignored) {
+        }
+        focusRequest = null;
+        audioHeld = false;
+    }
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -99,6 +142,8 @@ public class CallKeepAliveService extends Service {
             return START_NOT_STICKY;
         }
 
+        holdCallAudio();
+
         if (wakeLock == null) {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (pm != null) {
@@ -112,6 +157,7 @@ public class CallKeepAliveService extends Service {
 
     @Override
     public void onDestroy() {
+        releaseCallAudio();
         try {
             if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         } catch (Exception ignored) {
