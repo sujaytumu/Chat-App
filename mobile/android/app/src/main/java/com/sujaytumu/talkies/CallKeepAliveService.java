@@ -1,0 +1,123 @@
+package com.sujaytumu.talkies;
+
+import android.Manifest;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.PowerManager;
+
+/**
+ * Keeps a call alive while the app is in the background.
+ *
+ * Android silences the microphone (and may throttle the web page) of an app
+ * that isn't on screen, unless it is running a foreground service of type
+ * "microphone". This service does nothing but hold that status for the length
+ * of a call and show the ongoing-call notification (with a timer and Hang up).
+ */
+public class CallKeepAliveService extends Service {
+    static final String ACTION_HANGUP = "com.sujaytumu.talkies.CALL_HANGUP";
+    private static final String CHANNEL_ID = "ongoing_call";
+    private static final int NOTIFICATION_ID = 4712;
+
+    private PowerManager.WakeLock wakeLock;
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_HANGUP.equals(intent.getAction())) {
+            CallKeepAlivePlugin.hangup();
+            MainActivity.callActive = false;
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+        if (intent == null) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
+        String title = intent.getStringExtra("title");
+        String text = intent.getStringExtra("text");
+        boolean video = intent.getBooleanExtra("video", false);
+
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "Ongoing call", NotificationManager.IMPORTANCE_LOW));
+        }
+
+        Intent open = new Intent(this, MainActivity.class)
+                .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent openIntent = PendingIntent.getActivity(
+                this, 1, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Intent hang = new Intent(this, CallKeepAliveService.class).setAction(ACTION_HANGUP);
+        PendingIntent hangIntent = PendingIntent.getService(
+                this, 2, hang, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+        Notification.Builder b = Build.VERSION.SDK_INT >= 26
+                ? new Notification.Builder(this, CHANNEL_ID)
+                : new Notification.Builder(this);
+        b.setContentTitle(title == null ? "Talkies call" : title)
+                .setContentText(text == null ? "Call in progress" : text)
+                .setSmallIcon(android.R.drawable.sym_action_call)
+                .setCategory(Notification.CATEGORY_CALL)
+                .setOngoing(true)
+                .setUsesChronometer(true)
+                .setWhen(System.currentTimeMillis())
+                .setContentIntent(openIntent)
+                .addAction(new Notification.Action.Builder(null, "Hang up", hangIntent).build());
+        Notification n = b.build();
+
+        try {
+            if (Build.VERSION.SDK_INT >= 30) {
+                int type = 0;
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
+                }
+                if (video && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
+                }
+                if (type != 0) startForeground(NOTIFICATION_ID, n, type);
+                else startForeground(NOTIFICATION_ID, n);
+            } else {
+                startForeground(NOTIFICATION_ID, n);
+            }
+        } catch (Exception e) {
+            // Couldn't become a foreground service (e.g. started too late) — the
+            // call still works while the app is open.
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
+        if (wakeLock == null) {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "talkies:call");
+                wakeLock.setReferenceCounted(false);
+                wakeLock.acquire(4 * 60 * 60 * 1000L); // safety cap: 4 hours
+            }
+        }
+        return START_NOT_STICKY;
+    }
+
+    @Override
+    public void onDestroy() {
+        try {
+            if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
+        } catch (Exception ignored) {
+        }
+        wakeLock = null;
+        MainActivity.callActive = false;
+        super.onDestroy();
+    }
+}

@@ -14,6 +14,17 @@ import com.getcapacitor.BridgeActivity;
 public class MainActivity extends BridgeActivity {
     /** True while the app is on screen (pushes then leave the ringing / beeping to the page). */
     static volatile boolean visible = false;
+    /** True while a call is connected: the page must keep running when the app is in the background. */
+    static volatile boolean callActive = false;
+
+    private void keepPageAliveForCall() {
+        if (!callActive || getBridge() == null) return;
+        WebView w = getBridge().getWebView();
+        if (w != null) {
+            w.onResume();
+            w.resumeTimers();
+        }
+    }
 
     private void showOverLockScreenIfCall(Intent intent) {
         if (intent != null && intent.getBooleanExtra("tk_isCall", false)) {
@@ -46,6 +57,13 @@ public class MainActivity extends BridgeActivity {
     public void onPause() {
         visible = false;
         super.onPause();
+        keepPageAliveForCall();
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        keepPageAliveForCall();
     }
 
     @Override
@@ -54,6 +72,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ScreenSharePlugin.class);
         registerPlugin(AppChromePlugin.class);
         registerPlugin(TalkiesPushPlugin.class);
+        registerPlugin(CallKeepAlivePlugin.class);
         showOverLockScreenIfCall(getIntent());
         super.onCreate(savedInstanceState);
         TalkiesPushPlugin.handleIntent(getIntent());
