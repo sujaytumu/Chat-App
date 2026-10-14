@@ -9,6 +9,7 @@ import User from "../models/user.model.js";
 import { sendPushToUser, sendPushToUsers } from "./webPush.js";
 import { sendFcmCancelCall } from "./fcm.js";
 import { markGroupDelivered } from "./groupReceipts.js";
+import { ackDirectMessage } from "./directReceipts.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -218,6 +219,23 @@ io.on("connection", (socket) => {
   socket.on("groupStopTyping", ({ groupId }) => {
     if (!socket.rooms.has(String(groupId))) return;
     socket.to(groupId).emit("groupStopTyping", { fromUserId: userId, groupId });
+  });
+
+  // The device confirms a message actually arrived -> sender gets the double tick.
+  socket.on("messageReceived", async ({ messageId, groupId } = {}) => {
+    try {
+      if (!messageId) return;
+      if (groupId) {
+        await markGroupDelivered(io, userId, { messageIds: [messageId] });
+      } else {
+        await ackDirectMessage((uid, ev, payload) => {
+          const room = roomFor(uid);
+          if (room) io.to(room).emit(ev, payload);
+        }, userId, messageId);
+      }
+    } catch (e) {
+      console.log("Error in messageReceived:", e.message);
+    }
   });
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----

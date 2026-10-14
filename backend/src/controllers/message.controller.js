@@ -8,6 +8,7 @@ import { getLinkPreview } from "../lib/linkPreview.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
+import { markDirectDeliveredFor } from "../lib/directReceipts.js";
 
 import cloudinary from "../lib/cloudinary.js";
 import { getReceiverSocketId, io, setPrivacyCache, refreshOnline } from "../lib/socket.js";
@@ -21,19 +22,14 @@ const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 // (or opened) anything from someone, every earlier message from them to this
 // user has reached it too. Flips them all to "delivered" and tells the senders.
 export async function markDirectDelivered(receiverId, extra = {}) {
-  try {
-    const filter = { receiverId, groupId: null, delivered: false, ...extra };
-    const pending = await Message.find(filter).select("_id senderId").lean();
-    if (!pending.length) return;
-    await Message.updateMany({ _id: { $in: pending.map((m) => m._id) } }, { $set: { delivered: true, deliveredAt: new Date() } });
-    const senders = [...new Set(pending.map((m) => String(m.senderId)))];
-    senders.forEach((sid) => {
-      const room = getReceiverSocketId(sid);
-      if (room) io.to(room).emit("messagesDelivered", { by: String(receiverId) });
-    });
-  } catch (e) {
-    console.log("Error in markDirectDelivered:", e.message);
-  }
+  return markDirectDeliveredFor(
+    (uid, ev, payload) => {
+      const room = getReceiverSocketId(uid);
+      if (room) io.to(room).emit(ev, payload);
+    },
+    receiverId,
+    extra
+  );
 }
 
 // Sidebar: direct-message contacts, each with last message + unread count.
@@ -224,7 +220,10 @@ export const sendMessage = async (req, res) => {
     // They blocked me: the message is kept on my side (one tick) but never reaches them.
     const blockedByThem = !!receiver?.blockedUsers?.some((b) => String(b) === String(senderId));
     const receiverSocketId = blockedByThem ? undefined : getReceiverSocketId(receiverId);
-    const isDelivered = !!receiverSocketId;
+    // "Delivered" is only recorded once the receiving device confirms it (the app
+    // acks "messageReceived", or the push reaches the phone). A socket that merely
+    // looks connected — e.g. the phone just lost signal — must not count.
+    const isDelivered = false;
 
     const dSetting = await DirectChatSetting.findOne({ key: pairKey(senderId, receiverId) }).select("disappearAfter").lean();
     const newMessage = new Message({

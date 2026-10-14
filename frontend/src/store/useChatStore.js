@@ -722,6 +722,8 @@ export const useChatStore = create((set, get) => ({
     set({ socketSubscribed: true });
 
     socket.on("newMessage", (message) => {
+      // Tell the server this device really has it -> the sender's double tick.
+      if (message?._id && message.senderId !== useAuthStore.getState().authUser?._id) socket.emit("messageReceived", { messageId: message._id });
       const { selectedChat, messages } = get();
       const isActiveChat =
         selectedChat?.type === "direct" &&
@@ -764,6 +766,7 @@ export const useChatStore = create((set, get) => ({
     });
 
     socket.on("newGroupMessage", (message) => {
+      if (message?._id && message.senderId !== useAuthStore.getState().authUser?._id) socket.emit("messageReceived", { messageId: message._id, groupId: message.groupId });
       const { selectedChat, messages } = get();
       const isActiveChat = selectedChat?.type === "group" && selectedChat.data._id === message.groupId;
 
