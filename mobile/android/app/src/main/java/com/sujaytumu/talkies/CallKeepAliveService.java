@@ -93,6 +93,7 @@ public class CallKeepAliveService extends Service {
         String title = intent.getStringExtra("title");
         String text = intent.getStringExtra("text");
         boolean video = intent.getBooleanExtra("video", false);
+        long startedAt = intent.getLongExtra("startedAt", 0L);
 
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= 26) {
@@ -115,11 +116,30 @@ public class CallKeepAliveService extends Service {
                 .setSmallIcon(android.R.drawable.sym_action_call)
                 .setCategory(Notification.CATEGORY_CALL)
                 .setOngoing(true)
-                .setUsesChronometer(true)
-                .setWhen(System.currentTimeMillis())
-                .setContentIntent(openIntent)
-                .addAction(new Notification.Action.Builder(null, "Hang up", hangIntent).build());
-        Notification n = b.build();
+                .setContentIntent(openIntent);
+        // A live mm:ss timer once the call has connected (not while it's still ringing).
+        if (startedAt > 0) {
+            b.setUsesChronometer(true).setShowWhen(true).setWhen(startedAt);
+        } else {
+            b.setShowWhen(false);
+        }
+        Notification n;
+        if (Build.VERSION.SDK_INT >= 31) {
+            // Android's own call notification: contact name, timer and a red Hang up button.
+            try {
+                android.app.Person person = new android.app.Person.Builder()
+                        .setName(title == null ? "Talkies call" : title).setImportant(true).build();
+                b.setStyle(Notification.CallStyle.forOngoingCall(person, hangIntent));
+                n = b.build();
+            } catch (Exception e) {
+                b.setStyle(null);
+                b.addAction(new Notification.Action.Builder(null, "Hang up", hangIntent).build());
+                n = b.build();
+            }
+        } else {
+            b.addAction(new Notification.Action.Builder(null, "Hang up", hangIntent).build());
+            n = b.build();
+        }
 
         try {
             if (Build.VERSION.SDK_INT >= 30) {

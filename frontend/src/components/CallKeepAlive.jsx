@@ -12,7 +12,9 @@ const CallKeepAlive = () => {
   const callStatus = useCallStore((s) => s.callStatus);
   const callType = useCallStore((s) => s.callType);
   const remoteName = useCallStore((s) => s.remoteUser?.fullName);
+  const callStartedAt = useCallStore((s) => s.callStartedAt);
   const groupStatus = useGroupCallStore((s) => s.status);
+  const groupStartedAt = useGroupCallStore((s) => (s.status === "active" ? s.startedAt : 0));
   const groupName = useGroupCallStore((s) => s.groupName);
   const groupVideo = useGroupCallStore((s) => s.cameraOn);
 
@@ -21,16 +23,17 @@ const CallKeepAlive = () => {
   const active = oneToOne || group;
   const video = oneToOne ? callType === "video" : groupVideo;
   const title = oneToOne ? remoteName || "Talkies call" : groupName || "Group call";
-  const text = oneToOne
-    ? `${callType === "video" ? "Video" : "Voice"} call in progress`
-    : "Group call in progress";
+  // Epoch ms the call connected: the notification then shows a live mm:ss timer.
+  const startedAt = oneToOne ? (callStatus === "in-call" ? callStartedAt || Date.now() : 0) : groupStartedAt || 0;
+  const kind = oneToOne ? (callType === "video" ? "Video call" : "Voice call") : "Group call";
+  const text = startedAt ? kind : `${kind} · connecting…`;
 
   useEffect(() => {
     const p = plugin();
     if (!p) return;
-    if (active) p.start({ title, text, video }).catch(() => {});
+    if (active) p.start({ title, text, video, startedAt }).catch(() => {});
     else p.stop().catch(() => {});
-  }, [active, video, title, text]);
+  }, [active, video, title, text, startedAt]);
 
   useEffect(() => {
     const p = plugin();
