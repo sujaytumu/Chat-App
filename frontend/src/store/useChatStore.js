@@ -293,6 +293,20 @@ export const useChatStore = create((set, get) => ({
 
   setSelectedChat: (chat) => {
     if (get().selectedMsgIds.length) set({ selectedMsgIds: [] });
+    // Leaving a chat means its messages were read: remember that in the quick-reopen copy,
+    // so the "N unread messages" divider doesn't come back the next time it's opened.
+    const prev = get().selectedChat;
+    if (prev && (!chat || chatKeyOf(prev) !== chatKeyOf(chat)) && get().messages.length) {
+      const me = useAuthStore.getState().authUser?._id;
+      const key = chatKeyOf(prev);
+      const readList = get().messages.map((m) =>
+        m.senderId === me || m.pending
+          ? m
+          : { ...m, seen: true, seenBy: prev.type === "group" ? [...new Set([...(m.seenBy || []), me])] : m.seenBy }
+      );
+      msgCache.set(key, readList);
+      writeChatCache(me, `msgs-${key}`, readList.slice(-40));
+    }
     if (!chat) {
       set({ selectedChat: null, messages: [], hasMoreMessages: false, chatSearchOpen: false, pendingJump: null });
       return;
@@ -953,21 +967,23 @@ export const useChatStore = create((set, get) => ({
     // A group member's device received / read messages: update the ticks and
     // the "Message info" lists live.
     socket.on("groupReceipts", ({ groupId, userId, at, kind, messageIds }) => {
-      const { selectedChat } = get();
-      if (selectedChat?.type !== "group" || selectedChat.data._id !== groupId) return;
       const ids = new Set(messageIds);
+      const patch = (m) => {
+        if (!ids.has(m._id)) return m;
+        const has = (list) => (list || []).some((e) => String(e.user) === String(userId));
+        const next = { ...m };
+        if (!has(m.deliveredTo)) next.deliveredTo = [...(m.deliveredTo || []), { user: userId, at }];
+        if (kind === "seen") {
+          if (!has(m.seenLog)) next.seenLog = [...(m.seenLog || []), { user: userId, at }];
+          if (!(m.seenBy || []).map(String).includes(String(userId))) next.seenBy = [...(m.seenBy || []), userId];
+        }
+        return next;
+      };
+      const open = get().selectedChat?.type === "group" && get().selectedChat.data._id === groupId;
       set((state) => ({
-        messages: state.messages.map((m) => {
-          if (!ids.has(m._id)) return m;
-          const has = (list) => (list || []).some((e) => String(e.user) === String(userId));
-          const next = { ...m };
-          if (!has(m.deliveredTo)) next.deliveredTo = [...(m.deliveredTo || []), { user: userId, at }];
-          if (kind === "seen") {
-            if (!has(m.seenLog)) next.seenLog = [...(m.seenLog || []), { user: userId, at }];
-            if (!(m.seenBy || []).map(String).includes(String(userId))) next.seenBy = [...(m.seenBy || []), userId];
-          }
-          return next;
-        }),
+        // the chat-list preview's ticks update even when that group isn't open
+        groups: state.groups.map((g) => (g._id === groupId && g.lastMessage ? { ...g, lastMessage: patch(g.lastMessage) } : g)),
+        ...(open ? { messages: state.messages.map(patch) } : {}),
       }));
     });
 
@@ -992,7 +1008,7 @@ export const useChatStore = create((set, get) => ({
 
     socket.on("groupUpdated", (group) => {
       set((state) => ({
-        groups: state.groups.map((g) => (g._id === group._id ? group : g)),
+        groups: state.groups.map((g) => (g._id === group._id ? { ...g, ...group } : g)),
         selectedChat:
           state.selectedChat?.type === "group" && state.selectedChat.data._id === group._id
             ? { type: "group", data: group }

@@ -152,6 +152,10 @@ const ChatContainer = () => {
   const [expandedIds, setExpandedIds] = useState(() => new Set());
   // "N unread messages" divider: remembered when the chat is opened, before they are marked read.
   const [unreadMark, setUnreadMark] = useState({ key: null, id: null, count: 0 });
+  // Closing the chat forgets the divider; reopening it starts clean.
+  useEffect(() => {
+    if (!chatKeyNow) setUnreadMark((m) => (m.key ? { key: null, id: null, count: 0 } : m));
+  }, [chatKeyNow]);
   useEffect(() => {
     if (!chatKeyNow || unreadMark.key === chatKeyNow || !allMessages.length || isMessagesLoading) return;
     const me = authUser._id;

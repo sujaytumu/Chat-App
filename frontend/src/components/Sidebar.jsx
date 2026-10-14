@@ -6,7 +6,7 @@ import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import Avatar from "./Avatar";
-import MessageTicks from "./MessageTicks";
+import MessageTicks, { GroupMessageTicks } from "./MessageTicks";
 import { formatChatListTime } from "../lib/utils";
 import {
   Search,
@@ -720,6 +720,11 @@ const Sidebar = () => {
                     {!draftText && sentByMe && item.type === "direct" && (
                       <span className="shrink-0 text-wa-muted">
                         <MessageTicks message={item.lastMessage} />
+                      </span>
+                    )}
+                    {!draftText && sentByMe && item.type === "group" && (
+                      <span className="shrink-0 text-wa-muted">
+                        <GroupMessageTicks message={item.lastMessage} members={item.data.members} senderId={authUser._id} />
                       </span>
                     )}
                     {draftText ? (
