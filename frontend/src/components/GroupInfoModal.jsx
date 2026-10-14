@@ -1,23 +1,58 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { optimizeImage } from "../lib/cdn";
-import { X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check, Loader2, Smile, Images, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2, Bell, BellOff } from "lucide-react";
+import { lazy, Suspense, useRef, useState } from "react";
+import {
+  ArrowLeft, X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check,
+  Loader2, Smile, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2, MoreVertical, QrCode, Share2, Lock,
+  Heart, ListPlus, Upload, Eraser, UsersRound, Users, Bell,
+} from "lucide-react";
 import toast from "react-hot-toast";
+import { optimizeImage } from "../lib/cdn";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { useChatLockStore } from "../store/useChatLockStore";
 import { compressImage } from "../lib/imageUtils";
+import { exportChat } from "../lib/exportChat";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
+import Avatar from "./Avatar";
 import ImageLightbox from "./ImageLightbox";
 import ReportGroupDialog from "./ReportGroupDialog";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import MuteSheet from "./MuteSheet";
+import CreateGroupModal from "./CreateGroupModal";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const GroupEmojiPhoto = lazy(() => import("./GroupEmojiPhoto"));
 const GroupInviteSheet = lazy(() => import("./GroupInviteSheet"));
+
+const TABS = ["Members", "Media", "Settings"];
+
+// One row of the Settings lists: icon, title (+ small subtitle), optional right side.
+const Row = ({ icon: Icon, title, subtitle, right, onClick, danger, disabled }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    disabled={disabled}
+    className="w-full flex items-center gap-5 px-5 py-3.5 text-left hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
+  >
+    <span className={`w-7 flex justify-center shrink-0 ${danger ? "text-[#F15C6D]" : "text-wa-icon"}`}>
+      <Icon size={22} />
+    </span>
+    <span className="flex-1 min-w-0">
+      <span className={`block text-[15px] ${danger ? "text-[#F15C6D]" : "text-wa-text"}`}>{title}</span>
+      {subtitle && <span className="block text-[12.5px] text-wa-muted mt-0.5">{subtitle}</span>}
+    </span>
+    {right}
+  </button>
+);
+
+const Toggle = ({ on }) => (
+  <span className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${on ? "bg-[#00A884]" : "bg-wa-field border border-white/20"}`} aria-hidden="true">
+    <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${on ? "left-[22px]" : "left-0.5"}`} />
+  </span>
+);
 
 const GroupInfoModal = ({ group, onClose }) => {
   const { users, addMembersToGroup, removeMemberFromGroup, leaveGroup, updateGroupInfo, setChatSearchOpen } = useChatStore();
@@ -28,53 +63,70 @@ const GroupInfoModal = ({ group, onClose }) => {
   const groupBusy = useGroupCallStore((st) => st.status !== "idle");
   const callBusy = oneToOneBusy || groupBusy;
   const { authUser } = useAuthStore();
-  const [showAddMembers, setShowAddMembers] = useState(false);
-  const [toAdd, setToAdd] = useState([]);
+
+  const [tab, setTab] = useState("Members");
+  const [scrolled, setScrolled] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [nameDraft, setNameDraft] = useState(group.name);
+  const [descDraft, setDescDraft] = useState(group.description || "");
+  const [savingPhoto, setSavingPhoto] = useState(false);
   const [photoMenu, setPhotoMenu] = useState(false);
   const [viewPhoto, setViewPhoto] = useState(false);
   const [emojiPhoto, setEmojiPhoto] = useState(false);
+  const [memberSearch, setMemberSearch] = useState(null); // null = closed, string = open
+  const [showAddMembers, setShowAddMembers] = useState(false);
+  const [toAdd, setToAdd] = useState([]);
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
-  const starred = useStarredCount("group", group._id);
-  const mediaData = useChatMedia("group", group._id);
-  const mediaCount = mediaData ? mediaData.media.length + mediaData.docs.length + mediaData.links.length : 0;
-  const [savingPhoto, setSavingPhoto] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState(group.name);
+  const [showPerms, setShowPerms] = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [showMute, setShowMute] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [showDisappear, setShowDisappear] = useState(false);
+  const [showSimilar, setShowSimilar] = useState(false);
+  const [showLists, setShowLists] = useState(false);
   const uploadRef = useRef(null);
   const cameraRef = useRef(null);
+  const scrollRef = useRef(null);
 
   // Phone Back closes this screen instead of leaving the app.
   useBackToClose(true, onClose);
 
+  const starred = useStarredCount("group", group._id);
+  const mediaData = useChatMedia("group", group._id);
+  const mediaCount = mediaData ? mediaData.media.length + mediaData.docs.length + mediaData.links.length : 0;
+
+  const chat = { type: "group", data: group };
+  const key = `g:${group._id}`;
   const isAdmin = group.admins.some((a) => (a._id || a) === authUser._id);
   const perms = { editInfo: "admins", addMembers: "admins", sendMessages: "all", ...(group.permissions || {}) };
   const canEdit = isAdmin || perms.editInfo === "all";
   const canAddMembers = isAdmin || perms.addMembers === "all";
-  const [showPerms, setShowPerms] = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
-  const [showMute, setShowMute] = useState(false);
-  const muted = (authUser.mutedChats || []).includes(`g:${group._id}`);
-  const [showReport, setShowReport] = useState(false);
-  const [showDisappear, setShowDisappear] = useState(false);
+  const muted = (authUser.mutedChats || []).includes(key);
+  const locked = (authUser.lockedChats || []).includes(key);
+  const lists = authUser.chatLists || [];
+  const isFav = !!lists.find((l) => l.id === "favourites")?.chats?.includes(key);
+  const customLists = lists.filter((l) => l.id !== "favourites");
   const memberIds = new Set(group.members.map((m) => m._id || m));
   const nonMembers = users.filter((u) => !memberIds.has(u._id));
 
+  const shownMembers = group.members.filter(
+    (m) => memberSearch == null || (m.fullName || "").toLowerCase().includes(memberSearch.trim().toLowerCase())
+  );
+
+  // ---- actions ----
+  const placeCall = (type) => {
+    onClose();
+    if (groupCallActive) joinGroupCall(group._id, { name: group.name, groupPic: group.groupPic });
+    else startGroupCall(group, type);
+  };
   const handleAdd = async () => {
     if (toAdd.length === 0) return;
     await addMembersToGroup(group._id, toAdd);
     setToAdd([]);
     setShowAddMembers(false);
   };
-
-  // Close the little photo menu when tapping anywhere else.
-  useEffect(() => {
-    if (!photoMenu) return;
-    const close = () => setPhotoMenu(false);
-    window.addEventListener("pointerdown", close);
-    return () => window.removeEventListener("pointerdown", close);
-  }, [photoMenu]);
-
   const pickPhoto = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -90,328 +142,443 @@ const GroupInfoModal = ({ group, onClose }) => {
       setSavingPhoto(false);
     }
   };
-
   const saveEmojiPhoto = async (img) => {
     setEmojiPhoto(false);
     setSavingPhoto(true);
     if (await updateGroupInfo(group._id, { groupPic: img })) toast.success("Group photo updated");
     setSavingPhoto(false);
   };
-
   const removePhoto = async () => {
-    setPhotoMenu(false);
     setSavingPhoto(true);
     if (await updateGroupInfo(group._id, { removeGroupPic: true })) toast.success("Group photo removed");
     setSavingPhoto(false);
   };
-
-  const saveName = async () => {
-    const next = nameDraft.trim();
-    if (!next || next === group.name) {
-      setNameDraft(group.name);
-      return setEditingName(false);
-    }
-    if (await updateGroupInfo(group._id, { name: next })) setEditingName(false);
+  const saveEdits = async () => {
+    const payload = {};
+    if (nameDraft.trim() && nameDraft.trim() !== group.name) payload.name = nameDraft.trim();
+    if (descDraft.trim() !== (group.description || "")) payload.description = descDraft;
+    if (Object.keys(payload).length && !(await updateGroupInfo(group._id, payload))) return;
+    setEditMode(false);
   };
-
-  const onAvatarClick = () => {
-    if (canEdit) setPhotoMenu((o) => !o);
-    else if (group.groupPic) setViewPhoto(true);
+  const toggleFavourite = async () => {
+    const fav = lists.find((l) => l.id === "favourites") || { id: "favourites", name: "Favourites", chats: [] };
+    const chats = isFav ? fav.chats.filter((k) => k !== key) : [...new Set([...fav.chats, key])];
+    const next = [...lists.filter((l) => l.id !== "favourites"), { ...fav, chats }];
+    if (await useChatStore.getState().setChatLists(next)) toast(isFav ? "Removed from Favourites" : "Added to Favourites", { icon: "💚" });
   };
-
-  const placeCall = (type) => {
-    onClose();
-    if (groupCallActive) joinGroupCall(group._id, { name: group.name, groupPic: group.groupPic });
-    else startGroupCall(group, type);
+  const toggleInList = async (list) => {
+    const has = list.chats.includes(key);
+    const next = lists.map((l) => (l.id === list.id ? { ...l, chats: has ? l.chats.filter((k) => k !== key) : [...l.chats, key] } : l));
+    await useChatStore.getState().setChatLists(next);
   };
-
-  const actionBtns = [
-    { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
-    { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
-    canAddMembers && { icon: UserPlus, label: "Add", run: () => setShowAddMembers(true) },
-    { icon: Search, label: "Search", run: () => { onClose(); setTimeout(() => setChatSearchOpen(true), 50); } },
-  ].filter(Boolean);
-
+  const toggleLock = () => {
+    const { requestLock, requestRemoveLock } = useChatLockStore.getState();
+    if (locked) requestRemoveLock(chat);
+    else
+      requestLock(chat, () => {
+        onClose();
+        useChatStore.getState().setSelectedChat(null);
+      });
+  };
+  const handleClear = async () => {
+    if (!confirm(`Clear all messages in "${group.name}"? Starred messages will be kept.`)) return;
+    if (await useChatStore.getState().clearChat(chat, true)) toast.success("Chat cleared");
+  };
   const handleLeave = async () => {
-    if (!confirm(`Leave "${group.name}"?`)) return;
+    if (!confirm(`Exit "${group.name}"?`)) return;
     await leaveGroup(group._id);
     onClose();
   };
+  const goSearch = () => {
+    onClose();
+    setTimeout(() => setChatSearchOpen(true), 50);
+  };
+
+  const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 250);
+  const actionBtns = [
+    { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
+    { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
+    isAdmin
+      ? { icon: Share2, label: "Share", run: () => setShowInvite(true) }
+      : canAddMembers && { icon: UserPlus, label: "Add", run: () => { setTab("Members"); setShowAddMembers(true); } },
+    { icon: Search, label: "Search", run: goSearch },
+  ].filter(Boolean);
+
+  const iconBtn = "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
 
   return (
     <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center sm:p-4">
-      <div className="bg-wa-panel text-wa-text sm:rounded-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
-        <div className="flex items-center gap-5 px-4 h-14 shrink-0">
-          <button onClick={onClose} className="text-wa-text" aria-label="Close">
-            <X size={24} />
+      <div className="bg-wa-bg text-wa-text sm:rounded-2xl w-full sm:max-w-md h-full sm:h-[92vh] flex flex-col shadow-xl overflow-hidden relative">
+        {/* Top bar: back · (compact avatar + name once scrolled) · QR · ⋮ */}
+        <div className="flex items-center gap-1 px-2 h-14 shrink-0 bg-wa-bg z-10">
+          <button onClick={editMode ? () => setEditMode(false) : onClose} className={iconBtn} aria-label={editMode ? "Cancel editing" : "Back"}>
+            {editMode ? <X size={24} /> : <ArrowLeft size={24} />}
           </button>
-          <h3 className="text-[16px]">Group info</h3>
+          {editMode ? (
+            <h3 className="flex-1 text-[18px] pl-2">Group info</h3>
+          ) : scrolled ? (
+            <div className="flex-1 flex items-center gap-3 min-w-0 pl-1">
+              <Avatar src={group.groupPic} name={group.name} isGroup size="size-9" />
+              <span className="text-[18px] truncate">{group.name}</span>
+            </div>
+          ) : (
+            <div className="flex-1" />
+          )}
+          {!editMode && isAdmin && (
+            <button onClick={() => setShowInvite(true)} className={iconBtn} aria-label="Group QR code and link">
+              <QrCode size={24} />
+            </button>
+          )}
+          {!editMode && (
+            <div className="relative">
+              <button onClick={() => setMenu((v) => !v)} className={iconBtn} aria-label="More options">
+                <MoreVertical size={24} />
+              </button>
+              {menu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 w-52 rounded-2xl bg-wa-pop border border-white/10 shadow-2xl py-2 z-40">
+                    {[
+                      canEdit && { label: "Edit group", icon: Pencil, run: () => { setNameDraft(group.name); setDescDraft(group.description || ""); setEditMode(true); } },
+                      { label: "Search in chat", icon: Search, run: goSearch },
+                      { label: "Starred messages", icon: Star, run: () => setShowStarred(true) },
+                    ]
+                      .filter(Boolean)
+                      .map((o) => (
+                        <button
+                          key={o.label}
+                          onClick={() => {
+                            setMenu(false);
+                            o.run();
+                          }}
+                          className="w-full flex items-center gap-4 px-5 py-3 text-left text-[15px] hover:bg-white/5"
+                        >
+                          <o.icon size={19} className="text-wa-icon" /> {o.label}
+                        </button>
+                      ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="flex flex-col items-center gap-2 px-6 pt-2 pb-6 border-b border-white/10 relative">
-          <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={onAvatarClick}
-              className="relative block size-40 rounded-full overflow-hidden bg-wa-field group"
-              aria-label={canEdit ? "Change group photo" : "View group photo"}
-            >
-              {group.groupPic ? (
-                <img src={optimizeImage(group.groupPic, 120)} loading="lazy" decoding="async" alt={group.name} className="size-full object-cover" />
-              ) : (
-                <span className="size-full flex items-center justify-center text-6xl text-wa-muted">
-                  {group.name?.[0]?.toUpperCase()}
-                </span>
-              )}
-              {canEdit && (
-                <span className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                  {savingPhoto ? (
-                    <Loader2 size={36} className="animate-spin text-white" />
-                  ) : (
-                    <Camera size={44} className="text-white" strokeWidth={1.8} />
-                  )}
-                </span>
-              )}
-            </button>
-
-            {photoMenu && (
-              <div className="absolute z-10 left-1/2 -translate-x-1/2 top-[calc(100%+6px)] w-56 rounded-2xl bg-wa-pop border border-white/10 shadow-2xl py-2">
-                {[
-                  group.groupPic && { icon: Eye, label: "View photo", run: () => setViewPhoto(true) },
-                  { icon: Camera, label: "Take photo", run: () => cameraRef.current?.click() },
-                  { icon: FolderOpen, label: "Upload photo", run: () => uploadRef.current?.click() },
-                  { icon: Smile, label: "Emoji & sticker", run: () => setEmojiPhoto(true) },
-                  group.groupPic && { icon: Trash2, label: "Remove photo", run: removePhoto, divider: true },
-                ]
-                  .filter(Boolean)
-                  .map((o) => (
-                    <div key={o.label}>
-                      {o.divider && <div className="my-1.5 mx-4 border-t border-white/10" />}
+        <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto overscroll-contain">
+          {/* Header block */}
+          <div className="flex flex-col items-center px-6 pt-1 pb-5">
+            <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => (editMode ? setPhotoMenu((o) => !o) : group.groupPic && setViewPhoto(true))}
+                className="relative block size-[180px] rounded-full overflow-hidden bg-wa-field"
+                aria-label={editMode ? "Change group photo" : "View group photo"}
+              >
+                {group.groupPic ? (
+                  <img src={optimizeImage(group.groupPic, 360)} decoding="async" alt={group.name} className="size-full object-cover" />
+                ) : (
+                  <span className="size-full flex items-center justify-center text-7xl text-wa-muted">
+                    <UsersRound size={84} />
+                  </span>
+                )}
+                {editMode && (
+                  <span className="absolute inset-0 bg-black/45 flex items-center justify-center">
+                    {savingPhoto ? <Loader2 size={40} className="animate-spin text-white" /> : <Camera size={46} className="text-white" strokeWidth={1.8} />}
+                  </span>
+                )}
+              </button>
+              {editMode && photoMenu && (
+                <div className="absolute z-10 left-1/2 -translate-x-1/2 top-[calc(100%+6px)] w-56 rounded-2xl bg-wa-pop border border-white/10 shadow-2xl py-2">
+                  {[
+                    group.groupPic && { icon: Eye, label: "View photo", run: () => setViewPhoto(true) },
+                    { icon: Camera, label: "Take photo", run: () => cameraRef.current?.click() },
+                    { icon: FolderOpen, label: "Upload photo", run: () => uploadRef.current?.click() },
+                    { icon: Smile, label: "Emoji & sticker", run: () => setEmojiPhoto(true) },
+                    group.groupPic && { icon: Trash2, label: "Remove photo", run: removePhoto },
+                  ]
+                    .filter(Boolean)
+                    .map((o) => (
                       <button
+                        key={o.label}
                         type="button"
                         onClick={() => {
                           setPhotoMenu(false);
                           o.run();
                         }}
-                        className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[13px] hover:bg-white/5 active:bg-white/10"
+                        className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[14px] hover:bg-white/5 active:bg-white/10"
                       >
-                        <o.icon size={19} className="text-wa-icon" />
-                        {o.label}
+                        <o.icon size={19} className="text-wa-icon" /> {o.label}
                       </button>
-                    </div>
-                  ))}
-              </div>
-            )}
-            <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
-            <input ref={cameraRef} type="file" accept="image/*" capture="user" className="hidden" onChange={pickPhoto} />
-          </div>
+                    ))}
+                </div>
+              )}
+              <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={pickPhoto} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="user" className="hidden" onChange={pickPhoto} />
+            </div>
 
-          <div className="mt-3 flex items-center justify-center gap-3 w-full">
-            {editingName ? (
-              <>
-                <input
-                  autoFocus
-                  value={nameDraft}
-                  maxLength={50}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") saveName();
-                    if (e.key === "Escape") {
-                      setNameDraft(group.name);
-                      setEditingName(false);
-                    }
-                  }}
-                  className="min-w-0 flex-1 bg-transparent border-b-2 border-[#00A884] text-[20.5px] text-center focus:outline-none"
+            {editMode ? (
+              <div className="w-full mt-5 space-y-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    autoFocus
+                    value={nameDraft}
+                    maxLength={50}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    className="min-w-0 flex-1 bg-transparent border-b-2 border-[#00A884] text-[22px] text-center focus:outline-none pb-1"
+                    aria-label="Group name"
+                  />
+                  <button onClick={saveEdits} className="text-[#21C063] shrink-0" aria-label="Save">
+                    <Check size={28} />
+                  </button>
+                </div>
+                <textarea
+                  value={descDraft}
+                  maxLength={512}
+                  rows={3}
+                  onChange={(e) => setDescDraft(e.target.value)}
+                  placeholder="Add group description"
+                  className="w-full rounded-xl bg-wa-field px-4 py-3 text-[15px] focus:outline-none resize-none"
+                  aria-label="Group description"
                 />
-                <button onClick={saveName} className="text-[#00A884]" aria-label="Save name">
-                  <Check size={24} />
-                </button>
-              </>
+              </div>
             ) : (
               <>
-                <h4 className="text-[22px] leading-tight text-center break-words min-w-0">{group.name}</h4>
-                {canEdit && (
-                  <button
-                    onClick={() => {
-                      setNameDraft(group.name);
-                      setEditingName(true);
-                    }}
-                    className="text-wa-text shrink-0"
-                    aria-label="Edit group name"
-                  >
-                    <Pencil size={20} />
-                  </button>
+                <h4 className="mt-4 text-[30px] leading-tight text-center break-words max-w-full">{group.name}</h4>
+                <p className="mt-1 text-[15px] text-wa-muted">
+                  Group · {group.members.length} member{group.members.length === 1 ? "" : "s"}
+                </p>
+                {group.description ? (
+                  <p className="mt-3 text-[17px] leading-snug text-wa-muted text-center whitespace-pre-wrap break-words max-w-full">{group.description}</p>
+                ) : (
+                  canEdit && (
+                    <button
+                      onClick={() => {
+                        setNameDraft(group.name);
+                        setDescDraft("");
+                        setEditMode(true);
+                      }}
+                      className="mt-3 text-[15px] text-[#21C063]"
+                    >
+                      Add group description
+                    </button>
+                  )
                 )}
+                <div className="mt-6 flex items-start justify-center gap-3 w-full">
+                  {actionBtns.map((b) => (
+                    <button key={b.label} onClick={b.run} disabled={b.disabled} className="flex flex-col items-center gap-2 flex-1 max-w-[96px] disabled:opacity-40">
+                      <span className="w-full h-12 rounded-[22px] bg-wa-field hover:bg-wa-hover active:bg-wa-hover flex items-center justify-center">
+                        <b.icon size={23} />
+                      </span>
+                      <span className="text-[14px]">{b.label}</span>
+                    </button>
+                  ))}
+                </div>
               </>
             )}
           </div>
-          <p className="text-[13px] text-wa-muted">
-            Group · <span className="text-[#21C063] font-medium">{group.members.length} members</span>
-          </p>
-          <div className="mt-3 flex items-start justify-center gap-3">
-            {actionBtns.map((b) => (
+
+          {/* Tabs (stick to the top while scrolling) */}
+          <div className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex">
+            {TABS.map((t) => (
               <button
-                key={b.label}
-                onClick={b.run}
-                disabled={b.disabled}
-                className="flex flex-col items-center gap-1.5 w-[76px] disabled:opacity-40"
+                key={t}
+                onClick={() => {
+                  setTab(t);
+                  // Like WhatsApp: picking a tab collapses the big header so the list gets the room
+                  const el = scrollRef.current;
+                  if (el && el.scrollTop < 290) el.scrollTo({ top: 290, behavior: "smooth" });
+                }}
+                className={`flex-1 py-3.5 text-[16px] relative ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
               >
-                <span className="w-full h-11 rounded-full bg-wa-field hover:bg-wa-hover flex items-center justify-center">
-                  <b.icon size={22} />
-                </span>
-                <span className="text-[11px]">{b.label}</span>
+                {t}
+                {tab === t && <span className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[3px] w-14 rounded-full bg-[#21C063]" />}
               </button>
             ))}
           </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto">
-          <button
-            onClick={() => setShowMedia(true)}
-            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
-          >
-            <Images size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[13.5px]">Media, links and docs</span>
-            <span className="text-wa-muted">{mediaCount}</span>
-            <ChevronRight size={18} className="text-wa-muted" />
-          </button>
-          {mediaData?.media.length > 0 && (
-            <div className="flex gap-1.5 px-5 py-3 overflow-x-auto border-b border-white/10">
-              {mediaData.media.slice(0, 6).map((m) => (
-                <MediaThumb key={m._id} item={m} className="size-[84px] rounded-lg shrink-0" onClick={() => setShowMedia(true)} />
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={() => setShowDisappear(true)}
-            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
-          >
-            <Timer size={22} className="text-wa-muted" />
-            <span className="flex-1">
-              <span className="block text-[13.5px]">Disappearing messages</span>
-              <span className="block text-[11.5px] text-wa-muted">{DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}</span>
-            </span>
-            <ChevronRight size={18} className="text-wa-muted" />
-          </button>
-          <button
-            onClick={() => (muted ? useChatStore.getState().setChatMuted({ type: "group", data: group }, false) : setShowMute(true))}
-            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
-          >
-            {muted ? <BellOff size={22} className="text-wa-muted" /> : <Bell size={22} className="text-wa-muted" />}
-            <span className="flex-1 text-[13.5px]">Mute notifications</span>
-            <span className={`relative w-10 h-6 rounded-full transition-colors ${muted ? "bg-[#00A884]" : "bg-wa-field"}`} aria-hidden="true">
-              <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${muted ? "left-[18px]" : "left-0.5"}`} />
-            </span>
-          </button>
-          {isAdmin && (
-            <button
-              onClick={() => setShowInvite(true)}
-              className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
-            >
-              <Link2 size={22} className="text-wa-muted" />
-              <span className="flex-1 text-[13.5px]">Invite to group via link</span>
-              <ChevronRight size={18} className="text-wa-muted" />
-            </button>
-          )}
-          <button
-            onClick={() => setShowPerms(true)}
-            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
-          >
-            <Settings size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[13.5px]">Group permissions</span>
-            <ChevronRight size={18} className="text-wa-muted" />
-          </button>
-          <button
-            onClick={() => setShowStarred(true)}
-            className="w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10"
-          >
-            <Star size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[13.5px]">Starred messages</span>
-            <span className="text-wa-muted">{starred?.length || ""}</span>
-            <ChevronRight size={18} className="text-wa-muted" />
-          </button>
-          <div className="flex items-center justify-between px-4 pt-3 pb-1">
-            <span className="text-sm font-medium text-wa-muted">Members</span>
-            {canAddMembers && (
-              <button
-                onClick={() => setShowAddMembers((s) => !s)}
-                className="btn btn-xs gap-1"
-              >
-                <UserPlus size={14} /> Add
-              </button>
-            )}
-          </div>
-
-          {showAddMembers && (
-            <div className="px-4 pb-3 space-y-2 border-b border-white/10">
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {nonMembers.map((u) => (
-                  <label key={u._id} className="flex items-center gap-2 py-1 cursor-pointer">
+          {/* ---- Members ---- */}
+          {tab === "Members" && (
+            <div className="pb-6">
+              <div className="flex items-center justify-between px-5 pt-4 pb-2">
+                {memberSearch == null ? (
+                  <>
+                    <span className="text-[15px] text-wa-muted">
+                      {group.members.length} member{group.members.length === 1 ? "" : "s"}
+                    </span>
+                    <button onClick={() => setMemberSearch("")} className="text-wa-muted p-1" aria-label="Search members">
+                      <Search size={22} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 w-full bg-wa-field rounded-full px-4 h-10">
+                    <Search size={18} className="text-wa-muted shrink-0" />
                     <input
-                      type="checkbox"
-                      className="checkbox checkbox-xs"
-                      checked={toAdd.includes(u._id)}
-                      onChange={() =>
-                        setToAdd((prev) =>
-                          prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]
-                        )
-                      }
+                      autoFocus
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search members"
+                      className="flex-1 bg-transparent outline-none text-[15px]"
                     />
-                    <span className="text-sm">{u.fullName}</span>
-                  </label>
-                ))}
-                {nonMembers.length === 0 && (
-                  <p className="text-xs text-wa-muted">Everyone is already in this group</p>
+                    <button onClick={() => setMemberSearch(null)} aria-label="Close search">
+                      <X size={18} className="text-wa-muted" />
+                    </button>
+                  </div>
                 )}
               </div>
-              <button className="btn btn-xs btn-primary" onClick={handleAdd} disabled={toAdd.length === 0}>
-                Add selected
-              </button>
+
+              {canAddMembers && memberSearch == null && (
+                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-4 px-5 py-3 text-left hover:bg-white/5">
+                  <span className="size-12 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
+                    <UserPlus size={22} />
+                  </span>
+                  <span className="text-[17px]">Add members</span>
+                </button>
+              )}
+
+              {showAddMembers && (
+                <div className="mx-5 mb-2 p-3 rounded-2xl bg-wa-panel space-y-2">
+                  <div className="max-h-44 overflow-y-auto space-y-1">
+                    {nonMembers.map((u) => (
+                      <label key={u._id} className="flex items-center gap-3 py-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={toAdd.includes(u._id)}
+                          onChange={() => setToAdd((prev) => (prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]))}
+                        />
+                        <Avatar src={u.profilePic} name={u.fullName} size="size-8" textSize="text-sm" />
+                        <span className="text-[15px]">{u.fullName}</span>
+                      </label>
+                    ))}
+                    {nonMembers.length === 0 && <p className="text-xs text-wa-muted">Everyone is already in this group</p>}
+                  </div>
+                  <button className="btn btn-sm btn-primary w-full" onClick={handleAdd} disabled={toAdd.length === 0}>
+                    Add selected
+                  </button>
+                </div>
+              )}
+
+              {shownMembers.map((member) => {
+                const isYou = member._id === authUser._id;
+                const memberIsAdmin = group.admins.some((a) => (a._id || a) === member._id);
+                return (
+                  <div key={member._id} className="flex items-center gap-4 px-5 py-2.5">
+                    <Avatar src={member.profilePic} name={member.fullName} size="size-[52px]" textSize="text-lg" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[17px] truncate">{isYou ? "You" : member.fullName}</p>
+                      {member.about && <p className="text-[14px] text-wa-muted truncate">{member.about}</p>}
+                    </div>
+                    {memberIsAdmin && (
+                      <span className="text-[13px] px-2.5 py-1 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
+                    )}
+                    {isAdmin && !isYou && (
+                      <button
+                        onClick={() => confirm(`Remove ${member.fullName} from the group?`) && removeMemberFromGroup(group._id, member._id)}
+                        className="p-2 text-[#F15C6D] shrink-0"
+                        title="Remove member"
+                        aria-label={`Remove ${member.fullName}`}
+                      >
+                        <UserMinus size={20} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              {shownMembers.length === 0 && <p className="text-center text-wa-muted text-sm py-6">No members found</p>}
             </div>
           )}
 
-          {group.members.map((member) => {
-            const memberIsAdmin = group.admins.some((a) => (a._id || a) === member._id);
-            return (
-              <div key={member._id} className="flex items-center gap-3 px-4 py-2.5">
-                <img
-                  src={member.profilePic || "/avatar.png"}
-                  alt={member._id === authUser._id ? "You" : member.fullName}
-                  className="size-9 rounded-full object-cover"
-                />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate flex items-center gap-1">
-                    {member._id === authUser._id ? "You" : member.fullName}
-                    
-                  </p>
+          {/* ---- Media ---- */}
+          {tab === "Media" && (
+            <div className="pb-8">
+              <button onClick={() => setShowMedia(true)} className="w-full flex items-center justify-between px-5 pt-4 pb-3 text-left">
+                <span className="text-[17px]">Media, links and docs</span>
+                <span className="flex items-center gap-1 text-wa-muted text-[15px]">
+                  {mediaCount} <ChevronRight size={18} />
+                </span>
+              </button>
+              {mediaData?.media.length > 0 ? (
+                <div className="flex gap-2 px-5 pb-4 overflow-x-auto">
+                  {mediaData.media.slice(0, 8).map((m) => (
+                    <MediaThumb key={m._id} item={m} className="size-[108px] rounded-xl shrink-0" onClick={() => setShowMedia(true)} />
+                  ))}
                 </div>
-                {memberIsAdmin && (
-                  <span className="text-xs px-2 py-0.5 rounded bg-wa-tint text-wa-tinttext shrink-0">Group admin</span>
-                )}
-                {isAdmin && member._id !== authUser._id && (
-                  <button
-                    onClick={() => removeMemberFromGroup(group._id, member._id)}
-                    className="btn btn-xs btn-ghost text-error"
-                    title="Remove member"
-                  >
-                    <UserMinus size={14} />
-                  </button>
-                )}
+              ) : (
+                <p className="px-5 pb-4 text-[14px] text-wa-muted">No media shared yet</p>
+              )}
+              <div className="border-t border-white/10 mt-1">
+                <Row icon={Star} title="Starred messages" right={<span className="flex items-center gap-1 text-wa-muted">{starred?.length || ""}<ChevronRight size={18} /></span>} onClick={() => setShowStarred(true)} />
               </div>
-            );
-          })}
-        </div>
 
-        <div className="p-4 border-t border-white/10 space-y-2">
-          <button onClick={() => setShowReport(true)} className="btn btn-ghost btn-sm w-full gap-2 text-[#F15C6D]">
-            <ThumbsDown size={14} /> Report group
-          </button>
-          <button onClick={handleLeave} className="btn btn-outline btn-error btn-sm w-full gap-2">
-            <LogOut size={14} /> Exit group
-          </button>
+              <p className="px-5 pt-5 pb-1 text-[15px] text-wa-muted">Settings</p>
+              <Row icon={Settings} title="Group permissions" onClick={() => setShowPerms(true)} />
+              <Row
+                icon={Bell}
+                title="Notifications"
+                subtitle={muted ? "Muted" : "All"}
+                onClick={() => (muted ? useChatStore.getState().setChatMuted(chat, false) : setShowMute(true))}
+              />
+              <Row
+                icon={Timer}
+                title="Disappearing messages"
+                subtitle={DISAPPEAR_LABELS[group.disappearAfter || 0] || "On"}
+                onClick={() => setShowDisappear(true)}
+              />
+              <Row icon={Lock} title="Chat lock" subtitle="Lock and hide this chat on this device" right={<Toggle on={locked} />} onClick={toggleLock} />
+              {isAdmin && <Row icon={Link2} title="Invite to group via link" onClick={() => setShowInvite(true)} />}
+            </div>
+          )}
+
+          {/* ---- Settings ---- */}
+          {tab === "Settings" && (
+            <div className="pb-8 pt-2">
+              <Row icon={Users} title="Create a similar group" subtitle="Start with the same members that you can add or remove." onClick={() => setShowSimilar(true)} />
+              <div className="border-t border-white/10 my-1" />
+              <Row icon={Heart} title={isFav ? "Remove from Favourites" : "Add to Favourites"} onClick={toggleFavourite} />
+              <Row icon={ListPlus} title="Add to list" onClick={() => setShowLists(true)} />
+              <Row icon={Upload} title="Export chat" onClick={() => exportChat(chat, { myId: authUser._id, myName: authUser.fullName })} />
+              <Row icon={Eraser} title="Clear chat" danger onClick={handleClear} />
+              <div className="border-t border-white/10 my-1" />
+              <Row icon={LogOut} title="Exit group" danger onClick={handleLeave} />
+              <Row icon={ThumbsDown} title="Report group" danger onClick={() => setShowReport(true)} />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Add to list sheet */}
+      {showLists && (
+        <div className="fixed inset-0 z-[120] bg-black/60 flex items-end sm:items-center justify-center" onClick={() => setShowLists(false)}>
+          <div className="w-full sm:max-w-sm bg-wa-pop rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[17px] mb-3">Add to list</h3>
+            {customLists.length === 0 ? (
+              <p className="text-sm text-wa-muted py-3">You don&apos;t have any lists yet. Create one from the chat list (Chats → + next to the filters).</p>
+            ) : (
+              customLists.map((l) => (
+                <button key={l.id} onClick={() => toggleInList(l)} className="w-full flex items-center gap-4 py-3 text-left">
+                  <span className={`size-6 rounded-md border flex items-center justify-center ${l.chats.includes(key) ? "bg-[#00A884] border-[#00A884]" : "border-white/30"}`}>
+                    {l.chats.includes(key) && <Check size={16} className="text-white" />}
+                  </span>
+                  <span className="text-[16px]">{l.name}</span>
+                </button>
+              ))
+            )}
+            <div className="flex justify-end mt-3">
+              <button onClick={() => setShowLists(false)} className="px-4 h-10 rounded-full text-[#21C063] font-medium">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSimilar && (
+        <CreateGroupModal
+          initialMemberIds={group.members.map((m) => m._id || m).filter((id) => id !== authUser._id)}
+          onClose={() => setShowSimilar(false)}
+          onCreated={() => {
+            setShowSimilar(false);
+            onClose();
+          }}
+        />
+      )}
       {showReport && (
         <ReportGroupDialog
           group={group}
@@ -429,7 +596,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           onClose={() => setShowMute(false)}
           onPick={(until) => {
             setShowMute(false);
-            useChatStore.getState().setChatMuted({ type: "group", data: group }, true, { until });
+            useChatStore.getState().setChatMuted(chat, true, { until });
           }}
         />
       )}
@@ -442,7 +609,7 @@ const GroupInfoModal = ({ group, onClose }) => {
       {showStarred && (
         <ChatStarredPanel
           list={starred}
-          chat={{ type: "group", data: group }}
+          chat={chat}
           title={group.name}
           onClose={() => setShowStarred(false)}
           onJump={() => {
@@ -451,9 +618,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           }}
         />
       )}
-      {showMedia && (
-        <ChatMediaPanel data={mediaData} title={group.name} onClose={() => setShowMedia(false)} />
-      )}
+      {showMedia && <ChatMediaPanel data={mediaData} title={group.name} onClose={() => setShowMedia(false)} />}
       {emojiPhoto && (
         <Suspense fallback={null}>
           <GroupEmojiPhoto onClose={() => setEmojiPhoto(false)} onSave={saveEmojiPhoto} />
