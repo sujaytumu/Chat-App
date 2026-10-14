@@ -78,6 +78,10 @@ export const getUserGroups = async (req, res) => {
         {
           $group: {
             _id: "$groupId",
+            msgId: { $first: "$_id" },
+            deliveredTo: { $first: "$deliveredTo" },
+            seenBy: { $first: "$seenBy" },
+            seenLog: { $first: "$seenLog" },
             text: { $first: "$text" },
             image: { $first: "$image" },
             file: { $first: "$file" },
@@ -99,7 +103,7 @@ export const getUserGroups = async (req, res) => {
       const lm = lastMessageByGroup.get(group._id.toString());
       return {
         ...group,
-        lastMessage: lm ? { text: lm.text, image: lm.image, file: lm.file, createdAt: lm.createdAt, senderId: lm.senderId } : null,
+        lastMessage: lm ? { _id: lm.msgId, deliveredTo: lm.deliveredTo || [], seenBy: lm.seenBy || [], seenLog: lm.seenLog || [], text: lm.text, image: lm.image, file: lm.file, createdAt: lm.createdAt, senderId: lm.senderId } : null,
         unreadCount: unreadByGroup.get(group._id.toString()) || 0,
       };
     });
