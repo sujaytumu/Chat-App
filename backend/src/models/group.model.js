@@ -12,6 +12,8 @@ const groupSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // Shown under the group name on the group info screen
+    description: { type: String, default: "", maxlength: 512 },
     members: [
       {
         type: mongoose.Schema.Types.ObjectId,

@@ -448,7 +448,7 @@ export const setDisappearing = async (req, res) => {
 export const updateGroupInfo = async (req, res) => {
   try {
     const { id: groupId } = req.params;
-    const { name, groupPic, removeGroupPic } = req.body;
+    const { name, groupPic, removeGroupPic, description } = req.body;
     const myId = req.user._id;
 
     const group = await Group.findById(groupId);
@@ -458,6 +458,8 @@ export const updateGroupInfo = async (req, res) => {
     }
 
     if (name?.trim()) group.name = name.trim();
+    if (typeof description === "string") group.description = description.trim().slice(0, 512);
+    if (removeGroupPic === true && !groupPic) group.groupPic = ""; // "Remove photo" used to do nothing
     if (groupPic) {
       const uploadResponse = await cloudinary.uploader.upload(groupPic, {
         folder: "chat-app/groups",
