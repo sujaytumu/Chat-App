@@ -3,19 +3,79 @@ package com.sujaytumu.talkies;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.View;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
 import androidx.activity.OnBackPressedCallback;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
     /** True while the app is on screen (pushes then leave the ringing / beeping to the page). */
     static volatile boolean visible = false;
     /** True while a call is connected: the page must keep running when the app is in the background. */
     static volatile boolean callActive = false;
+
+    private final Handler retryHandler = new Handler(Looper.getMainLooper());
+    private boolean retryPending = false;
+
+    /**
+     * The app loads the live website. If that can't be reached (server waking up,
+     * no signal, 5xx), the WebView would otherwise stay on a blank white page.
+     * Show a visible "connecting" screen instead and keep retrying until it loads.
+     */
+    private void showConnectingAndRetry(final WebView view, final String url) {
+        if (view == null || url == null) return;
+        String html = "<!doctype html><html><head><meta charset='utf-8'>"
+                + "<meta name='viewport' content='width=device-width,initial-scale=1'></head>"
+                + "<body style='margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;"
+                + "justify-content:center;background:#FFFFFF;color:#54656F;font-family:sans-serif;text-align:center'>"
+                + "<div style='font-size:22px;font-weight:600;color:#111B21'>Talkies</div>"
+                + "<div style='margin-top:10px;font-size:15px'>Connecting&hellip;<br>this can take up to a minute "
+                + "if the server was asleep. Retrying automatically.</div></body></html>";
+        view.loadDataWithBaseURL(url, html, "text/html", "utf-8", url);
+        if (retryPending) return;
+        retryPending = true;
+        retryHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                retryPending = false;
+                if (!isFinishing() && !isDestroyed()) view.loadUrl(url);
+            }
+        }, 4000);
+    }
+
+    private void installLoadFailureHandler() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                super.onReceivedError(view, request, error);
+                if (request != null && request.isForMainFrame()) {
+                    showConnecting(view, request.getUrl().toString());
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                super.onReceivedHttpError(view, request, response);
+                if (request != null && request.isForMainFrame() && response != null && response.getStatusCode() >= 500) {
+                    showConnecting(view, request.getUrl().toString());
+                }
+            }
+
+            private void showConnecting(WebView view, String url) {
+                showConnectingAndRetry(view, url);
+            }
+        });
+    }
 
     private void keepPageAliveForCall() {
         if (!callActive || getBridge() == null) return;
@@ -94,6 +154,7 @@ public class MainActivity extends BridgeActivity {
             web.setVerticalScrollBarEnabled(false);
             web.setHorizontalScrollBarEnabled(false);
         }
+        installLoadFailureHandler();
         AppChromePlugin.applySaved(this);
 
         // Back button = go back inside the web app (close the open chat, search,
