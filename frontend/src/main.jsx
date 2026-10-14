@@ -7,10 +7,12 @@ import { BrowserRouter } from "react-router-dom";
 import { useThemeStore, applyTheme, watchAutoTheme } from "./store/useThemeStore";
 import { applyUiSettings } from "./lib/uiSettings";
 import { applyAppFont } from "./lib/appFont";
+import { applyAccent } from "./lib/accent";
 import { applyChatColor } from "./lib/chatColor";
 
 applyUiSettings();
 applyAppFont();
+applyAccent();
 applyChatColor();
 applyTheme(useThemeStore.getState().theme);
 watchAutoTheme();

@@ -9,6 +9,7 @@ import { useWallpaperStore } from "../lib/wallpaper";
 import WallpaperPicker from "../components/WallpaperPicker";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
 import toast from "react-hot-toast";
+import { ACCENTS, getAccent, setAccent } from "../lib/accent";
 import { APP_FONTS, getAppFont, setAppFont, preloadAllFonts } from "../lib/appFont";
 
 export const InstallAppControl = () => {
@@ -115,6 +116,8 @@ export const AppearancePage = () => {
         </div>
       </div>
 
+      <AccentCard />
+
       <FontStyleCard />
 
       <ToggleRow
@@ -194,6 +197,38 @@ function FontStyleCard() {
       </div>
       <div className="mt-3 rounded-xl bg-wa-out px-3 py-2 w-fit ml-auto" style={{ fontFamily: APP_FONTS.find((f) => f.id === font)?.css }}>
         <span className="text-[14px] leading-[21px]">Hey! This is how Talkies will look 👋</span>
+      </div>
+    </div>
+  );
+}
+
+function AccentCard() {
+  const [accent, setAcc] = useState(getAccent());
+  return (
+    <div className="rounded-xl bg-wa-surface p-4">
+      <span className="block text-[13.5px]">Accent colour</span>
+      <span className="block text-[11.5px] text-wa-muted mb-3">Buttons, badges, links and highlights across the app</span>
+      <div className="flex flex-wrap gap-3">
+        {ACCENTS.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => {
+              setAcc(c.id);
+              setAccent(c.id);
+            }}
+            className="flex flex-col items-center gap-1.5 w-[58px]"
+            aria-label={c.name}
+            aria-pressed={accent === c.id}
+          >
+            <span
+              className={`size-11 rounded-full flex items-center justify-center text-white text-[18px] font-bold transition-transform active:scale-90 ${accent === c.id ? "ring-2 ring-offset-2 ring-wa-text scale-105" : ""}`}
+              style={{ background: `linear-gradient(135deg, ${c.a}, ${c.b})` }}
+            >
+              {accent === c.id ? "✓" : ""}
+            </span>
+            <span className="text-[10.5px] text-wa-muted truncate w-full text-center">{c.name.replace("Talkies ", "")}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
