@@ -36,13 +36,13 @@ const Row = ({ icon: Icon, title, subtitle, right, onClick, danger, disabled }) 
     type="button"
     onClick={onClick}
     disabled={disabled}
-    className="w-full flex items-center gap-5 px-5 py-3.5 text-left hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
+    className="w-full flex items-center gap-4 px-4 py-3 text-left hover:bg-white/5 active:bg-white/10 disabled:opacity-50"
   >
     <span className={`w-7 flex justify-center shrink-0 ${danger ? "text-[#F15C6D]" : "text-wa-icon"}`}>
-      <Icon size={22} />
+      <Icon size={19} />
     </span>
     <span className="flex-1 min-w-0">
-      <span className={`block text-[15px] ${danger ? "text-[#F15C6D]" : "text-wa-text"}`}>{title}</span>
+      <span className={`block text-[13.5px] ${danger ? "text-[#F15C6D]" : "text-wa-text"}`}>{title}</span>
       {subtitle && <span className="block text-[12.5px] text-wa-muted mt-0.5">{subtitle}</span>}
     </span>
     {right}
@@ -83,7 +83,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [showStarred, setShowStarred] = useState(false);
   const [showPerms, setShowPerms] = useState(false);
   const [memberMenu, setMemberMenu] = useState(null);
-  const [memberMenuUp, setMemberMenuUp] = useState(false);
+  const [memberMenuPos, setMemberMenuPos] = useState({ top: 8, right: 8, maxHeight: 320 }); // where the member ⋮ menu sits (px, fixed)
   const [viewMember, setViewMember] = useState(null);
   const [showInvite, setShowInvite] = useState(false);
   const [showMute, setShowMute] = useState(false);
@@ -218,7 +218,7 @@ const GroupInfoModal = ({ group, onClose }) => {
     setTimeout(() => setChatSearchOpen(true), 50);
   };
 
-  const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 250);
+  const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 180);
   const actionBtns = [
     { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
     { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
@@ -228,35 +228,35 @@ const GroupInfoModal = ({ group, onClose }) => {
     { icon: Search, label: "Search", run: goSearch },
   ].filter(Boolean);
 
-  const iconBtn = "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
+  const iconBtn = "size-10 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
 
   return (
     <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center sm:p-4">
       <div className="bg-wa-bg text-wa-text sm:rounded-2xl w-full sm:max-w-md h-full sm:h-[92vh] flex flex-col shadow-xl overflow-hidden relative">
         {/* Top bar: back · (compact avatar + name once scrolled) · QR · ⋮ */}
-        <div className="flex items-center gap-1 px-2 h-14 shrink-0 bg-wa-bg z-10">
+        <div className="flex items-center gap-1 px-2 h-12 shrink-0 bg-wa-bg z-10">
           <button onClick={editMode ? () => setEditMode(false) : onClose} className={iconBtn} aria-label={editMode ? "Cancel editing" : "Back"}>
-            {editMode ? <X size={24} /> : <ArrowLeft size={24} />}
+            {editMode ? <X size={21} /> : <ArrowLeft size={21} />}
           </button>
           {editMode ? (
-            <h3 className="flex-1 text-[18px] pl-2">Group info</h3>
+            <h3 className="flex-1 text-[15.5px] pl-2">Group info</h3>
           ) : scrolled ? (
             <div className="flex-1 flex items-center gap-3 min-w-0 pl-1">
               <Avatar src={group.groupPic} name={group.name} isGroup size="size-9" />
-              <span className="text-[18px] truncate">{group.name}</span>
+              <span className="text-[15.5px] truncate">{group.name}</span>
             </div>
           ) : (
             <div className="flex-1" />
           )}
           {!editMode && isAdmin && (
             <button onClick={() => setShowInvite(true)} className={iconBtn} aria-label="Group QR code and link">
-              <QrCode size={24} />
+              <QrCode size={21} />
             </button>
           )}
           {!editMode && (
             <div className="relative">
               <button onClick={() => setMenu((v) => !v)} className={iconBtn} aria-label="More options">
-                <MoreVertical size={24} />
+                <MoreVertical size={21} />
               </button>
               {menu && (
                 <>
@@ -275,7 +275,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                             setMenu(false);
                             o.run();
                           }}
-                          className="w-full flex items-center gap-4 px-5 py-3 text-left text-[15px] hover:bg-white/5"
+                          className="w-full flex items-center gap-4 px-5 py-3 text-left text-[13.5px] hover:bg-white/5"
                         >
                           <o.icon size={19} className="text-wa-icon" /> {o.label}
                         </button>
@@ -289,30 +289,30 @@ const GroupInfoModal = ({ group, onClose }) => {
 
         <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto overscroll-contain">
           {/* Header block */}
-          <div className="flex flex-col items-center px-6 pt-1 pb-5">
+          <div className="flex flex-col items-center px-5 pt-0 pb-4">
             <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
               <button
                 type="button"
                 onClick={() => (editMode || canEdit ? setPhotoMenu((o) => !o) : group.groupPic && setViewPhoto(true))}
-                className="relative block size-[180px] rounded-full overflow-hidden bg-wa-field"
+                className="relative block size-[128px] rounded-full overflow-hidden bg-wa-field"
                 aria-label={editMode || canEdit ? "Change group photo" : "View group photo"}
               >
                 {group.groupPic ? (
                   <img src={optimizeImage(group.groupPic, 360)} decoding="async" alt={group.name} className="size-full object-cover" />
                 ) : (
                   <span className="size-full flex items-center justify-center text-7xl text-wa-muted">
-                    <UsersRound size={84} />
+                    <UsersRound size={60} />
                   </span>
                 )}
                 {editMode && (
                   <span className="absolute inset-0 bg-black/45 flex items-center justify-center">
-                    {savingPhoto ? <Loader2 size={40} className="animate-spin text-white" /> : <Camera size={46} className="text-white" strokeWidth={1.8} />}
+                    {savingPhoto ? <Loader2 size={30} className="animate-spin text-white" /> : <Camera size={32} className="text-white" strokeWidth={1.8} />}
                   </span>
                 )}
               </button>
               {!editMode && canEdit && (
-                <span className="absolute right-1 bottom-1 size-10 rounded-full bg-[#21C063] text-[#0B141A] border-2 border-wa-bg flex items-center justify-center pointer-events-none">
-                  {savingPhoto ? <Loader2 size={18} className="animate-spin" /> : <Camera size={19} />}
+                <span className="absolute right-0 bottom-0 size-8 rounded-full bg-[#21C063] text-[#0B141A] border-2 border-wa-bg flex items-center justify-center pointer-events-none">
+                  {savingPhoto ? <Loader2 size={15} className="animate-spin" /> : <Camera size={16} />}
                 </span>
               )}
               {photoMenu && (editMode || canEdit) && <div className="fixed inset-0 z-[5]" onClick={() => setPhotoMenu(false)} />}
@@ -334,7 +334,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                           setPhotoMenu(false);
                           o.run();
                         }}
-                        className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[14px] hover:bg-white/5 active:bg-white/10"
+                        className="w-full flex items-center gap-4 px-5 py-2.5 text-left text-[12.5px] hover:bg-white/5 active:bg-white/10"
                       >
                         <o.icon size={19} className="text-wa-icon" /> {o.label}
                       </button>
@@ -353,7 +353,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                     value={nameDraft}
                     maxLength={50}
                     onChange={(e) => setNameDraft(e.target.value)}
-                    className="min-w-0 flex-1 bg-transparent border-b-2 border-[#00A884] text-[22px] text-center focus:outline-none pb-1"
+                    className="min-w-0 flex-1 bg-transparent border-b-2 border-[#00A884] text-[18px] text-center focus:outline-none pb-1"
                     aria-label="Group name"
                   />
                   <button onClick={saveEdits} className="text-[#21C063] shrink-0" aria-label="Save">
@@ -366,18 +366,18 @@ const GroupInfoModal = ({ group, onClose }) => {
                   rows={3}
                   onChange={(e) => setDescDraft(e.target.value)}
                   placeholder="Add group description"
-                  className="w-full rounded-xl bg-wa-field px-4 py-3 text-[15px] focus:outline-none resize-none"
+                  className="w-full rounded-xl bg-wa-field px-4 py-3 text-[13.5px] focus:outline-none resize-none"
                   aria-label="Group description"
                 />
               </div>
             ) : (
               <>
-                <h4 className="mt-4 text-[30px] leading-tight text-center break-words max-w-full">{group.name}</h4>
-                <p className="mt-1 text-[15px] text-wa-muted">
+                <h4 className="mt-3 text-[22px] font-medium tracking-tight leading-tight text-center break-words max-w-full">{group.name}</h4>
+                <p className="mt-1 text-[13.5px] text-wa-muted">
                   Group · {group.members.length} member{group.members.length === 1 ? "" : "s"}
                 </p>
                 {group.description ? (
-                  <p className="mt-3 text-[17px] leading-snug text-wa-muted text-center whitespace-pre-wrap break-words max-w-full">{group.description}</p>
+                  <p className="mt-3 text-[14.5px] leading-snug text-wa-muted text-center whitespace-pre-wrap break-words max-w-full">{group.description}</p>
                 ) : (
                   canEdit && (
                     <button
@@ -386,19 +386,19 @@ const GroupInfoModal = ({ group, onClose }) => {
                         setDescDraft("");
                         setEditMode(true);
                       }}
-                      className="mt-3 text-[15px] text-[#21C063]"
+                      className="mt-3 text-[13.5px] text-[#21C063]"
                     >
                       Add group description
                     </button>
                   )
                 )}
-                <div className="mt-6 flex items-start justify-center gap-3 w-full">
+                <div className="mt-4 flex items-start justify-center gap-2.5 w-full">
                   {actionBtns.map((b) => (
-                    <button key={b.label} onClick={b.run} disabled={b.disabled} className="flex flex-col items-center gap-2 flex-1 max-w-[96px] disabled:opacity-40">
-                      <span className="w-full h-12 rounded-[22px] bg-wa-field hover:bg-wa-hover active:bg-wa-hover flex items-center justify-center">
-                        <b.icon size={23} />
+                    <button key={b.label} onClick={b.run} disabled={b.disabled} className="flex flex-col items-center gap-1.5 flex-1 max-w-[80px] disabled:opacity-40">
+                      <span className="w-full h-10 rounded-2xl bg-wa-field hover:bg-wa-hover active:bg-wa-hover flex items-center justify-center">
+                        <b.icon size={19} />
                       </span>
-                      <span className="text-[14px]">{b.label}</span>
+                      <span className="text-[12.5px]">{b.label}</span>
                     </button>
                   ))}
                 </div>
@@ -415,12 +415,12 @@ const GroupInfoModal = ({ group, onClose }) => {
                   setTab(t);
                   // Like WhatsApp: picking a tab collapses the big header so the list gets the room
                   const el = scrollRef.current;
-                  if (el && el.scrollTop < 290) el.scrollTo({ top: 290, behavior: "smooth" });
+                  if (el && el.scrollTop < 200) el.scrollTo({ top: 200, behavior: "smooth" });
                 }}
-                className={`flex-1 py-3.5 text-[16px] relative ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
+                className={`flex-1 py-2.5 text-[13.5px] relative ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
               >
                 {t}
-                {tab === t && <span className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[3px] w-14 rounded-full bg-[#21C063]" />}
+                {tab === t && <span className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[3px] w-10 rounded-full bg-[#21C063]" />}
               </button>
             ))}
           </div>
@@ -428,14 +428,14 @@ const GroupInfoModal = ({ group, onClose }) => {
           {/* ---- Members ---- */}
           {tab === "Members" && (
             <div className="pb-6">
-              <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
                 {memberSearch == null ? (
                   <>
-                    <span className="text-[15px] text-wa-muted">
+                    <span className="text-[13.5px] text-wa-muted">
                       {group.members.length} member{group.members.length === 1 ? "" : "s"}
                     </span>
                     <button onClick={() => setMemberSearch("")} className="text-wa-muted p-1" aria-label="Search members">
-                      <Search size={22} />
+                      <Search size={19} />
                     </button>
                   </>
                 ) : (
@@ -446,7 +446,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       placeholder="Search members"
-                      className="flex-1 bg-transparent outline-none text-[15px]"
+                      className="flex-1 bg-transparent outline-none text-[13.5px]"
                     />
                     <button onClick={() => setMemberSearch(null)} aria-label="Close search">
                       <X size={18} className="text-wa-muted" />
@@ -456,11 +456,11 @@ const GroupInfoModal = ({ group, onClose }) => {
               </div>
 
               {canAddMembers && memberSearch == null && (
-                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-4 px-5 py-3 text-left hover:bg-white/5">
-                  <span className="size-12 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
-                    <UserPlus size={22} />
+                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-3.5 px-4 py-2 text-left hover:bg-white/5">
+                  <span className="size-10 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
+                    <UserPlus size={19} />
                   </span>
-                  <span className="text-[17px]">Add members</span>
+                  <span className="text-[14.5px]">Add members</span>
                 </button>
               )}
 
@@ -476,7 +476,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                           onChange={() => setToAdd((prev) => (prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]))}
                         />
                         <Avatar src={u.profilePic} name={u.fullName} size="size-8" textSize="text-sm" />
-                        <span className="text-[15px]">{u.fullName}</span>
+                        <span className="text-[13.5px]">{u.fullName}</span>
                       </label>
                     ))}
                     {nonMembers.length === 0 && <p className="text-xs text-wa-muted">Everyone is already in this group</p>}
@@ -491,46 +491,57 @@ const GroupInfoModal = ({ group, onClose }) => {
                 const isYou = member._id === authUser._id;
                 const memberIsAdmin = group.admins.some((a) => (a._id || a) === member._id);
                 return (
-                  <div key={member._id} className="flex items-center gap-4 px-5 py-2.5">
-                    <Avatar src={member.profilePic} name={member.fullName} size="size-[52px]" textSize="text-lg" />
+                  <div key={member._id} className="flex items-center gap-3.5 px-4 py-2">
+                    <Avatar src={member.profilePic} name={member.fullName} size="size-[42px]" textSize="text-base" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[17px] truncate">{isYou ? "You" : member.fullName}</p>
-                      {member.about && <p className="text-[14px] text-wa-muted truncate">{member.about}</p>}
+                      <p className="text-[14.5px] truncate">{isYou ? "You" : member.fullName}</p>
+                      {member.about && <p className="text-[12.5px] text-wa-muted truncate">{member.about}</p>}
                     </div>
                     {memberIsAdmin && (
-                      <span className="text-[13px] px-2.5 py-1 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
+                      <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
                     )}
-                    {isYou && <div className="w-9 shrink-0" aria-hidden="true" />}
+                    {isYou && <div className="w-8 shrink-0" aria-hidden="true" />}
                     {!isYou && (
                       <div className="relative shrink-0">
                         <button
                           onClick={(e) => {
-                            // Open the menu upwards when there is no room below (last members in the list).
+                            // Place the menu where it fits: below the button if there is room, else above,
+                            // else pinned inside the screen (scrolls if the screen is very short).
                             const r = e.currentTarget.getBoundingClientRect();
-                            setMemberMenuUp(window.innerHeight - r.bottom < 170);
+                            const vh = window.innerHeight;
+                            const items = isAdmin ? 6 : 4;
+                            const h = items * 40 + 16;
+                            const below = vh - r.bottom - 8;
+                            const above = r.top - 8;
+                            const right = Math.max(8, window.innerWidth - r.right);
+                            let pos;
+                            if (h <= below) pos = { top: r.bottom + 4, right };
+                            else if (h <= above) pos = { top: r.top - h - 4, right };
+                            else pos = { top: Math.max(8, Math.min(r.bottom + 4, vh - h - 8)), right };
+                            setMemberMenuPos({ ...pos, maxHeight: vh - 16 });
                             setMemberMenu((m) => (m === member._id ? null : member._id));
                           }}
-                          className="p-2 text-wa-muted"
+                          className="p-1.5 text-wa-muted"
                           title="Member options"
                           aria-label={`Options for ${member.fullName}`}
                         >
-                          <MoreVertical size={20} />
+                          <MoreVertical size={18} />
                         </button>
                         {memberMenu === member._id && (
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setMemberMenu(null)} />
-                            <div className={`absolute right-0 ${memberMenuUp ? "bottom-full mb-1" : "top-full"} z-40 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2`}>
-                              <button className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate" onClick={() => messageMember(member)}>
+                            <div style={memberMenuPos} className="fixed z-40 w-52 overflow-y-auto bg-wa-pop rounded-2xl shadow-2xl border border-white/10 py-2">
+                              <button className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate" onClick={() => messageMember(member)}>
                                 Message {member.fullName}
                               </button>
-                              <button className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "audio")}>
+                              <button className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate" onClick={() => callMember(member, "audio")}>
                                 Voice call {member.fullName}
                               </button>
-                              <button className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "video")}>
+                              <button className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate" onClick={() => callMember(member, "video")}>
                                 Video call {member.fullName}
                               </button>
                               <button
-                                className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate"
+                                className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate"
                                 onClick={() => {
                                   setMemberMenu(null);
                                   setViewMember(memberUser(member));
@@ -541,7 +552,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                               {isAdmin && (
                                 <>
                               <button
-                                className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5"
+                                className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5"
                                 onClick={() => {
                                   setMemberMenu(null);
                                   setGroupAdmin(group._id, member._id, !memberIsAdmin);
@@ -550,7 +561,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                                 {memberIsAdmin ? "Dismiss as admin" : "Make group admin"}
                               </button>
                               <button
-                                className="w-full text-left px-5 py-3 text-[15px] text-[#F15C6D] hover:bg-white/5 flex items-center gap-2"
+                                className="w-full text-left px-4 py-2.5 text-[13.5px] text-[#F15C6D] hover:bg-white/5 flex items-center gap-2"
                                 onClick={() => {
                                   setMemberMenu(null);
                                   confirm(`Remove ${member.fullName} from the group?`) && removeMemberFromGroup(group._id, member._id);
@@ -576,8 +587,8 @@ const GroupInfoModal = ({ group, onClose }) => {
           {tab === "Media" && (
             <div className="pb-8">
               <button onClick={() => setShowMedia(true)} className="w-full flex items-center justify-between px-5 pt-4 pb-3 text-left">
-                <span className="text-[17px]">Media, links and docs</span>
-                <span className="flex items-center gap-1 text-wa-muted text-[15px]">
+                <span className="text-[14.5px]">Media, links and docs</span>
+                <span className="flex items-center gap-1 text-wa-muted text-[13.5px]">
                   {mediaCount} <ChevronRight size={18} />
                 </span>
               </button>
@@ -588,13 +599,13 @@ const GroupInfoModal = ({ group, onClose }) => {
                   ))}
                 </div>
               ) : (
-                <p className="px-5 pb-4 text-[14px] text-wa-muted">No media shared yet</p>
+                <p className="px-5 pb-4 text-[12.5px] text-wa-muted">No media shared yet</p>
               )}
               <div className="border-t border-white/10 mt-1">
                 <Row icon={Star} title="Starred messages" right={<span className="flex items-center gap-1 text-wa-muted">{starred?.length || ""}<ChevronRight size={18} /></span>} onClick={() => setShowStarred(true)} />
               </div>
 
-              <p className="px-5 pt-5 pb-1 text-[15px] text-wa-muted">Settings</p>
+              <p className="px-5 pt-5 pb-1 text-[13.5px] text-wa-muted">Settings</p>
               <Row icon={Settings} title="Group permissions" onClick={() => setShowPerms(true)} />
               <Row
                 icon={Bell}
@@ -634,7 +645,7 @@ const GroupInfoModal = ({ group, onClose }) => {
       {showLists && (
         <div className="fixed inset-0 z-[120] bg-black/60 flex items-end sm:items-center justify-center" onClick={() => setShowLists(false)}>
           <div className="w-full sm:max-w-sm bg-wa-pop rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[17px] mb-3">Add to list</h3>
+            <h3 className="text-[14.5px] mb-3">Add to list</h3>
             {customLists.length === 0 ? (
               <p className="text-sm text-wa-muted py-3">You don&apos;t have any lists yet. Create one from the chat list (Chats → + next to the filters).</p>
             ) : (
@@ -643,7 +654,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                   <span className={`size-6 rounded-md border flex items-center justify-center ${l.chats.includes(key) ? "bg-[#00A884] border-[#00A884]" : "border-white/30"}`}>
                     {l.chats.includes(key) && <Check size={16} className="text-white" />}
                   </span>
-                  <span className="text-[16px]">{l.name}</span>
+                  <span className="text-[14px]">{l.name}</span>
                 </button>
               ))
             )}
