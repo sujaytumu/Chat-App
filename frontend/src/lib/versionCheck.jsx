@@ -75,7 +75,7 @@ function offerUpdate() {
       <span className="flex items-center gap-3">
         New version available
         <button
-          className="px-3 py-1 rounded-full bg-white text-wa-bg text-sm font-semibold"
+          className="px-3 py-1 rounded-full bg-white text-[#0B6E5F] text-sm font-semibold shadow-sm"
           onClick={() => {
             toast.dismiss(t.id);
             window.location.reload();
