@@ -190,7 +190,7 @@ const CallsPage = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search"
-            className="flex-1 min-w-0 bg-transparent text-[18px] text-wa-text placeholder:text-wa-muted focus:outline-none"
+            className="flex-1 min-w-0 bg-transparent text-[15px] text-wa-text placeholder:text-wa-muted focus:outline-none"
           />
           {query && (
             <button onClick={() => setQuery("")} className="size-11 flex items-center justify-center text-wa-muted" aria-label="Clear">
@@ -200,7 +200,7 @@ const CallsPage = () => {
         </div>
       ) : (
         <div className="flex items-center justify-between pl-4 pr-2 h-16 shrink-0">
-          <h1 className="text-[28px] lg:text-[24px] leading-none font-normal text-wa-text">Calls</h1>
+          <h1 className="text-[22px] lg:text-[22px] leading-none font-normal text-wa-text">Calls</h1>
           <div className="flex items-center">
             <button onClick={() => setSearching(true)} className="size-11 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Search calls">
               <Search size={24} />
@@ -250,7 +250,7 @@ const CallsPage = () => {
           </div>
         )}
 
-        {!searching && <h2 className="px-4 pb-1 text-[20px] lg:text-[18px] text-wa-text">Recent</h2>}
+        {!searching && <h2 className="px-4 pb-1 text-[16px] lg:text-[16px] text-wa-text">Recent</h2>}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
@@ -319,7 +319,7 @@ const CallInfo = ({ row, myId, onClose, onCall, onMessage }) => (
       <div className="flex items-center gap-3 px-4 pt-5 pb-3">
         <Avatar src={row.other.profilePic} name={row.other.fullName} size="size-14" textSize="text-xl" />
         <div className="min-w-0 flex-1">
-          <p className="text-[19px] truncate">{row.other.fullName}</p>
+          <p className="text-[15.5px] truncate">{row.other.fullName}</p>
           <p className="text-[13.5px] text-wa-muted">{row.type === "video" ? "Video call" : "Voice call"}</p>
         </div>
         <button onClick={onClose} className="size-10 flex items-center justify-center text-wa-icon" aria-label="Close"><X size={22} /></button>
@@ -363,7 +363,7 @@ const ContactPicker = ({ users, onClose, onCall, title = "Select contact" }) => 
       <div className="bg-wa-bg text-wa-text w-full sm:max-w-md sm:rounded-2xl sm:max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-1 h-14 px-2 shrink-0">
           <button onClick={onClose} className="size-11 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back"><WaBack size={24} /></button>
-          <h2 className="text-[20px] pl-2">{title}</h2>
+          <h2 className="text-[17px] pl-2">{title}</h2>
         </div>
         <div className="px-4 pb-2 shrink-0">
           <div className="flex items-center gap-3 h-11 rounded-full bg-wa-surface px-4">
