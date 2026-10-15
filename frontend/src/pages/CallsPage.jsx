@@ -38,19 +38,25 @@ const fmtDuration = (s) => {
 //   green ↗  you called and they picked up
 //   green ↙  they called and you picked up
 //   red   ↙  they called and you missed / declined it
-//   red   ↗  you called but there was no answer
+//   (outgoing calls are never red in this app)
+const fmtBytes = (b) => {
+  if (!b) return "";
+  if (b < 1024 * 1024) return `${Math.max(1, Math.round(b / 1024))} KB`;
+  return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const describe = (call, myId) => {
   const outgoing = call.callerId._id === myId;
   const answered = call.status === "answered";
-  // Incoming calls are always shown green (even when not picked up); only unanswered outgoing calls are red.
-  const ok = outgoing ? answered : true;
+  // Outgoing calls are never red. Incoming calls are green when you picked up, red when you didn't.
+  const ok = outgoing ? true : answered;
   return {
     outgoing,
     ok,
     label: outgoing
       ? answered ? "Outgoing" : call.status === "declined" ? "Declined" : "No answer"
       : answered ? "Incoming" : call.status === "declined" ? "Declined" : "Missed",
-    missedIncoming: false,
+    missedIncoming: !outgoing && !answered,
   };
 };
 
@@ -103,6 +109,13 @@ const CallsPage = () => {
   useEffect(() => {
     load();
   }, []);
+  // Keep the list live: refresh a moment after any call ends (the server finalises the log first).
+  const liveCallStatus = useCallStore((s) => s.callStatus);
+  useEffect(() => {
+    if (liveCallStatus !== "idle") return;
+    const t = setTimeout(load, 1500);
+    return () => clearTimeout(t);
+  }, [liveCallStatus]);
 
   useEffect(() => {
     if (!menu) return;
@@ -262,7 +275,7 @@ const CallsPage = () => {
                     </p>
                     <div className="flex items-center gap-1 mt-[3px] text-[14.5px] lg:text-[14px] leading-5 text-wa-muted">
                       <Arrow outgoing={r.d.outgoing} ok={!red && r.d.ok} />
-                      <span className="truncate">{formatCallTime(first.createdAt)}</span>
+                      <span className="truncate">{formatCallTime(first.createdAt)}{first.status === "answered" && first.durationSeconds ? ` · ${fmtDuration(first.durationSeconds)}` : ""}</span>
                     </div>
                   </div>
                 </button>
@@ -331,7 +344,7 @@ const CallInfo = ({ row, myId, onClose, onCall, onMessage }) => (
               <Arrow outgoing={d.outgoing} ok={d.ok} size={20} />
               <div className="min-w-0 flex-1">
                 <p className="text-[15.5px]" style={{ color: d.missedIncoming ? RED : undefined }}>{d.label}</p>
-                <p className="text-[13px] text-wa-muted">{formatCallTime(c.createdAt)}</p>
+                <p className="text-[13px] text-wa-muted">{formatCallTime(c.createdAt)}{c.status === "answered" && c.dataBytes ? ` · ${fmtBytes(c.dataBytes)} used` : ""}</p>
               </div>
               <span className="text-[13.5px] text-wa-muted">{c.status === "answered" ? fmtDuration(c.durationSeconds) : ""}</span>
             </div>

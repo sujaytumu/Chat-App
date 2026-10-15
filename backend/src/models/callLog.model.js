@@ -13,6 +13,10 @@ const callLogSchema = new mongoose.Schema(
     startedAt: { type: Date, default: Date.now },
     endedAt: { type: Date, default: null },
     durationSeconds: { type: Number, default: 0 },
+    // When the call was actually picked up (duration counts from here, not from ringing).
+    answeredAt: { type: Date, default: null },
+    // Approximate data used by the call (bytes sent + received), reported by a client after it ends.
+    dataBytes: { type: Number, default: 0 },
     // People who cleared this entry from their own call list (the other side keeps it).
     hiddenFor: { type: [mongoose.Schema.Types.ObjectId], default: [], select: false },
   },
