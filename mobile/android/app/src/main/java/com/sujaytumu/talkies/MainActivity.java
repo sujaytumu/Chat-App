@@ -40,25 +40,26 @@ public class MainActivity extends BridgeActivity {
      * no signal, 5xx), the WebView would otherwise stay on a blank white page.
      * Show a visible "connecting" screen instead and keep retrying until it loads.
      */
+    /**
+     * Clean splash shown while the site can't be reached. The page retries by itself every
+     * few seconds (no flicker from reloading) and opens the app as soon as the site answers.
+     */
+    private static final String CONNECTING_HTML =
+            "<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><style>html,body{margin:0;height:100%}body{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#FFFFFF;color:#54656F;font-family:sans-serif}.l{width:84px;height:84px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center}.t{margin-top:20px;font-size:26px;font-weight:600;color:#111B21;letter-spacing:.3px}.s{margin-top:30px;width:26px;height:26px;border:3px solid #D1D7DB;border-top-color:#25D366;border-radius:50%;animation:r .9s linear infinite}.m{margin-top:14px;font-size:14px}@keyframes r{to{transform:rotate(360deg)}}@media (prefers-color-scheme:dark){body{background:#0B141A;color:#8696A0}.t{color:#E9EDEF}.s{border-color:#2A3942;border-top-color:#25D366}}</style></head><body><div class='l'><svg width='44' height='44' viewBox='0 0 24 24' fill='#FFFFFF'><path d='M12 3C6.5 3 2 6.9 2 11.7c0 2.6 1.3 4.9 3.4 6.5L4.5 21l3.7-1.8c1.2.4 2.4.5 3.8.5 5.5 0 10-3.9 10-8.7S17.5 3 12 3z'/></svg></div><div class='t'>Talkies</div><div class='s'></div><div class='m'>Connecting&hellip;</div><script>(function(){function go(){fetch('/',{cache:'no-store'}).then(function(r){if(r&&r.ok)location.replace('/');}).catch(function(){});}setInterval(go,3000);})();</script></body></html>";
+
     private void showConnectingAndRetry(final WebView view, final String url) {
         if (view == null || url == null) return;
-        String html = "<!doctype html><html><head><meta charset='utf-8'>"
-                + "<meta name='viewport' content='width=device-width,initial-scale=1'></head>"
-                + "<body style='margin:0;height:100vh;display:flex;flex-direction:column;align-items:center;"
-                + "justify-content:center;background:#FFFFFF;color:#54656F;font-family:sans-serif;text-align:center'>"
-                + "<div style='font-size:22px;font-weight:600;color:#111B21'>Talkies</div>"
-                + "<div style='margin-top:10px;font-size:15px'>Connecting&hellip;<br>this can take up to a minute "
-                + "if the server was asleep. Retrying automatically.</div></body></html>";
-        view.loadDataWithBaseURL(url, html, "text/html", "utf-8", url);
+        view.loadDataWithBaseURL(url, CONNECTING_HTML, "text/html", "utf-8", url);
         if (retryPending) return;
         retryPending = true;
+        // Backup only: the splash page above already retries on its own.
         retryHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 retryPending = false;
                 if (!isFinishing() && !isDestroyed()) view.loadUrl(url);
             }
-        }, 4000);
+        }, 20000);
     }
 
     private void installLoadFailureHandler() {
