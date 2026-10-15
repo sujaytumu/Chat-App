@@ -15,7 +15,7 @@ const screenAspect = () => {
   return w >= 1024 ? Math.max(0.5, (w - 472) / h) : w / h;
 };
 
-const WallpaperCropper = ({ file, onCancel, onDone }) => {
+const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", aspectRatio, lockLabel = "Fit my screen", maxSize = 1600, hint }) => {
   useBackToClose(true, onCancel);
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
@@ -26,7 +26,7 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
   const [locked, setLocked] = useState(true);
   const [box, setBox] = useState(null); // crop box in stage px
   const drag = useRef(null);
-  const ar = useRef(screenAspect());
+  const ar = useRef(aspectRatio || screenAspect());
 
   // Load the picture
   useEffect(() => {
@@ -144,7 +144,7 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
     const sy = (box.y - fit.y) / fit.s;
     const sw = box.w / fit.s;
     const sh = box.h / fit.s;
-    const scale = Math.min(1, 1600 / Math.max(sw, sh));
+    const scale = Math.min(1, maxSize / Math.max(sw, sh));
     const c = document.createElement("canvas");
     c.width = Math.max(1, Math.round(sw * scale));
     c.height = Math.max(1, Math.round(sh * scale));
@@ -169,7 +169,7 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
         <button onClick={onCancel} aria-label="Cancel" className="size-10 flex items-center justify-center">
           <X size={24} />
         </button>
-        <h3 className="flex-1 text-[16px]">Crop wallpaper</h3>
+        <h3 className="flex-1 text-[16px]">{title}</h3>
         <button onClick={done} disabled={!box} className="h-10 px-5 rounded-full bg-[#21C063] text-black font-medium flex items-center gap-1.5 disabled:opacity-40">
           <Check size={18} /> Done
         </button>
@@ -220,7 +220,7 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
       <div className="shrink-0 px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom))] flex flex-col items-center gap-2">
         <div className="flex gap-2">
           {[
-            [true, "Fit my screen"],
+            [true, lockLabel],
             [false, "Free"],
           ].map(([v, label]) => (
             <button
@@ -232,7 +232,7 @@ const WallpaperCropper = ({ file, onCancel, onDone }) => {
             </button>
           ))}
         </div>
-        <p className="text-[10.5px] text-white/60 text-center">Drag the frame to move it, drag a corner to resize. Only what&apos;s inside becomes your wallpaper.</p>
+        <p className="text-[10.5px] text-white/60 text-center">Drag the frame to move it, drag a corner to resize. {hint || "Only what&apos;s inside becomes your wallpaper."}</p>
       </div>
     </div>
   );
