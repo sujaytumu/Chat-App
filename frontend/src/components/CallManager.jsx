@@ -24,23 +24,34 @@ const colorForName = (name = "") => {
   return AVATAR_COLORS[code % AVATAR_COLORS.length];
 };
 
-// Full-screen backdrop for a call: the other person's photo, sharp and edge to edge
-// (fitted to the screen, not stretched or blurred), with a dark gradient so the
-// name, timer and buttons stay readable. Without a photo: a plain dark gradient.
-const CallBackdrop = ({ user }) => (
-  <div className="absolute inset-0 -z-10 overflow-hidden bg-[#0b141a]" aria-hidden>
-    {user?.profilePic && (
-      <img
-        src={optimizeImage(user.profilePic, 1080)}
-        alt=""
-        decoding="async"
-        draggable={false}
-        className="absolute inset-0 w-full h-full object-cover object-center"
-      />
-    )}
-    <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/25 to-black/75" />
-  </div>
-);
+// Full-screen backdrop for a call: the other person's photo edge to edge (fitted to the
+// screen, never stretched), under a dark gradient so the name, timer and buttons stay
+// readable. Small photos would look pixelated when enlarged, so those are softly blurred.
+// Without a photo: a plain dark gradient.
+const CallBackdrop = ({ user }) => {
+  const [soft, setSoft] = useState(false);
+  const [ready, setReady] = useState(false);
+  return (
+    <div className="absolute inset-0 -z-10 overflow-hidden bg-[#0b141a]" aria-hidden>
+      {user?.profilePic && (
+        <img
+          key={user.profilePic}
+          src={optimizeImage(user.profilePic, 1080)}
+          alt=""
+          decoding="async"
+          draggable={false}
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            setSoft(img.naturalWidth < window.innerWidth * 0.9 || img.naturalHeight < window.innerHeight * 0.6);
+            setReady(true);
+          }}
+          className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-300 ${ready ? "opacity-100" : "opacity-0"} ${soft ? "scale-110 blur-xl" : ""}`}
+        />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/25 to-black/75" />
+    </div>
+  );
+};
 
 // Big avatar with a colored-letter fallback (matches WhatsApp's style when
 // a contact has no photo) instead of a generic silhouette.
@@ -280,7 +291,6 @@ const CallManager = () => {
     return (
       <>
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
-      {(!isVideo || !remoteStream) && <CallBackdrop user={remoteUser} />}
       {adding && (
         <AddParticipantModal
           excludeIds={[remoteUser?._id]}
@@ -321,8 +331,9 @@ const CallManager = () => {
         : callDuration || (isVideo ? "Video call" : "Voice call");
 
   return (
-    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col">
+    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col isolate">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
+      {(!isVideo || !remoteStream) && <CallBackdrop user={remoteUser} />}
 
       {audioBlocked && (
         <button
@@ -354,7 +365,7 @@ const CallManager = () => {
           </p>
           {isScreenSharing && (
             <p className="text-xs text-[#00A884] flex items-center justify-center gap-1 mt-0.5">
-              <UploadCloud size={11} /> You're sharing your screen
+              <UploadCloud size={11} /> You&apos;re sharing your screen
             </p>
           )}
           {remoteMuted && callStatus === "in-call" && (
