@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check,
   Loader2, Smile, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2, MoreVertical, QrCode, Share2, Lock,
@@ -66,8 +66,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const { authUser } = useAuthStore();
 
   const [tab, setTab] = useState("Members");
-  const [tabDir, setTabDir] = useState(null); // which side the new tab slides in from
-  const swipe = useRef(null);
+  const [lastMin, setLastMin] = useState(0); // keeps the last section tall enough to reach the top
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -96,6 +95,23 @@ const GroupInfoModal = ({ group, onClose }) => {
   const uploadRef = useRef(null);
   const cameraRef = useRef(null);
   const scrollRef = useRef(null);
+  const tabsRef = useRef(null);
+  const sectionRefs = useRef({ Members: null, Media: null, Settings: null });
+  const lock = useRef(null); // while a tap-initiated scroll runs, the tab stays on the one tapped
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const measure = () => setLastMin(Math.max(0, el.clientHeight - (tabsRef.current?.offsetHeight || 44)));
+    measure();
+    const ro = window.ResizeObserver ? new ResizeObserver(measure) : null;
+    ro?.observe(el);
+    window.addEventListener("resize", measure);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, []);
 
   // Phone Back closes this screen instead of leaving the app.
   useBackToClose(true, onClose);
@@ -220,49 +236,50 @@ const GroupInfoModal = ({ group, onClose }) => {
     setTimeout(() => setChatSearchOpen(true), 50);
   };
 
-  const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 180);
-  // Switch tab (tap or swipe): the new tab slides in from the side you moved towards, and the
-  // big header collapses so the list gets the room, like WhatsApp.
-  const goTab = (t) => {
-    if (t === tab) return;
-    setTabDir(TABS.indexOf(t) > TABS.indexOf(tab) ? "right" : "left");
-    setTab(t);
+  // One scrolling page: Members, Media and Settings sit one under the other. The green tab follows
+  // whichever section is at the top, and tapping a tab scrolls to its section (like WhatsApp).
+  const tabsHeight = () => tabsRef.current?.offsetHeight || 44;
+  const syncTab = () => {
     const el = scrollRef.current;
-    if (el && el.scrollTop < 200) el.scrollTo({ top: 200, behavior: "smooth" });
-  };
-  const inHorizontalScroller = (node) => {
-    const root = scrollRef.current;
-    for (let el = node; el && el !== root; el = el.parentElement) {
-      if (el.scrollWidth > el.clientWidth + 4) {
-        const ox = getComputedStyle(el).overflowX;
-        if (ox === "auto" || ox === "scroll") return true;
-      }
+    if (!el || lock.current) return;
+    const line = el.getBoundingClientRect().top + tabsHeight() + 24;
+    let cur = TABS[0];
+    for (const t of TABS) {
+      const sec = sectionRefs.current[t];
+      if (sec && sec.getBoundingClientRect().top <= line) cur = t;
     }
-    return false;
+    setTab(cur);
   };
-  const onSwipeStart = (e) => {
+  const onScroll = (e) => {
+    setScrolled(e.currentTarget.scrollTop > 180);
+    syncTab();
+  };
+  const goTab = (t) => {
+    const el = scrollRef.current;
+    const sec = sectionRefs.current[t];
+    setTab(t);
+    if (!el || !sec) return;
+    const top = sec.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - tabsHeight();
+    clearTimeout(lock.current);
+    lock.current = setTimeout(() => {
+      lock.current = null;
+      syncTab();
+    }, 800);
+    el.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  };
+  const onTouchStartScroll = (e) => {
     e.stopPropagation(); // keep the app's own tab-swipe out of this screen
-    const t = e.touches[0];
-    swipe.current = e.touches.length === 1 && !inHorizontalScroller(e.target) ? { x: t.clientX, y: t.clientY, at: Date.now() } : null;
-  };
-  const onSwipeEnd = (e) => {
-    e.stopPropagation();
-    const sw = swipe.current;
-    swipe.current = null;
-    const t = e.changedTouches[0];
-    if (!sw || !t) return;
-    const dx = t.clientX - sw.x;
-    const dy = t.clientY - sw.y;
-    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6 || Date.now() - sw.at > 700) return;
-    const next = TABS[TABS.indexOf(tab) + (dx < 0 ? 1 : -1)];
-    if (next) goTab(next);
+    if (lock.current) {
+      clearTimeout(lock.current); // finger back on the page: it decides the tab again
+      lock.current = null;
+    }
   };
   const actionBtns = [
     { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
     { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
     isAdmin
       ? { icon: Share2, label: "Share", run: () => setShowInvite(true) }
-      : canAddMembers && { icon: UserPlus, label: "Add", run: () => { setTab("Members"); setShowAddMembers(true); } },
+      : canAddMembers && { icon: UserPlus, label: "Add", run: () => { goTab("Members"); setShowAddMembers(true); } },
     { icon: Search, label: "Search", run: goSearch },
   ].filter(Boolean);
 
@@ -325,7 +342,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           )}
         </div>
 
-        <div ref={scrollRef} onScroll={onScroll} onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd} onTouchMove={(e) => e.stopPropagation()} className="flex-1 overflow-y-auto overscroll-contain">
+        <div ref={scrollRef} onScroll={onScroll} onTouchStart={onTouchStartScroll} onTouchEnd={(e) => e.stopPropagation()} onTouchMove={(e) => e.stopPropagation()} className="flex-1 overflow-y-auto overscroll-contain">
           {/* Header block */}
           <div className="flex flex-col items-center px-5 pt-0 pb-4">
             <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
@@ -445,7 +462,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           </div>
 
           {/* Tabs (stick to the top while scrolling) */}
-          <div className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex relative">
+          <div ref={tabsRef} className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex relative">
             {TABS.map((t) => (
               <button
                 key={t}
@@ -461,10 +478,9 @@ const GroupInfoModal = ({ group, onClose }) => {
             />
           </div>
 
-          <div key={tab} className={tabDir === "right" ? "tab-slide-from-right" : tabDir === "left" ? "tab-slide-from-left" : ""}>
+          <div>
           {/* ---- Members ---- */}
-          {tab === "Members" && (
-            <div className="pb-6">
+            <div ref={(n) => (sectionRefs.current.Members = n)} className="pb-6">
               <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
                 {memberSearch == null ? (
                   <>
@@ -618,11 +634,9 @@ const GroupInfoModal = ({ group, onClose }) => {
               })}
               {shownMembers.length === 0 && <p className="text-center text-wa-muted text-sm py-6">No members found</p>}
             </div>
-          )}
 
           {/* ---- Media ---- */}
-          {tab === "Media" && (
-            <div className="pb-8">
+            <div ref={(n) => (sectionRefs.current.Media = n)} className="pb-8 border-t border-white/10">
               <button onClick={() => setShowMedia(true)} className="w-full flex items-center justify-between px-5 pt-4 pb-3 text-left">
                 <span className="text-[14.5px]">Media, links and docs</span>
                 <span className="flex items-center gap-1 text-wa-muted text-[13.5px]">
@@ -659,11 +673,9 @@ const GroupInfoModal = ({ group, onClose }) => {
               <Row icon={Lock} title="Chat lock" subtitle="Lock and hide this chat on this device" right={<Toggle on={locked} />} onClick={toggleLock} />
               {isAdmin && <Row icon={Link2} title="Invite to group via link" onClick={() => setShowInvite(true)} />}
             </div>
-          )}
 
           {/* ---- Settings ---- */}
-          {tab === "Settings" && (
-            <div className="pb-8 pt-2">
+            <div ref={(n) => (sectionRefs.current.Settings = n)} className="pb-8 pt-2 border-t border-white/10" style={{ minHeight: lastMin }}>
               <Row icon={Users} title="Create a similar group" subtitle="Start with the same members that you can add or remove." onClick={() => setShowSimilar(true)} />
               <div className="border-t border-white/10 my-1" />
               <Row icon={Heart} title={isFav ? "Remove from Favourites" : "Add to Favourites"} onClick={toggleFavourite} />
@@ -674,7 +686,6 @@ const GroupInfoModal = ({ group, onClose }) => {
               <Row icon={LogOut} title="Exit group" danger onClick={handleLeave} />
               <Row icon={ThumbsDown} title="Report group" danger onClick={() => setShowReport(true)} />
             </div>
-          )}
           </div>
         </div>
       </div>
