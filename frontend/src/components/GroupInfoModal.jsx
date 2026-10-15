@@ -9,13 +9,13 @@ import { optimizeImage } from "../lib/cdn";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatLockStore } from "../store/useChatLockStore";
-import { compressImage } from "../lib/imageUtils";
 import { exportChat } from "../lib/exportChat";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import { useCallStore } from "../store/useCallStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import Avatar from "./Avatar";
 import ImageLightbox from "./ImageLightbox";
+import WallpaperCropper from "./WallpaperCropper";
 import ReportGroupDialog from "./ReportGroupDialog";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
@@ -75,6 +75,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [photoMenu, setPhotoMenu] = useState(false);
   const [viewPhoto, setViewPhoto] = useState(false);
   const [emojiPhoto, setEmojiPhoto] = useState(false);
+  const [cropFile, setCropFile] = useState(null); // picked group photo waiting to be cropped
   const [memberSearch, setMemberSearch] = useState(null); // null = closed, string = open
   const [showAddMembers, setShowAddMembers] = useState(false);
   const [toAdd, setToAdd] = useState([]);
@@ -147,14 +148,17 @@ const GroupInfoModal = ({ group, onClose }) => {
     setToAdd([]);
     setShowAddMembers(false);
   };
-  const pickPhoto = async (e) => {
+  const pickPhoto = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     if (!file.type.startsWith("image/")) return toast.error("Please select an image file");
+    setCropFile(file); // crop first, then save
+  };
+  const saveCroppedPhoto = async (img) => {
+    setCropFile(null);
     setSavingPhoto(true);
     try {
-      const img = await compressImage(file, { maxDimension: 800, quality: 0.85 });
       if (await updateGroupInfo(group._id, { groupPic: img })) toast.success("Group photo updated");
     } catch {
       toast.error("Couldn't use that photo");
@@ -289,9 +293,9 @@ const GroupInfoModal = ({ group, onClose }) => {
             <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
               <button
                 type="button"
-                onClick={() => (editMode ? setPhotoMenu((o) => !o) : group.groupPic && setViewPhoto(true))}
+                onClick={() => (editMode || canEdit ? setPhotoMenu((o) => !o) : group.groupPic && setViewPhoto(true))}
                 className="relative block size-[180px] rounded-full overflow-hidden bg-wa-field"
-                aria-label={editMode ? "Change group photo" : "View group photo"}
+                aria-label={editMode || canEdit ? "Change group photo" : "View group photo"}
               >
                 {group.groupPic ? (
                   <img src={optimizeImage(group.groupPic, 360)} decoding="async" alt={group.name} className="size-full object-cover" />
@@ -306,7 +310,13 @@ const GroupInfoModal = ({ group, onClose }) => {
                   </span>
                 )}
               </button>
-              {editMode && photoMenu && (
+              {!editMode && canEdit && (
+                <span className="absolute right-1 bottom-1 size-10 rounded-full bg-[#21C063] text-[#0B141A] border-2 border-wa-bg flex items-center justify-center pointer-events-none">
+                  {savingPhoto ? <Loader2 size={18} className="animate-spin" /> : <Camera size={19} />}
+                </span>
+              )}
+              {photoMenu && (editMode || canEdit) && <div className="fixed inset-0 z-[5]" onClick={() => setPhotoMenu(false)} />}
+              {photoMenu && (editMode || canEdit) && (
                 <div className="absolute z-10 left-1/2 -translate-x-1/2 top-[calc(100%+6px)] w-56 rounded-2xl bg-wa-pop border border-white/10 shadow-2xl py-2">
                   {[
                     group.groupPic && { icon: Eye, label: "View photo", run: () => setViewPhoto(true) },
@@ -490,6 +500,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                     {memberIsAdmin && (
                       <span className="text-[13px] px-2.5 py-1 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
                     )}
+                    {isYou && <div className="w-9 shrink-0" aria-hidden="true" />}
                     {!isYou && (
                       <div className="relative shrink-0">
                         <button
@@ -697,6 +708,18 @@ const GroupInfoModal = ({ group, onClose }) => {
         <Suspense fallback={null}>
           <GroupEmojiPhoto onClose={() => setEmojiPhoto(false)} onSave={saveEmojiPhoto} />
         </Suspense>
+      )}
+      {cropFile && (
+        <WallpaperCropper
+          file={cropFile}
+          title="Crop group photo"
+          aspectRatio={1}
+          lockLabel="Square"
+          maxSize={800}
+          hint="Drag the frame to move it, drag a corner to resize. Only what's inside becomes the group photo."
+          onCancel={() => setCropFile(null)}
+          onDone={saveCroppedPhoto}
+        />
       )}
       {viewPhoto && group.groupPic && <ImageLightbox src={group.groupPic} onClose={() => setViewPhoto(false)} />}
       {viewMember && (
