@@ -620,6 +620,20 @@ export const useCallStore = create((set, get) => ({
   // device whose label suggests it's a speaker, when the browser exposes
   // that (Chrome/Edge via setSinkId — Safari has no equivalent API).
   toggleSpeakerOutput: async () => {
+    // Android app: switch the real loudspeaker/earpiece through the native plugin. An older app
+    // build without it rejects the call, and then we fall back to the browser behaviour below.
+    try {
+      const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesCall : null;
+      if (native && typeof native.setSpeaker === "function") {
+        const next = !get().isSpeakerOn;
+        await native.setSpeaker({ on: next });
+        set({ isSpeakerOn: next });
+        toast(next ? "Speaker on" : "Speaker off", { icon: "🔊", duration: 1200 });
+        return;
+      }
+    } catch {
+      /* not supported by this app version */
+    }
     const remoteAudioEl = document.getElementById("call-remote-audio");
     const remoteVideoEl = document.getElementById("call-remote-video");
     const supportsSinkId = remoteAudioEl?.setSinkId || remoteVideoEl?.setSinkId;

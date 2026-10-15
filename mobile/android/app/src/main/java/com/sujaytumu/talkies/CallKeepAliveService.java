@@ -64,6 +64,8 @@ public class CallKeepAliveService extends Service {
         try {
             if (am != null) {
                 if (Build.VERSION.SDK_INT >= 26 && focusRequest != null) am.abandonAudioFocusRequest(focusRequest);
+                if (Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice();
+                else am.setSpeakerphoneOn(false);
                 am.setMode(prevAudioMode);
             }
         } catch (Exception ignored) {
