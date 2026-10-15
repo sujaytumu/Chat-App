@@ -26,14 +26,30 @@ export function useChatMedia(chatType, chatId) {
   return data;
 }
 
+// Still frame for a video: Cloudinary can render one as a jpg; otherwise fall back to the video's first frame.
+const videoPoster = (url) =>
+  /res\.cloudinary\.com\/.+\/video\/upload\//.test(url || "")
+    ? url.replace("/video/upload/", "/video/upload/so_0,w_400,h_400,c_fill,q_auto/").replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg")
+    : null;
+
+const VideoFrame = ({ url }) => {
+  const [poster, setPoster] = useState(() => videoPoster(url));
+  return poster ? (
+    <img src={poster} alt="" loading="lazy" className="size-full object-cover" onError={() => setPoster(null)} />
+  ) : (
+    <video src={`${url}#t=0.1`} preload="metadata" muted playsInline disablePictureInPicture className="size-full object-cover pointer-events-none" />
+  );
+};
+
 export const MediaThumb = ({ item, className = "", onClick }) => (
   <button type="button" onClick={onClick} className={`relative overflow-hidden bg-wa-surface ${className}`}>
     {item.kind === "image" ? (
       <img src={item.url} alt="" loading="lazy" className="size-full object-cover" />
     ) : (
       <>
-        <video src={item.url} preload="metadata" muted className="size-full object-cover" />
-        <span className="absolute left-1.5 bottom-1 flex items-center gap-1 text-[10px] text-white drop-shadow">
+        <VideoFrame url={item.url} />
+        <span className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/55 to-transparent" />
+        <span className="absolute left-1.5 bottom-1 flex items-center gap-1 text-[11px] text-white">
           <Play size={12} fill="white" /> {fmtDur(item.duration)}
         </span>
       </>
