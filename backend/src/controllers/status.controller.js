@@ -61,7 +61,8 @@ export const createStatus = async (req, res) => {
 
     if (song?.data) {
       if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
-      const uploaded = await uploadFileAttachment({ data: song.data, name: song.name, mimeType: "audio/mpeg", size: song.size });
+      const songMime = typeof song.mime === "string" && song.mime.startsWith("audio/") ? song.mime : "audio/mpeg";
+      const uploaded = await uploadFileAttachment({ data: song.data, name: song.name, mimeType: songMime, size: song.size });
       doc.song = { url: uploaded.url, name: String(song.name || "Song").slice(0, 80) };
     }
 

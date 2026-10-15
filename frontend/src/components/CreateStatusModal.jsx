@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
+import StatusMusicSheet from "./StatusMusicSheet";
 import StatusVideoPreview, { MAX_STATUS_VIDEO_SECONDS } from "./StatusVideoPreview";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -154,6 +155,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [song, setSong] = useState(null); // { data, name, size }
   const [place, setPlace] = useState(null); // { name, lat, lng }
   const [showPlaces, setShowPlaces] = useState(false);
+  const [showMusic, setShowMusic] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [editorMode, setEditorMode] = useState(null); // null | draw | text | sticker (photo editor)
   const mediaRef = useRef(null);
@@ -199,6 +201,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
     if (file.size > MAX_SONG_BYTES) return toast.error("Pick a song under 4 MB");
     try {
       setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, ""), size: file.size });
+      setShowMusic(false);
     } catch {
       toast.error("Couldn't read that song");
     }
@@ -226,7 +229,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         caption: kind === "text" ? "" : caption,
         ...(kind !== "text" && kind !== "image" ? { file: { name: media.name, size: media.size, mime: media.mime, duration: media.duration } } : {}),
         ...(kind === "video" && trim ? { trim } : {}),
-        ...(song ? { song: { data: song.data, name: song.name, size: song.size } } : {}),
+        ...(song ? { song: { data: song.data, name: song.name, size: song.size, mime: song.mime } } : {}),
         ...(place ? { location: place } : {}),
       };
       await axiosInstance.post("/status", body, { timeout: 180000 });
@@ -299,7 +302,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           ref={editorRef}
           src={media.url}
           onClose={onClose}
-          onMusic={() => songRef.current?.click()}
+          onMusic={() => setShowMusic(true)}
           hasSong={!!song}
           onRotated={(d) => setMedia((m) => ({ ...m, url: d, data: d }))}
           onLocation={() => setShowPlaces(true)}
@@ -311,7 +314,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           <div className="absolute top-0 inset-x-0 flex items-center gap-1.5 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
             <button onClick={onClose} aria-label="Close" className="size-10 rounded-full bg-[#101418] text-white flex items-center justify-center text-[18px]">✕</button>
             <div className="flex-1" />
-            <button onClick={() => songRef.current?.click()} aria-label="Add music" className={`size-10 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-[#101418] text-white"}`}>
+            <button onClick={() => setShowMusic(true)} aria-label="Add music" className={`size-10 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-[#101418] text-white"}`}>
               <Mdi d={D_NOTE} size={19} />
             </button>
           </div>
@@ -516,6 +519,17 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       <input ref={audioRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={(e) => take(e, "audio")} />
       <input ref={fileRef} type="file" className="hidden" onChange={(e) => take(e, "file")} />
       <input ref={songRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={takeSong} />
+
+      {showMusic && (
+        <StatusMusicSheet
+          onClose={() => setShowMusic(false)}
+          onPick={(s) => {
+            setSong(s);
+            setShowMusic(false);
+          }}
+          onFiles={() => songRef.current?.click()}
+        />
+      )}
 
       {showPlaces && (
         <LocationSheet
