@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette, ChevronUp, AtSign, Sparkles } from "lucide-react";
+import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import toast from "react-hot-toast";
@@ -393,17 +393,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
 
       {isMedia && !(kind === "image" && editorMode) && (
         <div className={`${kind === "image" ? "absolute bottom-0 inset-x-0 z-[5]" : "shrink-0"} bg-black`}>
-          <div className="flex justify-center pt-1 text-white">
-            <ChevronUp size={22} strokeWidth={2.6} />
-          </div>
-          <div className="flex justify-center pt-1 pb-4">
-            <button
-              onClick={() => toast("Restyle with AI isn't available yet")}
-              className="h-[46px] px-6 rounded-full bg-[#101418] text-white text-[17px] flex items-center gap-3 active:bg-[#1c242b]"
-            >
-              <Sparkles size={20} className="fill-white" /> Restyle with AI
-            </button>
-          </div>
+          <div className="pt-3" />
           {(song || place) && (
             <div className="flex flex-wrap gap-2 px-4 pb-2.5">
               {song && (
@@ -422,7 +412,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               )}
             </div>
           )}
-          <div className="mx-2.5 mb-2.5 flex items-center gap-3.5 h-[54px] rounded-full bg-[#101418] pl-4 pr-3.5">
+          <div className="mx-2.5 mb-2.5 flex items-center gap-3.5 h-[54px] rounded-full bg-[#101418] pl-4 pr-4">
             <Mdi d={D_ADD_PHOTO} size={26} className="text-white shrink-0" />
             <input
               value={caption}
@@ -431,9 +421,6 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               maxLength={700}
               className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/70 text-[18px] focus:outline-none"
             />
-            <button onClick={() => toast("Mentions aren't available yet")} aria-label="Mention" className="text-white shrink-0">
-              <AtSign size={26} />
-            </button>
           </div>
           <div className="flex items-center gap-2 bg-[#0A0E11] px-2.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
             <button className="h-10 pl-3 pr-4 rounded-full bg-[#101418] text-white/90 text-[16px] flex items-center gap-2" onClick={() => toast("Your status goes to all your contacts")}>
