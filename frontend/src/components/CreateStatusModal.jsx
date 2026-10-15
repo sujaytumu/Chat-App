@@ -309,10 +309,10 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       {isMedia && kind === "video" && (
         <StatusVideoPreview src={media.url} duration={media.duration} trim={trim} onTrimChange={setTrim}>
           <div className="absolute top-0 inset-x-0 flex items-center gap-1.5 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
-            <button onClick={onClose} aria-label="Close" className="size-12 rounded-full bg-[#101418] text-white flex items-center justify-center text-[22px]">✕</button>
+            <button onClick={onClose} aria-label="Close" className="size-10 rounded-full bg-[#101418] text-white flex items-center justify-center text-[18px]">✕</button>
             <div className="flex-1" />
-            <button onClick={() => songRef.current?.click()} aria-label="Add music" className={`size-12 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-[#101418] text-white"}`}>
-              <Mdi d={D_NOTE} size={22} />
+            <button onClick={() => songRef.current?.click()} aria-label="Add music" className={`size-10 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-[#101418] text-white"}`}>
+              <Mdi d={D_NOTE} size={19} />
             </button>
           </div>
         </StatusVideoPreview>
@@ -400,14 +400,14 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           {(song || place) && (
             <div className="flex flex-wrap gap-2 px-4 pb-2.5">
               {song && (
-                <span className="flex items-center gap-1.5 text-[15px] text-white max-w-full">
+                <span className="flex items-center gap-1.5 text-[13px] text-white max-w-full">
                   <Music size={18} className="text-[#21C063] shrink-0" />
                   <span className="truncate">{song.name}</span>
                   <button onClick={() => setSong(null)} className="size-6 flex items-center justify-center text-white/70" aria-label="Remove song"><X size={16} /></button>
                 </span>
               )}
               {place && (
-                <span className="flex items-center gap-1.5 text-[15px] text-white max-w-full">
+                <span className="flex items-center gap-1.5 text-[13px] text-white max-w-full">
                   <MapPin size={18} className="text-[#F15C6D] shrink-0" />
                   <span className="truncate">{place.name}</span>
                   <button onClick={() => setPlace(null)} className="size-6 flex items-center justify-center text-white/70" aria-label="Remove location"><X size={16} /></button>
@@ -415,28 +415,28 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               )}
             </div>
           )}
-          <div className="mx-2.5 mb-2.5 flex items-center gap-3.5 h-[54px] rounded-full bg-[#101418] pl-4 pr-4">
-            <Mdi d={D_ADD_PHOTO} size={26} className="text-white shrink-0" />
+          <div className="mx-2.5 mb-2 flex items-center gap-3 h-[44px] rounded-full bg-[#101418] pl-4 pr-4">
+            <Mdi d={D_ADD_PHOTO} size={22} className="text-white shrink-0" />
             <input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Add a caption…"
               maxLength={700}
-              className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/70 text-[18px] focus:outline-none"
+              className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/60 text-[14.5px] focus:outline-none"
             />
           </div>
           <div className="flex items-center gap-2 bg-[#0A0E11] px-2.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
-            <button className="h-10 pl-3 pr-4 rounded-full bg-[#101418] text-white/90 text-[16px] flex items-center gap-2" onClick={() => toast("Your status goes to all your contacts")}>
-              <StatusRing size={22} /> Status (Contacts)
+            <button className="h-9 pl-3 pr-3.5 rounded-full bg-[#101418] text-white/90 text-[13px] flex items-center gap-1.5" onClick={() => toast("Your status goes to all your contacts")}>
+              <StatusRing size={18} /> Status (Contacts)
             </button>
             <div className="flex-1" />
             <button
               onClick={post}
               disabled={isPosting}
-              className="size-[54px] rounded-full bg-[#21C063] disabled:opacity-60 text-[#0B141A] flex items-center justify-center active:scale-95"
+              className="size-12 rounded-full bg-[#21C063] disabled:opacity-60 text-[#0B141A] flex items-center justify-center active:scale-95"
               aria-label="Post status"
             >
-              {isPosting ? <Loader2 className="animate-spin" size={22} /> : <Mdi d={D_SEND} size={26} />}
+              {isPosting ? <Loader2 className="animate-spin" size={22} /> : <Mdi d={D_SEND} size={22} />}
             </button>
           </div>
         </div>
@@ -463,49 +463,49 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
 
       {step === "pick" && (
         <div className="absolute inset-0 z-10 bg-[#0B0D0F]">
-          <div className="relative h-full flex flex-col rounded-t-[28px] bg-[#161A1D] overflow-hidden">
+          <div className="relative h-full flex flex-col rounded-t-[24px] bg-[#161A1D] overflow-hidden">
             <div className="flex justify-center pt-3 shrink-0">
-              <span className="w-10 h-1 rounded-full bg-[#4A5258]" />
+              <span className="w-9 h-1 rounded-full bg-[#4A5258]" />
             </div>
-            <div className="relative flex items-center justify-center h-[76px] shrink-0">
-              <button onClick={onClose} aria-label="Close" className="absolute left-3 size-11 rounded-full flex items-center justify-center text-white active:bg-white/15">
-                <X size={26} />
+            <div className="relative flex items-center justify-center h-[56px] shrink-0">
+              <button onClick={onClose} aria-label="Close" className="absolute left-2 size-10 rounded-full flex items-center justify-center text-white active:bg-white/15">
+                <X size={22} />
               </button>
-              <h3 className="text-[26px] text-[#E9EDEF]">Add status</h3>
+              <h3 className="text-[18px] font-medium tracking-tight text-[#E9EDEF]">Add status</h3>
             </div>
-            <div className="flex gap-[27px] px-8 pt-2 pb-5 overflow-x-auto no-scrollbar shrink-0">
+            <div className="flex gap-4 px-5 pt-1 pb-4 overflow-x-auto no-scrollbar shrink-0">
               {[
-                { icon: <Mdi d={D_EDIT} size={26} />, label: "Text", on: () => { setKind("text"); setStep("compose"); } },
-                { icon: <Mdi d={D_NOTE} size={26} />, label: "Music", on: () => audioRef.current?.click() },
-                { icon: <Mdi d={D_MIC} size={26} />, label: "Voice", on: () => voiceRef.current?.click() },
-                { icon: <FileText size={24} />, label: "File", on: () => fileRef.current?.click() },
+                { icon: <Mdi d={D_EDIT} size={20} />, label: "Text", on: () => { setKind("text"); setStep("compose"); } },
+                { icon: <Mdi d={D_NOTE} size={20} />, label: "Music", on: () => audioRef.current?.click() },
+                { icon: <Mdi d={D_MIC} size={20} />, label: "Voice", on: () => voiceRef.current?.click() },
+                { icon: <FileText size={19} />, label: "File", on: () => fileRef.current?.click() },
               ].map(({ icon, label, on }) => (
-                <button key={label} onClick={on} className="flex flex-col items-center gap-2 shrink-0 w-[73px] text-white">
-                  <span className="w-[73px] h-14 rounded-full bg-[#262A2E] flex items-center justify-center active:bg-[#30363b]">{icon}</span>
-                  <span className="text-[15px] text-[#E9EDEF]">{label}</span>
+                <button key={label} onClick={on} className="flex flex-col items-center gap-1.5 shrink-0 w-[60px] text-white">
+                  <span className="w-[60px] h-[44px] rounded-full bg-[#262A2E] flex items-center justify-center active:bg-[#30363b]">{icon}</span>
+                  <span className="text-[12px] text-[#C5CDD2]">{label}</span>
                 </button>
               ))}
             </div>
-            <button onClick={() => mediaRef.current?.click()} className="flex items-center gap-2.5 px-8 pt-3 pb-4 text-[20px] text-[#8E9AA2] self-start shrink-0">
+            <button onClick={() => mediaRef.current?.click()} className="flex items-center gap-2 px-5 pt-2 pb-3 text-[14px] text-[#8E9AA2] self-start shrink-0">
               Recents
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 6h20L12 19z" /></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 6h20L12 19z" /></svg>
             </button>
-            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 auto-rows-[33vw] sm:auto-rows-[120px] gap-[2px] bg-[#0B0D0F] content-start pb-24">
+            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-4 auto-rows-[25vw] sm:auto-rows-[100px] gap-[2px] bg-[#0B0D0F] content-start pb-24">
               <button onClick={() => cameraRef.current?.click()} className="bg-[#1A1E21] flex flex-col items-center justify-center gap-2 text-[#8E9AA2] active:opacity-70">
-                <Camera size={36} className="text-[#21C063]" />
-                <span className="text-[19px]">Camera</span>
+                <Camera size={24} className="text-[#21C063]" />
+                <span className="text-[12px]">Camera</span>
               </button>
               <button onClick={() => mediaRef.current?.click()} className="bg-[#1A1E21] flex flex-col items-center justify-center gap-2 text-[#8E9AA2] active:opacity-70">
-                <Images size={36} className="text-[#21C063]" />
-                <span className="text-[19px]">Gallery</span>
+                <Images size={24} className="text-[#21C063]" />
+                <span className="text-[12px]">Gallery</span>
               </button>
             </div>
             <button
               onClick={() => mediaRef.current?.click()}
               aria-label="Browse all photos and videos"
-              className="absolute right-4 bottom-[calc(16px+env(safe-area-inset-bottom))] size-16 rounded-[18px] bg-[#232A2F] text-white flex items-center justify-center shadow-lg active:bg-[#2d353b]"
+              className="absolute right-4 bottom-[calc(16px+env(safe-area-inset-bottom))] size-12 rounded-2xl bg-[#232A2F] text-white flex items-center justify-center shadow-lg active:bg-[#2d353b]"
             >
-              <Mdi d={D_COLLECTIONS} size={30} />
+              <Mdi d={D_COLLECTIONS} size={22} />
             </button>
           </div>
         </div>
