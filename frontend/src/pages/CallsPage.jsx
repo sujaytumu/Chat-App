@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
 import { useChatStore } from "../store/useChatStore";
 import { useNavigate } from "react-router-dom";
-import { Phone, Video, Loader2, ArrowUpRight, ArrowDownLeft, Search, X, Plus, MessageSquare, Heart } from "lucide-react";
+import { Phone, Video, Loader2, ArrowUpRight, ArrowDownLeft, Search, X, Plus, MessageSquare, Heart, Info } from "lucide-react";
 import toast from "react-hot-toast";
 import Avatar from "../components/Avatar";
 import { WaKebab, WaBack } from "../components/icons/WaIcons";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useScrollMemory } from "../lib/useScrollMemory";
+
+const ContactInfoModal = lazy(() => import("../components/ContactInfoModal"));
 
 const GREEN = "#25D366";
 const RED = "#F15C6D";
@@ -312,48 +314,95 @@ const CallsPage = () => {
   );
 };
 
-// Details for one row: every call in the group with its time, direction and length.
-const CallInfo = ({ row, myId, onClose, onCall, onMessage }) => (
-  <div className="fixed inset-0 z-[150] bg-black/60 flex items-end sm:items-center justify-center" onClick={onClose}>
-    <div className="wa-dark w-full sm:max-w-sm bg-wa-panel text-wa-text rounded-t-3xl sm:rounded-2xl max-h-[85vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-      <div className="flex items-center gap-3 px-4 pt-5 pb-3">
-        <Avatar src={row.other.profilePic} name={row.other.fullName} size="size-14" textSize="text-xl" />
-        <div className="min-w-0 flex-1">
-          <p className="text-[15.5px] truncate">{row.other.fullName}</p>
-          <p className="text-[13.5px] text-wa-muted">{row.type === "video" ? "Video call" : "Voice call"}</p>
+// Full call info page (like WhatsApp): who, quick actions, then every call grouped by day
+// with its kind, time, length and data used.
+const shortDuration = (s) => {
+  if (!s) return "";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h ? `${h}h ${m}m` : m ? `${m}m ${sec}s` : `${sec}s`;
+};
+const dayHeading = (dateStr) => {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", ...(d.getFullYear() !== now.getFullYear() && { year: "numeric" }) });
+};
+const kindLabel = (c, d) => {
+  const kind = c.callType === "video" ? "video call" : "voice call";
+  if (d.outgoing) return `Outgoing ${kind}`;
+  if (c.status === "answered") return `Incoming ${kind}`;
+  return `${c.status === "declined" ? "Declined" : "Missed"} ${kind}`;
+};
+
+const CallInfo = ({ row, myId, onClose, onCall, onMessage }) => {
+  const [showContact, setShowContact] = useState(false);
+  const days = [];
+  row.calls.forEach((c) => {
+    const key = new Date(c.createdAt).toDateString();
+    const last = days[days.length - 1];
+    if (last && last.key === key) last.items.push(c);
+    else days.push({ key, label: dayHeading(c.createdAt), items: [c] });
+  });
+  const actions = [
+    [MessageSquare, "Message", () => { onClose(); onMessage(row.other); }],
+    [Phone, "Voice", () => { onClose(); onCall(row.other, "audio"); }],
+    [Video, "Video", () => { onClose(); onCall(row.other, "video"); }],
+    [Info, "Info", () => setShowContact(true)],
+  ];
+  return (
+    <div className="wa-dark fixed inset-0 z-[150] bg-black/60 flex items-stretch sm:items-center justify-center sm:p-4" onClick={onClose}>
+      <div className="w-full sm:max-w-md h-full sm:h-auto sm:max-h-[90vh] bg-wa-bg text-wa-text sm:rounded-2xl flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1 h-14 px-2 shrink-0 border-b border-white/5">
+          <button onClick={onClose} className="size-11 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back"><WaBack size={24} /></button>
+          <h2 className="text-[20px] pl-2">Call info</h2>
         </div>
-        <button onClick={onClose} className="size-10 flex items-center justify-center text-wa-icon" aria-label="Close"><X size={22} /></button>
-      </div>
-      <div className="flex justify-around px-4 pb-3">
-        {[
-          [Phone, "Audio", () => onCall(row.other, "audio")],
-          [Video, "Video", () => onCall(row.other, "video")],
-          [MessageSquare, "Message", () => onMessage(row.other)],
-        ].map(([Icon, label, fn]) => (
-          <button key={label} onClick={() => { onClose(); fn(); }} className="flex flex-col items-center gap-1.5 active:opacity-70">
-            <span className="size-12 rounded-full bg-wa-surface flex items-center justify-center"><Icon size={22} /></span>
-            <span className="text-[12.5px] text-wa-muted">{label}</span>
-          </button>
-        ))}
-      </div>
-      <div className="overflow-y-auto border-t border-white/10 py-1">
-        {row.calls.map((c) => {
-          const d = describe(c, myId);
-          return (
-            <div key={c._id} className="flex items-center gap-3 px-4 py-2.5">
-              <Arrow outgoing={d.outgoing} ok={d.ok} size={20} />
-              <div className="min-w-0 flex-1">
-                <p className="text-[15.5px]" style={{ color: d.missedIncoming ? RED : undefined }}>{d.label}</p>
-                <p className="text-[13px] text-wa-muted">{formatCallTime(c.createdAt)}{c.status === "answered" && c.dataBytes ? ` · ${fmtBytes(c.dataBytes)} used` : ""}</p>
-              </div>
-              <span className="text-[13.5px] text-wa-muted">{c.status === "answered" ? fmtDuration(c.durationSeconds) : ""}</span>
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-6">
+          <div className="flex flex-col items-center pt-6 px-4">
+            <Avatar src={row.other.profilePic} name={row.other.fullName} size="size-[170px]" textSize="text-6xl" />
+            <p className="mt-4 text-[28px] leading-tight text-center break-words max-w-full">{row.other.fullName}</p>
+            {row.other.about ? <p className="mt-1 text-[15px] text-wa-muted text-center max-w-full truncate">{row.other.about}</p> : null}
+          </div>
+          <div className="grid grid-cols-4 gap-2 px-4 mt-6 pb-5 border-b border-white/10">
+            {actions.map(([Icon, label, fn]) => (
+              <button key={label} onClick={fn} className="flex flex-col items-center gap-2 active:opacity-70">
+                <span className="w-full h-14 rounded-full bg-wa-surface flex items-center justify-center"><Icon size={24} /></span>
+                <span className="text-[14px]">{label}</span>
+              </button>
+            ))}
+          </div>
+          {days.map((day) => (
+            <div key={day.key}>
+              <p className="px-5 pt-6 pb-2 text-[15px] text-wa-muted">{day.label}</p>
+              {day.items.map((c) => {
+                const d = describe(c, myId);
+                const answered = c.status === "answered";
+                return (
+                  <div key={c._id} className="flex items-center gap-5 px-5 py-2.5">
+                    <Arrow outgoing={d.outgoing} ok={d.ok} size={24} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[17px]" style={{ color: d.missedIncoming ? RED : undefined }}>{kindLabel(c, d)}</p>
+                      <p className="text-[15px] text-wa-muted">{hhmm(new Date(c.createdAt))}</p>
+                    </div>
+                    <div className="text-right text-[15px] text-wa-muted leading-snug">
+                      {answered && c.durationSeconds ? <p>{shortDuration(c.durationSeconds)}</p> : null}
+                      {answered && c.dataBytes ? <p>{fmtBytes(c.dataBytes)}</p> : null}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
+      {showContact && (
+        <Suspense fallback={null}>
+          <ContactInfoModal user={row.other} status={row.other.about || ""} onClose={() => setShowContact(false)} />
+        </Suspense>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 const ContactPicker = ({ users, onClose, onCall, title = "Select contact" }) => {
   const [q, setQ] = useState("");
