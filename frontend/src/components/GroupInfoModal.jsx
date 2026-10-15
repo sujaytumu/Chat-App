@@ -66,6 +66,8 @@ const GroupInfoModal = ({ group, onClose }) => {
   const { authUser } = useAuthStore();
 
   const [tab, setTab] = useState("Members");
+  const [tabDir, setTabDir] = useState(null); // which side the new tab slides in from
+  const swipe = useRef(null);
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -219,6 +221,42 @@ const GroupInfoModal = ({ group, onClose }) => {
   };
 
   const onScroll = (e) => setScrolled(e.currentTarget.scrollTop > 180);
+  // Switch tab (tap or swipe): the new tab slides in from the side you moved towards, and the
+  // big header collapses so the list gets the room, like WhatsApp.
+  const goTab = (t) => {
+    if (t === tab) return;
+    setTabDir(TABS.indexOf(t) > TABS.indexOf(tab) ? "right" : "left");
+    setTab(t);
+    const el = scrollRef.current;
+    if (el && el.scrollTop < 200) el.scrollTo({ top: 200, behavior: "smooth" });
+  };
+  const inHorizontalScroller = (node) => {
+    const root = scrollRef.current;
+    for (let el = node; el && el !== root; el = el.parentElement) {
+      if (el.scrollWidth > el.clientWidth + 4) {
+        const ox = getComputedStyle(el).overflowX;
+        if (ox === "auto" || ox === "scroll") return true;
+      }
+    }
+    return false;
+  };
+  const onSwipeStart = (e) => {
+    e.stopPropagation(); // keep the app's own tab-swipe out of this screen
+    const t = e.touches[0];
+    swipe.current = e.touches.length === 1 && !inHorizontalScroller(e.target) ? { x: t.clientX, y: t.clientY, at: Date.now() } : null;
+  };
+  const onSwipeEnd = (e) => {
+    e.stopPropagation();
+    const sw = swipe.current;
+    swipe.current = null;
+    const t = e.changedTouches[0];
+    if (!sw || !t) return;
+    const dx = t.clientX - sw.x;
+    const dy = t.clientY - sw.y;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6 || Date.now() - sw.at > 700) return;
+    const next = TABS[TABS.indexOf(tab) + (dx < 0 ? 1 : -1)];
+    if (next) goTab(next);
+  };
   const actionBtns = [
     { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
     { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
@@ -287,7 +325,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           )}
         </div>
 
-        <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto overscroll-contain">
+        <div ref={scrollRef} onScroll={onScroll} onTouchStart={onSwipeStart} onTouchEnd={onSwipeEnd} onTouchMove={(e) => e.stopPropagation()} className="flex-1 overflow-y-auto overscroll-contain">
           {/* Header block */}
           <div className="flex flex-col items-center px-5 pt-0 pb-4">
             <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
@@ -407,24 +445,23 @@ const GroupInfoModal = ({ group, onClose }) => {
           </div>
 
           {/* Tabs (stick to the top while scrolling) */}
-          <div className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex">
+          <div className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex relative">
             {TABS.map((t) => (
               <button
                 key={t}
-                onClick={() => {
-                  setTab(t);
-                  // Like WhatsApp: picking a tab collapses the big header so the list gets the room
-                  const el = scrollRef.current;
-                  if (el && el.scrollTop < 200) el.scrollTo({ top: 200, behavior: "smooth" });
-                }}
-                className={`flex-1 py-2.5 text-[13.5px] relative ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
+                onClick={() => goTab(t)}
+                className={`flex-1 py-2.5 text-[13.5px] transition-colors duration-200 ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
               >
                 {t}
-                {tab === t && <span className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[3px] w-10 rounded-full bg-[#21C063]" />}
               </button>
             ))}
+            <span
+              className="absolute bottom-0 h-[3px] w-10 rounded-full bg-[#21C063] transition-[left] duration-300 ease-out"
+              style={{ left: `calc(${((TABS.indexOf(tab) + 0.5) / TABS.length) * 100}% - 20px)` }}
+            />
           </div>
 
+          <div key={tab} className={tabDir === "right" ? "tab-slide-from-right" : tabDir === "left" ? "tab-slide-from-left" : ""}>
           {/* ---- Members ---- */}
           {tab === "Members" && (
             <div className="pb-6">
@@ -638,6 +675,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               <Row icon={ThumbsDown} title="Report group" danger onClick={() => setShowReport(true)} />
             </div>
           )}
+          </div>
         </div>
       </div>
 
