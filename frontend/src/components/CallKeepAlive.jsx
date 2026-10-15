@@ -38,6 +38,19 @@ const CallKeepAlive = () => {
     }
   }, [active, video, title, text, startedAt]);
 
+  // Like WhatsApp: video calls start on the loudspeaker, voice calls on the earpiece.
+  useEffect(() => {
+    const p = plugin();
+    if (!p || !active || typeof p.setSpeaker !== "function") return;
+    try {
+      Promise.resolve(p.setSpeaker({ on: video }))
+        .then(() => useCallStore.setState({ isSpeakerOn: video }))
+        .catch(() => {});
+    } catch {
+      /* older app build without speaker control */
+    }
+  }, [active, video]);
+
   useEffect(() => {
     const p = plugin();
     if (!p?.addListener) return;

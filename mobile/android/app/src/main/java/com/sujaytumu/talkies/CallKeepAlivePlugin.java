@@ -2,6 +2,9 @@ package com.sujaytumu.talkies;
 
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
+import android.os.Build;
 
 import androidx.core.content.ContextCompat;
 
@@ -42,6 +45,33 @@ public class CallKeepAlivePlugin extends Plugin {
             MainActivity.callActive = false;
             call.reject(e.getMessage() == null ? "Couldn't keep the call running" : e.getMessage());
         }
+    }
+
+    /** JS: TalkiesCall.setSpeaker({ on: true|false }) — loudspeaker or earpiece/headset for the call. */
+    @PluginMethod
+    public void setSpeaker(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", false));
+        try {
+            AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+            if (am != null) {
+                if (Build.VERSION.SDK_INT >= 31) {
+                    if (on) {
+                        for (AudioDeviceInfo d : am.getAvailableCommunicationDevices()) {
+                            if (d.getType() == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER) {
+                                am.setCommunicationDevice(d);
+                                break;
+                            }
+                        }
+                    } else {
+                        am.clearCommunicationDevice();
+                    }
+                } else {
+                    am.setSpeakerphoneOn(on);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        call.resolve();
     }
 
     @PluginMethod
