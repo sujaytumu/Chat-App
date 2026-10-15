@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
+import StatusVideoPreview, { MAX_STATUS_VIDEO_SECONDS } from "./StatusVideoPreview";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
@@ -148,6 +149,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [bgColor, setBgColor] = useState(COLORS[0]);
   const [font, setFont] = useState(0);
   const [media, setMedia] = useState(null); // { data, url(preview), name, size, mime, duration }
+  const [trim, setTrim] = useState(null); // video longer than 90 s: { start, end } seconds
   const [caption, setCaption] = useState("");
   const [song, setSong] = useState(null); // { data, name, size }
   const [place, setPlace] = useState(null); // { name, lat, lng }
@@ -173,6 +175,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       } else if (as === "media" && file.type.startsWith("video/")) {
         const duration = await mediaDuration(file, "video");
         setMedia({ data: await readFileAsBase64(file), url: URL.createObjectURL(file), name: file.name, size: file.size, mime: file.type, duration });
+        setTrim(duration > MAX_STATUS_VIDEO_SECONDS ? { start: 0, end: MAX_STATUS_VIDEO_SECONDS } : null);
         setKind("video"); setStep("compose");
       } else if (as === "audio") {
         const duration = await mediaDuration(file, "audio");
@@ -222,6 +225,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         font,
         caption: kind === "text" ? "" : caption,
         ...(kind !== "text" && kind !== "image" ? { file: { name: media.name, size: media.size, mime: media.mime, duration: media.duration } } : {}),
+        ...(kind === "video" && trim ? { trim } : {}),
         ...(song ? { song: { data: song.data, name: song.name, size: song.size } } : {}),
         ...(place ? { location: place } : {}),
       };
@@ -303,8 +307,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         />
       )}
       {isMedia && kind === "video" && (
-        <div className="relative flex-1 min-h-0 bg-black flex items-center justify-center">
-          <video src={media.url} controls playsInline className="max-w-full max-h-full" />
+        <StatusVideoPreview src={media.url} duration={media.duration} trim={trim} onTrimChange={setTrim}>
           <div className="absolute top-0 inset-x-0 flex items-center gap-1.5 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
             <button onClick={onClose} aria-label="Close" className="size-12 rounded-full bg-[#101418] text-white flex items-center justify-center text-[22px]">✕</button>
             <div className="flex-1" />
@@ -312,7 +315,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               <Mdi d={D_NOTE} size={22} />
             </button>
           </div>
-        </div>
+        </StatusVideoPreview>
       )}
 
       <div className={`flex-1 min-h-0 overflow-y-auto px-4 pb-3 ${isMedia ? "hidden" : ""}`}>
