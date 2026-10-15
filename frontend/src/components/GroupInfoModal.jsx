@@ -294,11 +294,11 @@ const GroupInfoModal = ({ group, onClose }) => {
               <button
                 type="button"
                 onClick={() => (editMode || canEdit ? setPhotoMenu((o) => !o) : group.groupPic && setViewPhoto(true))}
-                className="relative block size-[128px] rounded-full overflow-hidden bg-wa-field"
+                className={`relative block overflow-hidden bg-wa-field ${group.groupPic ? "rounded-[28px]" : "size-[128px] rounded-full"}`}
                 aria-label={editMode || canEdit ? "Change group photo" : "View group photo"}
               >
                 {group.groupPic ? (
-                  <img src={optimizeImage(group.groupPic, 360)} decoding="async" alt={group.name} className="size-full object-cover" />
+                  <img src={optimizeImage(group.groupPic, 720)} decoding="async" alt={group.name} className="block max-h-[230px] w-auto max-w-[min(86vw,340px)] min-h-[128px] object-cover" />
                 ) : (
                   <span className="size-full flex items-center justify-center text-7xl text-wa-muted">
                     <UsersRound size={60} />
@@ -726,7 +726,8 @@ const GroupInfoModal = ({ group, onClose }) => {
           title="Crop group photo"
           aspectRatio={1}
           lockLabel="Square"
-          maxSize={800}
+          initialLocked={false}
+          maxSize={1200}
           variant="whatsapp"
           hint="Drag the frame to move it, drag a corner to resize. Only what's inside becomes the group photo."
           onCancel={() => setCropFile(null)}
