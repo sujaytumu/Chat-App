@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Pencil, Undo2, Check, Sticker, MapPin } from "lucide-react";
+import { Pencil, Undo2, Check, Sticker, MapPin, RotateCw } from "lucide-react";
+import WallpaperCropper from "./WallpaperCropper";
 
 // Filled music note and crop-rotate icons (Material Design Icons, Apache 2.0) so the toolbar matches WhatsApp's.
 const NoteIcon = ({ size = 22 }) => (
@@ -22,6 +23,7 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
   const stage = useRef(null);
   const imgEl = useRef(null);
   const [mode, setMode] = useState(null); // null | draw | text | sticker
+  const [cropFile, setCropFile] = useState(null); // photo handed to the cropper
   const [color, setColor] = useState(COLORS[0]);
   const [strokes, setStrokes] = useState([]);
   const [items, setItems] = useState([]);
@@ -95,6 +97,21 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
     setStrokes([]);
     setItems([]);
     onRotated?.(c.toDataURL("image/jpeg", 0.88));
+  };
+
+  // Real crop: hand the current photo to the cropper (drag the frame / corners), then use the result.
+  const openCrop = async () => {
+    try {
+      setCropFile(await (await fetch(src)).blob());
+    } catch {
+      /* photo couldn't be read: leave the editor as it is */
+    }
+  };
+  const applyCrop = (dataUrl) => {
+    setCropFile(null);
+    setStrokes([]); // drawings / stickers were placed on the old framing
+    setItems([]);
+    onRotated?.(dataUrl);
   };
 
   useImperativeHandle(ref, () => ({
@@ -209,8 +226,11 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
         <button onClick={onMusic} aria-label="Add music" className={`${tb} ${hasSong ? "!bg-[#21C063] !text-black" : ""}`}>
           <NoteIcon size={22} />
         </button>
-        <button onClick={rotate} aria-label="Rotate" className={tb}>
+        <button onClick={openCrop} aria-label="Crop" className={tb}>
           <CropRotateIcon size={24} />
+        </button>
+        <button onClick={rotate} aria-label="Rotate" className={tb}>
+          <RotateCw size={21} />
         </button>
         <button onClick={() => setMode(mode === "sticker" ? null : "sticker")} aria-label="Stickers" className={`${tb} ${mode === "sticker" ? "!bg-white !text-black" : ""}`}>
           <Sticker size={22} />
@@ -281,6 +301,19 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
             Done
           </button>
         </div>
+      )}
+      {cropFile && (
+        <WallpaperCropper
+          file={cropFile}
+          title="Crop photo"
+          lockLabel="Fit screen"
+          initialLocked={false}
+          maxSize={1600}
+          zIndex={170}
+          hint="Drag the frame to move it, drag a corner to resize. Only what's inside is kept."
+          onCancel={() => setCropFile(null)}
+          onDone={applyCrop}
+        />
       )}
     </div>
   );

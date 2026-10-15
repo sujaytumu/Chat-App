@@ -15,7 +15,7 @@ const screenAspect = () => {
   return w >= 1024 ? Math.max(0.5, (w - 472) / h) : w / h;
 };
 
-const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", aspectRatio, lockLabel = "Fit my screen", maxSize = 1600, hint }) => {
+const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", aspectRatio, lockLabel = "Fit my screen", maxSize = 1600, hint, initialLocked = true, zIndex = 120 }) => {
   useBackToClose(true, onCancel);
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
@@ -23,7 +23,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const [img, setImg] = useState(null); // HTMLImageElement
   const [url, setUrl] = useState("");
   const [stage, setStage] = useState({ w: 0, h: 0 });
-  const [locked, setLocked] = useState(true);
+  const [locked, setLocked] = useState(initialLocked);
   const [box, setBox] = useState(null); // crop box in stage px
   const drag = useRef(null);
   const ar = useRef(aspectRatio || screenAspect());
@@ -164,7 +164,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   );
 
   return (
-    <div className="wa-dark fixed inset-0 z-[120] bg-black text-white flex flex-col select-none">
+    <div className="wa-dark fixed inset-0 bg-black text-white flex flex-col select-none" style={{ zIndex }}>
       <div className="flex items-center gap-4 px-4 h-14 shrink-0">
         <button onClick={onCancel} aria-label="Cancel" className="size-10 flex items-center justify-center">
           <X size={24} />
