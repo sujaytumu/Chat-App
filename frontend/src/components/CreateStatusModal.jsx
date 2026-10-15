@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { X, Pencil, Mic, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
+import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette, ChevronUp, AtSign, Sparkles } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import toast from "react-hot-toast";
@@ -8,6 +8,26 @@ import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
 import { readFileAsBase64, formatFileSize } from "../lib/fileUtils";
 import { useBackToClose } from "../lib/useBackToClose";
+import { useStatusBarColor } from "../lib/useStatusBarColor";
+
+// Filled icons (Material Design Icons, Apache 2.0) so this screen looks like WhatsApp's.
+const Mdi = ({ d, size = 24, className }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+    <path d={d} />
+  </svg>
+);
+const D_EDIT = "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z";
+const D_NOTE = "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z";
+const D_MIC = "M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z";
+const D_SEND = "M2.01 21L23 12 2.01 3 2 10l15 2-15 2z";
+const D_COLLECTIONS = "M22 16V4c0-1.1-.9-2-2-2H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2zm-11-4l2.03 2.71L16 11l4 5H8l3-4zM2 6v14c0 1.1.9 2 2 2h14v-2H4V6H2z";
+const D_ADD_PHOTO = "M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z";
+const StatusRing = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4.2" />
+  </svg>
+);
 
 const COLORS = ["#00A884", "#0B141A", "#7f66ff", "#ff8f4d", "#e91e8c", "#22c55e", "#2563eb"];
 const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
@@ -133,6 +153,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [place, setPlace] = useState(null); // { name, lat, lng }
   const [showPlaces, setShowPlaces] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [editorMode, setEditorMode] = useState(null); // null | draw | text | sticker (photo editor)
   const mediaRef = useRef(null);
   const audioRef = useRef(null);
   const fileRef = useRef(null);
@@ -221,6 +242,10 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
 
   const isMedia = (kind === "image" || kind === "video") && !!media;
 
+  // Status bar follows the screen: black in the photo editor, the sheet's shade on "Add status".
+  const barColor = step === "pick" ? "#0B0D0F" : kind === "text" ? bgColor : isMedia ? "#000000" : "#0B141A";
+  useStatusBarColor(barColor, true);
+
   const tool = (Icon, label, onClick, active) => (
     <button
       onClick={onClick}
@@ -273,16 +298,18 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           onMusic={() => songRef.current?.click()}
           hasSong={!!song}
           onRotated={(d) => setMedia((m) => ({ ...m, url: d, data: d }))}
+          onLocation={() => setShowPlaces(true)}
+          onModeChange={setEditorMode}
         />
       )}
       {isMedia && kind === "video" && (
         <div className="relative flex-1 min-h-0 bg-black flex items-center justify-center">
           <video src={media.url} controls playsInline className="max-w-full max-h-full" />
-          <div className="absolute top-0 inset-x-0 flex items-center gap-2 px-3 pt-[calc(8px+env(safe-area-inset-top))] pb-6 bg-gradient-to-b from-black/60 to-transparent">
-            <button onClick={onClose} aria-label="Close" className="size-12 rounded-full bg-black/45 text-white flex items-center justify-center text-[22px]">✕</button>
+          <div className="absolute top-0 inset-x-0 flex items-center gap-1.5 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
+            <button onClick={onClose} aria-label="Close" className="size-12 rounded-full bg-[#101418] text-white flex items-center justify-center text-[22px]">✕</button>
             <div className="flex-1" />
-            <button onClick={() => songRef.current?.click()} aria-label="Add music" className={`size-12 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-black/45 text-white"}`}>
-              <Music size={22} />
+            <button onClick={() => songRef.current?.click()} aria-label="Add music" className={`size-12 rounded-full flex items-center justify-center ${song ? "bg-[#21C063] text-black" : "bg-[#101418] text-white"}`}>
+              <Mdi d={D_NOTE} size={22} />
             </button>
           </div>
         </div>
@@ -364,51 +391,62 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         )}
       </div>
 
-      {isMedia && (
-        <div className="shrink-0 bg-black px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] space-y-2.5">
+      {isMedia && !(kind === "image" && editorMode) && (
+        <div className={`${kind === "image" ? "absolute bottom-0 inset-x-0 z-[5]" : "shrink-0"} bg-black`}>
+          <div className="flex justify-center pt-1 text-white">
+            <ChevronUp size={22} strokeWidth={2.6} />
+          </div>
+          <div className="flex justify-center pt-1 pb-4">
+            <button
+              onClick={() => toast("Restyle with AI isn't available yet")}
+              className="h-[46px] px-6 rounded-full bg-[#101418] text-white text-[17px] flex items-center gap-3 active:bg-[#1c242b]"
+            >
+              <Sparkles size={20} className="fill-white" /> Restyle with AI
+            </button>
+          </div>
           {(song || place) && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 px-4 pb-2.5">
               {song && (
-                <span className="flex items-center gap-1.5 rounded-full bg-white/15 pl-3 pr-1.5 py-1.5 text-[12px] text-white max-w-full">
-                  <Music size={14} className="text-[#21C063] shrink-0" />
+                <span className="flex items-center gap-1.5 text-[15px] text-white max-w-full">
+                  <Music size={18} className="text-[#21C063] shrink-0" />
                   <span className="truncate">{song.name}</span>
-                  <button onClick={() => setSong(null)} className="size-5 rounded-full flex items-center justify-center text-white/70" aria-label="Remove song"><X size={13} /></button>
+                  <button onClick={() => setSong(null)} className="size-6 flex items-center justify-center text-white/70" aria-label="Remove song"><X size={16} /></button>
                 </span>
               )}
               {place && (
-                <span className="flex items-center gap-1.5 rounded-full bg-white/15 pl-3 pr-1.5 py-1.5 text-[12px] text-white max-w-full">
-                  <MapPin size={14} className="text-[#F15C6D] shrink-0" />
+                <span className="flex items-center gap-1.5 text-[15px] text-white max-w-full">
+                  <MapPin size={18} className="text-[#F15C6D] shrink-0" />
                   <span className="truncate">{place.name}</span>
-                  <button onClick={() => setPlace(null)} className="size-5 rounded-full flex items-center justify-center text-white/70" aria-label="Remove location"><X size={13} /></button>
+                  <button onClick={() => setPlace(null)} className="size-6 flex items-center justify-center text-white/70" aria-label="Remove location"><X size={16} /></button>
                 </span>
               )}
             </div>
           )}
-          <div className="flex items-center gap-3 h-12 rounded-full bg-[#1f2c34] px-4">
-            <ImageIcon size={22} className="text-white/80 shrink-0" />
+          <div className="mx-2.5 mb-2.5 flex items-center gap-3.5 h-[54px] rounded-full bg-[#101418] pl-4 pr-3.5">
+            <Mdi d={D_ADD_PHOTO} size={26} className="text-white shrink-0" />
             <input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="Add a caption…"
               maxLength={700}
-              className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/60 text-[15px] focus:outline-none"
+              className="flex-1 min-w-0 bg-transparent text-white placeholder:text-white/70 text-[18px] focus:outline-none"
             />
-          </div>
-          <div className="flex items-center gap-2">
-            <button className="h-11 px-4 rounded-full bg-[#1f2c34] text-white text-[14px] flex items-center gap-2" onClick={() => toast("Your status goes to all your contacts")}>
-              <span className="size-4 rounded-full border-2 border-white/80" /> Status (Contacts)
+            <button onClick={() => toast("Mentions aren't available yet")} aria-label="Mention" className="text-white shrink-0">
+              <AtSign size={26} />
             </button>
-            <button onClick={() => setShowPlaces(true)} aria-label="Add location" className={`size-11 rounded-full flex items-center justify-center ${place ? "bg-[#21C063] text-black" : "bg-[#1f2c34] text-white"}`}>
-              <MapPin size={20} />
+          </div>
+          <div className="flex items-center gap-2 bg-[#0A0E11] px-2.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
+            <button className="h-10 pl-3 pr-4 rounded-full bg-[#101418] text-white/90 text-[16px] flex items-center gap-2" onClick={() => toast("Your status goes to all your contacts")}>
+              <StatusRing size={22} /> Status (Contacts)
             </button>
             <div className="flex-1" />
             <button
               onClick={post}
               disabled={isPosting}
-              className="size-14 rounded-full bg-[#21C063] disabled:opacity-60 text-black flex items-center justify-center active:scale-95"
+              className="size-[54px] rounded-full bg-[#21C063] disabled:opacity-60 text-[#0B141A] flex items-center justify-center active:scale-95"
               aria-label="Post status"
             >
-              {isPosting ? <Loader2 className="animate-spin" size={22} /> : <Send size={24} />}
+              {isPosting ? <Loader2 className="animate-spin" size={22} /> : <Mdi d={D_SEND} size={26} />}
             </button>
           </div>
         </div>
@@ -434,41 +472,50 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       </div>
 
       {step === "pick" && (
-        <div className="absolute inset-0 z-10 bg-wa-bg flex flex-col rounded-t-3xl overflow-hidden">
-          <div className="flex justify-center pt-3 shrink-0">
-            <span className="w-10 h-1 rounded-full bg-wa-muted/50" />
-          </div>
-          <div className="relative flex items-center justify-center h-16 shrink-0">
-            <button onClick={onClose} aria-label="Close" className="absolute left-3 size-11 rounded-full flex items-center justify-center active:bg-white/15">
-              <X size={24} />
-            </button>
-            <h3 className="text-[18px]">Add status</h3>
-          </div>
-          <div className="flex gap-3 px-4 pb-4 overflow-x-auto no-scrollbar shrink-0">
-            {[
-              { Icon: Pencil, label: "Text", on: () => { setKind("text"); setStep("compose"); } },
-              { Icon: Music, label: "Music", on: () => audioRef.current?.click() },
-              { Icon: Mic, label: "Voice", on: () => voiceRef.current?.click() },
-              { Icon: FileText, label: "File", on: () => fileRef.current?.click() },
-              { Icon: MapPin, label: "Location", on: () => { setKind("text"); setStep("compose"); setShowPlaces(true); } },
-            ].map(({ Icon, label, on }) => (
-              <button key={label} onClick={on} className="flex flex-col items-center gap-2 shrink-0 w-[76px]">
-                <span className="w-[76px] h-14 rounded-full bg-wa-field flex items-center justify-center">
-                  <Icon size={24} />
-                </span>
-                <span className="text-[13px] text-wa-text2">{label}</span>
+        <div className="absolute inset-0 z-10 bg-[#0B0D0F]">
+          <div className="relative h-full flex flex-col rounded-t-[28px] bg-[#161A1D] overflow-hidden">
+            <div className="flex justify-center pt-3 shrink-0">
+              <span className="w-10 h-1 rounded-full bg-[#4A5258]" />
+            </div>
+            <div className="relative flex items-center justify-center h-[76px] shrink-0">
+              <button onClick={onClose} aria-label="Close" className="absolute left-3 size-11 rounded-full flex items-center justify-center text-white active:bg-white/15">
+                <X size={26} />
               </button>
-            ))}
-          </div>
-          <p className="px-5 pb-2 text-[16px] text-wa-muted shrink-0">Recents</p>
-          <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 auto-rows-[33vw] sm:auto-rows-[120px] gap-px bg-wa-bg content-start">
-            <button onClick={() => cameraRef.current?.click()} className="bg-wa-surface flex flex-col items-center justify-center gap-2 text-wa-text2 active:opacity-70">
-              <Camera size={30} className="text-[#21C063]" />
-              <span className="text-[15px]">Camera</span>
+              <h3 className="text-[26px] text-[#E9EDEF]">Add status</h3>
+            </div>
+            <div className="flex gap-[27px] px-8 pt-2 pb-5 overflow-x-auto no-scrollbar shrink-0">
+              {[
+                { icon: <Mdi d={D_EDIT} size={26} />, label: "Text", on: () => { setKind("text"); setStep("compose"); } },
+                { icon: <Mdi d={D_NOTE} size={26} />, label: "Music", on: () => audioRef.current?.click() },
+                { icon: <Mdi d={D_MIC} size={26} />, label: "Voice", on: () => voiceRef.current?.click() },
+                { icon: <FileText size={24} />, label: "File", on: () => fileRef.current?.click() },
+              ].map(({ icon, label, on }) => (
+                <button key={label} onClick={on} className="flex flex-col items-center gap-2 shrink-0 w-[73px] text-white">
+                  <span className="w-[73px] h-14 rounded-full bg-[#262A2E] flex items-center justify-center active:bg-[#30363b]">{icon}</span>
+                  <span className="text-[15px] text-[#E9EDEF]">{label}</span>
+                </button>
+              ))}
+            </div>
+            <button onClick={() => mediaRef.current?.click()} className="flex items-center gap-2.5 px-8 pt-3 pb-4 text-[20px] text-[#8E9AA2] self-start shrink-0">
+              Recents
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 6h20L12 19z" /></svg>
             </button>
-            <button onClick={() => mediaRef.current?.click()} className="bg-wa-surface flex flex-col items-center justify-center gap-2 text-wa-text2 active:opacity-70">
-              <Images size={30} className="text-[#21C063]" />
-              <span className="text-[15px]">Gallery</span>
+            <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 auto-rows-[33vw] sm:auto-rows-[120px] gap-[2px] bg-[#0B0D0F] content-start pb-24">
+              <button onClick={() => cameraRef.current?.click()} className="bg-[#1A1E21] flex flex-col items-center justify-center gap-2 text-[#8E9AA2] active:opacity-70">
+                <Camera size={36} className="text-[#21C063]" />
+                <span className="text-[19px]">Camera</span>
+              </button>
+              <button onClick={() => mediaRef.current?.click()} className="bg-[#1A1E21] flex flex-col items-center justify-center gap-2 text-[#8E9AA2] active:opacity-70">
+                <Images size={36} className="text-[#21C063]" />
+                <span className="text-[19px]">Gallery</span>
+              </button>
+            </div>
+            <button
+              onClick={() => mediaRef.current?.click()}
+              aria-label="Browse all photos and videos"
+              className="absolute right-4 bottom-[calc(16px+env(safe-area-inset-bottom))] size-16 rounded-[18px] bg-[#232A2F] text-white flex items-center justify-center shadow-lg active:bg-[#2d353b]"
+            >
+              <Mdi d={D_COLLECTIONS} size={30} />
             </button>
           </div>
         </div>

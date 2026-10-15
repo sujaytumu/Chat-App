@@ -1,12 +1,24 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
-import { Music, RotateCw, Smile, Pencil, Undo2, Check } from "lucide-react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { Pencil, Undo2, Check, Sticker, MapPin } from "lucide-react";
+
+// Filled music note and crop-rotate icons (Material Design Icons, Apache 2.0) so the toolbar matches WhatsApp's.
+const NoteIcon = ({ size = 22 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+  </svg>
+);
+const CropRotateIcon = ({ size = 24 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M7.47 21.49C4.2 19.93 1.86 16.76 1.5 13H0c.51 6.16 5.66 11 11.95 11 .23 0 .44-.02.66-.03L8.8 20.15l-1.33 1.34zM12.05 0c-.23 0-.44.02-.66.04l3.81 3.81 1.33-1.33C19.8 4.07 22.14 7.24 22.5 11H24c-.51-6.16-5.66-11-11.95-11zM16 14h2V8c0-1.11-.9-2-2-2h-6v2h6v6zm-8 2V4H6v2H4v2h2v8c0 1.1.89 2 2 2h8v2h2v-2h2v-2H8z" />
+  </svg>
+);
 
 const COLORS = ["#FFFFFF", "#000000", "#FF3B30", "#FFCC00", "#34C759", "#0A84FF", "#BF5AF2", "#FF2D92"];
 const EMOJIS = ["😂", "😍", "🔥", "🥰", "😎", "🙏", "👍", "❤️", "🎉", "😭", "😮", "💯", "✨", "🤝", "😘", "🥳"];
 
 // Photo editor like WhatsApp's status editor: draw, add text, stickers, rotate.
 // Everything stays editable on screen and is flattened into the picture on send.
-const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, onMusic, hasSong, onRotated }, ref) {
+const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, onMusic, hasSong, onRotated, onLocation, onModeChange }, ref) {
   const stage = useRef(null);
   const imgEl = useRef(null);
   const [mode, setMode] = useState(null); // null | draw | text | sticker
@@ -16,6 +28,11 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
   const [draft, setDraft] = useState("");
   const drawing = useRef(null);
   const dragging = useRef(null);
+
+  // Lets the screen hide its bottom bar while drawing / picking stickers / typing, like WhatsApp.
+  useEffect(() => {
+    onModeChange?.(mode);
+  }, [mode, onModeChange]);
 
   const rel = (e) => {
     const r = stage.current.getBoundingClientRect();
@@ -125,12 +142,12 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
     },
   }));
 
-  const tb = "size-12 rounded-full bg-black/45 backdrop-blur text-white flex items-center justify-center active:bg-black/65";
+  const tb = "size-12 rounded-full bg-[#101418] text-white flex items-center justify-center active:bg-[#1c242b]";
 
   return (
     <div className="relative flex-1 min-h-0 bg-black flex items-center justify-center overflow-hidden select-none">
       <div ref={stage} className="relative inline-flex max-w-full max-h-full">
-        <img ref={imgEl} src={src} alt="Status preview" draggable={false} className="block max-w-full max-h-[calc(100dvh-210px)] object-contain" />
+        <img ref={imgEl} src={src} alt="Status preview" draggable={false} className="block max-w-full max-h-[calc(100dvh-440px)] object-contain" />
 
         <svg
           className={`absolute inset-0 w-full h-full ${mode === "draw" ? "cursor-crosshair" : "pointer-events-none"}`}
@@ -184,19 +201,19 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
       </div>
 
       {/* Top toolbar */}
-      <div className="absolute top-0 inset-x-0 flex items-center gap-2 px-3 pt-[calc(8px+env(safe-area-inset-top))] bg-gradient-to-b from-black/60 to-transparent pb-6">
+      <div className="absolute top-0 inset-x-0 flex items-center gap-1.5 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
         <button onClick={onClose} aria-label="Close" className={tb}>
           <span className="text-[22px] leading-none">✕</span>
         </button>
         <div className="flex-1" />
         <button onClick={onMusic} aria-label="Add music" className={`${tb} ${hasSong ? "!bg-[#21C063] !text-black" : ""}`}>
-          <Music size={22} />
+          <NoteIcon size={22} />
         </button>
         <button onClick={rotate} aria-label="Rotate" className={tb}>
-          <RotateCw size={22} />
+          <CropRotateIcon size={24} />
         </button>
         <button onClick={() => setMode(mode === "sticker" ? null : "sticker")} aria-label="Stickers" className={`${tb} ${mode === "sticker" ? "!bg-white !text-black" : ""}`}>
-          <Smile size={22} />
+          <Sticker size={22} />
         </button>
         <button onClick={() => setMode("text")} aria-label="Add text" className={`${tb} text-[20px] font-medium`}>
           Aa
@@ -208,7 +225,7 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
 
       {/* Draw: colours + undo */}
       {mode === "draw" && (
-        <div className="absolute bottom-3 inset-x-3 flex items-center gap-2 rounded-full bg-black/55 backdrop-blur px-3 py-2">
+        <div className="absolute bottom-[calc(12px+env(safe-area-inset-bottom))] inset-x-3 flex items-center gap-2 rounded-full bg-[#101418] px-3 py-2">
           {COLORS.map((c) => (
             <button key={c} onClick={() => setColor(c)} aria-label={`Colour ${c}`} className={`size-7 rounded-full border-2 ${color === c ? "border-white scale-110" : "border-white/30"}`} style={{ backgroundColor: c }} />
           ))}
@@ -224,7 +241,16 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
 
       {/* Stickers */}
       {mode === "sticker" && (
-        <div className="absolute bottom-3 inset-x-3 rounded-2xl bg-black/70 backdrop-blur p-3 grid grid-cols-8 gap-1">
+        <div className="absolute bottom-[calc(12px+env(safe-area-inset-bottom))] inset-x-3 rounded-2xl bg-[#101418] p-3 grid grid-cols-8 gap-1">
+          <button
+            onClick={() => {
+              setMode(null);
+              onLocation?.();
+            }}
+            className="col-span-8 mb-1 flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2.5 text-left text-[14px] text-white active:bg-white/15"
+          >
+            <MapPin size={20} className="text-[#F15C6D]" /> Location
+          </button>
           {EMOJIS.map((e) => (
             <button key={e} onClick={() => addEmoji(e)} className="text-[26px] leading-none py-1.5 active:scale-90">
               {e}
