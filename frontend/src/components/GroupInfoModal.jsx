@@ -727,6 +727,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           aspectRatio={1}
           lockLabel="Square"
           maxSize={800}
+          variant="whatsapp"
           hint="Drag the frame to move it, drag a corner to resize. Only what's inside becomes the group photo."
           onCancel={() => setCropFile(null)}
           onDone={saveCroppedPhoto}

@@ -310,6 +310,7 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
           initialLocked={false}
           maxSize={1600}
           zIndex={170}
+          variant="whatsapp"
           hint="Drag the frame to move it, drag a corner to resize. Only what's inside is kept."
           onCancel={() => setCropFile(null)}
           onDone={applyCrop}

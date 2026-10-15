@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Check } from "lucide-react";
+import { X, Check, RotateCcw } from "lucide-react";
 import { useBackToClose } from "../lib/useBackToClose";
 
 // Full-screen wallpaper cropper. Shows the WHOLE picture; a frame (shaped like
@@ -15,7 +15,8 @@ const screenAspect = () => {
   return w >= 1024 ? Math.max(0.5, (w - 472) / h) : w / h;
 };
 
-const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", aspectRatio, lockLabel = "Fit my screen", maxSize = 1600, hint, initialLocked = true, zIndex = 120 }) => {
+const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", aspectRatio, lockLabel = "Fit my screen", maxSize = 1600, hint, initialLocked = true, zIndex = 120, variant = "default" }) => {
+  const wa = variant === "whatsapp"; // WhatsApp-style: bracket frame, edge handles, Cancel · rotate · Done bar
   useBackToClose(true, onCancel);
   const cancelRef = useRef(onCancel);
   cancelRef.current = onCancel;
@@ -26,6 +27,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const [locked, setLocked] = useState(initialLocked);
   const [box, setBox] = useState(null); // crop box in stage px
   const drag = useRef(null);
+  const [resetN, setResetN] = useState(0); // bumps to re-frame after a rotate
   const ar = useRef(aspectRatio || screenAspect());
 
   // Load the picture
@@ -63,6 +65,10 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const fitKey = fit ? `${Math.round(fit.w)}x${Math.round(fit.h)}` : "";
   useEffect(() => {
     if (!fit) return;
+    if (wa && !initialLocked) {
+      setBox({ x: fit.x, y: fit.y, w: fit.w, h: fit.h });
+      return;
+    }
     let w = fit.w;
     let h = w / ar.current;
     if (h > fit.h) {
@@ -71,7 +77,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
     }
     setBox({ x: fit.x + (fit.w - w) / 2, y: fit.y + (fit.h - h) / 2, w, h });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fitKey]);
+  }, [fitKey, resetN]);
 
   const toggleLock = (lock) => {
     setLocked(lock);
@@ -110,6 +116,25 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
         const x = Math.min(Math.max(b.x + p.x - d.start.x, fit.x), fit.x + fit.w - b.w);
         const y = Math.min(Math.max(b.y + p.y - d.start.y, fit.y), fit.y + fit.h - b.h);
         setBox({ ...b, x, y });
+        return;
+      }
+      if (d.mode.length === 1) {
+        // Edge resize (free mode): only that side moves.
+        let { x, y, w, h } = b;
+        if (d.mode === "l") {
+          const nx = Math.min(Math.max(p.x, fit.x), b.x + b.w - MIN);
+          x = nx;
+          w = b.x + b.w - nx;
+        } else if (d.mode === "r") {
+          w = Math.min(Math.max(p.x - b.x, MIN), fit.x + fit.w - b.x);
+        } else if (d.mode === "t") {
+          const ny = Math.min(Math.max(p.y, fit.y), b.y + b.h - MIN);
+          y = ny;
+          h = b.y + b.h - ny;
+        } else {
+          h = Math.min(Math.max(p.y - b.y, MIN), fit.y + fit.h - b.y);
+        }
+        setBox({ x, y, w, h });
         return;
       }
       // Corner resize: the opposite corner stays put.
@@ -152,6 +177,25 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
     onDone(c.toDataURL("image/jpeg", 0.82));
   };
 
+  const rotate = () => {
+    if (!img) return;
+    const c = document.createElement("canvas");
+    c.width = img.naturalHeight;
+    c.height = img.naturalWidth;
+    const ctx = c.getContext("2d");
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    const u = c.toDataURL("image/jpeg", 0.92);
+    const im = new Image();
+    im.onload = () => {
+      setUrl(u);
+      setImg(im);
+      setResetN((n) => n + 1);
+    };
+    im.src = u;
+  };
+
   const handle = (mode, style) => (
     <span
       key={mode}
@@ -159,21 +203,28 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
       className="absolute size-9 flex items-center justify-center touch-none"
       style={style}
     >
-      <span className="size-4 rounded-full bg-white shadow ring-2 ring-black/30" />
+      {!wa && <span className="size-4 rounded-full bg-white shadow ring-2 ring-black/30" />}
     </span>
+  );
+  const edge = (mode, style) => (
+    <span key={mode} onPointerDown={(e) => startDrag(mode, e)} className="absolute w-11 h-11 touch-none" style={style} />
   );
 
   return (
     <div className="wa-dark fixed inset-0 bg-black text-white flex flex-col select-none" style={{ zIndex }}>
-      <div className="flex items-center gap-4 px-4 h-14 shrink-0">
-        <button onClick={onCancel} aria-label="Cancel" className="size-10 flex items-center justify-center">
-          <X size={24} />
-        </button>
-        <h3 className="flex-1 text-[16px]">{title}</h3>
-        <button onClick={done} disabled={!box} className="h-10 px-5 rounded-full bg-[#21C063] text-black font-medium flex items-center gap-1.5 disabled:opacity-40">
-          <Check size={18} /> Done
-        </button>
-      </div>
+      {wa ? (
+        <div className="h-[calc(24px+env(safe-area-inset-top))] shrink-0" />
+      ) : (
+        <div className="flex items-center gap-4 px-4 h-14 shrink-0">
+          <button onClick={onCancel} aria-label="Cancel" className="size-10 flex items-center justify-center">
+            <X size={24} />
+          </button>
+          <h3 className="flex-1 text-[16px]">{title}</h3>
+          <button onClick={done} disabled={!box} className="h-10 px-5 rounded-full bg-[#21C063] text-black font-medium flex items-center gap-1.5 disabled:opacity-40">
+            <Check size={18} /> Done
+          </button>
+        </div>
+      )}
 
       <div
         ref={stageRef}
@@ -196,8 +247,25 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
             {/* Dim everything outside the frame */}
             <div
               className="absolute pointer-events-none"
-              style={{ left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)", border: "2px solid #fff" }}
+              style={{ left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)", border: wa ? "1px solid rgba(255,255,255,.55)" : "2px solid #fff" }}
             >
+              {wa && (
+                <>
+                  {/* thick corner brackets + short edge bars, like WhatsApp */}
+                  <span className="absolute -left-px -top-px w-6 h-6 border-l-[3px] border-t-[3px] border-white" />
+                  <span className="absolute -right-px -top-px w-6 h-6 border-r-[3px] border-t-[3px] border-white" />
+                  <span className="absolute -left-px -bottom-px w-6 h-6 border-l-[3px] border-b-[3px] border-white" />
+                  <span className="absolute -right-px -bottom-px w-6 h-6 border-r-[3px] border-b-[3px] border-white" />
+                  {!locked && (
+                    <>
+                      <span className="absolute left-1/2 -top-px -translate-x-1/2 w-8 h-[3px] bg-white" />
+                      <span className="absolute left-1/2 -bottom-px -translate-x-1/2 w-8 h-[3px] bg-white" />
+                      <span className="absolute top-1/2 -left-px -translate-y-1/2 h-8 w-[3px] bg-white" />
+                      <span className="absolute top-1/2 -right-px -translate-y-1/2 h-8 w-[3px] bg-white" />
+                    </>
+                  )}
+                </>
+              )}
               <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-40">
                 {Array.from({ length: 9 }).map((_, i) => (
                   <span key={i} className="border border-white/50" style={{ borderWidth: "0.5px" }} />
@@ -209,6 +277,10 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
               className="absolute cursor-move touch-none"
               style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
             />
+            {wa && !locked && edge("l", { left: box.x - 18, top: box.y + box.h / 2 - 22 })}
+            {wa && !locked && edge("r", { left: box.x + box.w - 18, top: box.y + box.h / 2 - 22 })}
+            {wa && !locked && edge("t", { left: box.x + box.w / 2 - 22, top: box.y - 18 })}
+            {wa && !locked && edge("b", { left: box.x + box.w / 2 - 22, top: box.y + box.h - 18 })}
             {handle("tl", { left: box.x - 18, top: box.y - 18 })}
             {handle("tr", { left: box.x + box.w - 18, top: box.y - 18 })}
             {handle("bl", { left: box.x - 18, top: box.y + box.h - 18 })}
@@ -217,6 +289,19 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
         )}
       </div>
 
+      {wa ? (
+        <div className="shrink-0 h-[72px] pb-[env(safe-area-inset-bottom)] box-content flex items-center justify-between px-8">
+          <button onClick={onCancel} className="text-[16px] text-[#21C063] py-3 pr-4">
+            Cancel
+          </button>
+          <button onClick={rotate} aria-label="Rotate" className="size-11 flex items-center justify-center text-white">
+            <RotateCcw size={26} />
+          </button>
+          <button onClick={done} disabled={!box} className="text-[16px] text-[#21C063] py-3 pl-4 disabled:opacity-40">
+            Done
+          </button>
+        </div>
+      ) : (
       <div className="shrink-0 px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom))] flex flex-col items-center gap-2">
         <div className="flex gap-2">
           {[
@@ -234,6 +319,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
         </div>
         <p className="text-[10.5px] text-white/60 text-center">Drag the frame to move it, drag a corner to resize. {hint || "Only what&apos;s inside becomes your wallpaper."}</p>
       </div>
+      )}
     </div>
   );
 };
