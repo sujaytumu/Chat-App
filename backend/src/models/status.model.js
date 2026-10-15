@@ -13,6 +13,11 @@ const statusSchema = new mongoose.Schema(
       size: { type: Number },
       mime: { type: String },
     },
+    // Video only: the part of the clip to play (seconds). Set when the video is longer than 90s.
+    trim: {
+      start: { type: Number },
+      end: { type: Number },
+    },
     // A song picked from the person's device, played while the status is open
     song: {
       url: { type: String },

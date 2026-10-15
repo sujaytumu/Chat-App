@@ -8,10 +8,11 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const MAX_MEDIA_BASE64 = 13 * 1024 * 1024;
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 90;
 
 export const createStatus = async (req, res) => {
   try {
-    const { type, content, backgroundColor, caption, file, song, location, font } = req.body;
+    const { type, content, backgroundColor, caption, file, song, location, font, trim } = req.body;
     const myId = req.user._id;
 
     if (!["text", "image", "video", "audio", "file"].includes(type) || !content) {
@@ -46,6 +47,16 @@ export const createStatus = async (req, res) => {
       });
       doc.content = uploaded.url;
       doc.file = { name: uploaded.name, size: uploaded.size, mime: file?.mime || mime };
+    }
+
+    if (type === "video" && trim) {
+      const start = Number(trim.start);
+      const end = Number(trim.end);
+      if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end - start <= MAX_VIDEO_SECONDS + 0.5) {
+        doc.trim = { start, end };
+      } else {
+        return res.status(400).json({ error: "Status videos can be at most 90 seconds" });
+      }
     }
 
     if (song?.data) {

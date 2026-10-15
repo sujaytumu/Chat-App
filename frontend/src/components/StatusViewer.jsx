@@ -248,7 +248,20 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             autoPlay
             playsInline
             className="max-w-full max-h-full object-contain"
-            onLoadedMetadata={(e) => setMediaMs(Math.round((e.currentTarget.duration || 0) * 1000))}
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              const t = current.trim;
+              if (t && t.end > t.start) {
+                el.currentTime = t.start; // long video: play only the part the poster chose
+                setMediaMs(Math.round((t.end - t.start) * 1000));
+              } else {
+                setMediaMs(Math.round((el.duration || 0) * 1000));
+              }
+            }}
+            onTimeUpdate={(e) => {
+              const t = current.trim;
+              if (t && e.currentTarget.currentTime >= t.end) next();
+            }}
             onEnded={next}
           />
         )}
