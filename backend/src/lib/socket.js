@@ -384,7 +384,7 @@ io.on("connection", (socket) => {
     }
     const logId = activeCallLogs.get(pairKey(userId, toUserId));
     if (logId) {
-      CallLog.findByIdAndUpdate(logId, { status: "answered" }).catch(() => {});
+      CallLog.findByIdAndUpdate(logId, { status: "answered", answeredAt: new Date() }).catch(() => {});
     }
   });
 
@@ -455,6 +455,29 @@ io.on("connection", (socket) => {
     activeCallLogs.delete(key);
   });
 
+  // A client reports roughly how much data its call used (bytes sent + received) once it ends.
+  // Best-effort only: it never touches the call itself, and old clients simply don't send it.
+  socket.on("callUsage", async ({ peerId, bytes } = {}) => {
+    try {
+      const n = Math.round(Number(bytes));
+      if (!peerId || !Number.isFinite(n) || n <= 0 || n > 5e9) return;
+      await CallLog.findOneAndUpdate(
+        {
+          status: "answered",
+          dataBytes: 0,
+          $or: [
+            { callerId: userId, calleeId: peerId },
+            { callerId: peerId, calleeId: userId },
+          ],
+        },
+        { $set: { dataBytes: n } },
+        { sort: { createdAt: -1 } }
+      );
+    } catch (err) {
+      console.log("Error saving call usage:", err.message);
+    }
+  });
+
   socket.on("endCall", async ({ toUserId }) => {
     clearHeldCall(toUserId, userId);
     const receiverSocketId = roomFor(toUserId);
@@ -486,7 +509,7 @@ io.on("connection", (socket) => {
               })
               .catch(() => {});
           }
-          const durationSeconds = wasAnswered ? Math.round((endedAt - log.startedAt) / 1000) : 0;
+          const durationSeconds = wasAnswered ? Math.round((endedAt - (log.answeredAt || log.startedAt)) / 1000) : 0;
           await CallLog.findByIdAndUpdate(logId, {
             status: wasAnswered ? "answered" : "missed",
             endedAt,

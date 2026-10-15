@@ -84,9 +84,12 @@ function attachConnectionWatchdog(peerConnection, get) {
     try {
       const stats = await peerConnection.getStats();
       let bytes = 0;
+      let sentBytes = 0;
       stats.forEach((r) => {
         if (r.type === "inbound-rtp" && !r.isRemote) bytes += r.bytesReceived || 0;
+        else if (r.type === "outbound-rtp" && !r.isRemote) sentBytes += r.bytesSent || 0;
       });
+      if (bytes + sentBytes > callUsageBytes) callUsageBytes = bytes + sentBytes;
       if (bytes > lastBytes) {
         stalls = 0;
         if (kicked) {
@@ -177,6 +180,7 @@ function emitWithRetry(socket, event, payload, { timeoutMs = 4000, retries = 1 }
 }
 
 let pc = null;
+let callUsageBytes = 0; // approx. bytes sent + received in the current call (sampled every few seconds)
 let pendingCandidates = [];
 let voiceOriginShare = false; // screen share started from a voice call (no camera to go back to)
 let cameraTrack = null; // kept so screen share can revert back to it
@@ -533,6 +537,17 @@ export const useCallStore = create((set, get) => ({
   },
 
   resetCall: () => {
+    // Tell the server roughly how much data this call used (best-effort, never blocks the hang-up).
+    try {
+      const st = get();
+      const sock = useAuthStore.getState().socket;
+      if (sock && st.callStartedAt && st.remoteUser && callUsageBytes > 0) {
+        sock.emit("callUsage", { peerId: st.remoteUser._id, bytes: Math.round(callUsageBytes) });
+      }
+    } catch {
+      /* ignore */
+    }
+    callUsageBytes = 0;
     get().stopRingtone();
     voiceOriginShare = false;
     if (pc) {
