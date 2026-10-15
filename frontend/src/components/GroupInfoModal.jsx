@@ -26,6 +26,7 @@ import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const GroupEmojiPhoto = lazy(() => import("./GroupEmojiPhoto"));
 const GroupInviteSheet = lazy(() => import("./GroupInviteSheet"));
+const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
 
 const TABS = ["Members", "Media", "Settings"];
 
@@ -82,6 +83,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [showPerms, setShowPerms] = useState(false);
   const [memberMenu, setMemberMenu] = useState(null);
   const [memberMenuUp, setMemberMenuUp] = useState(false);
+  const [viewMember, setViewMember] = useState(null);
   const [showInvite, setShowInvite] = useState(false);
   const [showMute, setShowMute] = useState(false);
   const [showReport, setShowReport] = useState(false);
@@ -122,6 +124,22 @@ const GroupInfoModal = ({ group, onClose }) => {
     onClose();
     if (groupCallActive) joinGroupCall(group._id, { name: group.name, groupPic: group.groupPic });
     else startGroupCall(group, type);
+  };
+  // Member options (same as WhatsApp): message / call / view for everyone, admin tools for admins.
+  const memberUser = (member) => users.find((u) => u._id === member._id) || member;
+  const messageMember = (member) => {
+    setMemberMenu(null);
+    onClose();
+    useChatStore.getState().setSelectedChat({ type: "direct", data: memberUser(member) });
+  };
+  const callMember = (member, type) => {
+    setMemberMenu(null);
+    if (callBusy) {
+      toast.error("You're already on a call");
+      return;
+    }
+    onClose();
+    setTimeout(() => useCallStore.getState().startCall(memberUser(member), type), 150);
   };
   const handleAdd = async () => {
     if (toAdd.length === 0) return;
@@ -472,7 +490,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                     {memberIsAdmin && (
                       <span className="text-[13px] px-2.5 py-1 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
                     )}
-                    {isAdmin && !isYou && (
+                    {!isYou && (
                       <div className="relative shrink-0">
                         <button
                           onClick={(e) => {
@@ -491,6 +509,26 @@ const GroupInfoModal = ({ group, onClose }) => {
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setMemberMenu(null)} />
                             <div className={`absolute right-0 ${memberMenuUp ? "bottom-full mb-1" : "top-full"} z-40 w-56 bg-wa-pop rounded-2xl shadow-2xl py-2`}>
+                              <button className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate" onClick={() => messageMember(member)}>
+                                Message {member.fullName}
+                              </button>
+                              <button className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "audio")}>
+                                Voice call {member.fullName}
+                              </button>
+                              <button className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "video")}>
+                                Video call {member.fullName}
+                              </button>
+                              <button
+                                className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5 truncate"
+                                onClick={() => {
+                                  setMemberMenu(null);
+                                  setViewMember(memberUser(member));
+                                }}
+                              >
+                                View {member.fullName}
+                              </button>
+                              {isAdmin && (
+                                <>
                               <button
                                 className="w-full text-left px-5 py-3 text-[15px] hover:bg-white/5"
                                 onClick={() => {
@@ -509,6 +547,8 @@ const GroupInfoModal = ({ group, onClose }) => {
                               >
                                 <UserMinus size={18} /> Remove from group
                               </button>
+                                </>
+                              )}
                             </div>
                           </>
                         )}
@@ -659,6 +699,11 @@ const GroupInfoModal = ({ group, onClose }) => {
         </Suspense>
       )}
       {viewPhoto && group.groupPic && <ImageLightbox src={group.groupPic} onClose={() => setViewPhoto(false)} />}
+      {viewMember && (
+        <Suspense fallback={null}>
+          <ContactInfoModal user={viewMember} status={viewMember.about || ""} onClose={() => setViewMember(null)} />
+        </Suspense>
+      )}
     </div>
   );
 };
