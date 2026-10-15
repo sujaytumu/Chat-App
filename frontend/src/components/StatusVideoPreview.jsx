@@ -19,6 +19,7 @@ const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children }) => 
   const [now, setNow] = useState(0);
   const [total, setTotal] = useState(duration || 0);
   const [failed, setFailed] = useState(false);
+  const [shown, setShown] = useState(false); // hide the browser's grey play placeholder until a real frame exists
 
   const start = trim ? trim.start : 0;
   const end = trim ? trim.end : total;
@@ -69,7 +70,8 @@ const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children }) => 
         preload="auto"
         playsInline
         muted={muted}
-        className="w-full h-full object-contain"
+        className={`w-full h-full object-contain ${shown ? "opacity-100" : "opacity-0"}`}
+        onLoadedData={() => setShown(true)}
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
           if (Number.isFinite(d) && d > 0) {

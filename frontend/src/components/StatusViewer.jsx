@@ -43,6 +43,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const current = list[index];
   const [mediaMs, setMediaMs] = useState(0); // length of the current video / audio
   const mediaEl = useRef(null);
+  const [videoReady, setVideoReady] = useState(false); // first frame decoded: until then the video stays hidden (no grey placeholder)
+  const [showSpinner, setShowSpinner] = useState(false);
+  const readyRef = useRef(false);
+  const advancedRef = useRef(null); // status id already moved on from (end / trim end can both fire)
   const songEl = useRef(null);
   const [songBlocked, setSongBlocked] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -56,13 +60,30 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
     if (!isOwn && current) axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
     setProgress(0);
     setMediaMs(0);
+    setVideoReady(false);
+    setShowSpinner(false);
+    readyRef.current = false;
+    advancedRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?._id]);
+
+  readyRef.current = videoReady;
+  // A tiny spinner only if the video is genuinely slow to arrive (never flashes for a fast one).
+  useEffect(() => {
+    if (current?.type !== "video" || videoReady) return;
+    const id = setTimeout(() => setShowSpinner(true), 900);
+    return () => clearTimeout(id);
+  }, [current?._id, current?.type, videoReady]);
 
   const next = useCallback(() => {
     if (index >= list.length - 1) onClose();
     else setIndex((i) => i + 1);
   }, [index, list.length, onClose]);
+  const advanceOnce = () => {
+    if (advancedRef.current === current?._id) return;
+    advancedRef.current = current?._id;
+    next();
+  };
   const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
 
   // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
@@ -76,6 +97,16 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       const dt = now - last.current;
       last.current = now;
       setProgress((p) => {
+        if (current.type === "video") {
+          // Follow the video itself: nothing moves until the first frame is showing.
+          const el = mediaEl.current;
+          const t = current.trim;
+          if (!el || !readyRef.current) return p;
+          const st = t ? t.start : 0;
+          const len = t ? t.end - t.start : el.duration;
+          if (!len || !Number.isFinite(len)) return p;
+          return Math.min(1, Math.max(0, (el.currentTime - st) / len));
+        }
         const isMedia = current.type === "video" || current.type === "audio";
         const total = isMedia ? Math.max(mediaMs, 1000) : DURATION_MS;
         const np = p + dt / total;
@@ -242,28 +273,39 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
         )}
         {current.type === "image" && <img src={optimizeImage(current.content, 1080)} decoding="async" alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
         {current.type === "video" && (
-          <video
-            ref={mediaEl}
-            src={current.content}
-            autoPlay
-            playsInline
-            className="max-w-full max-h-full object-contain"
-            onLoadedMetadata={(e) => {
-              const el = e.currentTarget;
-              const t = current.trim;
-              if (t && t.end > t.start) {
-                el.currentTime = t.start; // long video: play only the part the poster chose
-                setMediaMs(Math.round((t.end - t.start) * 1000));
-              } else {
-                setMediaMs(Math.round((el.duration || 0) * 1000));
-              }
-            }}
-            onTimeUpdate={(e) => {
-              const t = current.trim;
-              if (t && e.currentTarget.currentTime >= t.end) next();
-            }}
-            onEnded={next}
-          />
+          <>
+            <video
+              ref={mediaEl}
+              key={current._id}
+              src={current.content}
+              autoPlay
+              playsInline
+              preload="auto"
+              className={`w-full h-full object-contain bg-black ${videoReady ? "opacity-100" : "opacity-0"}`}
+              onLoadedMetadata={(e) => {
+                const el = e.currentTarget;
+                const t = current.trim;
+                if (t && t.end > t.start) {
+                  el.currentTime = t.start; // long video: play only the part the poster chose
+                  setMediaMs(Math.round((t.end - t.start) * 1000));
+                } else {
+                  setMediaMs(Math.round((el.duration || 0) * 1000));
+                }
+              }}
+              onLoadedData={() => setVideoReady(true)}
+              onPlaying={() => setVideoReady(true)}
+              onTimeUpdate={(e) => {
+                const t = current.trim;
+                if (t && e.currentTarget.currentTime >= t.end) advanceOnce();
+              }}
+              onEnded={advanceOnce}
+            />
+            {!videoReady && showSpinner && (
+              <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <Loader2 size={34} className="animate-spin text-white/80" />
+              </span>
+            )}
+          </>
         )}
         {current.type === "audio" && (
           <div className="flex flex-col items-center gap-5 px-8 text-center">
