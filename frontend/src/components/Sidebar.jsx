@@ -21,7 +21,7 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { Lock } from "lucide-react";
+import { Lock, Megaphone } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import { useDraftStore } from "../store/useDraftStore";
@@ -42,6 +42,7 @@ import {
 } from "./icons/WaIcons";
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
+const BroadcastModal = lazy(() => import("./BroadcastModal"));
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -108,6 +109,7 @@ const Sidebar = () => {
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const listRef = useScrollMemory("chats");
   useBackToClose(showMenu, () => setShowMenu(false));
@@ -532,6 +534,15 @@ const Sidebar = () => {
               >
                 <UsersRound size={18} className="text-wa-icon" /> New group
               </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowBroadcast(true);
+                }}
+              >
+                <Megaphone size={18} className="text-wa-icon" /> New broadcast
+              </button>
               <Link to="/profile" className={menuItem} onClick={() => setShowMenu(false)}>
                 <UserRound size={18} className="text-wa-icon" /> Profile
               </Link>
@@ -881,6 +892,12 @@ const Sidebar = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showBroadcast && (
+        <Suspense fallback={null}>
+          <BroadcastModal onClose={() => setShowBroadcast(false)} />
+        </Suspense>
       )}
 
       {showCreateGroup && (

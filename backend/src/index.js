@@ -17,6 +17,7 @@ import pushRoutes from "./routes/push.route.js";
 import callRoutes from "./routes/call.route.js";
 import statusRoutes from "./routes/status.route.js";
 import scheduledRoutes from "./routes/scheduled.route.js";
+import broadcastRoutes from "./routes/broadcast.route.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { app, server } from "./lib/socket.js";
 import { configureWebPush } from "./lib/webPush.js";
@@ -85,6 +86,7 @@ app.use("/api/push", pushRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/scheduled", scheduledRoutes);
+app.use("/api/broadcasts", broadcastRoutes);
 
 // Tiny wake-up / keep-alive endpoint (no database, no auth).
 app.get("/api/health", (req, res) => {
