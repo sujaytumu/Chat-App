@@ -42,14 +42,15 @@ const fmtDuration = (s) => {
 const describe = (call, myId) => {
   const outgoing = call.callerId._id === myId;
   const answered = call.status === "answered";
-  const ok = answered || (call.status === "ringing" && false);
+  // Incoming calls are always shown green (even when not picked up); only unanswered outgoing calls are red.
+  const ok = outgoing ? answered : true;
   return {
     outgoing,
     ok,
     label: outgoing
       ? answered ? "Outgoing" : call.status === "declined" ? "Declined" : "No answer"
       : answered ? "Incoming" : call.status === "declined" ? "Declined" : "Missed",
-    missedIncoming: !outgoing && !answered,
+    missedIncoming: false,
   };
 };
 
