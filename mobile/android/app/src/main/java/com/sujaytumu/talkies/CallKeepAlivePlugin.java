@@ -4,6 +4,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.os.Build;
 
 import androidx.core.content.ContextCompat;
@@ -70,6 +73,38 @@ public class CallKeepAlivePlugin extends Plugin {
                 }
             }
         } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    /** JS: TalkiesCall.batteryStatus() -> { unrestricted } — can the app run in the background freely? */
+    @PluginMethod
+    public void batteryStatus(PluginCall call) {
+        boolean ok = true;
+        try {
+            PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            if (pm != null && Build.VERSION.SDK_INT >= 23) ok = pm.isIgnoringBatteryOptimizations(getContext().getPackageName());
+        } catch (Exception ignored) {
+        }
+        JSObject r = new JSObject();
+        r.put("unrestricted", ok);
+        call.resolve(r);
+    }
+
+    /** JS: TalkiesCall.requestBatteryUnrestricted() — opens Android's "allow background" prompt. */
+    @PluginMethod
+    public void requestBatteryUnrestricted(PluginCall call) {
+        try {
+            Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:" + getContext().getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            } catch (Exception ignored) {
+            }
         }
         call.resolve();
     }

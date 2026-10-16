@@ -645,7 +645,8 @@ export const useCallStore = create((set, get) => ({
       set({ isSpeakerOn: !get().isSpeakerOn });
       if (!speakerNoticeShown) {
         speakerNoticeShown = true;
-        toast("This browser can't switch the speaker — your phone decides where call audio plays", {
+        const inApp = !!window.Capacitor?.isNativePlatform?.();
+        toast(inApp ? "Install the latest Talkies app to switch the speaker" : "This browser can't switch the speaker — your phone decides where call audio plays", {
           icon: "🔊",
           duration: 3500,
         });
