@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import { generateToken } from "../lib/utils.js";
+import { generateToken, deviceLabel } from "../lib/utils.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
@@ -37,7 +37,7 @@ export const signup = async (req, res) => {
 
     if (newUser) {
       // generate jwt token here
-      generateToken(newUser._id, res, newUser.tokenVersion || 0);
+      generateToken(newUser._id, res, newUser.tokenVersion || 0, req);
       await newUser.save();
 
       res.status(201).json({
@@ -86,7 +86,7 @@ export const login = async (req, res) => {
       return res.status(200).json({ twoFactorRequired: true, ticket });
     }
 
-    generateToken(user._id, res, user.tokenVersion || 0);
+    generateToken(user._id, res, user.tokenVersion || 0, req);
 
     res.status(200).json({
       _id: user._id,
@@ -110,6 +110,9 @@ export const login = async (req, res) => {
 
 export const logout = (req, res) => {
   try {
+    // This device leaves the Linked devices list
+    const old = req.cookies?.jwt ? jwt.decode(req.cookies.jwt) : null;
+    if (old?.userId && old?.sid) User.updateOne({ _id: old.userId }, { $pull: { sessions: { sid: old.sid } } }).catch(() => {});
     res.cookie("jwt", "", { maxAge: 0 });
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
@@ -181,7 +184,7 @@ export const changePassword = async (req, res) => {
     user.password = await bcrypt.hash(newPassword, salt);
     user.tokenVersion = (user.tokenVersion || 0) + 1; // every other device must sign in again
     await user.save();
-    generateToken(user._id, res, user.tokenVersion);
+    generateToken(user._id, res, user.tokenVersion, req);
     endOtherSessions(user._id);
 
     res.status(200).json({ message: "Password changed" });
@@ -261,7 +264,7 @@ async function endOtherSessions(userId) {
 export const logoutAllDevices = async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(req.user._id, { $inc: { tokenVersion: 1 } }, { new: true }).select("tokenVersion");
-    generateToken(req.user._id, res, user.tokenVersion);
+    generateToken(req.user._id, res, user.tokenVersion, req);
     endOtherSessions(req.user._id);
     res.status(200).json({ message: "Logged out of all other devices" });
   } catch (error) {
@@ -308,6 +311,51 @@ export const deleteAccount = async (req, res) => {
     res.status(200).json({ message: "Account deleted" });
   } catch (error) {
     console.log("Error in deleteAccount controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ---- Linked devices ----
+export const listSessions = async (req, res) => {
+  try {
+    let mySid = req.sid;
+    if (!mySid) {
+      // This device signed in before the list existed: give it a tracked login now (same account, same device)
+      const t = generateToken(req.user._id, res, req.user.tokenVersion || 0, req);
+      mySid = jwt.decode(t)?.sid;
+      await new Promise((r) => setTimeout(r, 150)); // let the new entry land
+    }
+    const user = await User.findById(req.user._id).select("sessions tokenVersion").lean();
+    const tv = user?.tokenVersion || 0;
+    const sessions = (user?.sessions || [])
+      .filter((x) => (x.tv || 0) === tv)
+      .map((x) => ({ sid: x.sid, device: x.device || "Browser", createdAt: x.createdAt, lastActive: x.lastActive, current: x.sid === mySid }))
+      .sort((a, b) => (b.current ? 1 : 0) - (a.current ? 1 : 0) || new Date(b.lastActive) - new Date(a.lastActive));
+    res.status(200).json(sessions);
+  } catch (error) {
+    console.log("Error in listSessions controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+export const endSession = async (req, res) => {
+  try {
+    const { sid } = req.params;
+    if (!sid || sid === req.sid) return res.status(400).json({ message: "Use Log out to leave this device" });
+    await User.updateOne({ _id: req.user._id }, { $pull: { sessions: { sid } } });
+    // Cut that device's live connection, if it has one
+    try {
+      const sockets = await io.in(String(req.user._id)).fetchSockets();
+      sockets.filter((s) => s.data.sid === sid).forEach((s) => {
+        s.emit("forceLogout");
+        s.disconnect(true);
+      });
+    } catch {
+      /* it signs out on its next request anyway */
+    }
+    res.status(200).json({ message: "Device logged out" });
+  } catch (error) {
+    console.log("Error in endSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };

@@ -64,7 +64,7 @@ export const loginWithTwoFactor = async (req, res) => {
     }
     clearFails(user._id);
     await user.save();
-    generateToken(user._id, res, user.tokenVersion || 0);
+    generateToken(user._id, res, user.tokenVersion || 0, req);
     res.status(200).json({
       _id: user._id,
       fullName: user.fullName,

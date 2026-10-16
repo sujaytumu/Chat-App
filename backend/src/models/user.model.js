@@ -68,6 +68,11 @@ const userSchema = new mongoose.Schema(
     },
     // People I have blocked (they can't message or call me; I can't message them).
     blockedUsers: { type: [mongoose.Schema.Types.ObjectId], default: [] },
+    // Signed-in devices ("Linked devices"): one entry per login, matched by the sid inside the login cookie
+    sessions: {
+      type: [{ _id: false, sid: String, tv: Number, device: String, createdAt: Date, lastActive: Date }],
+      default: [],
+    },
     // Chat lists shown as filter chips: the built-in "favourites" list plus the
     // user's own lists. Each holds chat keys ("d:<id>" / "g:<id>").
     chatLists: {

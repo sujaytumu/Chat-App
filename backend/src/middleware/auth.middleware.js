@@ -29,6 +29,20 @@ export const protectRoute = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized - Session ended" });
     }
 
+    // A login that was removed from "Linked devices" is signed out (older logins carry no sid and stay valid)
+    if (decoded.sid) {
+      const mine = (user.sessions || []).find((x) => x.sid === decoded.sid);
+      if (!mine && Date.now() / 1000 - (decoded.iat || 0) > 20) { // (a brand-new login may still be being recorded)
+        res.cookie("jwt", "", { maxAge: 0 });
+        return res.status(401).json({ message: "Unauthorized - Session ended" });
+      }
+      req.sid = decoded.sid;
+      // keep "last active" fresh, at most every 5 minutes
+      if (mine && (!mine.lastActive || Date.now() - new Date(mine.lastActive).getTime() > 5 * 60 * 1000)) {
+        User.updateOne({ _id: user._id, "sessions.sid": decoded.sid }, { $set: { "sessions.$.lastActive": new Date() } }).catch(() => {});
+      }
+    }
+
     req.user = user;
 
     next();
