@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle } from "lucide-react";
+import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
@@ -49,6 +49,7 @@ const ProfilePage = () => {
 
   const rows = [
     { icon: KeyRound, title: "Account", sub: "Name, about, password, two-step verification", to: "/settings/account" },
+    { icon: Smartphone, title: "Linked devices", sub: "Phones and browsers signed in to your account", to: "/settings/devices" },
     { icon: Lock, title: "Privacy", sub: "Read receipts, typing, blocked contacts", to: "/settings/privacy" },
     { icon: Star, title: "Starred messages", sub: "Messages you've saved", to: "/starred" },
     { icon: MessageSquareText, title: "Chats", sub: "Enter key, archive, chat history", to: "/settings/chats" },

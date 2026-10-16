@@ -48,6 +48,7 @@ const AccountPage = more("AccountPage");
 const StarredPage = more("StarredPage");
 const PrivacyPage = more("PrivacyPage");
 const TwoStepPage = more("TwoStepPage");
+const LinkedDevicesPage = more("LinkedDevicesPage");
 const ChatsSettingsPage = more("ChatsSettingsPage");
 const StoragePage = more("StoragePage");
 const AccessibilityPage = more("AccessibilityPage");
@@ -243,6 +244,10 @@ const App = () => {
           <Route
             path="/settings/two-step"
             element={authUser ? <MainLayout><TwoStepPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/devices"
+            element={authUser ? <MainLayout><LinkedDevicesPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/settings/privacy"

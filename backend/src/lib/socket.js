@@ -185,11 +185,13 @@ io.use(async (socket, next) => {
       .find((c) => c.startsWith("jwt="));
     if (!pair) return next(new Error("unauthorized"));
     const decoded = jwt.verify(decodeURIComponent(pair.slice(4)), process.env.JWT_SECRET);
-    const user = await User.findById(decoded.userId).select("fullName profilePic privacy blockedUsers tokenVersion deleted").lean();
+    const user = await User.findById(decoded.userId).select("fullName profilePic privacy blockedUsers tokenVersion deleted sessions").lean();
     // Signed out everywhere / deleted since this login was issued -> no realtime either
     if (!user || user.deleted || (decoded.tv || 0) !== (user.tokenVersion || 0)) return next(new Error("unauthorized"));
+    if (decoded.sid && Date.now() / 1000 - (decoded.iat || 0) > 20 && !(user.sessions || []).some((x) => x.sid === decoded.sid)) return next(new Error("unauthorized"));
     setPrivacyCache(user._id, user);
     socket.data.userId = String(user._id);
+    socket.data.sid = decoded.sid || null;
     // Trusted identity shown to the other side of a call
     socket.data.profile = { _id: String(user._id), fullName: user.fullName, profilePic: user.profilePic };
     next();

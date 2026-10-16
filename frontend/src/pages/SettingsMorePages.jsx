@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Loader2, Camera, ExternalLink, RefreshCw } from "lucide-react";
+import { Loader2, Camera, ExternalLink, RefreshCw, Smartphone, Monitor } from "lucide-react";
 import toast from "react-hot-toast";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import Avatar from "../components/Avatar";
@@ -874,3 +874,117 @@ export const HelpPage = () => {
 };
 
 export default AccountPage;
+
+/* ---------------- Linked devices ---------------- */
+const sinceText = (d) => {
+  if (!d) return "";
+  const m = Math.round((Date.now() - new Date(d).getTime()) / 60000);
+  if (m < 2) return "Active now";
+  if (m < 60) return `Last active ${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `Last active ${h} hr ago`;
+  return `Last active ${new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+};
+
+export const LinkedDevicesPage = () => {
+  const [list, setList] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [confirm, setConfirm] = useState(null);
+
+  const load = () =>
+    axiosInstance
+      .get("/auth/sessions")
+      .then((r) => setList(r.data))
+      .catch(() => setList([]));
+  useEffect(() => {
+    load();
+  }, []);
+
+  const logout = async (sid) => {
+    setBusy(sid);
+    try {
+      await axiosInstance.delete(`/auth/sessions/${sid}`);
+      toast.success("Device logged out");
+      setConfirm(null);
+      await load();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Couldn't log that device out");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const me = list?.find((x) => x.current);
+  const others = (list || []).filter((x) => !x.current);
+  const Icon = (d) => (/Android|iPhone|app/i.test(d) ? Smartphone : Monitor);
+
+  return (
+    <SettingsShell title="Linked devices" back="/profile">
+      {!list ? (
+        <p className="text-center text-wa-muted py-10">
+          <Loader2 className="animate-spin inline" size={18} />
+        </p>
+      ) : (
+        <>
+          {me && (
+            <div className="px-4 pt-3">
+              <p className="text-[12.5px] text-wa-muted mb-2">This device</p>
+              <div className={`${card} flex items-center gap-3`}>
+                {(() => {
+                  const I = Icon(me.device);
+                  return <I size={26} strokeWidth={1.7} className="text-[#25D366] shrink-0" />;
+                })()}
+                <div className="min-w-0">
+                  <p className="text-[14.5px] text-wa-text truncate">{me.device}</p>
+                  <p className="text-[12px] text-wa-muted">Active now</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="px-4 pt-5">
+            <p className="text-[12.5px] text-wa-muted mb-2">Other devices</p>
+            {others.length === 0 ? (
+              <p className="text-[13px] text-wa-muted py-4">No other devices are signed in to your account.</p>
+            ) : (
+              <div className="space-y-2.5">
+                {others.map((d) => {
+                  const I = Icon(d.device);
+                  return (
+                    <div key={d.sid} className={card}>
+                      <div className="flex items-center gap-3">
+                        <I size={26} strokeWidth={1.7} className="text-wa-muted shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14.5px] text-wa-text truncate">{d.device}</p>
+                          <p className="text-[12px] text-wa-muted">{sinceText(d.lastActive)}</p>
+                        </div>
+                        {confirm !== d.sid && (
+                          <button className="text-[13px] text-red-500 px-2 py-1" onClick={() => setConfirm(d.sid)}>
+                            Log out
+                          </button>
+                        )}
+                      </div>
+                      {confirm === d.sid && (
+                        <div className="flex justify-end gap-2 mt-3">
+                          <button type="button" className="px-4 h-10 rounded-full text-wa-muted hover:bg-wa-pop" onClick={() => setConfirm(null)}>
+                            Cancel
+                          </button>
+                          <button type="button" className={primaryBtn} disabled={busy === d.sid} onClick={() => logout(d.sid)}>
+                            {busy === d.sid ? <Loader2 className="animate-spin" size={18} /> : "Log out device"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <p className="px-5 pt-4 text-[11.5px] text-wa-muted">
+            Devices appear here when you sign in on them. Logging one out signs it out of Talkies right away. Devices signed in before this
+            list existed show up after their next sign-in.
+          </p>
+        </>
+      )}
+    </SettingsShell>
+  );
+};
