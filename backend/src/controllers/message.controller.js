@@ -32,6 +32,28 @@ export async function markDirectDelivered(receiverId, extra = {}) {
   );
 }
 
+// A reply proves the other person got AND opened the chat: everything I sent them before it
+// is delivered and read (blue ticks), exactly like WhatsApp. `replier` just sent something to `other`.
+export async function markImpliedRead(replier, other, upTo = new Date()) {
+  try {
+    const result = await Message.updateMany(
+      { senderId: other, receiverId: replier, groupId: null, createdAt: { $lte: upTo }, $or: [{ seen: false }, { delivered: false }] },
+      { $set: { seen: true, seenAt: upTo, delivered: true, deliveredAt: upTo } }
+    );
+    if (!result.modifiedCount) return;
+    const room = getReceiverSocketId(other);
+    if (!room) return;
+    io.to(room).emit("messagesDelivered", { by: String(replier) });
+    const me = await User.findById(replier).select("privacy").lean();
+    const them = await User.findById(other).select("privacy").lean();
+    if (me?.privacy?.readReceipts !== false && them?.privacy?.readReceipts !== false) {
+      io.to(room).emit("messagesSeen", { by: String(replier), count: result.modifiedCount });
+    }
+  } catch (e) {
+    console.log("Error in markImpliedRead:", e.message);
+  }
+}
+
 // Sidebar: direct-message contacts, each with last message + unread count.
 // Uses two aggregations (not one query per contact) so this stays fast
 // regardless of how many contacts/messages exist.
@@ -159,6 +181,23 @@ export const getMessages = async (req, res) => {
       .lean();
     const messages = page.reverse();
 
+    // Self-heal old chats: anything I sent before their latest reply was obviously read.
+    const lastReply = await Message.findOne({ senderId: userToChatId, receiverId: myId, groupId: null }).sort({ createdAt: -1 }).select("createdAt").lean();
+    if (lastReply) {
+      const cut = new Date(lastReply.createdAt);
+      const stale = messages.filter((m) => String(m.senderId) === String(myId) && (!m.seen || !m.delivered) && new Date(m.createdAt) <= cut);
+      if (stale.length) {
+        for (const m of stale) {
+          m.seen = true;
+          m.delivered = true;
+        }
+        Message.updateMany(
+          { senderId: myId, receiverId: userToChatId, groupId: null, createdAt: { $lte: cut }, $or: [{ seen: false }, { delivered: false }] },
+          { $set: { seen: true, seenAt: cut, delivered: true, deliveredAt: cut } }
+        ).catch(() => {});
+      }
+    }
+
     // Read receipts are two-way, like WhatsApp: if either of us switched them
     // off, neither of us sees "seen" on messages I sent in this chat.
     const other = await User.findById(userToChatId).select("privacy").lean();
@@ -248,6 +287,7 @@ export const sendMessage = async (req, res) => {
     });
 
     await newMessage.save();
+    if (!blockedByThem) markImpliedRead(senderId, receiverId, newMessage.createdAt); // replying = they have read what I sent
     newMessage.set("viewOnceUrl", undefined); // never send the hidden picture's address to anyone
     if (replyTo) await newMessage.populate("replyTo", "text image file senderId");
 

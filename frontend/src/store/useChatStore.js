@@ -788,7 +788,18 @@ export const useChatStore = create((set, get) => ({
     socket.on("newMessage", (message) => {
       // Tell the server this device really has it -> the sender's double tick.
       if (message?._id && message.senderId !== useAuthStore.getState().authUser?._id) socket.emit("messageReceived", { messageId: message._id });
-      const { selectedChat, messages } = get();
+      const { selectedChat, messages: current } = get();
+      const me = useAuthStore.getState().authUser?._id;
+      // They replied, so they have read everything I sent them before it (blue ticks).
+      const replied = message.senderId !== me && !message.groupId;
+      const messages = replied
+        ? current.map((m) => (m.senderId === me && m.receiverId === message.senderId && !m.groupId && (!m.seen || !m.delivered) ? { ...m, seen: true, delivered: true } : m))
+        : current;
+      if (replied) {
+        set((st) => ({
+          users: st.users.map((u) => (u._id === message.senderId && u.lastMessage?.senderId === me ? { ...u, lastMessage: { ...u.lastMessage, seen: true, delivered: true } } : u)),
+        }));
+      }
       const isActiveChat =
         selectedChat?.type === "direct" &&
         (message.senderId === selectedChat.data._id || message.receiverId === selectedChat.data._id);
