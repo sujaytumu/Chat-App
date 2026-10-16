@@ -133,9 +133,11 @@ const CallsPage = () => {
 
   // Back-to-back calls with the same person, same direction/result, same day
   // collapse into one row with a count: "Kavya (3)".
+  const [filter, setFilter] = useState("all"); // all | missed | video
   const rows = useMemo(() => {
     const out = [];
-    for (const c of calls) {
+    const shown = filter === "missed" ? calls.filter((c) => describe(c, myId).missedIncoming) : filter === "video" ? calls.filter((c) => c.callType === "video") : calls;
+    for (const c of shown) {
       const d = describe(c, myId);
       const other = d.outgoing ? c.calleeId : c.callerId;
       const key = `${other._id}|${d.outgoing}|${c.status}|${c.callType}`;
@@ -145,7 +147,7 @@ const CallsPage = () => {
     }
     const q = query.trim().toLowerCase();
     return q ? out.filter((r) => r.other.fullName.toLowerCase().includes(q)) : out;
-  }, [calls, myId, query]);
+  }, [calls, myId, query, filter]);
 
   // Quick-call row: your Favourites first, then people you called most recently.
   const quick = useMemo(() => {
@@ -253,6 +255,19 @@ const CallsPage = () => {
         )}
 
         {!searching && <h2 className="px-4 pb-1 text-[16px] lg:text-[16px] text-wa-text">Recent</h2>}
+        {!searching && (
+          <div className="flex gap-2 px-4 pt-1 pb-2">
+            {[["all", "All"], ["missed", "Missed"], ["video", "Video"]].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setFilter(id)}
+                className={`h-8 px-4 rounded-full text-[13.5px] border transition-colors ${filter === id ? "bg-[#103629] border-transparent text-[#D9FDD3]" : "border-white/15 text-wa-muted active:bg-white/5"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
