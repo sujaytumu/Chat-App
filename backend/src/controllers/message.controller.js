@@ -1170,3 +1170,42 @@ export const transcribeMessage = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// "Search by date": the first message of a chat on or after a given moment (the start of the chosen day).
+export const firstMessageFrom = async (req, res) => {
+  try {
+    const { chatType, chatId } = req.query;
+    const from = new Date(String(req.query.from || ""));
+    if (Number.isNaN(from.getTime())) return res.status(400).json({ error: "Pick a date" });
+    const myId = req.user._id;
+    let scope;
+    if (chatType === "direct" && mongoose.isValidObjectId(chatId)) {
+      scope = {
+        groupId: null,
+        $or: [
+          { senderId: myId, receiverId: chatId },
+          { senderId: chatId, receiverId: myId },
+        ],
+      };
+    } else if (chatType === "group" && mongoose.isValidObjectId(chatId)) {
+      if (!(await Group.exists({ _id: chatId, members: myId }))) return res.status(403).json({ error: "You are not a member of this group" });
+      scope = { groupId: chatId };
+    } else {
+      return res.status(400).json({ error: "Open a chat first" });
+    }
+    const m = await Message.findOne({
+      ...scope,
+      createdAt: { $gte: from },
+      deletedFor: { $ne: myId },
+      $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }],
+    })
+      .sort({ createdAt: 1 })
+      .select("_id createdAt")
+      .lean();
+    if (!m) return res.status(404).json({ error: "No messages on or after that date" });
+    res.status(200).json({ id: m._id, createdAt: m.createdAt });
+  } catch (error) {
+    console.log("Error in firstMessageFrom:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
