@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { useBackToClose } from "../lib/useBackToClose";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { axiosInstance } from "../lib/axios";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
@@ -240,6 +241,22 @@ const Sidebar = () => {
     return null;
   }, [filter, favList, activeList]);
 
+  // "You (Message yourself)": a private notes chat with your own account. It sits in the list like
+  // any chat (at the bottom until you write something), and can be found by searching "you".
+  const [selfLast, setSelfLast] = useState(null);
+  const selfId = authUser?._id;
+  useEffect(() => {
+    if (!selfId) return;
+    let alive = true;
+    axiosInstance
+      .get(`/messages/${selfId}?limit=1`)
+      .then((res) => alive && setSelfLast(Array.isArray(res.data) && res.data.length ? res.data[res.data.length - 1] : null))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [selfId, selectedChat?.data?._id]); // refreshed each time you open or leave a chat
+
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
 
@@ -283,7 +300,29 @@ const Sidebar = () => {
           : new Date(g.createdAt).getTime(),
       }));
 
-    return [...directItems, ...groupItems]
+    const selfItems =
+      selfId && (!q || "you (message yourself)".includes(q) || (authUser?.fullName || "").toLowerCase().includes(q))
+        ? [
+            {
+              type: "direct",
+              data: { _id: selfId, fullName: `${authUser?.fullName || "You"} (You)`, profilePic: authUser?.profilePic, about: authUser?.about, isSelf: true },
+              key: `d-${selfId}`,
+              archived: archivedSet.has(`d:${selfId}`),
+              locked: lockedSet.has(`d:${selfId}`),
+              pinned: pinnedSet.has(`d:${selfId}`),
+              muted: false,
+              markedUnread: false,
+              name: `${authUser?.fullName || "You"} (You)`,
+              avatar: authUser?.profilePic,
+              online: false,
+              lastMessage: selfLast,
+              unreadCount: 0,
+              sortTime: selfLast ? new Date(selfLast.createdAt).getTime() : 0,
+            },
+          ]
+        : [];
+
+    return [...directItems, ...groupItems, ...selfItems]
       .filter((item) => (showLocked ? item.locked : !item.locked && item.archived === showArchived))
       .filter((item) => {
         if (filter === "unread") return item.unreadCount > 0;
@@ -293,7 +332,7 @@ const Sidebar = () => {
         return true;
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, showLocked, lockedSet, activeKeys]);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, showLocked, lockedSet, activeKeys, selfId, selfLast, authUser?.fullName, authUser?.profilePic, authUser?.about]);
 
   // Laptop keyboard shortcuts: Ctrl/Cmd+K or "/" = search, Alt+↑/↓ = previous / next chat.
   const itemsRef = useRef(items);

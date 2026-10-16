@@ -223,6 +223,7 @@ export const sendMessage = async (req, res) => {
     const poll = sanitizePoll(req.body.poll);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
+    const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
     // Independent lookups run together instead of one after another.
     const [contact, statusReply, receiver, dSetting] = await Promise.all([
       buildContact(req.body.contactUserId),
@@ -282,11 +283,19 @@ export const sendMessage = async (req, res) => {
       replyTo: replyTo || null,
       forwarded: forwarded === true,
       statusReply: statusReply || undefined,
-      delivered: isDelivered,
-      deliveredAt: isDelivered ? new Date() : null,
+      delivered: isDelivered || isSelf,
+      deliveredAt: isDelivered || isSelf ? new Date() : null,
+      seen: isSelf,
+      seenAt: isSelf ? new Date() : null,
     });
 
     await newMessage.save();
+    if (isSelf) {
+      // Notes to yourself: nobody else to notify, no ticks to wait for, no push to send.
+      newMessage.set("viewOnceUrl", undefined);
+      if (replyTo) await newMessage.populate("replyTo", "text image file senderId");
+      return res.status(201).json(newMessage);
+    }
     if (!blockedByThem) markImpliedRead(senderId, receiverId, newMessage.createdAt); // replying = they have read what I sent
     newMessage.set("viewOnceUrl", undefined); // never send the hidden picture's address to anyone
     if (replyTo) await newMessage.populate("replyTo", "text image file senderId");

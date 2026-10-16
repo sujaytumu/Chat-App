@@ -108,7 +108,10 @@ const ChatHeader = () => {
 
   const groupTypingCount = isGroup ? (typingUsers[`group:${data._id}`]?.size ?? 0) : 0;
   const name = isGroup ? data.name : data.fullName;
-  const status = isGroup
+  const isSelf = !isGroup && !!data.isSelf; // "You (Message yourself)"
+  const status = isSelf
+    ? "Message yourself"
+    : isGroup
     ? groupTypingCount > 0
       ? groupTypingLabel(typingUsers[`group:${data._id}`], data.members)
       : `${data.members.length} members`
@@ -117,7 +120,7 @@ const ChatHeader = () => {
     : onlineUsers.includes(data._id)
     ? "online"
     : lastSeenText(wentOffline || data.lastSeen);
-  const isOnline = !isGroup && status === "online";
+  const isOnline = !isGroup && !isSelf && status === "online";
   const isArchived = (authUser?.archivedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
   const isLocked = (authUser?.lockedChats || []).includes(`${isGroup ? "g" : "d"}:${data._id}`);
 
@@ -161,7 +164,7 @@ const ChatHeader = () => {
             </button>
           </>
         )}
-        {!isGroup && (
+        {!isGroup && !isSelf && (
           <>
             <button
               onClick={() => startCall(data, "video")}
@@ -219,7 +222,7 @@ const ChatHeader = () => {
               >
                 <Palette size={18} className="text-wa-icon" /> Wallpaper
               </button>
-              {!isGroup && (
+              {!isGroup && !isSelf && (
                 <button
                   className={menuItem}
                   onClick={async () => {
