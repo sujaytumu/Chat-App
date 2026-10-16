@@ -743,7 +743,7 @@ export const useChatStore = create((set, get) => ({
   emitTyping: () => {
     const socket = useAuthStore.getState().socket;
     const { selectedChat } = get();
-    if (!socket || !selectedChat) return;
+    if (!socket || !selectedChat || selectedChat.data?.isSelf) return; // no typing signal to yourself
     if (selectedChat.type === "direct") {
       socket.emit("typing", { toUserId: selectedChat.data._id });
     } else {
@@ -762,7 +762,7 @@ export const useChatStore = create((set, get) => ({
   emitStopTyping: () => {
     const socket = useAuthStore.getState().socket;
     const { selectedChat } = get();
-    if (!socket || !selectedChat) return;
+    if (!socket || !selectedChat || selectedChat.data?.isSelf) return;
     if (selectedChat.type === "direct") {
       socket.emit("stopTyping", { toUserId: selectedChat.data._id });
     } else {
