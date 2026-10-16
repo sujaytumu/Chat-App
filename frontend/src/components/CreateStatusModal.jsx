@@ -4,6 +4,7 @@ import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Musi
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import StatusMusicSheet from "./StatusMusicSheet";
+import StatusAudienceSheet, { readAudience, audienceLabel, AUDIENCE_KEY } from "./StatusAudienceSheet";
 import StatusVideoPreview, { MAX_STATUS_VIDEO_SECONDS } from "./StatusVideoPreview";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -156,6 +157,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [place, setPlace] = useState(null); // { name, lat, lng }
   const [showPlaces, setShowPlaces] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
+  const [audience, setAudience] = useState(readAudience);
+  const [showAudience, setShowAudience] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [editorMode, setEditorMode] = useState(null); // null | draw | text | sticker (photo editor)
   const mediaRef = useRef(null);
@@ -231,6 +234,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         ...(kind === "video" && trim ? { trim } : {}),
         ...(song ? { song: { data: song.data, name: song.name, size: song.size, mime: song.mime } } : {}),
         ...(place ? { location: place } : {}),
+        ...(audience.mode !== "all" ? { audience } : {}),
       };
       await axiosInstance.post("/status", body, { timeout: 180000 });
       toast.success("Status posted");
@@ -429,8 +433,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
             />
           </div>
           <div className="flex items-center gap-2 bg-[#0A0E11] px-2.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
-            <button className="h-9 pl-3 pr-3.5 rounded-full bg-[#101418] text-white/90 text-[13px] flex items-center gap-1.5" onClick={() => toast("Your status goes to all your contacts")}>
-              <StatusRing size={18} /> Status (Contacts)
+            <button className="h-9 pl-3 pr-3.5 rounded-full bg-[#101418] text-white/90 text-[13px] flex items-center gap-1.5" onClick={() => setShowAudience(true)}>
+              <StatusRing size={18} /> Status ({audienceLabel(audience)})
             </button>
             <div className="flex-1" />
             <button
@@ -519,6 +523,22 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
       <input ref={audioRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={(e) => take(e, "audio")} />
       <input ref={fileRef} type="file" className="hidden" onChange={(e) => take(e, "file")} />
       <input ref={songRef} type="file" accept={AUDIO_ACCEPT} className="hidden" onChange={takeSong} />
+
+      {showAudience && (
+        <StatusAudienceSheet
+          value={audience}
+          onClose={() => setShowAudience(false)}
+          onSave={(a) => {
+            setAudience(a);
+            try {
+              localStorage.setItem(AUDIENCE_KEY, JSON.stringify(a));
+            } catch {
+              /* private mode */
+            }
+            setShowAudience(false);
+          }}
+        />
+      )}
 
       {showMusic && (
         <StatusMusicSheet

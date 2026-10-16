@@ -29,6 +29,11 @@ const statusSchema = new mongoose.Schema(
       lat: { type: Number },
       lng: { type: Number },
     },
+    // Who may see it: everyone (my contacts), everyone except some people, or only some people
+    audience: {
+      mode: { type: String, enum: ["all", "except", "only"], default: "all" },
+      users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    },
     backgroundColor: { type: String, default: "#00A884" }, // for text statuses
     font: { type: Number, default: 0, min: 0, max: 4 }, // text-status font style
     viewedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
