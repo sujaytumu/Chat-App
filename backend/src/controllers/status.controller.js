@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Status from "../models/status.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { uploadFileAttachment } from "../lib/uploadFile.js";
@@ -10,9 +11,17 @@ const MAX_MEDIA_BASE64 = 13 * 1024 * 1024;
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 const MAX_VIDEO_SECONDS = 90;
 
+// Can `viewerId` see this status? The owner always can; otherwise the audience the owner picked decides.
+const canSee = (s, viewerId) => {
+  const a = s.audience;
+  if (!a || !a.mode || a.mode === "all") return true;
+  const listed = (a.users || []).some((u) => String(u) === String(viewerId));
+  return a.mode === "only" ? listed : !listed;
+};
+
 export const createStatus = async (req, res) => {
   try {
-    const { type, content, backgroundColor, caption, file, song, location, font, trim } = req.body;
+    const { type, content, backgroundColor, caption, file, song, location, font, trim, audience } = req.body;
     const myId = req.user._id;
 
     if (!["text", "image", "video", "audio", "file"].includes(type) || !content) {
@@ -75,6 +84,12 @@ export const createStatus = async (req, res) => {
       };
     }
 
+    if (audience && ["except", "only"].includes(audience.mode) && Array.isArray(audience.users)) {
+      const ids = [...new Set(audience.users.map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(myId)).slice(0, 1000);
+      if (audience.mode === "only" && !ids.length) return res.status(400).json({ error: "Pick at least one person to share with" });
+      doc.audience = { mode: audience.mode, users: ids };
+    }
+
     const status = await Status.create(doc);
     res.status(201).json(status);
   } catch (error) {
@@ -98,6 +113,7 @@ export const getStatusFeed = async (req, res) => {
     for (const s of statuses) {
       if (!s.userId) continue; // owner account was deleted
       const uid = s.userId._id.toString();
+      if (uid !== myId.toString() && !canSee(s, myId)) continue; // the owner left me out of this one
       if (!byUser.has(uid)) byUser.set(uid, { user: s.userId, statuses: [] });
       byUser.get(uid).statuses.push(s);
     }
@@ -121,6 +137,7 @@ export const getStatusFeed = async (req, res) => {
         delete o.viewedBy;
         delete o.views;
         delete o.likes;
+        delete o.audience; // nobody else learns who was left out
         return o;
       }),
     }));
@@ -138,7 +155,16 @@ export const markStatusViewed = async (req, res) => {
     const myId = req.user._id;
 
     await Status.updateOne(
-      { _id: id, userId: { $ne: myId }, viewedBy: { $ne: myId } },
+      {
+        _id: id,
+        userId: { $ne: myId },
+        viewedBy: { $ne: myId },
+        $or: [
+          { "audience.mode": { $in: [null, "all"] } },
+          { "audience.mode": "except", "audience.users": { $ne: myId } },
+          { "audience.mode": "only", "audience.users": myId },
+        ],
+      },
       { $push: { viewedBy: myId, views: { user: myId, at: new Date() } } }
     );
 
@@ -175,8 +201,8 @@ export const likeStatus = async (req, res) => {
     const myId = req.user._id;
     const liked = req.body?.liked !== false;
 
-    const status = await Status.findOne({ _id: id, expiresAt: { $gt: new Date() } }).select("userId");
-    if (!status) return res.status(404).json({ error: "Status not found" });
+    const status = await Status.findOne({ _id: id, expiresAt: { $gt: new Date() } }).select("userId audience");
+    if (!status || (!status.userId.equals(myId) && !canSee(status, myId))) return res.status(404).json({ error: "Status not found" });
     if (status.userId.equals(myId)) return res.status(400).json({ error: "You can't like your own status" });
 
     if (liked) {
