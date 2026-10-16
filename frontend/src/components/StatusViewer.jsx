@@ -49,6 +49,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const advancedRef = useRef(null); // status id already moved on from (end / trim end can both fire)
   const songEl = useRef(null);
   const [songBlocked, setSongBlocked] = useState(false);
+  const swipeStart = useRef(null);
+  const swipedAt = useRef(0);
+  const replyInput = useRef(null);
   const [replyText, setReplyText] = useState("");
   const [replyFocus, setReplyFocus] = useState(false);
   const [sendingReply, setSendingReply] = useState(false);
@@ -254,9 +257,21 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       {/* The update; tap left / right to move, hold to pause */}
       <div
         className="w-full h-full max-w-md relative flex items-center justify-center"
-        onPointerDown={() => setPaused(true)}
-        onPointerUp={() => {
+        style={{ touchAction: "none" }}
+        onPointerDown={(e) => {
+          swipeStart.current = { x: e.clientX, y: e.clientY };
+          setPaused(true);
+        }}
+        onPointerUp={(e) => {
           setPaused(false);
+          // Swipe up, like WhatsApp: viewers open the reply box, the owner opens the viewers list
+          const st = swipeStart.current;
+          swipeStart.current = null;
+          if (st && st.y - e.clientY > 70 && Math.abs(e.clientX - st.x) < 90) {
+            swipedAt.current = Date.now();
+            if (isOwn) setShowViewers(true);
+            else replyInput.current?.focus();
+          }
           const a = songEl.current;
           if (a && a.paused) a.play().then(() => setSongBlocked(false)).catch(() => {});
         }}
@@ -359,8 +374,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             {linkify(current.caption)}
           </p>
         )}
-        <button className="absolute left-0 top-24 bottom-24 w-1/3" onClick={prev} aria-label="Previous" />
-        <button className="absolute right-0 top-24 bottom-24 w-1/3" onClick={next} aria-label="Next" />
+        <button className="absolute left-0 top-24 bottom-24 w-1/3" onClick={() => Date.now() - swipedAt.current > 450 && prev()} aria-label="Previous" />
+        <button className="absolute right-0 top-24 bottom-24 w-1/3" onClick={() => Date.now() - swipedAt.current > 450 && next()} aria-label="Next" />
       </div>
 
       {/* Viewer: reply to this status (arrives in the chat with its owner) */}
@@ -370,6 +385,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
           className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto flex items-center gap-2 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent"
         >
           <input
+            ref={replyInput}
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             onFocus={() => setReplyFocus(true)}
