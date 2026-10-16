@@ -313,6 +313,7 @@ io.on("connection", (socket) => {
       const timeout = setTimeout(() => {
         pendingCalls.delete(toUserId);
         socket.emit("callFailed", { reason: "No answer" });
+        if (isOnline(toUserId)) io.to(toUserId).emit("callEnded"); // stop it ringing on their screen
         sendPushToUser(toUserId, {
           title: fromUser?.fullName || "Someone",
           body: `Missed ${callType === "video" ? "video" : "voice"} call`,
@@ -393,11 +394,20 @@ io.on("connection", (socket) => {
   // "Calling…" to "Ringing…", mirroring the sent → delivered distinction
   // used for message ticks.
   socket.on("callRingingAck", ({ toUserId }) => {
-    clearHeldCall(userId, toUserId);
+    // Keep the call held (don't clear it here): the phone saying "ringing" doesn't mean the
+    // person saw it. If they leave and re-open the app, "syncCalls" / reconnect hands it over again.
     const callerSocketId = roomFor(toUserId);
     if (callerSocketId) {
       io.to(callerSocketId).emit("remoteDeviceRinging");
     }
+  });
+
+  // The app came back to the front (or the network returned): hand over any call that is
+  // still ringing for this user. The client ignores a call it is already showing.
+  socket.on("syncCalls", () => {
+    const pending = pendingCalls.get(userId);
+    if (!pending) return;
+    socket.emit("incomingCall", { fromUser: pending.fromUser, offer: pending.offer, callType: pending.callType });
   });
 
   socket.on("iceCandidate", ({ toUserId, candidate }) => {
@@ -826,8 +836,6 @@ io.on("connection", (socket) => {
       // offline and is still within its grace period.
       const pending = pendingCalls.get(userId);
       if (pending) {
-        clearTimeout(pending.timeout);
-        pendingCalls.delete(userId);
         socket.emit("incomingCall", {
           fromUser: pending.fromUser,
           offer: pending.offer,

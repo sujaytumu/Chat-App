@@ -8,6 +8,9 @@ import androidx.annotation.NonNull;
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Map;
 
 /**
@@ -35,6 +38,11 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
             return;
         }
 
+        // The message reached this phone: tell the server right away so the sender gets the
+        // double tick, even when the app is closed (WhatsApp-style).
+        String messageId = nz(d.get("messageId"));
+        if (!messageId.isEmpty()) confirmDelivered(messageId);
+
         // The app is on screen: the page already rings / beeps by itself.
         if (MainActivity.visible) return;
 
@@ -50,6 +58,33 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
             boolean missed = body.toLowerCase().startsWith("missed");
             NotificationHelper.showMessage(this, title, body, tag, chatId, chatType, missed);
         }
+    }
+
+    private void confirmDelivered(final String messageId) {
+        final String token = getSharedPreferences("talkies_push", Context.MODE_PRIVATE).getString("token", "");
+        if (token == null || token.isEmpty()) return;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection c = null;
+                try {
+                    c = (HttpURLConnection) new URL("https://chat-app-jjcg.onrender.com/api/push/device-delivered").openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(8000);
+                    c.setReadTimeout(8000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json");
+                    byte[] body = ("{\"token\":\"" + token + "\",\"messageId\":\"" + messageId + "\"}").getBytes("UTF-8");
+                    OutputStream os = c.getOutputStream();
+                    os.write(body);
+                    os.close();
+                    c.getResponseCode();
+                } catch (Exception ignored) {
+                } finally {
+                    if (c != null) c.disconnect();
+                }
+            }
+        }).start();
     }
 
     private static String nz(String s) {
