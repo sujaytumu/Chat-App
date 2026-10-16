@@ -53,7 +53,7 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
         boolean isCall = "1".equals(d.get("isCall"));
 
         if (isCall) {
-            NotificationHelper.showIncomingCall(this, title, body, tag, nz(d.get("callerId")).isEmpty() ? chatId : nz(d.get("callerId")));
+            NotificationHelper.showIncomingCall(this, title, body, tag, nz(d.get("callerId")).isEmpty() ? chatId : nz(d.get("callerId")), nz(d.get("icon")));
         } else {
             boolean missed = body.toLowerCase().startsWith("missed");
             NotificationHelper.showMessage(this, title, body, tag, chatId, chatType, missed);

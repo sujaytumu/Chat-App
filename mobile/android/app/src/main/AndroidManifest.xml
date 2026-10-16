@@ -34,6 +34,17 @@
             </intent-filter>
         </service>
 
+        <!-- Full-screen incoming call with the caller's photo; opens over the lock screen -->
+        <activity
+            android:name=".IncomingCallActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
         <receiver
             android:name=".CallActionReceiver"
             android:exported="false" />

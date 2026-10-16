@@ -41,22 +41,10 @@ let listening = false;
 export async function registerNativePush(userId, goHome) {
   const p = plugin();
   if (!p) return;
-  try {
-    await p.requestPermission?.();
-  } catch {
-    /* ignore */
-  }
-  await ensureRegistered(userId);
-  currentUser = userId;
-  if (!watching) {
-    watching = true;
-    // A failed sign-up with the push service (server asleep, no signal) or a rotated token must never
-    // leave this phone without background calls: check again whenever the app comes back.
-    const again = () => currentUser && ensureRegistered(currentUser);
-    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && again());
-    window.addEventListener("online", again);
-  }
 
+  // Hand the notification's action (Answer / open chat) to the app FIRST. Registering for push
+  // can take many seconds (permission prompt, server waking up); waiting for it used to leave
+  // "Answer" unhandled so the call had to be picked up a second time inside the app.
   const deliver = (intent) => {
     if (!intent) return;
     handleNotificationAction({ action: intent.action || "open", data: intent }, goHome);
@@ -74,6 +62,22 @@ export async function registerNativePush(userId, goHome) {
     }
   } catch {
     /* ignore */
+  }
+
+  try {
+    await p.requestPermission?.();
+  } catch {
+    /* ignore */
+  }
+  await ensureRegistered(userId);
+  currentUser = userId;
+  if (!watching) {
+    watching = true;
+    // A failed sign-up with the push service (server asleep, no signal) or a rotated token must never
+    // leave this phone without background calls: check again whenever the app comes back.
+    const again = () => currentUser && ensureRegistered(currentUser);
+    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && again());
+    window.addEventListener("online", again);
   }
 }
 
