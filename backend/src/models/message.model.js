@@ -81,6 +81,8 @@ const messageSchema = new mongoose.Schema(
       duration: { type: Number },
       waveform: { type: [Number], default: undefined },
     },
+    // Voice notes: the written-out words, made on request (shown under the voice note)
+    transcript: { type: { text: String, at: Date }, default: undefined, _id: false },
     editedAt: { type: Date, default: null },
     // Reply to someone's status: a small quote of it above the message.
     statusReply: {

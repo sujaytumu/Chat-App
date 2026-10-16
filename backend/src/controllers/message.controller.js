@@ -1113,3 +1113,60 @@ export const linkPreview = async (req, res) => {
     res.status(200).json({});
   }
 };
+
+// ---- Voice message transcripts ----
+// Turns a voice note into text with a Whisper-compatible speech service (Groq's free tier or OpenAI).
+// Set GROQ_API_KEY (or OPENAI_API_KEY) on the server. The text is saved on the message, so each note is
+// transcribed once and both people see it.
+const MAX_TRANSCRIBE_BYTES = 24 * 1024 * 1024;
+export const transcribeMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const message = await Message.findById(id);
+    if (!message || message.file?.type !== "audio" || !message.file?.url || message.deletedForEveryone) {
+      return res.status(404).json({ error: "Voice message not found" });
+    }
+    const me = req.user._id;
+    if (message.groupId) {
+      const member = await Group.exists({ _id: message.groupId, members: me });
+      if (!member) return res.status(403).json({ error: "Not allowed" });
+    } else if (!message.senderId.equals(me) && !message.receiverId?.equals(me)) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    if (message.transcript?.text) return res.status(200).json({ text: message.transcript.text });
+
+    const groq = process.env.GROQ_API_KEY;
+    const openai = process.env.OPENAI_API_KEY;
+    if (!groq && !openai) return res.status(501).json({ error: "not_configured" });
+
+    const audio = await fetch(message.file.url);
+    if (!audio.ok) return res.status(502).json({ error: "Couldn't load that voice message" });
+    const buf = Buffer.from(await audio.arrayBuffer());
+    if (!buf.length || buf.length > MAX_TRANSCRIBE_BYTES) return res.status(413).json({ error: "That voice message is too long to transcribe" });
+
+    const mime = message.file.mimeType || audio.headers.get("content-type") || "audio/webm";
+    const ext = /mp4|m4a|aac/.test(mime) ? "m4a" : /ogg/.test(mime) ? "ogg" : /mpeg|mp3/.test(mime) ? "mp3" : /wav/.test(mime) ? "wav" : "webm";
+    const form = new FormData();
+    form.append("file", new Blob([buf], { type: mime }), `voice.${ext}`);
+    form.append("model", groq ? "whisper-large-v3-turbo" : "whisper-1");
+    form.append("response_format", "json");
+    const r = await fetch(groq ? "https://api.groq.com/openai/v1/audio/transcriptions" : "https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${groq || openai}` },
+      body: form,
+    });
+    if (!r.ok) {
+      console.log("Transcribe failed:", r.status, (await r.text().catch(() => "")).slice(0, 200));
+      return res.status(502).json({ error: "The speech service couldn't read that voice message" });
+    }
+    const text = String((await r.json())?.text || "").trim().slice(0, 4000);
+    if (!text) return res.status(200).json({ text: "", empty: true });
+    message.transcript = { text, at: new Date() };
+    await message.save();
+    res.status(200).json({ text });
+  } catch (error) {
+    console.log("Error in transcribeMessage controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
