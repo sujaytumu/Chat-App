@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { optimizeImage } from "../lib/cdn";
-import { Plus, Loader2, Pencil, Camera, Lock } from "lucide-react";
+import { Plus, Loader2, Pencil, Camera, Lock, BellOff, Bell } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import CreateStatusModal from "../components/CreateStatusModal";
@@ -20,6 +20,25 @@ const StatusPage = () => {
   const { authUser } = useAuthStore();
   const [feed, setFeed] = useState({ myStatuses: [], others: [] });
   const [isLoading, setIsLoading] = useState(true);
+  // People whose updates you muted: they move to "Muted updates" at the bottom (kept on this device).
+  const [muted, setMuted] = useState(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("talkies.mutedStatus") || "[]");
+      return Array.isArray(raw) ? raw : [];
+    } catch {
+      return [];
+    }
+  });
+  const toggleMute = (id) =>
+    setMuted((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem("talkies.mutedStatus", JSON.stringify(next));
+      } catch {
+        /* storage unavailable: still works until the page closes */
+      }
+      return next;
+    });
   const [showCreate, setShowCreate] = useState(false); // false | "text" | "image"
   const [viewing, setViewing] = useState(null); // { user, statuses, isOwn }
 
@@ -86,31 +105,40 @@ const StatusPage = () => {
             </button>
 
             {[
-              ["Recent updates", feed.others.filter((o) => o.hasUnseen)],
-              ["Viewed updates", feed.others.filter((o) => !o.hasUnseen)],
+              ["Recent updates", feed.others.filter((o) => o.hasUnseen && !muted.includes(o.user._id))],
+              ["Viewed updates", feed.others.filter((o) => !o.hasUnseen && !muted.includes(o.user._id))],
+              ["Muted updates", feed.others.filter((o) => muted.includes(o.user._id))],
             ].map(
               ([title, list]) =>
                 list.length > 0 && (
                   <div key={title}>
                     <p className="px-4 pt-4 pb-1 text-[12px] font-medium text-wa-muted">{title}</p>
                     {list.map(({ user, statuses, hasUnseen }) => (
-                      <button
-                        key={user._id}
-                        onClick={() => setViewing({ user, statuses, isOwn: false })}
-                        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface"
-                      >
-                        <img
-                          src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                          alt={user.fullName}
-                          className={`size-14 rounded-full object-cover ring-2 ${
-                            hasUnseen ? "ring-[#00A884]" : "ring-wa-muted/40"
-                          } ring-offset-2 ring-offset-wa-bg`}
-                        />
-                        <div className="text-left min-w-0">
-                          <p className="text-[14.5px] text-wa-text truncate">{user.fullName}</p>
-                          <p className="text-[12px] text-wa-muted">{statusTime(statuses[statuses.length - 1].createdAt)}</p>
-                        </div>
-                      </button>
+                      <div key={user._id} className={`flex items-center hover:bg-white/5 ${title === "Muted updates" ? "opacity-70" : ""}`}>
+                        <button
+                          onClick={() => setViewing({ user, statuses, isOwn: false })}
+                          className="flex-1 min-w-0 flex items-center gap-4 pl-4 py-3 active:bg-wa-surface"
+                        >
+                          <img
+                            src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
+                            alt={user.fullName}
+                            className={`size-14 rounded-full object-cover ring-2 ${
+                              hasUnseen && title !== "Muted updates" ? "ring-[#00A884]" : "ring-wa-muted/40"
+                            } ring-offset-2 ring-offset-wa-bg`}
+                          />
+                          <div className="text-left min-w-0">
+                            <p className="text-[14.5px] text-wa-text truncate">{user.fullName}</p>
+                            <p className="text-[12px] text-wa-muted">{statusTime(statuses[statuses.length - 1].createdAt)}</p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={() => toggleMute(user._id)}
+                          className="size-11 mr-2 rounded-full flex items-center justify-center text-wa-icon hover:bg-white/10 active:bg-white/15 shrink-0"
+                          aria-label={muted.includes(user._id) ? `Unmute ${user.fullName}` : `Mute ${user.fullName}`}
+                        >
+                          {muted.includes(user._id) ? <Bell size={19} /> : <BellOff size={19} />}
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )
