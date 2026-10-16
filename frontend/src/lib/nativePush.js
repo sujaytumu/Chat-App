@@ -9,6 +9,33 @@ const plugin = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor?
 export const isNativeApp = () => !!plugin();
 
 let registeredFor = null;
+let currentUser = null;
+let watching = false;
+let registering = false;
+
+// Registers this phone's push token with the server, retrying a few times if the server is slow.
+async function ensureRegistered(userId) {
+  const p = plugin();
+  if (!p || registering) return;
+  registering = true;
+  try {
+    for (const wait of [0, 3000, 10000, 30000]) {
+      if (wait) await new Promise((r) => setTimeout(r, wait));
+      try {
+        const { token } = await p.getToken();
+        if (!token) return; // Firebase isn't configured in this build
+        if (registeredFor === `${userId}:${token}`) return;
+        await axiosInstance.post("/push/fcm-register", { token });
+        registeredFor = `${userId}:${token}`;
+        return;
+      } catch {
+        /* try again */
+      }
+    }
+  } finally {
+    registering = false;
+  }
+}
 let listening = false;
 
 export async function registerNativePush(userId, goHome) {
@@ -19,14 +46,15 @@ export async function registerNativePush(userId, goHome) {
   } catch {
     /* ignore */
   }
-  try {
-    const { token } = await p.getToken();
-    if (token && registeredFor !== `${userId}:${token}`) {
-      await axiosInstance.post("/push/fcm-register", { token });
-      registeredFor = `${userId}:${token}`;
-    }
-  } catch {
-    /* Firebase isn't configured in this build */
+  await ensureRegistered(userId);
+  currentUser = userId;
+  if (!watching) {
+    watching = true;
+    // A failed sign-up with the push service (server asleep, no signal) or a rotated token must never
+    // leave this phone without background calls: check again whenever the app comes back.
+    const again = () => currentUser && ensureRegistered(currentUser);
+    document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && again());
+    window.addEventListener("online", again);
   }
 
   const deliver = (intent) => {
@@ -59,4 +87,5 @@ export async function unregisterNativePush() {
     /* ignore */
   }
   registeredFor = null;
+  currentUser = null;
 }
