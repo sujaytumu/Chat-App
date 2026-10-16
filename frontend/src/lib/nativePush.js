@@ -66,6 +66,8 @@ export async function registerNativePush(userId, goHome) {
 
   try {
     await p.requestPermission?.();
+    // Mic / camera up front so "Answer" never stops at a permission prompt.
+    await p.requestCallPermissions?.();
   } catch {
     /* ignore */
   }

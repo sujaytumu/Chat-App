@@ -13,6 +13,7 @@ try {
 }
 import GroupCallManager from "./components/GroupCallManager";
 import CallKeepAlive from "./components/CallKeepAlive";
+import BackgroundCallSetup from "./components/BackgroundCallSetup";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
 import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -202,6 +203,7 @@ const App = () => {
       )}
       {authUser && <NotificationManager />}
       {authUser && <CallKeepAlive />}
+      {authUser && <BackgroundCallSetup />}
       {authUser && (
         <ErrorBoundary silent>
           <CallManager />

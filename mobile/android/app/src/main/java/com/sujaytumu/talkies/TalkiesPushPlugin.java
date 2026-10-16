@@ -51,8 +51,15 @@ public class TalkiesPushPlugin extends Plugin {
         // consume so rotating / re-delivering the same intent can't repeat it
         intent.removeExtra("tk_action");
         NotificationHelper.clearRecent(intent.getStringExtra("tk_chatId") == null ? "" : intent.getStringExtra("tk_chatId"));
-        pending = o;
-        if (instance != null) instance.notifyListeners("nativeIntent", o, true);
+        // Deliver exactly once: to the live listener if the page is already listening,
+        // otherwise park it for getLaunchIntent(). (It used to do both, so "Answer" reached the
+        // page twice and the call had to be picked up a second time.)
+        if (instance != null && instance.hasListeners("nativeIntent")) {
+            pending = null;
+            instance.notifyListeners("nativeIntent", o, false);
+        } else {
+            pending = o;
+        }
     }
 
     @PluginMethod
@@ -110,6 +117,62 @@ public class TalkiesPushPlugin extends Plugin {
             fullScreen = nm != null && nm.canUseFullScreenIntent();
         }
         res.put("fullScreen", fullScreen);
+        call.resolve(res);
+    }
+
+    /** Microphone (+ camera) permission up front, so tapping Answer never stops at a permission prompt. */
+    @PluginMethod
+    public void requestCallPermissions(PluginCall call) {
+        Activity a = getActivity();
+        boolean mic = a != null && ContextCompat.checkSelfPermission(a, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
+        boolean cam = a != null && ContextCompat.checkSelfPermission(a, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
+        if (a != null && (!mic || !cam)) {
+            ActivityCompat.requestPermissions(a, new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, 7002);
+        }
+        JSObject res = new JSObject();
+        res.put("mic", mic);
+        res.put("camera", cam);
+        call.resolve(res);
+    }
+
+    /**
+     * Xiaomi / Oppo / Vivo / Samsung etc. kill closed apps unless "Autostart" (or similar) is
+     * allowed. Tries the maker's own screen, falls back to this app's settings page.
+     */
+    @PluginMethod
+    public void openAutostartSettings(PluginCall call) {
+        Context c = getContext();
+        String[][] targets = {
+                {"com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"},
+                {"com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"},
+                {"com.oppo.safe", "com.oppo.safe.permission.startup.StartupAppListActivity"},
+                {"com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"},
+                {"com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"},
+                {"com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"},
+                {"com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"},
+                {"com.asus.mobilemanager", "com.asus.mobilemanager.autostart.AutoStartActivity"},
+        };
+        boolean opened = false;
+        for (String[] t : targets) {
+            try {
+                Intent i = new Intent().setComponent(new android.content.ComponentName(t[0], t[1]));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+                opened = true;
+                break;
+            } catch (Exception ignored) {
+            }
+        }
+        if (!opened) {
+            try {
+                Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+            } catch (Exception ignored) {
+            }
+        }
+        JSObject res = new JSObject();
+        res.put("vendorScreen", opened);
         call.resolve(res);
     }
 
