@@ -1,6 +1,6 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
-import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, registerFcmToken, unregisterFcmToken } from "../controllers/push.controller.js";
+import { getVapidPublicKey, subscribeToPush, unsubscribeFromPush, registerFcmToken, unregisterFcmToken, deviceDelivered } from "../controllers/push.controller.js";
 
 const router = express.Router();
 
@@ -8,6 +8,7 @@ router.get("/vapid-public-key", getVapidPublicKey);
 router.post("/subscribe", protectRoute, subscribeToPush);
 router.post("/unsubscribe", protectRoute, unsubscribeFromPush);
 
+router.post("/device-delivered", deviceDelivered);
 router.post("/fcm-register", protectRoute, registerFcmToken);
 router.post("/fcm-unregister", protectRoute, unregisterFcmToken);
 

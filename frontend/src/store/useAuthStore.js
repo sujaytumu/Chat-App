@@ -230,6 +230,8 @@ export const useAuthStore = create((set, get) => ({
       // swallows incoming calls and messages. Probe it; if the server doesn't answer
       // within 2.5 s, rebuild the connection right now.
       let answered = false;
+      // A call that is still ringing for us (we left the app and came back) is handed over again.
+      socket.emit("syncCalls");
       socket.volatile.emit("clientPing", () => {
         answered = true;
       });
