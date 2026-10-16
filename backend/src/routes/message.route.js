@@ -22,6 +22,7 @@ import {
   exportChats,
   deleteChatForMe,
   searchMessages,
+  firstMessageFrom,
   reactToMessage,
   editMessage,
   votePoll,
@@ -39,6 +40,7 @@ router.get("/users", protectRoute, getUsersForSidebar);
 router.get("/starred/all", protectRoute, getStarredMessages);
 router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
 router.get("/search/all", protectRoute, searchMessages);
+router.get("/search/date", protectRoute, firstMessageFrom);
 router.put("/react/:id", protectRoute, reactToMessage);
 router.put("/edit/:id", protectRoute, editMessage);
 router.post("/transcribe/:id", protectRoute, transcribeMessage);

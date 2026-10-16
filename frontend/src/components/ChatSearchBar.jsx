@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, CalendarDays } from "lucide-react";
+import toast from "react-hot-toast";
+import { axiosInstance } from "../lib/axios";
 import { useChatStore } from "../store/useChatStore";
 import SearchSnippet from "./SearchSnippet";
 
@@ -16,6 +18,25 @@ const ChatSearchBar = () => {
   const [results, setResults] = useState(null); // null = nothing searched yet
   const [loading, setLoading] = useState(false);
   const seq = useRef(0);
+  const dateInput = useRef(null);
+
+  // Jump to a day: the first message on that date (or the next day that has one).
+  const goToDate = async (value) => {
+    if (!value) return;
+    const [y, m, d] = value.split("-").map(Number);
+    const from = new Date(y, m - 1, d, 0, 0, 0, 0); // start of that day, in this phone's time zone
+    try {
+      const { data } = await axiosInstance.get("/messages/search/date", {
+        params: { chatType: selectedChat.type, chatId: selectedChat.data._id, from: from.toISOString() },
+      });
+      if (new Date(data.createdAt).toDateString() !== from.toDateString()) {
+        toast(`No messages that day — showing ${new Date(data.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}`);
+      }
+      jumpToMessage(selectedChat, data.id);
+    } catch (e) {
+      toast.error(e?.response?.data?.error || "Couldn't find that date");
+    }
+  };
 
   useEffect(() => {
     const term = q.trim();
@@ -56,6 +77,23 @@ const ChatSearchBar = () => {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search in this chat"
             className="flex-1 bg-transparent outline-none text-[13px] text-wa-text placeholder:text-wa-muted"
+          />
+          <button
+            type="button"
+            onClick={() => (dateInput.current?.showPicker ? dateInput.current.showPicker() : dateInput.current?.click())}
+            className="shrink-0 text-wa-icon"
+            aria-label="Search by date"
+          >
+            <CalendarDays size={19} />
+          </button>
+          <input
+            ref={dateInput}
+            type="date"
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => goToDate(e.target.value)}
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
           />
         </div>
       </div>
