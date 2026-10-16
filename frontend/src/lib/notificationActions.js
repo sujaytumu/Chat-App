@@ -42,6 +42,10 @@ function answerCall(callerId) {
 }
 
 export function handleNotificationAction({ action, data = {} }, goHome) {
+  if (data.callCode) {
+    window.location.assign(`/call/${data.callCode}`); // scheduled-call reminder
+    return;
+  }
   if (data.isCall || action === "answer") {
     if (action === "answer" && data.callerId) answerCall(data.callerId);
     return; // the incoming-call screen handles the rest
