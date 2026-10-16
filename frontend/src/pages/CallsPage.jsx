@@ -4,7 +4,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { useCallStore } from "../store/useCallStore";
 import { useChatStore } from "../store/useChatStore";
 import { useNavigate } from "react-router-dom";
-import { Phone, Video, Loader2, ArrowUpRight, ArrowDownLeft, Search, X, Plus, MessageSquare, Heart, Info } from "lucide-react";
+import { Phone, Video, Loader2, ArrowUpRight, ArrowDownLeft, Search, X, Plus, MessageSquare, Heart, Info, Link2, CalendarClock, Copy, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import Avatar from "../components/Avatar";
 import { WaKebab, WaBack } from "../components/icons/WaIcons";
@@ -12,6 +12,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 import { useScrollMemory } from "../lib/useScrollMemory";
 
 const ContactInfoModal = lazy(() => import("../components/ContactInfoModal"));
+const CallLinkSheet = lazy(() => import("../components/CallLinkSheet"));
 
 const GREEN = "#25D366";
 const RED = "#F15C6D";
@@ -86,6 +87,34 @@ const CallsPage = () => {
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
   const [info, setInfo] = useState(null); // grouped row shown in the details sheet
+  const [linkSheet, setLinkSheet] = useState(null); // null | "link" | "schedule"
+  const [upcoming, setUpcoming] = useState([]);
+  useBackToClose(!!linkSheet, () => setLinkSheet(null));
+  const loadUpcoming = () =>
+    axiosInstance
+      .get("/calls/links")
+      .then((r) => setUpcoming(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  useEffect(() => {
+    loadUpcoming();
+  }, []);
+  const copyLink = async (code) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/call/${code}`);
+      toast("Link copied");
+    } catch {
+      toast.error("Couldn't copy the link");
+    }
+  };
+  const removeLink = async (code) => {
+    if (!window.confirm("Cancel this call link? Nobody will be able to join with it.")) return;
+    try {
+      await axiosInstance.delete(`/calls/links/${code}`);
+      setUpcoming((l) => l.filter((x) => x.code !== code));
+    } catch {
+      toast.error("Couldn't cancel it");
+    }
+  };
   const menuRef = useRef(null);
   // Phone Back closes the open sheet / menu / search first instead of leaving the screen.
   useBackToClose(menu, () => setMenu(false));
@@ -245,6 +274,18 @@ const CallsPage = () => {
               </button>
               <span className="text-[13px] text-wa-muted">Favourites</span>
             </div>
+            <div className="flex flex-col items-center gap-2 w-[76px] shrink-0">
+              <button onClick={() => setLinkSheet("schedule")} className={circleBtn} aria-label="Schedule call">
+                <CalendarClock size={24} />
+              </button>
+              <span className="text-[13px] text-wa-muted">Schedule</span>
+            </div>
+            <div className="flex flex-col items-center gap-2 w-[76px] shrink-0">
+              <button onClick={() => setLinkSheet("link")} className={circleBtn} aria-label="Call link">
+                <Link2 size={24} />
+              </button>
+              <span className="text-[13px] text-wa-muted">Call link</span>
+            </div>
             {quick.map((u) => (
               <button key={u._id} onClick={() => callBack(u, "audio")} className="flex flex-col items-center gap-2 w-[76px] shrink-0 active:opacity-70">
                 <Avatar src={u.profilePic} name={u.fullName} size="size-14" textSize="text-xl" />
@@ -252,6 +293,39 @@ const CallsPage = () => {
               </button>
             ))}
           </div>
+        )}
+
+        {!searching && upcoming.length > 0 && (
+          <>
+            <h2 className="px-4 pb-1 text-[16px] text-wa-text">Upcoming and links</h2>
+            {upcoming.map((l) => {
+              const mine = l.creatorId === myId;
+              return (
+                <div key={l.code} className="flex items-center gap-3 px-4 py-2.5">
+                  <button onClick={() => navigate(`/call/${l.code}`)} className="flex items-center gap-3 min-w-0 flex-1 text-left">
+                    <span className="size-12 rounded-full bg-[#21C063]/15 text-[#21C063] flex items-center justify-center shrink-0">
+                      {l.scheduledFor ? <CalendarClock size={22} /> : <Link2 size={22} />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[16.5px] text-wa-text truncate">{l.title || (l.callType === "video" ? "Video call" : "Voice call")}</span>
+                      <span className="block text-[13.5px] text-wa-muted truncate">
+                        {l.live ? `${l.participants} in the call now` : l.scheduledFor ? new Date(l.scheduledFor).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Call link"}
+                        {!mine && l.creatorName ? ` · ${l.creatorName}` : ""}
+                      </span>
+                    </span>
+                  </button>
+                  <button onClick={() => copyLink(l.code)} className="size-10 rounded-full flex items-center justify-center text-wa-muted active:bg-white/10" aria-label="Copy link">
+                    <Copy size={19} />
+                  </button>
+                  {mine && (
+                    <button onClick={() => removeLink(l.code)} className="size-10 rounded-full flex items-center justify-center text-wa-muted active:bg-white/10" aria-label="Cancel">
+                      <Trash2 size={19} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </>
         )}
 
         {!searching && <h2 className="px-4 pb-1 text-[16px] lg:text-[16px] text-wa-text">Recent</h2>}
@@ -322,6 +396,11 @@ const CallsPage = () => {
         </span>
       </button>
 
+      {linkSheet && (
+        <Suspense fallback={null}>
+          <CallLinkSheet schedule={linkSheet === "schedule"} onClose={() => setLinkSheet(null)} onCreated={loadUpcoming} />
+        </Suspense>
+      )}
       {info && <CallInfo row={info} myId={myId} onClose={() => setInfo(null)} onCall={callBack} onMessage={(u) => { navigate("/"); setTimeout(() => useChatStore.getState().setSelectedChat({ type: "direct", data: u }), 150); }} />}
       {favPicker && <ContactPicker title="Favourites" users={favUsers} onClose={() => setFavPicker(false)} onCall={(u, t) => { setFavPicker(false); callBack(u, t); }} />}
       {picker && <ContactPicker users={users} onClose={() => setPicker(false)} onCall={(u, t) => { setPicker(false); callBack(u, t); }} />}

@@ -1,3 +1,4 @@
+import CallLink from "../models/callLink.model.js";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
 import http from "http";
@@ -94,6 +95,18 @@ const groupCallPublic = (groupId) => {
     participants: [...c.participants.values()],
   };
 };
+// Calls made from a call link live in the ad-hoc machinery (no Group document), under "adhoc:link-<code>".
+const LINK_PREFIX = "adhoc:link-";
+export const linkCallLive = (code) => groupCalls.has(`${LINK_PREFIX}${code}`);
+export const linkCallCount = (code) => groupCalls.get(`${LINK_PREFIX}${code}`)?.participants.size || 0;
+async function linkFor(groupId) {
+  if (typeof groupId !== "string" || !groupId.startsWith(LINK_PREFIX)) return null;
+  try {
+    return await CallLink.findOne({ code: groupId.slice(LINK_PREFIX.length), expiresAt: { $gt: new Date() } }).lean();
+  } catch {
+    return null;
+  }
+}
 const isAdhoc = (groupId) => typeof groupId === "string" && groupId.startsWith("adhoc:");
 
 // Ad-hoc calls come from adding people to a 1:1 call: they have no Group document,
@@ -542,6 +555,28 @@ io.on("connection", (socket) => {
     const reply = typeof ack === "function" ? ack : () => {};
     const { groupId, callType } = payload || {};
     if (typeof groupId !== "string") return reply({ ok: false, error: "Invalid group" });
+    if (groupId.startsWith(LINK_PREFIX)) {
+      // Joining (or opening) a call from a link: no ringing, anyone with the link may come in.
+      const link = await linkFor(groupId);
+      if (!link) return reply({ ok: false, error: "This call link has expired" });
+      let call = groupCalls.get(groupId);
+      if (!call) {
+        call = {
+          callType: link.callType,
+          startedBy: userId,
+          startedAt: Date.now(),
+          participants: new Map(),
+          adhoc: { name: link.title || "Call link", members: new Set() },
+          link: link.code,
+        };
+        groupCalls.set(groupId, call);
+      }
+      if (!call.participants.has(userId) && call.participants.size >= MAX_GROUP_CALL) {
+        return reply({ ok: false, error: `This call is full (${MAX_GROUP_CALL} people)` });
+      }
+      call.adhoc.members.add(userId);
+      return reply(joinGroupCall(groupId, call, userId, socket.data.profile));
+    }
     const group = await Group.findOne({ _id: groupId, members: userId })
       .select("name groupPic members")
       .lean()
@@ -690,6 +725,7 @@ io.on("connection", (socket) => {
     if (typeof groupId !== "string") return reply({ ok: false, error: "Invalid group" });
     const call = groupCalls.get(groupId);
     if (!call) return reply({ ok: false, error: "This call has ended" });
+    if (call.link && (await linkFor(groupId))) call.adhoc.members.add(userId); // anyone with the link may join
     if (!(await isGroupMember(groupId, userId))) return reply({ ok: false, error: "You're not in this group" });
     if (!groupCalls.has(groupId)) return reply({ ok: false, error: "This call has ended" });
     if (!call.participants.has(userId) && call.participants.size >= MAX_GROUP_CALL) {

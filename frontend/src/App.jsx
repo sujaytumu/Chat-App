@@ -15,7 +15,7 @@ import GroupCallManager from "./components/GroupCallManager";
 import CallKeepAlive from "./components/CallKeepAlive";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
-import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { syncPreferences } from "./lib/prefsSync";
@@ -55,6 +55,18 @@ const AccessibilityPage = more("AccessibilityPage");
 const HelpPage = more("HelpPage");
 const ProfilePage = lazy(loaders.ProfilePage);
 const CallsPage = lazy(loaders.CallsPage);
+const CallJoinPage = lazy(() => import("./pages/CallJoinPage"));
+
+// Someone opened a call link while signed out: remember it, sign in, then land on the call.
+const CallLinkLogin = () => {
+  const { code } = useParams();
+  try {
+    sessionStorage.setItem("talkies-call-code", code);
+  } catch {
+    /* ignore */
+  }
+  return <Navigate to="/login" replace />;
+};
 const StatusPage = lazy(loaders.StatusPage);
 
 const JoinGroupDialog = lazy(() => import("./components/JoinGroupDialog"));
@@ -90,6 +102,20 @@ const App = () => {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Signed in after opening a call link: go to that call
+  useEffect(() => {
+    if (!authUser) return;
+    try {
+      const code = sessionStorage.getItem("talkies-call-code");
+      if (code) {
+        sessionStorage.removeItem("talkies-call-code");
+        navigate(`/call/${code}`, { replace: true });
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [authUser, navigate]);
 
   // Same look & sounds on every device signed in to this account.
   const userId = authUser?._id;
@@ -203,6 +229,10 @@ const App = () => {
                 <Navigate to="/login" />
               )
             }
+          />
+          <Route
+            path="/call/:code"
+            element={authUser ? <MainLayout><CallJoinPage /></MainLayout> : <CallLinkLogin />}
           />
           <Route
             path="/calls"
