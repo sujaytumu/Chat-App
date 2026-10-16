@@ -320,6 +320,9 @@ const CallManager = () => {
 
   // ---- Outgoing / active call ----
   const isVideo = callType === "video";
+  // With a profile photo the whole screen is their photo (like WhatsApp): no small circle photo,
+  // and the name + "Ringing…"/timer live together at the top.
+  const hasPhoto = !!remoteUser?.profilePic;
   const canFlip = isVideo && isPhoneLike() && !isVideoOff && !isScreenSharing;
   const statusText =
     callStatus === "calling"
@@ -359,8 +362,11 @@ const CallManager = () => {
           <Minimize2 size={18} />
         </button>
         <div className="text-center">
-          <h3 className="text-white font-medium">{remoteUser?.fullName}</h3>
-          <p className="text-xs text-white/60 flex items-center justify-center gap-1">
+          <h3 className={hasPhoto ? "text-white text-[22px] leading-tight font-semibold drop-shadow max-w-[62vw] truncate" : "text-white font-medium"}>
+            {remoteUser?.fullName}
+          </h3>
+          {hasPhoto && <p className="text-[15px] text-white/90 mt-0.5 tabular-nums drop-shadow">{statusText}</p>}
+          <p className="text-xs text-white/60 flex items-center justify-center gap-1 mt-0.5">
             <Lock size={10} /> End-to-end encrypted
           </p>
           {isScreenSharing && (
@@ -415,7 +421,7 @@ const CallManager = () => {
               <UploadCloud size={12} /> {remoteUser?.fullName?.split(" ")[0] || "They"} is sharing their screen
             </div>
           )}
-          {!remoteStream && (
+          {!remoteStream && !hasPhoto && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white drop-shadow">
               <div className="relative mb-4">
                 {callStatus === "calling" && (
@@ -437,6 +443,8 @@ const CallManager = () => {
             className="absolute top-4 right-4 w-24 h-32 sm:w-32 sm:h-44 object-cover rounded-lg border-2 border-white/20 shadow-lg"
           />
         </div>
+      ) : hasPhoto ? (
+        <div className="flex-1" />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-white">
           <div className="relative mb-4">
