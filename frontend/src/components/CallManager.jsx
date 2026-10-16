@@ -139,8 +139,8 @@ const useCallWakeLock = (active) => {
 // The two states are separate full class strings — mixing bg-white/10 and
 // bg-white on one element leaves the winner up to stylesheet order.
 const gridBtnBase = "size-16 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95";
-const gridBtnOff = `${gridBtnBase} bg-white/10 hover:bg-white/15 text-white`;
-const gridBtnOn = `${gridBtnBase} bg-white hover:bg-white/90 text-wa-bg shadow-lg shadow-white/10`;
+const gridBtnOff = `${gridBtnBase} bg-[rgba(255,255,255,0.18)] text-[#FFFFFF] active:bg-[rgba(255,255,255,0.28)]`;
+const gridBtnOn = `${gridBtnBase} call-btn-on bg-[#FFFFFF] text-[#0B141A]`;
 const gridBtn = gridBtnOff;
 const callBtn = (active) => (active ? gridBtnOn : gridBtnOff);
 

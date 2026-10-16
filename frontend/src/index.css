@@ -295,3 +295,11 @@ html.reduce-motion .fmt-pop{animation:none}
 @keyframes selpop{from{opacity:0;translate:0 -8px;scale:.9}to{opacity:1;translate:0 0;scale:1}}
 .sel-pop{animation:selpop .16s ease-out}
 html.reduce-motion .sel-pop{animation:none}
+
+/* Call controls that turn on (speaker, mute, camera, share): a clean white circle that blinks once, like WhatsApp. */
+@keyframes call-on-blink {
+  0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.75); transform: scale(0.92); }
+  60% { box-shadow: 0 0 0 14px rgba(255,255,255,0); transform: scale(1.06); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); transform: scale(1); }
+}
+.call-btn-on { animation: call-on-blink 0.5s ease-out; }

@@ -12,8 +12,8 @@ import { TRANSPARENT_POSTER } from "../lib/utils";
 
 // Same control look as 1-to-1 calls: dark circle, solid white while "on".
 const btnBase = "size-16 rounded-full flex items-center justify-center transition-all duration-150 active:scale-95";
-const btnOff = `${btnBase} bg-white/10 hover:bg-white/15 text-white`;
-const btnOn = `${btnBase} bg-white hover:bg-white/90 text-wa-bg shadow-lg shadow-white/10`;
+const btnOff = `${btnBase} bg-[rgba(255,255,255,0.18)] text-[#FFFFFF] active:bg-[rgba(255,255,255,0.28)]`;
+const btnOn = `${btnBase} call-btn-on bg-[#FFFFFF] text-[#0B141A]`;
 const ctl = (on) => (on ? btnOn : btnOff);
 
 const fmt = (sec) => {
