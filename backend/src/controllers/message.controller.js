@@ -698,7 +698,7 @@ export const getChatMedia = async (req, res) => {
     const visible = { ...scope, deletedFor: { $ne: myId }, deletedForEveryone: { $ne: true } };
     const pick = "image file text senderId createdAt";
     const [media, docs, linkMsgs] = await Promise.all([
-      Message.find({ ...visible, $or: [{ image: { $ne: "" } }, { "file.type": "video" }] })
+      Message.find({ ...visible, $or: [{ image: { $nin: ["", null] } }, { "file.type": "video", "file.url": { $nin: ["", null] } }] }) // ($ne: "" also matched every message with no image at all)
         .sort({ createdAt: -1 }).limit(300).select(pick).lean(),
       Message.find({ ...visible, "file.type": "document" }).sort({ createdAt: -1 }).limit(200).select(pick).lean(),
       Message.find({ ...visible, text: /https?:\/\//i }).sort({ createdAt: -1 }).limit(200).select(pick).lean(),
@@ -710,13 +710,15 @@ export const getChatMedia = async (req, res) => {
       }
     }
     res.status(200).json({
-      media: media.map((m) => ({
-        _id: m._id,
-        createdAt: m.createdAt,
-        kind: m.image ? "image" : "video",
-        url: m.image || m.file?.url,
-        duration: m.file?.duration,
-      })),
+      media: media
+        .filter((m) => m.image || (m.file?.type === "video" && m.file?.url))
+        .map((m) => ({
+          _id: m._id,
+          createdAt: m.createdAt,
+          kind: m.image ? "image" : "video",
+          url: m.image || m.file?.url,
+          duration: m.file?.duration,
+        })),
       docs: docs.map((m) => ({ _id: m._id, createdAt: m.createdAt, name: m.file?.name, size: m.file?.size, url: m.file?.url })),
       links,
     });
