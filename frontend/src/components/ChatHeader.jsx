@@ -17,6 +17,7 @@ const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
 const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
 const ScheduledPanel = lazy(() => import("./ScheduledPanel"));
 const ChatColorSheet = lazy(() => import("./ChatColorSheet"));
+const ChatThemeSheet = lazy(() => import("./ChatThemeSheet"));
 
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
@@ -60,6 +61,7 @@ const ChatHeader = () => {
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showWallpaper, setShowWallpaper] = useState(false);
+  const [showTheme, setShowTheme] = useState(false);
   const [showClear, setShowClear] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
   const selecting = useChatStore((st) => st.selectedMsgIds.length > 0);
@@ -217,6 +219,15 @@ const ChatHeader = () => {
                 className={menuItem}
                 onClick={() => {
                   setShowMenu(false);
+                  setShowTheme(true);
+                }}
+              >
+                <Palette size={18} className="text-wa-icon" /> Theme &amp; font
+              </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
                   setShowWallpaper(true);
                 }}
               >
@@ -322,6 +333,11 @@ const ChatHeader = () => {
         </Suspense>
       )}
 
+      {showTheme && (
+        <Suspense fallback={null}>
+          <ChatThemeSheet chatKey={`${selectedChat.type}:${data._id}`} chatName={name} onClose={() => setShowTheme(false)} />
+        </Suspense>
+      )}
       {showWallpaper && (
         <Suspense fallback={null}>
           <WallpaperPicker scope={`${selectedChat.type}:${data._id}`} chatName={name} onClose={() => setShowWallpaper(false)} />

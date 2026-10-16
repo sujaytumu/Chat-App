@@ -162,6 +162,18 @@ final class NotificationHelper {
         }
     }
 
+    /** Cached caller photo only — never touches the network, so the ring can start instantly. */
+    static Bitmap cachedPhoto(Context ctx, String callerId) {
+        try {
+            File f = photoFile(ctx, callerId);
+            if (f.exists() && System.currentTimeMillis() - f.lastModified() < 10 * 60_000L) {
+                return BitmapFactory.decodeFile(f.getAbsolutePath());
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
     /** Square, round avatar for the notification's own caller icon. */
     private static Bitmap roundAvatar(Bitmap src, int size) {
         Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
@@ -180,7 +192,9 @@ final class NotificationHelper {
     static void showIncomingCall(Context ctx, String name, String body, String tag, String callerId, String photoUrl) {
         ensureChannels(ctx);
         int id = idFor(tag);
-        Bitmap photo = loadPhoto(ctx, photoUrl, callerId, 1080); // background thread (push service)
+        // Ring FIRST: downloading the photo here used to delay the ring by up to ~12 s on a slow
+        // network (FCM only gives the service ~10 s). The call screen loads the photo by itself.
+        Bitmap photo = cachedPhoto(ctx, callerId);
 
         // Full-screen "calling card": over the lock screen it opens our own call screen.
         Intent screen = new Intent(ctx, IncomingCallActivity.class);

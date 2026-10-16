@@ -1,5 +1,6 @@
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
+import { useAuthStore } from "../store/useAuthStore";
 
 // Handles taps on system notifications (messages and calls), whether the app
 // was already open (the service worker posts a message) or was launched by the
@@ -31,14 +32,38 @@ function openChat(type, id, goHome) {
 // "Answer" pressed on a call notification. If the call is already ringing here,
 // pick it up now; otherwise remember the intent so the call is answered the
 // moment it arrives (e.g. the app was closed and the server hands it over as
-// soon as the socket connects).
+// soon as the socket connects). Never needs a second tap.
+let lastAnswer = { from: "", at: 0 };
+let chaseTimer = null;
+
 function answerCall(callerId) {
+  // The same "Answer" can reach the page twice (launch intent + live event): only act once.
+  if (lastAnswer.from === callerId && Date.now() - lastAnswer.at < 4000) return;
+  lastAnswer = { from: callerId, at: Date.now() };
+
   const { callStatus, remoteUser, acceptCall } = useCallStore.getState();
   if (callStatus === "incoming" && remoteUser?._id === callerId) {
     acceptCall();
     return;
   }
+  // Already connected to this person (answered from the call screen first): nothing to do.
+  if ((callStatus === "in-call" || callStatus === "calling") && remoteUser?._id === callerId) return;
+
   useCallStore.setState({ autoAnswer: { from: callerId, until: Date.now() + ANSWER_WINDOW_MS } });
+
+  // The server holds the call for a short while; ask for it again until it arrives (the socket may
+  // still be reconnecting after the app was closed) so the call is picked up without another tap.
+  clearInterval(chaseTimer);
+  let tries = 0;
+  chaseTimer = setInterval(() => {
+    const { autoAnswer, callStatus: st } = useCallStore.getState();
+    if (!autoAnswer || autoAnswer.from !== callerId || st !== "idle" || ++tries > 20) {
+      clearInterval(chaseTimer);
+      return;
+    }
+    useAuthStore.getState().socket?.emit?.("syncCalls");
+  }, 1000);
+  useAuthStore.getState().socket?.emit?.("syncCalls");
 }
 
 export function handleNotificationAction({ action, data = {} }, goHome) {

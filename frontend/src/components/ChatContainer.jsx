@@ -20,6 +20,8 @@ import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
 import { useChatColorStore } from "../store/useChatColorStore";
+import { useChatThemeStore } from "../store/useChatThemeStore";
+import { getTheme, getFont, themeStyle, loadChatFont } from "../lib/chatThemes";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
@@ -63,6 +65,16 @@ const ChatContainer = () => {
   } = useChatStore();
   const { authUser } = useAuthStore();
   const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
+  // Instagram-style theme + font for this chat (a live "Preview" wins over the saved choice)
+  const themeKey = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "";
+  const savedTheme = useChatThemeStore((s) => s.map[themeKey]);
+  const previewTheme = useChatThemeStore((s) => (s.preview && s.preview.chatKey === themeKey ? s.preview : null));
+  const activeTheme = getTheme((previewTheme || savedTheme)?.theme);
+  const activeFont = getFont((previewTheme || savedTheme)?.font);
+  useEffect(() => loadChatFont(activeFont), [activeFont]);
+  const chatThemeStyle = activeTheme || activeFont ? themeStyle(activeTheme, activeFont) : null;
+  const chatLook = { ...(activeTheme ? {} : wallpaperStyle), ...(chatThemeStyle || {}), ...(activeFont ? { fontFamily: activeFont.css } : {}) };
+  const chatDarkClass = activeTheme ? " wa-dark" : "";
 
   // Disappearing messages: hide each one the moment it expires (the server
   // also deletes it for good a little later).
@@ -333,7 +345,7 @@ const ChatContainer = () => {
 
   if (isMessagesLoading) {
     return (
-      <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper" style={wallpaperStyle}>
+      <div className={`flex-1 flex flex-col overflow-hidden chat-wallpaper${chatDarkClass}`} style={chatLook}>
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -342,7 +354,7 @@ const ChatContainer = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0" style={wallpaperStyle} data-chat-color={ownColor || undefined}>
+    <div className={`flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0${chatDarkClass}`} style={chatLook} data-chat-color={activeTheme ? undefined : ownColor || undefined}>
       <ChatHeader />
       {chatSearchOpen && <ChatSearchBar />}
 
