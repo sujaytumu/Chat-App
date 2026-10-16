@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import toast from "react-hot-toast";
 import { useCallStore } from "../store/useCallStore";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 
@@ -37,6 +38,45 @@ const CallKeepAlive = () => {
       /* ignore */
     }
   }, [active, video, title, text, startedAt]);
+
+  // Phones like Realme/Oppo/Xiaomi stop apps in the background, so calls/messages never arrive once
+  // the app is closed. Ask once (every few days at most) to let Talkies run in the background.
+  useEffect(() => {
+    const p = plugin();
+    if (!p || typeof p.batteryStatus !== "function" || typeof p.requestBatteryUnrestricted !== "function") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const last = Number(localStorage.getItem("talkies.batteryAsked") || 0);
+        if (Date.now() - last < 3 * 24 * 3600 * 1000) return;
+        const st = await p.batteryStatus();
+        if (cancelled || st?.unrestricted) return;
+        localStorage.setItem("talkies.batteryAsked", String(Date.now()));
+        toast(
+          (t) => (
+            <span className="text-[14px]">
+              Allow Talkies to run in the background so calls and messages reach you when the app is closed.
+              <button
+                className="ml-3 px-3 py-1 rounded-full bg-[#25D366] text-[#0b141a] font-medium"
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  Promise.resolve(p.requestBatteryUnrestricted()).catch(() => {});
+                }}
+              >
+                Allow
+              </button>
+            </span>
+          ),
+          { duration: 15000 }
+        );
+      } catch {
+        /* older app build */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Like WhatsApp: video calls start on the loudspeaker, voice calls on the earpiece.
   useEffect(() => {
