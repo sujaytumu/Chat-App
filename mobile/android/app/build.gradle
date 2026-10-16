@@ -16,6 +16,17 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // One fixed signing key for every build. Without it each CI run signs with a brand-new random
+    // debug key, so installing a newer APK over an older one fails with
+    // "App not installed as package conflicts with an existing package".
+    signingConfigs {
+        debug {
+            storeFile file('talkies-debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
