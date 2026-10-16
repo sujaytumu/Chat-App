@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { axiosInstance } from "../lib/axios";
 
 // Only one voice note plays at a time (like WhatsApp): starting one pauses the other.
 let currentlyPlaying = null;
@@ -23,7 +25,31 @@ const fallbackBars = (seed) => {
   });
 };
 
-const VoiceMessagePlayer = ({ file, onError, autoNext }) => {
+const VoiceMessagePlayer = ({ file, onError, autoNext, messageId, transcript }) => {
+  const [text, setText] = useState(transcript || "");
+  const [open, setOpen] = useState(!!transcript);
+  const [busy, setBusy] = useState(false);
+  const transcribe = async (e) => {
+    e.stopPropagation();
+    if (text) return setOpen((o) => !o);
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.post(`/messages/transcribe/${messageId}`);
+      if (data.empty || !data.text) toast("No speech found in this voice message");
+      else {
+        setText(data.text);
+        setOpen(true);
+      }
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.error === "not_configured"
+          ? "Transcripts aren't switched on yet — add a GROQ_API_KEY on the server"
+          : err?.response?.data?.error || "Couldn't transcribe this voice message"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const audioRef = useRef(null);
   const barsRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -127,7 +153,8 @@ const VoiceMessagePlayer = ({ file, onError, autoNext }) => {
   const shown = playing || current > 0 ? current : duration;
 
   return (
-    <div data-voice-row="1" className="flex items-center gap-2.5 mb-1 min-w-[230px] max-w-[270px] select-none">
+    <div className="mb-1 min-w-[230px] max-w-[270px]">
+    <div data-voice-row="1" className="flex items-center gap-2.5 min-w-[230px] max-w-[270px] select-none">
       <button
         type="button"
         onClick={toggle}
@@ -181,6 +208,23 @@ const VoiceMessagePlayer = ({ file, onError, autoNext }) => {
         }}
         onError={onError}
       />
+    </div>
+      {messageId && (
+        <div className="mt-1">
+          <button type="button" onClick={transcribe} disabled={busy} className="text-[11.5px] font-medium opacity-90 underline-offset-2 hover:underline flex items-center gap-1">
+            {busy ? (
+              <>
+                <Loader2 size={12} className="animate-spin" /> Transcribing…
+              </>
+            ) : text ? (
+              open ? "Hide transcript" : "Show transcript"
+            ) : (
+              "Transcribe"
+            )}
+          </button>
+          {open && text && <p className="mt-1 text-[13.5px] leading-snug whitespace-pre-wrap break-words">{text}</p>}
+        </div>
+      )}
     </div>
   );
 };

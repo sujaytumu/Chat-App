@@ -628,7 +628,7 @@ const ChatContainer = () => {
                       className="max-w-full w-[260px] max-h-[320px] h-auto object-cover rounded-lg mb-1 cursor-pointer hover:opacity-90 transition-opacity"
                     />
                   )}
-                  {message.file && <AttachmentContent file={message.file} incoming={!isMe} onMediaLoaded={handleMediaLoaded} />}
+                  {message.file && <AttachmentContent file={message.file} incoming={!isMe} onMediaLoaded={handleMediaLoaded} messageId={message._id} transcript={message.transcript?.text} />}
                   {message.contact ? (
                     <ContactCard
                       contact={message.contact}

@@ -12,6 +12,7 @@ import {
   getStarredMessages,
   setChatArchived,
   ackDelivered,
+  transcribeMessage,
   setChatPinned,
   setChatMuted,
   setChatLists,
@@ -40,6 +41,7 @@ router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
 router.get("/search/all", protectRoute, searchMessages);
 router.put("/react/:id", protectRoute, reactToMessage);
 router.put("/edit/:id", protectRoute, editMessage);
+router.post("/transcribe/:id", protectRoute, transcribeMessage);
 router.put("/poll/:id/vote", protectRoute, votePoll);
 router.post("/view-once/:id", protectRoute, openViewOnce);
 router.get("/disappearing/:id", protectRoute, getDirectDisappearing);
