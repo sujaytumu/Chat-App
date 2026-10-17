@@ -299,11 +299,31 @@ final class NotificationHelper {
         synchronized (RINGING) {
             RINGING.remove(key);
         }
+        // A cancel names a specific call. If what is on screen under this tag is no longer that ringing
+        // call (e.g. the "Missed call" notification already replaced it), leave it alone.
+        if (callId != null && !callId.isEmpty() && !callNotificationShown(ctx, idFor(tag))) return;
         try {
             NotificationManagerCompat.from(ctx).cancel(idFor(tag));
         } catch (Exception ignored) {
         }
         IncomingCallActivity.dismiss(tag); // also closes the full-screen call screen
+    }
+
+    /** True when the notification with this id is currently the ringing-call one (not a message / missed call). */
+    private static boolean callNotificationShown(Context ctx, int id) {
+        try {
+            if (Build.VERSION.SDK_INT < 23) return true;
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return true;
+            for (android.service.notification.StatusBarNotification sbn : nm.getActiveNotifications()) {
+                if (sbn.getId() != id) continue;
+                if (Build.VERSION.SDK_INT >= 26) return CH_CALLS.equals(sbn.getNotification().getChannelId());
+                return true;
+            }
+            return false;
+        } catch (Exception e) {
+            return true; // when unsure, stop the ring
+        }
     }
 
     static void showMessage(Context ctx, String title, String body, String tag, String chatId, String chatType, boolean missedCall) {
