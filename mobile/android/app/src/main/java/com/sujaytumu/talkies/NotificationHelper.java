@@ -47,6 +47,32 @@ final class NotificationHelper {
     static final String ACTION_DECLINE = "com.sujaytumu.talkies.DECLINE_CALL";
     private static final long CALL_RING_MS = 45_000;
 
+    // Which call is ringing under each notification tag, and which calls were already cancelled.
+    // A cancel that arrives before its ring (or twice) must never ring / re-ring a finished call, and a
+    // cancel for an OLD call must never silence a newer one.
+    private static final Map<String, String> RINGING = new HashMap<>();
+    private static final Map<String, Long> CANCELLED = new HashMap<>();
+
+    static boolean wasCancelled(String callId) {
+        if (callId == null || callId.isEmpty()) return false;
+        synchronized (CANCELLED) {
+            Long t = CANCELLED.get(callId);
+            return t != null && System.currentTimeMillis() - t < 5 * 60_000L;
+        }
+    }
+
+    private static void markCancelled(String callId) {
+        if (callId == null || callId.isEmpty()) return;
+        synchronized (CANCELLED) {
+            long now = System.currentTimeMillis();
+            CANCELLED.put(callId, now);
+            java.util.Iterator<Map.Entry<String, Long>> it = CANCELLED.entrySet().iterator();
+            while (it.hasNext()) {
+                if (now - it.next().getValue() > 5 * 60_000L) it.remove();
+            }
+        }
+    }
+
     // last few lines per chat so a burst of messages stacks like WhatsApp
     private static final Map<String, ArrayDeque<String>> RECENT = new HashMap<>();
 
@@ -191,7 +217,13 @@ final class NotificationHelper {
     }
 
     /** Full-screen incoming call (caller photo, ringtone, Answer / Decline). */
-    static void showIncomingCall(Context ctx, String name, String body, String tag, String callerId, String photoUrl) {
+    static void showIncomingCall(Context ctx, String name, String body, String tag, String callerId, String photoUrl, String callId) {
+        // This call was already cancelled / ended before its ring reached the phone (it was offline,
+        // then came back): stay silent, exactly like a real call that was hung up.
+        if (wasCancelled(callId)) return;
+        synchronized (RINGING) {
+            RINGING.put(tag == null ? "" : tag, callId == null ? "" : callId);
+        }
         ensureChannels(ctx);
         int id = idFor(tag);
         // Ring FIRST: downloading the photo here used to delay the ring by up to ~12 s on a slow
@@ -206,6 +238,7 @@ final class NotificationHelper {
         screen.putExtra(IncomingCallActivity.EXTRA_TAG, tag);
         screen.putExtra(IncomingCallActivity.EXTRA_CALLER, callerId);
         screen.putExtra(IncomingCallActivity.EXTRA_PHOTO, photoUrl);
+        screen.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId == null ? "" : callId);
         screen.setData(Uri.parse("talkies://call/" + id));
         PendingIntent fullScreen = PendingIntent.getActivity(ctx, id + 3, screen, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
@@ -217,6 +250,7 @@ final class NotificationHelper {
         decline.setAction(ACTION_DECLINE);
         decline.putExtra("callerId", callerId);
         decline.putExtra("notifId", id);
+        decline.putExtra("callId", callId == null ? "" : callId);
         PendingIntent declinePi = PendingIntent.getBroadcast(ctx, id + 2, decline, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         Person.Builder pb = new Person.Builder().setName(name == null || name.isEmpty() ? "Talkies" : name).setImportant(true);
@@ -249,6 +283,22 @@ final class NotificationHelper {
 
     /** Replaces / removes whatever is shown for this tag (stops a ring). */
     static void cancel(Context ctx, String tag) {
+        cancel(ctx, tag, "");
+    }
+
+    /** Stops the ring of one specific call. A cancel naming an older call than the one ringing is ignored. */
+    static void cancel(Context ctx, String tag, String callId) {
+        String key = tag == null ? "" : tag;
+        if (callId != null && !callId.isEmpty()) {
+            markCancelled(callId);
+            synchronized (RINGING) {
+                String ringing = RINGING.get(key);
+                if (ringing != null && !ringing.isEmpty() && !ringing.equals(callId)) return;
+            }
+        }
+        synchronized (RINGING) {
+            RINGING.remove(key);
+        }
         try {
             NotificationManagerCompat.from(ctx).cancel(idFor(tag));
         } catch (Exception ignored) {
@@ -257,6 +307,13 @@ final class NotificationHelper {
     }
 
     static void showMessage(Context ctx, String title, String body, String tag, String chatId, String chatType, boolean missedCall) {
+        if (missedCall) {
+            // "Missed call" replaces the ringing notification: the full-screen call screen must go too.
+            synchronized (RINGING) {
+                RINGING.remove(tag == null ? "" : tag);
+            }
+            IncomingCallActivity.dismiss(tag);
+        }
         ensureChannels(ctx);
         int id = idFor(tag.isEmpty() ? (chatId.isEmpty() ? title : chatId) : tag);
         String key = chatId.isEmpty() ? title : chatId;

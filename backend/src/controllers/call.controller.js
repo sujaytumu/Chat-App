@@ -71,7 +71,8 @@ export const getIceConfig = (req, res) => {
 export const declineCall = (req, res) => {
   const callerId = String(req.body?.callerId || "");
   if (!callerId) return res.status(400).json({ error: "callerId required" });
-  declineCallFor(String(req.user._id), callerId);
+  const callId = String(req.body?.callId || "").replace(/[^A-Za-z0-9-]/g, "").slice(0, 64) || undefined;
+  declineCallFor(String(req.user._id), callerId, callId);
   res.status(200).json({ ok: true });
 };
 

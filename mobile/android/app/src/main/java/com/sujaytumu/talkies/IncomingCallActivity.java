@@ -32,6 +32,7 @@ public class IncomingCallActivity extends Activity {
     static final String EXTRA_TAG = "tag";
     static final String EXTRA_CALLER = "callerId";
     static final String EXTRA_PHOTO = "photoUrl";
+    static final String EXTRA_CALL_ID = "callId";
 
     private static volatile IncomingCallActivity current;
 
@@ -40,6 +41,7 @@ public class IncomingCallActivity extends Activity {
     private TextView initialView;
     private String tag = "";
     private String callerId = "";
+    private String callId = "";
     private boolean done = false;
 
     /** Closes the screen when the caller hangs up / the call is answered elsewhere. */
@@ -77,6 +79,7 @@ public class IncomingCallActivity extends Activity {
         String body = nz(in.getStringExtra(EXTRA_BODY));
         tag = nz(in.getStringExtra(EXTRA_TAG));
         callerId = nz(in.getStringExtra(EXTRA_CALLER));
+        callId = nz(in.getStringExtra(EXTRA_CALL_ID));
         final String photoUrl = nz(in.getStringExtra(EXTRA_PHOTO));
         if (name.isEmpty()) name = "Talkies";
         if (name.endsWith("is calling…")) name = name.substring(0, name.length() - "is calling…".length()).trim();
@@ -230,6 +233,7 @@ public class IncomingCallActivity extends Activity {
         d.setAction(NotificationHelper.ACTION_DECLINE);
         d.putExtra("callerId", callerId);
         d.putExtra("notifId", NotificationHelper.idFor(tag));
+        d.putExtra("callId", callId);
         sendBroadcast(d);
         NotificationHelper.cancel(this, tag);
         finishCall();
