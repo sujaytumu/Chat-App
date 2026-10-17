@@ -257,6 +257,9 @@ export const useCallStore = create((set, get) => ({
   isVideoOff: false,
   isRemoteRinging: false, // true once the callee's device has actually started ringing
   isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
+  audioRoutes: [], // Android app: [{ id, kind: "earpiece"|"speaker"|"bluetooth"|"wired", name }]
+  audioRoute: null, // id of the output the call audio is on right now
+  audioPickerOpen: false,
   isScreenSharing: false,
   cameraFacing: "user", // front / back camera on phones
   remoteMuted: false, // the other person has muted their mic
@@ -574,6 +577,9 @@ export const useCallStore = create((set, get) => ({
       isRemoteRinging: false,
       isScreenSharing: false,
       isSpeakerOn: false,
+      audioRoutes: [],
+      audioRoute: null,
+      audioPickerOpen: false,
       isReconnecting: false,
       remoteMuted: false,
       remoteVideoOff: false,
@@ -614,6 +620,38 @@ export const useCallStore = create((set, get) => ({
     set({ isSpeakerOn: true });
   },
 
+  // ---- Android app: choose where the call is heard (phone / speaker / Bluetooth / headphones) ----
+  setAudioRoutes: (data) => {
+    if (!data?.routes) return;
+    set({ audioRoutes: data.routes, audioRoute: data.current, isSpeakerOn: data.current === "speaker" });
+  },
+
+  refreshAudioRoutes: async () => {
+    const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesCall : null;
+    if (typeof native?.getAudioRoutes !== "function") return false;
+    try {
+      get().setAudioRoutes(await native.getAudioRoutes());
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  chooseAudioRoute: async (id) => {
+    const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesCall : null;
+    set({ audioPickerOpen: false });
+    if (typeof native?.setAudioRoute !== "function") return;
+    try {
+      const res = await native.setAudioRoute({ id });
+      get().setAudioRoutes(res);
+      if (res?.ok === false) toast.error("Couldn't switch to that output");
+    } catch {
+      toast.error("Couldn't switch the audio output");
+    }
+  },
+
+  closeAudioPicker: () => set({ audioPickerOpen: false }),
+
   // Single-tap speaker toggle (matches WhatsApp's simple on/off behavior).
   // True earpiece-vs-speaker routing is OS-managed and not something a
   // browser can control; this toggles between the default output and any
@@ -624,7 +662,13 @@ export const useCallStore = create((set, get) => ({
     // build without it rejects the call, and then we fall back to the browser behaviour below.
     try {
       const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesCall : null;
+      if (native && typeof native.getAudioRoutes === "function") {
+        // Ask where to play the call: Phone / Speaker / Bluetooth / Headphones.
+        if (await get().refreshAudioRoutes()) set({ audioPickerOpen: true });
+        return;
+      }
       if (native && typeof native.setSpeaker === "function") {
+        // older app build: plain on/off
         const next = !get().isSpeakerOn;
         await native.setSpeaker({ on: next });
         set({ isSpeakerOn: next });

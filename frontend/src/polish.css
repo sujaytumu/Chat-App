@@ -242,3 +242,18 @@ html[data-accent] .bg-\[\#00A884\]\/20 { background-color: color-mix(in srgb, va
 html[data-accent] .border-\[\#25D366\] { border-color: var(--ac2); }
 html[data-accent] ::selection { background: color-mix(in srgb, var(--ac1) 35%, transparent); }
 html[data-accent] .toggle:checked { box-shadow: 0 0 12px -2px color-mix(in srgb, var(--ac1) 60%, transparent); }
+
+/* Themed chats: own bubbles carry their own text colour (dark on a light bubble, white on a
+   dark one) — the rest of the chat stays on the light-on-dark palette. */
+.chat-themed .bg-wa-out {
+  --wa-text: var(--ct-out-text);
+  --wa-text2: var(--ct-out-text);
+  --wa-muted: var(--ct-out-text);
+  --wa-muted2: var(--ct-out-text);
+  --wa-icon: var(--ct-out-text);
+  color: rgb(var(--ct-out-text));
+}
+.chat-themed .bg-wa-out .text-wa-muted,
+.chat-themed .bg-wa-out .text-wa-muted2 { opacity: .72; }
+/* the header and composer sit on the theme, with a soft edge instead of a hard navy bar */
+.chat-themed .border-white\/5 { border-color: rgb(255 255 255 / .08); }

@@ -12,6 +12,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import AddParticipantModal from "./AddParticipantModal";
+import AudioRoutePicker, { routeLabel } from "./AudioRoutePicker";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import { isPhoneLike } from "../lib/device";
 import { Phone, PhoneEnd, Video, VideoOff, Mic, MicOff, Volume2 } from "./icons/WaGlyphs";
@@ -156,6 +157,8 @@ const CallManager = () => {
     isRemoteRinging,
     isScreenSharing,
     isSpeakerOn,
+    audioRoutes,
+    audioRoute,
     callStartedAt,
     isReconnecting,
     remoteMuted,
@@ -337,6 +340,7 @@ const CallManager = () => {
     <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col isolate">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
       {(!isVideo || !remoteStream) && <CallBackdrop user={remoteUser} />}
+      <AudioRoutePicker />
 
       {audioBlocked && (
         <button
@@ -467,7 +471,7 @@ const CallManager = () => {
             <button onClick={toggleSpeakerOutput} className={callBtn(isSpeakerOn)}>
               <Volume2 size={24} />
             </button>
-            <span className="text-xs text-white/70">Speaker</span>
+            <span className="text-xs text-white/70">{audioRoutes.length && audioRoute ? routeLabel(audioRoutes, audioRoute) : "Speaker"}</span>
           </div>
 
           <div className="flex flex-col items-center gap-1.5">

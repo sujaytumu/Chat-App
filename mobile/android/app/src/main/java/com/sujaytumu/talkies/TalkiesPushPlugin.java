@@ -126,8 +126,14 @@ public class TalkiesPushPlugin extends Plugin {
         Activity a = getActivity();
         boolean mic = a != null && ContextCompat.checkSelfPermission(a, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED;
         boolean cam = a != null && ContextCompat.checkSelfPermission(a, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED;
-        if (a != null && (!mic || !cam)) {
-            ActivityCompat.requestPermissions(a, new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA}, 7002);
+        // Android 12+: Bluetooth headsets need their own "nearby devices" permission to carry a call
+        boolean bt = Build.VERSION.SDK_INT < 31 || (a != null && ContextCompat.checkSelfPermission(a, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED);
+        if (a != null && (!mic || !cam || !bt)) {
+            java.util.List<String> need = new java.util.ArrayList<>();
+            if (!mic) need.add(Manifest.permission.RECORD_AUDIO);
+            if (!cam) need.add(Manifest.permission.CAMERA);
+            if (!bt) need.add(Manifest.permission.BLUETOOTH_CONNECT);
+            ActivityCompat.requestPermissions(a, need.toArray(new String[0]), 7002);
         }
         JSObject res = new JSObject();
         res.put("mic", mic);

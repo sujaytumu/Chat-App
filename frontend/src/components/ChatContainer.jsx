@@ -21,7 +21,8 @@ import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
 import { useChatColorStore } from "../store/useChatColorStore";
 import { useChatThemeStore } from "../store/useChatThemeStore";
-import { getTheme, getFont, themeStyle, loadChatFont } from "../lib/chatThemes";
+import { getTheme, getFont, themeStyle, themeBarHex, loadChatFont } from "../lib/chatThemes";
+import { useStatusBarColor } from "../lib/useStatusBarColor";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
@@ -33,8 +34,17 @@ import { optimizeImage } from "../lib/cdn";
 
 // WhatsApp tints each person's name in a group differently.
 const SENDER_COLORS = ["#25D366", "#53BDEB", "#E8A33D", "#B794F6", "#F472B6", "#A3E635"];
-const colorForId = (id = "") =>
-  SENDER_COLORS[[...String(id)].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % SENDER_COLORS.length];
+const THEMED_SENDER_COLORS = ["#9BF6B8", "#9EDCFF", "#FFD28A", "#D8C2FF", "#FFB3D9", "#D4F28A"];
+const colorForId = (id = "", themed = false) => {
+  const list = themed ? THEMED_SENDER_COLORS : SENDER_COLORS;
+  return list[[...String(id)].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % list.length];
+};
+
+// While a themed chat is open the phone's status bar takes the header colour (handed back on close).
+const ThemeStatusBar = ({ color }) => {
+  useStatusBarColor(color, true);
+  return null;
+};
 
 const READ_MORE_AT = 700; // longer messages fold up with a "Read more" link
 
@@ -74,7 +84,7 @@ const ChatContainer = () => {
   useEffect(() => loadChatFont(activeFont), [activeFont]);
   const chatThemeStyle = activeTheme || activeFont ? themeStyle(activeTheme, activeFont) : null;
   const chatLook = { ...(activeTheme ? {} : wallpaperStyle), ...(chatThemeStyle || {}), ...(activeFont ? { fontFamily: activeFont.css } : {}) };
-  const chatDarkClass = activeTheme ? " wa-dark" : "";
+  const chatDarkClass = activeTheme ? " wa-dark chat-themed" : "";
 
   // Disappearing messages: hide each one the moment it expires (the server
   // also deletes it for good a little later).
@@ -346,6 +356,7 @@ const ChatContainer = () => {
   if (isMessagesLoading) {
     return (
       <div className={`flex-1 flex flex-col overflow-hidden chat-wallpaper${chatDarkClass}`} style={chatLook}>
+        {activeTheme && <ThemeStatusBar color={themeBarHex(activeTheme)} />}
         <ChatHeader />
         <MessageSkeleton />
         <MessageInput />
@@ -355,6 +366,7 @@ const ChatContainer = () => {
 
   return (
     <div className={`flex-1 flex flex-col overflow-hidden chat-wallpaper min-w-0${chatDarkClass}`} style={chatLook} data-chat-color={activeTheme ? undefined : ownColor || undefined}>
+      {activeTheme && <ThemeStatusBar color={themeBarHex(activeTheme)} />}
       <ChatHeader />
       {chatSearchOpen && <ChatSearchBar />}
 
@@ -561,7 +573,7 @@ const ChatContainer = () => {
                   {isGroup && !isMe && isFirstInGroup && (
                     <span
                       className="text-[11px] font-medium mb-0.5"
-                      style={{ color: colorForId(message.senderId) }}
+                      style={{ color: colorForId(message.senderId, !!activeTheme) }}
                     >
                       {sender?.fullName || "Unknown"}
                     </span>
