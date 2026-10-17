@@ -4,6 +4,7 @@ import Message from "../models/message.model.js";
 import { io } from "../lib/socket.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 import { markDirectDelivered } from "./message.controller.js";
+import { fcmEnabled } from "../lib/fcm.js";
 
 export const getVapidPublicKey = (req, res) => {
   res.status(200).json({ publicKey: process.env.VAPID_PUBLIC_KEY || null });
@@ -85,5 +86,17 @@ export const deviceDelivered = async (req, res) => {
   } catch (e) {
     console.log("Error in deviceDelivered:", e.message);
     res.status(500).json({ ok: false });
+  }
+};
+
+// Lets the Android app check that background calls can actually reach this phone:
+// is the server set up for Firebase push, and is this account registered with a phone?
+export const pushStatus = async (req, res) => {
+  try {
+    const u = await User.findById(req.user._id).select("fcmTokens").lean();
+    res.status(200).json({ fcmServer: fcmEnabled(), phones: (u?.fcmTokens || []).length });
+  } catch (e) {
+    console.log("Error in pushStatus:", e.message);
+    res.status(500).json({ error: "Internal server error" });
   }
 };

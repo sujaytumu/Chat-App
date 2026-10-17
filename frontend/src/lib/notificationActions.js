@@ -1,6 +1,7 @@
 import { useChatStore } from "../store/useChatStore";
 import { useCallStore } from "../store/useCallStore";
 import { useAuthStore } from "../store/useAuthStore";
+import toast from "react-hot-toast";
 
 // Handles taps on system notifications (messages and calls), whether the app
 // was already open (the service worker posts a message) or was launched by the
@@ -35,6 +36,7 @@ function openChat(type, id, goHome) {
 // soon as the socket connects). Never needs a second tap.
 let lastAnswer = { from: "", at: 0 };
 let chaseTimer = null;
+let giveUpTimer = null;
 
 function answerCall(callerId) {
   // The same "Answer" can reach the page twice (launch intent + live event): only act once.
@@ -50,6 +52,15 @@ function answerCall(callerId) {
   if ((callStatus === "in-call" || callStatus === "calling") && remoteUser?._id === callerId) return;
 
   useCallStore.setState({ autoAnswer: { from: callerId, until: Date.now() + ANSWER_WINDOW_MS } });
+  // Give up (and say so) if the call never reaches us, instead of leaving a stuck screen.
+  clearTimeout(giveUpTimer);
+  giveUpTimer = setTimeout(() => {
+    const { autoAnswer, callStatus: st } = useCallStore.getState();
+    if (autoAnswer && autoAnswer.from === callerId && st === "idle") {
+      useCallStore.setState({ autoAnswer: null });
+      toast("The call ended before it could connect", { icon: "📞" });
+    }
+  }, 30_000);
 
   // The server holds the call for a short while; ask for it again until it arrives (the socket may
   // still be reconnecting after the app was closed) so the call is picked up without another tap.

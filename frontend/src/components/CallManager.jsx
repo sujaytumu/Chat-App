@@ -159,6 +159,8 @@ const CallManager = () => {
     isSpeakerOn,
     audioRoutes,
     audioRoute,
+    autoAnswer,
+    isAnswering,
     callStartedAt,
     isReconnecting,
     remoteMuted,
@@ -247,9 +249,32 @@ const CallManager = () => {
     if (callStatus === "idle") setIsMinimized(false);
   }, [callStatus]);
 
+  // "Answer" was tapped on the notification and the call is still on its way to this phone:
+  // show that it is connecting (nothing to tap) instead of the home screen.
+  if (callStatus === "idle" && autoAnswer && Date.now() < autoAnswer.until) {
+    return (
+      <div className="wa-dark fixed inset-0 z-[200] bg-[#0b141a] flex flex-col items-center justify-center gap-5 text-white">
+        <div className="size-12 rounded-full border-[3px] border-white/20 border-t-[#25D366] animate-spin" />
+        <p className="text-[17px]">Connecting your call…</p>
+        <button onClick={() => useCallStore.setState({ autoAnswer: null })} className="mt-4 h-11 px-7 rounded-full bg-white/10 text-[14px]">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
   if (callStatus === "idle") return null;
 
   // ---- Incoming call ----
+  if (callStatus === "incoming" && isAnswering) {
+    return (
+      <div className="wa-dark fixed inset-0 z-[200] bg-[#0b141a] flex flex-col items-center justify-center gap-5 text-white">
+        <CallAvatar user={remoteUser} size="size-24" />
+        <h3 className="text-xl font-semibold">{remoteUser?.fullName}</h3>
+        <p className="text-[15px] text-white/70">Connecting…</p>
+      </div>
+    );
+  }
   if (callStatus === "incoming") {
     return (
       <div className="wa-dark fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">

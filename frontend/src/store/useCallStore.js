@@ -260,6 +260,7 @@ export const useCallStore = create((set, get) => ({
   audioRoutes: [], // Android app: [{ id, kind: "earpiece"|"speaker"|"bluetooth"|"wired", name }]
   audioRoute: null, // id of the output the call audio is on right now
   audioPickerOpen: false,
+  isAnswering: false, // Answer was tapped (on the notification or here) and the call is connecting
   isScreenSharing: false,
   cameraFacing: "user", // front / back camera on phones
   remoteMuted: false, // the other person has muted their mic
@@ -391,13 +392,15 @@ export const useCallStore = create((set, get) => ({
     if (!socket || !incomingOffer) return;
 
     get().stopRingtone();
+    if (get().isAnswering) return; // already connecting: a second tap must not start a second answer
+    set({ isAnswering: true });
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: AUDIO_CONSTRAINTS,
         video: callType === "video",
       });
-      set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now() });
+      set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now(), isAnswering: false });
 
       pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
@@ -450,6 +453,7 @@ export const useCallStore = create((set, get) => ({
       }
     } catch (err) {
       console.error("acceptCall failed:", err);
+      set({ isAnswering: false });
       toast.error("Couldn't answer the call — check mic/camera permission");
       get().endCall();
     }
@@ -580,6 +584,7 @@ export const useCallStore = create((set, get) => ({
       audioRoutes: [],
       audioRoute: null,
       audioPickerOpen: false,
+      isAnswering: false,
       isReconnecting: false,
       remoteMuted: false,
       remoteVideoOff: false,
@@ -897,7 +902,7 @@ export const useCallStore = create((set, get) => ({
       // They already pressed "Answer" on the notification: pick up right away
       // instead of ringing.
       const auto = get().autoAnswer;
-      if (auto && auto.from === fromUser._id && Date.now() < auto.until) {
+      if (auto && String(auto.from) === String(fromUser._id) && Date.now() < auto.until) {
         set({ autoAnswer: null });
         get().acceptCall();
         return;

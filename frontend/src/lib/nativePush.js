@@ -37,6 +37,7 @@ async function ensureRegistered(userId) {
   }
 }
 let listening = false;
+let lastIntentTs = 0;
 
 export async function registerNativePush(userId, goHome) {
   const p = plugin();
@@ -47,6 +48,12 @@ export async function registerNativePush(userId, goHome) {
   // "Answer" unhandled so the call had to be picked up a second time inside the app.
   const deliver = (intent) => {
     if (!intent) return;
+    // The app can hand over the same tap twice (launch intent + live event) or an old one:
+    // act once, and never on something older than a minute and a half.
+    if (intent.ts) {
+      if (intent.ts === lastIntentTs || Date.now() - intent.ts > 90_000) return;
+      lastIntentTs = intent.ts;
+    }
     handleNotificationAction({ action: intent.action || "open", data: intent }, goHome);
   };
   try {
@@ -94,4 +101,10 @@ export async function unregisterNativePush() {
   }
   registeredFor = null;
   currentUser = null;
+}
+
+// For the "background calls" check: forget what was registered and sign this phone up again.
+export async function forceRegisterNativePush(userId) {
+  registeredFor = null;
+  await ensureRegistered(userId);
 }

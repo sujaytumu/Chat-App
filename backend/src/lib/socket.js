@@ -224,6 +224,14 @@ io.on("connection", (socket) => {
 
   io.emit("getOnlineUsers", onlineIds());
 
+  // A call placed while this person was offline / in the background is handed over the instant
+  // they connect — before the slower catch-up work below — so tapping Answer on the notification
+  // connects straight away instead of waiting on database queries.
+  if (userId) {
+    const held = pendingCalls.get(userId);
+    if (held) socket.emit("incomingCall", { fromUser: held.fromUser, offer: held.offer, callType: held.callType });
+  }
+
   // ---- Typing indicators (1:1) ----
   socket.on("typing", ({ toUserId }) => {
     if (privacyCache.get(userId)?.typing === false || !canSignal(userId, String(toUserId))) return;
@@ -870,16 +878,6 @@ io.on("connection", (socket) => {
         console.log("Error catching up delivery receipts:", err.message);
       }
 
-      // Deliver any call that was placed to this user while they were
-      // offline and is still within its grace period.
-      const pending = pendingCalls.get(userId);
-      if (pending) {
-        socket.emit("incomingCall", {
-          fromUser: pending.fromUser,
-          offer: pending.offer,
-          callType: pending.callType,
-        });
-      }
     })();
   }
 });
