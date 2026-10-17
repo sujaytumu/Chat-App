@@ -102,6 +102,8 @@ export async function registerNativePush(userId, goHome) {
   } catch {
     /* ignore */
   }
+  // hand the chosen call tone to the app so the ringing notification uses it too (closed app)
+  import("./soundSettings").then((m) => m.syncNativeCallTone()).catch(() => {});
   await ensureRegistered(userId);
   currentUser = userId;
   if (!watching) {

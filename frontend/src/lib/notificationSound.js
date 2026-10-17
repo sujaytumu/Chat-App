@@ -337,14 +337,20 @@ export function startRingtone() {
 }
 
 // The caller hears the Talkies tune (softly) while the other phone is ringing — never a phone default.
-export function startRingback() {
+let backToken = 0;
+export async function startRingback() {
   stopRingback();
   if (!isCallRingtoneEnabled() || typeof Audio === "undefined") return;
+  const token = backToken;
   try {
+    // the caller hears the tone they chose (their own file), else the Talkies tune
+    let url = TALKIES_RING_URL;
+    if (getCallTone() === "custom") url = (await loadCustomTone("call")) || TALKIES_RING_URL;
+    if (token !== backToken) return; // stopped while loading
     backEl = backEl || new Audio();
     backEl.loop = true;
     backEl.volume = 0.5;
-    backEl.src = TALKIES_RING_URL;
+    backEl.src = url;
     backEl.currentTime = 0;
     backEl.play().catch(() => {});
   } catch {
@@ -353,6 +359,7 @@ export function startRingback() {
 }
 
 export function stopRingback() {
+  backToken++;
   try {
     if (backEl) {
       backEl.pause();
