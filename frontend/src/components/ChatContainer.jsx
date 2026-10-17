@@ -20,7 +20,8 @@ import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
 import { useChatColorStore } from "../store/useChatColorStore";
-import { useChatThemeStore } from "../store/useChatThemeStore";
+import { useShallow } from "zustand/react/shallow";
+import { useChatThemeStore, resolveLook } from "../store/useChatThemeStore";
 import { getTheme, getFont, themeStyle, themeBarHex, loadChatFont } from "../lib/chatThemes";
 import { useStatusBarColor } from "../lib/useStatusBarColor";
 import { Forward } from "./icons/WaGlyphs";
@@ -77,10 +78,9 @@ const ChatContainer = () => {
   const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
   // Instagram-style theme + font for this chat (a live "Preview" wins over the saved choice)
   const themeKey = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "";
-  const savedTheme = useChatThemeStore((s) => s.map[themeKey]);
-  const previewTheme = useChatThemeStore((s) => (s.preview && s.preview.chatKey === themeKey ? s.preview : null));
-  const activeTheme = getTheme((previewTheme || savedTheme)?.theme);
-  const activeFont = getFont((previewTheme || savedTheme)?.font);
+  const look = useChatThemeStore(useShallow((s) => resolveLook(s, themeKey)));
+  const activeTheme = getTheme(look.theme);
+  const activeFont = getFont(look.font);
   useEffect(() => loadChatFont(activeFont), [activeFont]);
   const chatThemeStyle = activeTheme || activeFont ? themeStyle(activeTheme, activeFont) : null;
   const chatLook = { ...(activeTheme ? {} : wallpaperStyle), ...(chatThemeStyle || {}), ...(activeFont ? { fontFamily: activeFont.css } : {}) };

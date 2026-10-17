@@ -335,7 +335,7 @@ const ChatHeader = () => {
 
       {showTheme && (
         <Suspense fallback={null}>
-          <ChatThemeSheet chatKey={`${selectedChat.type}:${data._id}`} chatName={name} onClose={() => setShowTheme(false)} />
+          <ChatThemeSheet scope={`${selectedChat.type}:${data._id}`} chatName={name} onClose={() => setShowTheme(false)} />
         </Suspense>
       )}
       {showWallpaper && (

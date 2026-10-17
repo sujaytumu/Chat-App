@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Loader2, Camera, ExternalLink, RefreshCw, Smartphone, Monitor } from "lucide-react";
+import { Loader2, Camera, ExternalLink, RefreshCw, Smartphone, Monitor, QrCode } from "lucide-react";
 import toast from "react-hot-toast";
+import LinkDeviceSheet from "../components/LinkDeviceSheet";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import Avatar from "../components/Avatar";
 import { InstallAppControl } from "./SettingsPage";
@@ -890,6 +891,7 @@ export const LinkedDevicesPage = () => {
   const [list, setList] = useState(null);
   const [busy, setBusy] = useState(null);
   const [confirm, setConfirm] = useState(null);
+  const [scanning, setScanning] = useState(false);
 
   const load = () =>
     axiosInstance
@@ -941,6 +943,18 @@ export const LinkedDevicesPage = () => {
               </div>
             </div>
           )}
+          <div className="px-4 pt-4">
+            <button
+              onClick={() => setScanning(true)}
+              className="w-full h-12 rounded-full bg-[#25D366] text-black font-medium flex items-center justify-center gap-2"
+            >
+              <QrCode size={19} /> Link a device
+            </button>
+            <p className="text-[12px] text-wa-muted mt-2 text-center">
+              Open Talkies in a browser, choose “Log in with QR code”, then scan it here.
+            </p>
+          </div>
+          {scanning && <LinkDeviceSheet onClose={() => setScanning(false)} onDone={load} />}
           <div className="px-4 pt-5">
             <p className="text-[12.5px] text-wa-muted mb-2">Other devices</p>
             {others.length === 0 ? (

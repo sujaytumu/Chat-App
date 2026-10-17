@@ -152,6 +152,30 @@ function attachConnectionWatchdog(peerConnection, get) {
 // of sending), retries once automatically rather than leaving both sides
 // stuck — this was very likely why calls sometimes appeared to connect on
 // one side with the other never finding out.
+// Phone clocks can differ by seconds. Both phones show the call timer from ONE start time chosen by
+// the server, converted to the local clock with a measured offset (server time minus local time).
+let clockOffset = 0;
+function syncClock(socket) {
+  if (!socket) return;
+  const samples = [];
+  const one = () =>
+    new Promise((resolve) => {
+      const t0 = Date.now();
+      const timer = setTimeout(resolve, 2500);
+      socket.emit("timeSync", (serverNow) => {
+        clearTimeout(timer);
+        const t1 = Date.now();
+        if (typeof serverNow === "number") samples.push({ rtt: t1 - t0, offset: serverNow - (t0 + t1) / 2 });
+        resolve();
+      });
+    });
+  (async () => {
+    for (let i = 0; i < 3; i++) await one();
+    if (samples.length) clockOffset = samples.sort((a, b) => a.rtt - b.rtt)[0].offset; // the quickest round trip is the most accurate
+  })();
+}
+const serverToLocal = (t) => (typeof t === "number" ? t - clockOffset : Date.now());
+
 function emitWithRetry(socket, event, payload, { timeoutMs = 4000, retries = 1 } = {}) {
   return new Promise((resolve) => {
     let attempt = 0;
@@ -298,6 +322,7 @@ export const useCallStore = create((set, get) => ({
       toast.error("Already in a call");
       return;
     }
+    syncClock(socket);
     if (Date.now() < get().callCooldownUntil) {
       toast("Please wait a moment before calling again", { icon: "⏳" });
       return;
@@ -418,6 +443,7 @@ export const useCallStore = create((set, get) => ({
     if (!socket || !incomingOffer) return;
 
     get().stopRingtone();
+    syncClock(socket);
     if (get().isAnswering) return; // already connecting: a second tap must not start a second answer
     set({ isAnswering: true });
 
@@ -468,6 +494,7 @@ export const useCallStore = create((set, get) => ({
         timeoutMs: 7000,
         retries: 2,
       });
+      if (result.startedAt) set({ callStartedAt: serverToLocal(result.startedAt) }); // same start as the caller
       if (!result.delivered) {
         // Don't hang up here on a bare ack failure — if the answer genuinely
         // never reached the caller, the peer connection will never actually
@@ -881,6 +908,7 @@ export const useCallStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     if (!socket) return;
     set({ callSubscribed: true });
+    syncClock(socket);
     getIceConfig(); // warm the cache so answering/placing a call isn't delayed
 
     document.addEventListener("visibilitychange", () => {
@@ -953,7 +981,7 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
-    socket.on("callAnswered", async ({ answer, callId }) => {
+    socket.on("callAnswered", async ({ answer, callId, startedAt }) => {
       if (isOtherCall(callId)) return;
       if (!pc) {
         console.warn("Received callAnswered but no active peer connection — call may have already ended");
@@ -965,7 +993,7 @@ export const useCallStore = create((set, get) => ({
         pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
         pendingCandidates = [];
         stopRingtoneSound(); // the ringing tone ends the moment they pick up
-        set({ callStatus: "in-call", isRemoteRinging: false, callStartedAt: Date.now() });
+        set({ callStatus: "in-call", isRemoteRinging: false, callStartedAt: serverToLocal(startedAt) });
         sendMediaState(get);
       } catch (err) {
         console.error("Failed to apply call answer:", err);

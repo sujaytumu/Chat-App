@@ -22,7 +22,7 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { Lock, Megaphone } from "lucide-react";
+import { Lock, Megaphone, QrCode } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import { useDraftStore } from "../store/useDraftStore";
@@ -584,6 +584,9 @@ const Sidebar = () => {
               </button>
               <Link to="/profile" className={menuItem} onClick={() => setShowMenu(false)}>
                 <UserRound size={18} className="text-wa-icon" /> Profile
+              </Link>
+              <Link to="/settings/devices" className={menuItem} onClick={() => setShowMenu(false)}>
+                <QrCode size={18} className="text-wa-icon" /> Linked devices
               </Link>
               <Link to="/settings" className={menuItem} onClick={() => setShowMenu(false)}>
                 <Settings size={18} className="text-wa-icon" /> Settings

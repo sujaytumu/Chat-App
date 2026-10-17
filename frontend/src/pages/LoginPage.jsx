@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
+import QrLoginPanel from "../components/QrLoginPanel";
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, UserPlus, ShieldCheck } from "lucide-react";
@@ -138,6 +139,8 @@ const LoginPage = () => {
               )}
             </button>
           </form>
+
+          {!window.Capacitor?.isNativePlatform?.() && <QrLoginPanel />}
 
           {/* Highlighted Create Account Box */}
           <div className="mt-6">

@@ -383,8 +383,11 @@ export function stopRingtoneSound() {
 
 // Settings previews — play the given tone once regardless of the on/off
 // switches, so people can hear what they're choosing.
+const PREVIEW_MS = 10000; // call tones preview for 10 seconds
 export function stopTonePreview() {
   clearTimeout(previewTimer);
+  clearInterval(ringSoundInterval);
+  ringSoundInterval = null;
   clearTimeout(msgStopTimer);
   stopElement(ringEl);
   stopElement(msgEl);
@@ -399,7 +402,7 @@ export async function previewCallTone(id) {
     try {
       ensureElements();
       await playElement(ringEl, url, { loop: true });
-      previewTimer = setTimeout(() => stopElement(ringEl), 5000);
+      previewTimer = setTimeout(() => stopElement(ringEl), PREVIEW_MS);
       return true;
     } catch {
       return false;
@@ -409,13 +412,19 @@ export async function previewCallTone(id) {
     try {
       ensureElements();
       await playElement(ringEl, TALKIES_RING_URL, { loop: true });
-      previewTimer = setTimeout(() => stopElement(ringEl), 5000);
+      previewTimer = setTimeout(() => stopElement(ringEl), PREVIEW_MS);
       return true;
     } catch {
       return false;
     }
   }
+  // built-in tones: repeat the ring cycle (every 2 s) for the whole preview
   playPresetOnce(CALL_PRESETS, id, "classic");
+  let n = 1;
+  ringSoundInterval = setInterval(() => {
+    if (++n > PREVIEW_MS / 2000) return stopTonePreview();
+    playPresetOnce(CALL_PRESETS, id, "classic");
+  }, 2000);
   return true;
 }
 
