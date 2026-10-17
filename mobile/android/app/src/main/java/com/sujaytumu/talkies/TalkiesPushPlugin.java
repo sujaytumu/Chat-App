@@ -89,6 +89,21 @@ public class TalkiesPushPlugin extends Plugin {
         }
     }
 
+    /**
+     * The call tone chosen inside Talkies: { mode: "talkies" | "custom" | "silent", data?: base64 file, ext? }.
+     * The ringing notification then plays exactly that tone, even when the app is closed.
+     */
+    @PluginMethod
+    public void setCallTone(PluginCall call) {
+        String mode = call.getString("mode", "talkies");
+        String data = call.getString("data", "");
+        String ext = call.getString("ext", "mp3");
+        boolean ok = NotificationHelper.setCallTone(getContext(), mode, data, ext);
+        JSObject res = new JSObject();
+        res.put("ok", ok);
+        call.resolve(res);
+    }
+
     /** Android 13+: ask for the notification permission. Resolves with { granted }. */
     @PluginMethod
     public void requestPermission(PluginCall call) {

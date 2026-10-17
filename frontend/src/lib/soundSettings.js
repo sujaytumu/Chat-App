@@ -26,6 +26,7 @@ export function isCallRingtoneEnabled() {
 }
 export function setCallRingtoneEnabled(enabled) {
   localStorage.setItem(CALL_RINGTONE_KEY, String(enabled));
+  syncNativeCallTone();
 }
 
 // ---- Tone choices ----------------------------------------------------------
@@ -54,6 +55,7 @@ export function getCallTone() {
 }
 export function setCallTone(id) {
   localStorage.setItem(CALL_TONE_KEY, id);
+  syncNativeCallTone();
 }
 export function getMessageTone() {
   return localStorage.getItem(MESSAGE_TONE_KEY) || "ding";
@@ -123,6 +125,7 @@ export async function saveCustomTone(kind, file) {
   const old = urlCache.get(kind);
   if (old) URL.revokeObjectURL(old);
   urlCache.delete(kind);
+  if (kind === "call") syncNativeCallTone();
 }
 
 // Resolves to an object URL for the saved sound, or null if none is saved.
@@ -149,6 +152,50 @@ export async function removeCustomTone(kind) {
   const old = urlCache.get(kind);
   if (old) URL.revokeObjectURL(old);
   urlCache.delete(kind);
+  if (kind === "call") syncNativeCallTone();
+}
+
+// ---- Android app: ring with the SAME tone when the app is closed ------------
+// The phone's notification (shown while the app is closed / in the background) can't read this
+// page's storage, so the chosen tone is handed to the app itself. Only re-sent when it changes.
+const NATIVE_TONE_SIG_KEY = "talkies-native-call-tone-sig";
+const blobToBase64 = (blob) =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result).split(",")[1] || "");
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+
+export async function syncNativeCallTone() {
+  try {
+    const p = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesPush : null;
+    if (!p?.setCallTone) return; // web, or an older app build
+    let mode = "talkies";
+    if (!isCallRingtoneEnabled()) mode = "silent";
+    else if (getCallTone() === "custom") mode = "custom";
+
+    let sig = mode;
+    let payload = { mode };
+    if (mode === "custom") {
+      const blob = await dbRun("readonly", (store) => store.get("call"));
+      if (!blob) {
+        payload = { mode: "talkies" };
+        sig = "talkies";
+      } else {
+        const name = getCustomToneName("call");
+        sig = `custom:${name}:${blob.size}`;
+        if (localStorage.getItem(NATIVE_TONE_SIG_KEY) === sig) return;
+        const ext = (name.match(/\.([A-Za-z0-9]{2,5})$/) || [])[1] || "mp3";
+        payload = { mode: "custom", ext, data: await blobToBase64(blob) };
+      }
+    }
+    if (mode !== "custom" && localStorage.getItem(NATIVE_TONE_SIG_KEY) === sig) return;
+    await p.setCallTone(payload);
+    localStorage.setItem(NATIVE_TONE_SIG_KEY, sig);
+  } catch {
+    /* best effort — the in-app ring still uses the chosen tone */
+  }
 }
 
 

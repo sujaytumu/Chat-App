@@ -87,21 +87,36 @@ final class NotificationHelper {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        // The phone's own ringtone is never used: calls ring with Talkies' own tune shipped in the app.
-        nm.deleteNotificationChannel("talkies_calls_v1");
-        Uri ringtone = Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring);
-        AudioAttributes ring = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .build();
-        NotificationChannel calls = new NotificationChannel(CH_CALLS, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
-        calls.setDescription("Rings when someone calls you on Talkies");
-        calls.setSound(ringtone, ring);
-        calls.enableVibration(true);
-        calls.setVibrationPattern(new long[]{0, 900, 600, 900, 600, 900, 600, 900});
-        calls.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
-        calls.setBypassDnd(false);
-        nm.createNotificationChannel(calls);
+        // The phone's own ringtone is never used. Calls ring with the tone the person picked inside
+        // Talkies (their own file), or the Talkies tune shipped in the app when they picked none.
+        // A channel's sound can't be changed once created, so every change gets a fresh channel id.
+        String chId = callChannelId(ctx);
+        for (NotificationChannel old : nm.getNotificationChannels()) {
+            String oid = old.getId();
+            if (oid.startsWith("talkies_calls") && !oid.equals(chId)) nm.deleteNotificationChannel(oid);
+        }
+        if (nm.getNotificationChannel(chId) == null) {
+            AudioAttributes ring = new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build();
+            NotificationChannel calls = new NotificationChannel(chId, "Incoming calls", NotificationManager.IMPORTANCE_HIGH);
+            calls.setDescription("Rings when someone calls you on Talkies");
+            String mode = toneMode(ctx);
+            if ("silent".equals(mode)) {
+                calls.setSound(null, null);
+            } else if ("custom".equals(mode)) {
+                Uri custom = customToneUri(ctx);
+                calls.setSound(custom != null ? custom : Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring), ring);
+            } else {
+                calls.setSound(Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring), ring);
+            }
+            calls.enableVibration(true);
+            calls.setVibrationPattern(new long[]{0, 900, 600, 900, 600, 900, 600, 900});
+            calls.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            calls.setBypassDnd(false);
+            nm.createNotificationChannel(calls);
+        }
 
         AudioAttributes note = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -120,6 +135,79 @@ final class NotificationHelper {
         NotificationChannel missed = new NotificationChannel(CH_MISSED, "Missed calls", NotificationManager.IMPORTANCE_DEFAULT);
         missed.setSound(Settings.System.DEFAULT_NOTIFICATION_URI, note);
         nm.createNotificationChannel(missed);
+    }
+
+    // ---- the call tone the person chose inside Talkies ----
+
+    private static android.content.SharedPreferences tonePrefs(Context ctx) {
+        return ctx.getSharedPreferences("talkies_call_tone", Context.MODE_PRIVATE);
+    }
+
+    /** "talkies" (bundled tune) | "custom" (their own file) | "silent". Falls back to the bundled tune if the file is gone. */
+    private static String toneMode(Context ctx) {
+        String mode = tonePrefs(ctx).getString("mode", "talkies");
+        if ("custom".equals(mode) && customToneFile(ctx) == null) return "talkies";
+        return mode;
+    }
+
+    private static File customToneFile(Context ctx) {
+        String name = tonePrefs(ctx).getString("file", "");
+        if (name.isEmpty()) return null;
+        File f = new File(new File(ctx.getFilesDir(), "tones"), name);
+        return f.exists() && f.length() > 0 ? f : null;
+    }
+
+    private static Uri customToneUri(Context ctx) {
+        try {
+            File f = customToneFile(ctx);
+            if (f == null) return null;
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.getPackageName() + ".fileprovider", f);
+            // the system's notification service plays the sound, so it must be allowed to read the file
+            ctx.grantUriPermission("com.android.systemui", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            ctx.grantUriPermission("android", uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            return uri;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** Id of the notification channel that carries the currently chosen call tone. */
+    static String callChannelId(Context ctx) {
+        String mode = toneMode(ctx);
+        int ver = tonePrefs(ctx).getInt("ver", 0);
+        if ("custom".equals(mode)) return "talkies_calls_c" + ver;
+        if ("silent".equals(mode)) return "talkies_calls_silent_v1";
+        return CH_CALLS;
+    }
+
+    /** Saves the tone the person picked in the app (called from the web page via the plugin). */
+    static boolean setCallTone(Context ctx, String mode, String base64, String ext) {
+        try {
+            android.content.SharedPreferences.Editor e = tonePrefs(ctx).edit();
+            if ("custom".equals(mode) && base64 != null && !base64.isEmpty()) {
+                byte[] bytes = android.util.Base64.decode(base64, android.util.Base64.DEFAULT);
+                File dir = new File(ctx.getFilesDir(), "tones");
+                dir.mkdirs();
+                String safeExt = ext == null ? "" : ext.replaceAll("[^A-Za-z0-9]", "");
+                if (safeExt.isEmpty() || safeExt.length() > 5) safeExt = "mp3";
+                String fileName = "call_tone_" + System.currentTimeMillis() + "." + safeExt;
+                try (FileOutputStream out = new FileOutputStream(new File(dir, fileName))) {
+                    out.write(bytes);
+                }
+                File[] olds = dir.listFiles();
+                if (olds != null) for (File o : olds) if (!o.getName().equals(fileName)) o.delete();
+                e.putString("mode", "custom").putString("file", fileName);
+            } else if ("silent".equals(mode)) {
+                e.putString("mode", "silent");
+            } else {
+                e.putString("mode", "talkies");
+            }
+            e.putInt("ver", tonePrefs(ctx).getInt("ver", 0) + 1).apply();
+            ensureChannels(ctx);
+            return true;
+        } catch (Exception ex) {
+            return false;
+        }
     }
 
     /** The intent that brings the app to the front and hands it a notification action. */
@@ -267,7 +355,7 @@ final class NotificationHelper {
             pb.setIcon(IconCompat.createWithBitmap(avatar));
         }
         Person caller = pb.build();
-        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, CH_CALLS)
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, callChannelId(ctx))
                 .setSmallIcon(R.drawable.ic_stat_talkies)
                 .setColor(Color.parseColor("#00A884"))
                 .setContentTitle(name)
@@ -324,7 +412,10 @@ final class NotificationHelper {
             if (nm == null) return true;
             for (android.service.notification.StatusBarNotification sbn : nm.getActiveNotifications()) {
                 if (sbn.getId() != id) continue;
-                if (Build.VERSION.SDK_INT >= 26) return CH_CALLS.equals(sbn.getNotification().getChannelId());
+                if (Build.VERSION.SDK_INT >= 26) {
+                    String chan = sbn.getNotification().getChannelId();
+                    return chan != null && chan.startsWith("talkies_calls");
+                }
                 return true;
             }
             return false;
