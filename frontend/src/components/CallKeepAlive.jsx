@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { useCallStore } from "../store/useCallStore";
 import { useGroupCallStore } from "../store/useGroupCallStore";
@@ -78,18 +78,46 @@ const CallKeepAlive = () => {
     };
   }, []);
 
-  // Like WhatsApp: video calls start on the loudspeaker, voice calls on the earpiece.
+  // Once per call (not on every video toggle): a connected headset wins, otherwise video calls
+  // start on the speaker and voice calls on the phone. After that the person decides — the old
+  // code re-forced the speaker on every change, which is why the audio kept jumping around.
+  const videoRef = useRef(video);
+  videoRef.current = video;
   useEffect(() => {
     const p = plugin();
-    if (!p || !active || typeof p.setSpeaker !== "function") return;
+    if (!p || !active) return;
+    if (typeof p.initCallAudio === "function") {
+      Promise.resolve(p.initCallAudio({ video: videoRef.current }))
+        .then(() => setTimeout(() => useCallStore.getState().refreshAudioRoutes(), 900))
+        .catch(() => {});
+    } else if (typeof p.setSpeaker === "function") {
+      Promise.resolve(p.setSpeaker({ on: videoRef.current }))
+        .then(() => useCallStore.setState({ isSpeakerOn: videoRef.current }))
+        .catch(() => {});
+    }
+  }, [active]);
+
+  // headset plugged in / Bluetooth connected or lost: keep the picker and button in step
+  useEffect(() => {
+    const p = plugin();
+    if (!p?.addListener) return;
+    let handle;
+    let gone = false;
     try {
-      Promise.resolve(p.setSpeaker({ on: video }))
-        .then(() => useCallStore.setState({ isSpeakerOn: video }))
+      Promise.resolve(p.addListener("audioRoutes", (d) => useCallStore.getState().setAudioRoutes(d)))
+        .then((h) => {
+          handle = h;
+          if (gone) h?.remove?.();
+        })
         .catch(() => {});
     } catch {
-      /* older app build without speaker control */
+      /* older app build */
     }
-  }, [active, video]);
+    return () => {
+      gone = true;
+      handle?.remove?.();
+    };
+  }, []);
 
   useEffect(() => {
     const p = plugin();

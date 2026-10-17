@@ -23,18 +23,18 @@ export const CHAT_THEMES = [
     thumb: "#00697a",
   }),
   T("touchgrass", "Touch grass", {
-    out: [86, 120, 255], outText: [255, 255, 255], inn: [7, 40, 64],
+    out: [58, 86, 230], outText: [255, 255, 255], inn: [7, 40, 64],
     bg: { backgroundColor: "#05334f", backgroundImage: svg(180, 180, `<g stroke='#7bd37a' stroke-opacity='.55' stroke-width='2' stroke-linecap='round'><path d='M30 60l-3 -9M30 60l3 -10M30 60l0 -12'/><path d='M120 120l-3 -9M120 120l3 -10M120 120l0 -12'/><path d='M70 160l-3 -8M70 160l3 -9'/></g><g fill='#ff8aa5' fill-opacity='.7'><circle cx='90' cy='40' r='2'/><circle cx='150' cy='70' r='2'/><circle cx='20' cy='130' r='2'/><circle cx='150' cy='160' r='2'/></g><g fill='#b9a0ff' fill-opacity='.6'><circle cx='50' cy='100' r='3'/><circle cx='110' cy='20' r='2.5'/></g>`), backgroundSize: "180px 180px" },
     thumb: "#05334f",
   }),
   T("heartdrive", "Heart drive", {
-    out: [255, 77, 94], outText: [255, 255, 255], inn: [26, 14, 64],
+    out: [214, 40, 80], outText: [255, 255, 255], inn: [26, 14, 64],
     bg: { backgroundColor: "#0a0a4a", backgroundImage: `${svg(300, 300, hearts([[70, 80, 2.2, -14], [210, 70, 1.6, 10], [150, 200, 2.6, 6], [250, 250, 1.4, -8], [50, 250, 1.5, 14]], "#ff2d55", 0.85))}, radial-gradient(80% 60% at 50% 30%, rgb(255 45 85 / .25), transparent 70%)`, backgroundSize: "300px 300px, auto" },
     thumb: "#1a0a5a",
   }),
   T("lofi", "Lo-Fi night", {
-    out: [128, 90, 255], outText: [255, 255, 255], inn: [27, 18, 80],
-    bg: { backgroundColor: "#1b0f66", backgroundImage: `${svg(360, 200, `<path d='M0 200V120h30V90h26v40h20V70h34v60h22V100h28v30h24V80h30v50h26V110h40v90z' fill='#2fd6e0' fill-opacity='.35'/><path d='M0 200V150h40v-24h30v34h24v-18h30v30h32v-40h36v52h40v-30h50v50z' fill='#3b27b8' fill-opacity='.9'/><circle cx='300' cy='40' r='16' fill='#fff' fill-opacity='.85'/><circle cx='310' cy='34' r='15' fill='#1b0f66'/>`)}, linear-gradient(#150a52, #2a1a96 55%, #3fb9d6)`, backgroundSize: "100% auto, auto", backgroundPosition: "bottom, center", backgroundRepeat: "no-repeat, no-repeat" },
+    out: [104, 66, 235], outText: [255, 255, 255], inn: [27, 18, 80],
+    bg: { backgroundColor: "#1b0f66", backgroundImage: `${svg(360, 200, `<path d='M0 200V120h30V90h26v40h20V70h34v60h22V100h28v30h24V80h30v50h26V110h40V90h40V120h40v80z' fill='#2fd6e0' fill-opacity='.35'/><path d='M0 200V150h40v-24h30v34h24v-18h30v30h32v-40h36v52h40v-30h50v-24h40v-8h38v52z' fill='#3b27b8' fill-opacity='.9'/><circle cx='300' cy='40' r='16' fill='#fff' fill-opacity='.85'/><circle cx='310' cy='34' r='15' fill='#1b0f66'/>`)}, linear-gradient(#150a52, #2a1a96 55%, #3fb9d6)`, backgroundSize: "100% auto, auto", backgroundPosition: "bottom, center", backgroundRepeat: "no-repeat, no-repeat" },
     thumb: "#2a1a96",
   }),
   T("bubbletea", "Boba time", {
@@ -128,7 +128,7 @@ export const CHAT_THEMES = [
     thumb: "#ff6a00",
   }),
   T("midnight", "Midnight", {
-    out: [96, 140, 255], outText: [255, 255, 255], inn: [22, 30, 60],
+    out: [52, 92, 220], outText: [255, 255, 255], inn: [22, 30, 60],
     bg: { backgroundColor: "#0a1030", backgroundImage: "radial-gradient(1.5px 1.5px at 20% 30%, #fff, transparent), radial-gradient(1.5px 1.5px at 70% 20%, #fff, transparent), radial-gradient(1px 1px at 40% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 85% 60%, #fff, transparent), radial-gradient(1px 1px at 10% 85%, #fff, transparent), linear-gradient(#0a1030, #1a1f5c)", backgroundSize: "260px 260px, 260px 260px, 260px 260px, 260px 260px, 260px 260px, auto" },
     thumb: "#0a1030",
   }),
@@ -137,17 +137,33 @@ export const CHAT_THEMES = [
 export const getTheme = (id) => CHAT_THEMES.find((t) => t.id === id) || null;
 
 const rgb = (a) => a.join(" ");
+const shade = (a, k) => a.map((v) => Math.max(0, Math.min(255, Math.round(v * k))));
+const hex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
 
-// Inline style + class for a chat's container. Dark themes switch the chat to the dark
-// palette (so the header / composer text stays readable) and then override the bubbles.
+// The colour of the header / status bar for a theme: a deeper shade of the received-bubble tone,
+// so the top of the chat belongs to the wallpaper instead of staying a different navy.
+export const themeBar = (theme) => (theme ? shade(theme.inn, 0.62) : null);
+export const themeBarHex = (theme) => (theme ? hex(themeBar(theme)) : null);
+
+// Inline style for a chat's container. Dark themes switch the chat to the dark palette (so
+// text on the wallpaper stays readable), then the theme re-colours bubbles, header and bars.
+// --ct-out-text is applied per own-bubble in CSS (.chat-themed .bg-wa-out) so the text on a
+// light bubble is dark even though the rest of the chat uses light text.
 export function themeStyle(theme, font) {
   const style = {};
   if (theme) {
     Object.assign(style, { backgroundSize: "auto", backgroundPosition: "0 0", backgroundRepeat: "repeat" }, theme.bg);
+    const bar = themeBar(theme);
     style["--wa-out"] = rgb(theme.out);
     style["--wa-tint"] = rgb(theme.out);
     style["--wa-tinttext"] = rgb(theme.outText);
     style["--wa-surface"] = rgb(theme.inn);
+    style["--wa-bg"] = rgb(bar);
+    style["--wa-panel"] = rgb(bar);
+    style["--wa-field"] = rgb(shade(theme.inn, 1.25));
+    style["--wa-hover"] = rgb(shade(theme.inn, 1.15));
+    style["--wa-pop"] = rgb(shade(theme.inn, 0.8));
+    style["--ct-out-text"] = rgb(theme.outText);
   }
   if (font?.css) style["--chat-font"] = font.css;
   return style;
