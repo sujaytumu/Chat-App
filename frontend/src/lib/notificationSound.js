@@ -17,6 +17,11 @@ let audioUnlocked = false;
 // A 0-sample WAV, used to "unlock" <audio> elements inside a user gesture.
 const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
 
+// The Talkies tune shipped with the app (the same file the Android notification rings with), so a
+// call sounds identical whether the phone is locked, in the background or the app is open.
+const TALKIES_RING_URL = "/talkies_ring.ogg";
+let backEl = null; // the caller's "ringing…" tone
+
 let ringEl = null; // looping call ringtone (custom files)
 let msgEl = null; // one-shot message sound (custom files)
 let elementsUnlocked = false;
@@ -304,6 +309,13 @@ export function startRingtone() {
   };
 
   const toneId = getCallTone();
+  if (toneId === "talkies") {
+    ensureElements();
+    playElement(ringEl, TALKIES_RING_URL, { loop: true }).catch(() => {
+      if (token === ringToken) startPreset("classic"); // blocked / not loadable: still ring
+    });
+    return;
+  }
   if (toneId !== "custom") {
     startPreset(toneId);
     return;
@@ -324,7 +336,35 @@ export function startRingtone() {
   });
 }
 
+// The caller hears the Talkies tune (softly) while the other phone is ringing — never a phone default.
+export function startRingback() {
+  stopRingback();
+  if (!isCallRingtoneEnabled() || typeof Audio === "undefined") return;
+  try {
+    backEl = backEl || new Audio();
+    backEl.loop = true;
+    backEl.volume = 0.5;
+    backEl.src = TALKIES_RING_URL;
+    backEl.currentTime = 0;
+    backEl.play().catch(() => {});
+  } catch {
+    // never critical
+  }
+}
+
+export function stopRingback() {
+  try {
+    if (backEl) {
+      backEl.pause();
+      backEl.currentTime = 0;
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export function stopRingtoneSound() {
+  stopRingback();
   ringToken++;
   clearInterval(ringVibrateInterval);
   clearInterval(ringSoundInterval);
@@ -352,6 +392,16 @@ export async function previewCallTone(id) {
     try {
       ensureElements();
       await playElement(ringEl, url, { loop: true });
+      previewTimer = setTimeout(() => stopElement(ringEl), 5000);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  if (id === "talkies") {
+    try {
+      ensureElements();
+      await playElement(ringEl, TALKIES_RING_URL, { loop: true });
       previewTimer = setTimeout(() => stopElement(ringEl), 5000);
       return true;
     } catch {

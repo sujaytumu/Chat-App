@@ -367,7 +367,7 @@ io.on("connection", (socket) => {
         if (previous.callId !== callId) expireHeldCall(String(toUserId), previous);
       }
       const timeout = setTimeout(() => expireHeldCall(String(toUserId), entry), CALL_GRACE_PERIOD_MS);
-      const entry = { offer, callType, fromUser, fromUserId: userId, callId, timeout };
+      const entry = { offer, callType, fromUser, fromUserId: userId, callId, timeout, ice: [] };
       pendingCalls.set(String(toUserId), entry);
     };
 
@@ -414,18 +414,32 @@ io.on("connection", (socket) => {
 
   socket.on("answerCall", ({ toUserId, answer, callId }, ack) => {
     toUserId = String(toUserId);
-    // An answer to a call that is already over (the caller hung up / it timed out) must not
-    // resurrect anything: tell this device to drop it.
-    if (isStaleSignal(userId, toUserId, callId) || !activeCalls.has(pairKey(userId, toUserId))) {
-      socket.emit("callEnded", { callId });
+    const key = pairKey(userId, toUserId);
+    let cur = activeCalls.get(key);
+    const held = pendingCalls.get(userId);
+    const heldFromCaller = held && String(held.fromUserId) === toUserId ? held : null;
+    // Answering a DIFFERENT call than the one that is live (an older ring) must not hijack the new one.
+    const otherCall = (cur && callId && cur.callId !== callId) || (heldFromCaller && callId && heldFromCaller.callId !== callId);
+    // Over for real: the caller hung up / it timed out / someone else already answered.
+    if (otherCall || (!cur && !heldFromCaller)) {
+      socket.emit("callEnded", { callId, reason: "The call had already ended" });
       if (typeof ack === "function") ack({ delivered: false, reason: "call ended" });
       return;
     }
-    const cur = activeCalls.get(pairKey(userId, toUserId));
+    // The call is still ringing for this person (held for them) but its record was lost — e.g. their
+    // phone's connection dropped while it rang. Picking up must still work: rebuild it.
+    if (!cur) {
+      cur = { callId: heldFromCaller.callId, callerId: toUserId, calleeId: userId, startedAt: Date.now(), answered: false };
+      activeCalls.set(key, cur);
+    }
     cur.answered = true;
-    socket.to(userId).emit("callEnded", { callId: cur.callId }); // stop ringing on my other devices
+    const iceBuffer = heldFromCaller?.ice || [];
+    socket.to(userId).emit("callEnded", { callId: cur.callId, reason: "Answered on another device" }); // stop ringing on my other devices
     sendFcmCancelCall(userId, toUserId, cur.callId); // ...and on my Android phone(s)
     clearHeldCall(userId, toUserId);
+    // The caller's network candidates sent while this phone was still asleep / not listening are
+    // handed over now, so the call connects straight away instead of timing out.
+    for (const candidate of iceBuffer) socket.emit("iceCandidate", { candidate });
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("callAnswered", { answer, callId: cur.callId });
@@ -433,7 +447,7 @@ io.on("connection", (socket) => {
     } else if (typeof ack === "function") {
       ack({ delivered: false, reason: "caller disconnected" });
     }
-    const logId = activeCallLogs.get(pairKey(userId, toUserId));
+    const logId = activeCallLogs.get(key);
     if (logId) {
       CallLog.findByIdAndUpdate(logId, { status: "answered", answeredAt: new Date() }).catch(() => {});
     }
@@ -462,6 +476,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("iceCandidate", ({ toUserId, candidate }) => {
+    // Candidates the caller sends while the call is still ringing may be lost (callee asleep / app
+    // just starting): keep them so they can be replayed the moment the call is answered.
+    const held = pendingCalls.get(String(toUserId));
+    if (held && String(held.fromUserId) === userId && held.ice.length < 80) held.ice.push(candidate);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("iceCandidate", { candidate });
@@ -856,6 +874,11 @@ io.on("connection", (socket) => {
       for (const [key, logId] of activeCallLogs.entries()) {
         const [a, b] = key.split("_");
         if (a !== userId && b !== userId) continue;
+        // The person being CALLED lost their connection while it is still ringing (app in the
+        // background, weak network): the call is not over — their phone is ringing from the push and
+        // they can still pick up. Only the caller hanging up, a decline, or the timeout end it.
+        const live = activeCalls.get(key);
+        if (live && !live.answered && live.calleeId === userId) continue;
         const otherId = a === userId ? b : a;
         const otherRoom = roomFor(otherId);
         if (otherRoom) {
@@ -865,6 +888,7 @@ io.on("connection", (socket) => {
           CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
         }
         activeCallLogs.delete(key);
+        activeCalls.delete(key);
       }
 
       // Also clear any call this user placed that's still waiting in the
@@ -877,9 +901,6 @@ io.on("connection", (socket) => {
           if (isOnline(toUserId)) io.to(toUserId).emit("callEnded", { callId: pending.callId });
           sendFcmCancelCall(toUserId, userId, pending.callId);
         }
-      }
-      for (const [key, c] of [...activeCalls.entries()]) {
-        if (c.callerId === userId || c.calleeId === userId) activeCalls.delete(key);
       }
     }, DISCONNECT_CALL_GRACE_MS);
   });

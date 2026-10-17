@@ -10,8 +10,10 @@ import { applyUiSettings } from "./lib/uiSettings";
 import { applyAppFont } from "./lib/appFont";
 import { applyAccent } from "./lib/accent";
 import { applyChatColor } from "./lib/chatColor";
+import { consumeLaunchIntentEarly } from "./lib/nativePush";
 
 applyUiSettings();
+consumeLaunchIntentEarly(); // Android: an "Answer" tapped on the call notification is picked up immediately
 applyAppFont();
 applyAccent();
 applyChatColor();

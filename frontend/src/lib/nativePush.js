@@ -39,6 +39,39 @@ async function ensureRegistered(userId) {
 let listening = false;
 let lastIntentTs = 0;
 
+// Hands a notification tap (Answer / open chat) to the app. The same tap can arrive twice (launch
+// intent + live event) or be old: act once, and never on something older than a minute and a half.
+function deliverIntent(intent, goHome) {
+  if (!intent) return;
+  if (intent.ts) {
+    if (intent.ts === lastIntentTs || Date.now() - intent.ts > 90_000) return;
+    lastIntentTs = intent.ts;
+  }
+  handleNotificationAction({ action: intent.action || "open", data: intent }, goHome);
+}
+
+// Picks up an "Answer" tapped on the call notification AS SOON AS the page starts — before login /
+// the socket are ready — so the "Connecting your call…" screen shows at once and the call is taken
+// the moment it arrives, instead of showing the home screen first.
+export async function consumeLaunchIntentEarly() {
+  const p = plugin();
+  if (!p) return;
+  try {
+    const { intent } = (await p.getLaunchIntent?.()) || {};
+    deliverIntent(intent);
+  } catch {
+    /* ignore */
+  }
+}
+
+// Coming back to the app (e.g. after tapping Answer on the notification while it was asleep): check
+// again, so an Answer that arrived while the page was frozen is never missed.
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") consumeLaunchIntentEarly();
+  });
+}
+
 export async function registerNativePush(userId, goHome) {
   const p = plugin();
   if (!p) return;
@@ -46,16 +79,7 @@ export async function registerNativePush(userId, goHome) {
   // Hand the notification's action (Answer / open chat) to the app FIRST. Registering for push
   // can take many seconds (permission prompt, server waking up); waiting for it used to leave
   // "Answer" unhandled so the call had to be picked up a second time inside the app.
-  const deliver = (intent) => {
-    if (!intent) return;
-    // The app can hand over the same tap twice (launch intent + live event) or an old one:
-    // act once, and never on something older than a minute and a half.
-    if (intent.ts) {
-      if (intent.ts === lastIntentTs || Date.now() - intent.ts > 90_000) return;
-      lastIntentTs = intent.ts;
-    }
-    handleNotificationAction({ action: intent.action || "open", data: intent }, goHome);
-  };
+  const deliver = (intent) => deliverIntent(intent, goHome);
   try {
     const { intent } = (await p.getLaunchIntent?.()) || {};
     deliver(intent);

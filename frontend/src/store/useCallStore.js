@@ -4,7 +4,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { startRingtone, stopRingtoneSound, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, startRingback, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -964,6 +964,7 @@ export const useCallStore = create((set, get) => ({
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
         pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
         pendingCandidates = [];
+        stopRingtoneSound(); // the ringing tone ends the moment they pick up
         set({ callStatus: "in-call", isRemoteRinging: false, callStartedAt: Date.now() });
         sendMediaState(get);
       } catch (err) {
@@ -991,6 +992,7 @@ export const useCallStore = create((set, get) => ({
 
     socket.on("remoteDeviceRinging", (payload) => {
       if (isOtherCall(payload?.callId)) return;
+      if (get().callStatus === "calling") startRingback(); // caller hears the Talkies tune while it rings
       set({ isRemoteRinging: true });
     });
 
@@ -1038,7 +1040,7 @@ export const useCallStore = create((set, get) => ({
       if (isOtherCall(id)) return;
       if (Date.now() < handoffUntil) return;
       if (get().callStatus === "idle") return;
-      toast("Call ended", { icon: "📴" });
+      toast(payload?.reason || "Call ended", { icon: "📴" });
       get().resetCall();
     });
 
