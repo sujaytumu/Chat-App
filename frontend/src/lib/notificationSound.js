@@ -20,7 +20,6 @@ const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAI
 // The Talkies tune shipped with the app (the same file the Android notification rings with), so a
 // call sounds identical whether the phone is locked, in the background or the app is open.
 const TALKIES_RING_URL = "/talkies_ring.ogg";
-let backEl = null; // the caller's "ringing…" tone
 
 let ringEl = null; // looping call ringtone (custom files)
 let msgEl = null; // one-shot message sound (custom files)
@@ -336,38 +335,49 @@ export function startRingtone() {
   });
 }
 
-// The caller hears the Talkies tune (softly) while the other phone is ringing — never a phone default.
+// ---- Caller-side tones (what the person placing the call hears) ----------
+//  calling: one short tap every few seconds (connecting, their phone hasn't rung yet)
+//  ringing: two quick taps every few seconds (their phone is ringing)
+//  busy:    one long, lower tone, a few times (they are on another call)
+let backTimer = null;
+let backStopTimer = null;
 let backToken = 0;
-export async function startRingback() {
+
+const TAP = { freq: 440, dur: 0.38, gain: 0.12, type: "sine" };
+const CALLING_STEPS = [{ ...TAP, start: 0 }];
+const RINGING_STEPS = [{ ...TAP, start: 0 }, { ...TAP, start: 0.55 }];
+const BUSY_STEPS = [
+  { freq: 480, dur: 0.9, gain: 0.12, type: "sine", start: 0 },
+  { freq: 620, dur: 0.9, gain: 0.08, type: "sine", start: 0 },
+];
+
+function startPattern(steps, periodMs, maxMs) {
   stopRingback();
-  if (!isCallRingtoneEnabled() || typeof Audio === "undefined") return;
+  if (!isCallRingtoneEnabled()) return;
   const token = backToken;
-  try {
-    // the caller hears the tone they chose (their own file), else the Talkies tune
-    let url = TALKIES_RING_URL;
-    if (getCallTone() === "custom") url = (await loadCustomTone("call")) || TALKIES_RING_URL;
-    if (token !== backToken) return; // stopped while loading
-    backEl = backEl || new Audio();
-    backEl.loop = true;
-    backEl.volume = 0.5;
-    backEl.src = url;
-    backEl.currentTime = 0;
-    backEl.play().catch(() => {});
-  } catch {
-    // never critical
-  }
+  const play = () => {
+    if (token !== backToken) return;
+    try {
+      scheduleSteps(steps);
+    } catch {
+      // audio blocked: never critical
+    }
+  };
+  play();
+  backTimer = setInterval(play, periodMs);
+  if (maxMs) backStopTimer = setTimeout(() => { if (token === backToken) stopRingback(); }, maxMs);
 }
+
+export function startCallingTone() { startPattern(CALLING_STEPS, 3000); }
+export function startRingback() { startPattern(RINGING_STEPS, 3500); }
+export function startBusyTone() { startPattern(BUSY_STEPS, 1500, 4300); }
 
 export function stopRingback() {
   backToken++;
-  try {
-    if (backEl) {
-      backEl.pause();
-      backEl.currentTime = 0;
-    }
-  } catch {
-    // ignore
-  }
+  clearInterval(backTimer);
+  clearTimeout(backStopTimer);
+  backTimer = null;
+  backStopTimer = null;
 }
 
 export function stopRingtoneSound() {
