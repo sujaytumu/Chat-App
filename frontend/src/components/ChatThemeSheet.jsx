@@ -8,7 +8,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 const RING = "#4f5bff";
 const W = 360; // thumbnails are drawn at phone size, then scaled down to the card
 
-const ThemeCard = ({ theme, scale, selected, onPick }) => (
+const ThemeCard = ({ theme, scale, selected, onPick, label, sub }) => (
   <button onClick={onPick} className="flex flex-col gap-1.5 text-left" aria-pressed={selected}>
     <span
       className="relative block w-full rounded-2xl overflow-hidden"
@@ -21,18 +21,19 @@ const ThemeCard = ({ theme, scale, selected, onPick }) => (
           <span className="absolute right-[26px] top-[320px] h-[54px] w-[170px] rounded-3xl" style={{ background: `rgb(${theme.out.join(" ")})` }} />
         </span>
       ) : (
-        <span className="absolute inset-0 flex items-center justify-center text-[13px] text-white/70">Default</span>
+        <span className="absolute inset-0 flex items-center justify-center text-[13px] text-white/70 text-center px-2">{sub || "Default"}</span>
       )}
     </span>
     <span className="text-[13.5px] leading-tight" style={{ color: selected ? RING : "rgb(var(--wa-text))" }}>
-      {theme ? theme.name : "Default"}
+      {theme ? theme.name : label || "Default"}
     </span>
   </button>
 );
 
-const ChatThemeSheet = ({ chatKey, chatName, onClose }) => {
+const ChatThemeSheet = ({ scope = "default", chatName, onClose }) => {
+  const isDefault = scope === "default";
   useBackToClose(true, onClose);
-  const saved = useChatThemeStore((s) => s.map[chatKey]);
+  const saved = useChatThemeStore((s) => (isDefault ? s.def : s.chats[scope]));
   const applyStore = useChatThemeStore((s) => s.apply);
   const setPreview = useChatThemeStore((s) => s.setPreview);
 
@@ -63,11 +64,11 @@ const ChatThemeSheet = ({ chatKey, chatName, onClose }) => {
 
   const doPreview = () => {
     loadChatFont(getFont(font));
-    setPreview({ chatKey, theme, font });
+    setPreview({ scope, theme, font });
     setPreviewing(true);
   };
   const doApply = () => {
-    applyStore(chatKey, theme, font);
+    applyStore(scope, theme, font);
     onClose();
   };
   const stopPreview = () => {
@@ -79,7 +80,7 @@ const ChatThemeSheet = ({ chatKey, chatName, onClose }) => {
     return (
       <div className="fixed inset-x-0 bottom-0 z-[125] wa-dark flex justify-center pb-[calc(14px+env(safe-area-inset-bottom))] px-4 pointer-events-none">
         <div className="pointer-events-auto w-full max-w-md rounded-3xl bg-wa-panel text-wa-text shadow-2xl p-3 flex items-center gap-3">
-          <span className="flex-1 pl-2 text-[14px] truncate">Previewing {getTheme(theme)?.name || "Default"}</span>
+          <span className="flex-1 pl-2 text-[14px] truncate">Previewing {getTheme(theme)?.name || (theme === "none" ? "Plain" : "Default")}</span>
           <button onClick={stopPreview} className="h-10 px-5 rounded-full bg-wa-surface text-[14px] font-medium">Back</button>
           <button onClick={doApply} className="h-10 px-6 rounded-full text-[14px] font-medium text-white" style={{ background: RING }}>Apply</button>
         </div>
@@ -91,7 +92,7 @@ const ChatThemeSheet = ({ chatKey, chatName, onClose }) => {
     <div className="fixed inset-0 z-[125] bg-black/50 flex items-end justify-center" onClick={onClose}>
       <div className="wa-dark w-full max-w-md h-[88vh] bg-wa-panel text-wa-text rounded-t-[28px] flex flex-col pb-[env(safe-area-inset-bottom)]" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/30" />
-        <h3 className="text-center text-[17px] font-semibold pt-5 pb-3">Customise</h3>
+        <h3 className="text-center text-[17px] font-semibold pt-5 pb-3">{isDefault ? "Theme for all chats" : "Customise"}</h3>
         <div className="flex border-b border-white/10">
           {[["theme", "Theme"], ["font", "Font"]].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} className={`flex-1 pb-3 text-[16px] font-medium relative ${tab === id ? "text-wa-text" : "text-wa-muted"}`}>
@@ -104,21 +105,27 @@ const ChatThemeSheet = ({ chatKey, chatName, onClose }) => {
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-3 no-scrollbar">
           {tab === "theme" ? (
             <div ref={gridRef} className="grid grid-cols-3 gap-x-3 gap-y-4">
-              <ThemeCard theme={null} scale={scale} selected={!theme} onPick={() => setTheme(null)} />
+              <ThemeCard theme={null} scale={scale} selected={!theme} onPick={() => setTheme(null)} label={isDefault ? "Plain" : "Same as all chats"} sub={isDefault ? "Plain" : "All chats"} />
+              {!isDefault && <ThemeCard theme={null} scale={scale} selected={theme === "none"} onPick={() => setTheme("none")} label="Plain" sub="Plain" />}
               {CHAT_THEMES.map((t) => (
                 <ThemeCard key={t.id} theme={t} scale={scale} selected={theme === t.id} onPick={() => setTheme(t.id)} />
               ))}
             </div>
           ) : (
             <>
-              <p className="text-center text-[14px] text-wa-muted mb-4">Pick a font for messages in {chatName}.</p>
+              <p className="text-center text-[14px] text-wa-muted mb-4">{isDefault ? "Pick a font for messages in all chats." : `Pick a font for messages in ${chatName}.`}</p>
               <div className="grid grid-cols-2 gap-3">
+                {!isDefault && (
+                  <button onClick={() => setFont(null)} className="h-[104px] rounded-3xl bg-wa-surface flex items-center justify-center text-[17px] text-center px-3" style={{ outline: !font ? `2.5px solid ${RING}` : "none" }} aria-pressed={!font}>
+                    Same as all chats
+                  </button>
+                )}
                 {CHAT_FONTS.map((f) => {
-                  const on = (font || "default") === f.id;
+                  const on = isDefault ? (font || "default") === f.id : f.id === "default" ? font === "none" : font === f.id;
                   return (
                     <button
                       key={f.id}
-                      onClick={() => setFont(f.id === "default" ? null : f.id)}
+                      onClick={() => setFont(f.id === "default" ? (isDefault ? null : "none") : f.id)}
                       className="h-[104px] rounded-3xl bg-wa-surface flex items-center justify-center text-[30px]"
                       style={{ fontFamily: f.css || "inherit", fontWeight: f.weight || 400, outline: on ? `2.5px solid ${RING}` : "none" }}
                       aria-pressed={on}

@@ -412,6 +412,11 @@ io.on("connection", (socket) => {
     socket.emit("callRinging", { reason: "Waiting for them to come online", callId });
   });
 
+  // Lets each phone measure how far its clock is from the server's (see useCallStore).
+  socket.on("timeSync", (ack) => {
+    if (typeof ack === "function") ack(Date.now());
+  });
+
   socket.on("answerCall", ({ toUserId, answer, callId }, ack) => {
     toUserId = String(toUserId);
     const key = pairKey(userId, toUserId);
@@ -433,6 +438,8 @@ io.on("connection", (socket) => {
       activeCalls.set(key, cur);
     }
     cur.answered = true;
+    // ONE start time, decided here, that both phones show — so the two timers never differ.
+    cur.answeredAt = Date.now();
     const iceBuffer = heldFromCaller?.ice || [];
     socket.to(userId).emit("callEnded", { callId: cur.callId, reason: "Answered on another device" }); // stop ringing on my other devices
     sendFcmCancelCall(userId, toUserId, cur.callId); // ...and on my Android phone(s)
@@ -442,14 +449,14 @@ io.on("connection", (socket) => {
     for (const candidate of iceBuffer) socket.emit("iceCandidate", { candidate });
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("callAnswered", { answer, callId: cur.callId });
-      if (typeof ack === "function") ack({ delivered: true });
+      io.to(receiverSocketId).emit("callAnswered", { answer, callId: cur.callId, startedAt: cur.answeredAt });
+      if (typeof ack === "function") ack({ delivered: true, startedAt: cur.answeredAt });
     } else if (typeof ack === "function") {
       ack({ delivered: false, reason: "caller disconnected" });
     }
     const logId = activeCallLogs.get(key);
     if (logId) {
-      CallLog.findByIdAndUpdate(logId, { status: "answered", answeredAt: new Date() }).catch(() => {});
+      CallLog.findByIdAndUpdate(logId, { status: "answered", answeredAt: new Date(cur.answeredAt) }).catch(() => {});
     }
   });
 

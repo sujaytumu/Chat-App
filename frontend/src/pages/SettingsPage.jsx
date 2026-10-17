@@ -6,6 +6,8 @@ import { useState, useEffect } from "react";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import { getWallpaper, setWallpaper } from "../lib/uiSettings";
 import { useWallpaperStore } from "../lib/wallpaper";
+import ChatThemeSheet from "../components/ChatThemeSheet";
+import { useChatThemeStore } from "../store/useChatThemeStore";
 import WallpaperPicker from "../components/WallpaperPicker";
 import { useInstallPrompt } from "../lib/useInstallPrompt";
 import toast from "react-hot-toast";
@@ -61,6 +63,9 @@ export const AppearancePage = () => {
   const { theme, setTheme } = useThemeStore();
   const [wallpaper, setWall] = useState(getWallpaper());
   const [picking, setPicking] = useState(false);
+  const [themeOpen, setThemeOpen] = useState(false);
+  const themedChats = useChatThemeStore((s) => Object.keys(s.chats).length);
+  const clearThemedChats = useChatThemeStore((s) => s.clearChats);
   const [color, setColor] = useState(getChatColor());
   const [auto, setAuto] = useState(getThemeAuto());
   const chatCount = useWallpaperStore((s) => Object.keys(s.chats).length);
@@ -88,6 +93,17 @@ export const AppearancePage = () => {
         </button>
       )}
       {picking && <WallpaperPicker scope="default" onClose={() => setPicking(false)} />}
+
+      <button onClick={() => setThemeOpen(true)} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field">
+        <span className="block text-[13.5px]">Chat theme &amp; font</span>
+        <span className="block text-[11.5px] text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Theme &amp; font.</span>
+      </button>
+      {themedChats > 0 && (
+        <button onClick={clearThemedChats} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[13px]">
+          Reset {themedChats} chat{themedChats > 1 ? "s" : ""} with their own theme
+        </button>
+      )}
+      {themeOpen && <ChatThemeSheet scope="default" onClose={() => setThemeOpen(false)} />}
 
       <div className="rounded-xl bg-wa-surface p-4">
         <span className="block text-[13.5px]">Chat colour</span>

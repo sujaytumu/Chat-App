@@ -1,6 +1,7 @@
 import { axiosInstance } from "./axios";
 import { useThemeStore, applyTheme } from "../store/useThemeStore";
 import { reloadWallpapers } from "./wallpaper";
+import { useChatThemeStore } from "../store/useChatThemeStore";
 import { applyUiSettings } from "./uiSettings";
 
 // Look & sound settings follow the ACCOUNT, so the browser, the installed app
@@ -13,6 +14,7 @@ import { applyUiSettings } from "./uiSettings";
 export const SYNC_KEYS = [
   "chat-theme",
   "talkies-wallpapers",
+  "talkies-chat-looks",
   "talkies-wallpaper-off",
   "talkies-reduce-motion",
   "talkies-haptics-off",
@@ -85,6 +87,7 @@ function applyToApp() {
   applyTheme(t);
   useThemeStore.setState({ theme: t });
   reloadWallpapers();
+  useChatThemeStore.getState().reload();
   applyUiSettings();
 }
 

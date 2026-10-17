@@ -6,6 +6,7 @@ import cloudinary from "../lib/cloudinary.js";
 import Status from "../models/status.model.js";
 import Group from "../models/group.model.js";
 import { io } from "../lib/socket.js";
+import { createQr, qrInfo, approveQr, collectQr } from "../lib/qrLogin.js";
 
 export const signup = async (req, res) => {
   const { fullName, email, password } = req.body;
@@ -208,6 +209,7 @@ export const checkAuth = (req, res) => {
 const PREF_KEYS = new Set([
   "chat-theme",
   "talkies-wallpapers",
+  "talkies-chat-looks",
   "talkies-wallpaper-off",
   "talkies-reduce-motion",
   "talkies-haptics-off",
@@ -313,6 +315,63 @@ export const deleteAccount = async (req, res) => {
     console.log("Error in deleteAccount controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
+};
+
+// ---- Log in with QR code (link a new browser / device from the phone) ----
+const accountPayload = (user) => ({
+  _id: user._id,
+  fullName: user.fullName,
+  email: user.email,
+  profilePic: user.profilePic,
+  archivedChats: user.archivedChats || [],
+  lockedChats: user.lockedChats || [],
+  pinnedChats: user.pinnedChats || [],
+  mutedChats: user.mutedChats || [],
+  markedUnread: user.markedUnread || [],
+  chatLists: user.chatLists || [],
+  privacy: user.privacy,
+  blockedUsers: user.blockedUsers || [],
+});
+
+// The browser asks for a code to show as a QR.
+export const qrNew = (req, res) => {
+  const made = createQr(req.ip || "x", deviceLabel(req.headers["user-agent"] || ""));
+  if (!made) return res.status(429).json({ message: "Too many QR codes — wait a moment" });
+  res.status(200).json(made);
+};
+
+// The browser asks whether the phone has approved yet.
+export const qrPoll = async (req, res) => {
+  try {
+    const { code, poll } = req.body || {};
+    if (typeof code !== "string" || typeof poll !== "string") return res.status(400).json({ message: "Invalid request" });
+    const r = collectQr(code, poll);
+    if (r.state === "expired") return res.status(410).json({ message: "This QR code expired" });
+    if (r.state === "waiting") return res.status(200).json({ status: "waiting" });
+    const user = await User.findById(r.userId);
+    if (!user || user.deleted) return res.status(410).json({ message: "This QR code expired" });
+    generateToken(user._id, res, user.tokenVersion || 0, req);
+    res.status(200).json({ status: "approved", user: accountPayload(user) });
+  } catch (error) {
+    console.log("Error in qrPoll controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// The phone looks at a scanned code before approving: which device is asking?
+export const qrLookup = (req, res) => {
+  const info = qrInfo(req.params.code);
+  if (!info || info.status !== "waiting") return res.status(404).json({ message: "This QR code expired — refresh it on the other screen" });
+  res.status(200).json(info);
+};
+
+// The phone says "yes, link it".
+export const qrApprove = (req, res) => {
+  const code = req.body?.code;
+  if (typeof code !== "string" || !approveQr(code, req.user._id)) {
+    return res.status(404).json({ message: "This QR code expired — refresh it on the other screen" });
+  }
+  res.status(200).json({ message: "Device linked" });
 };
 
 // ---- Linked devices ----
