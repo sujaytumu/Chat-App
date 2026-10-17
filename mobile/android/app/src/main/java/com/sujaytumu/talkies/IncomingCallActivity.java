@@ -33,6 +33,7 @@ public class IncomingCallActivity extends Activity {
     static final String EXTRA_CALLER = "callerId";
     static final String EXTRA_PHOTO = "photoUrl";
     static final String EXTRA_CALL_ID = "callId";
+    static final String EXTRA_STARTED = "startedAt";
 
     private static volatile IncomingCallActivity current;
 
@@ -88,13 +89,16 @@ public class IncomingCallActivity extends Activity {
         hideSystemBars();
         loadPhoto(photoUrl);
 
-        // stop ringing the screen once the notification itself would have timed out
+        // stop showing the screen once the call itself would have timed out (counted from when it
+        // started ringing, so re-opening it from the notification doesn't extend the call)
+        long startedAt = in.getLongExtra(EXTRA_STARTED, 0L);
+        long left = startedAt > 0 ? 45_000 - (System.currentTimeMillis() - startedAt) : 45_000;
         main.postDelayed(new Runnable() {
             @Override
             public void run() {
                 finishCall();
             }
-        }, 45_000);
+        }, Math.max(1_000L, left));
     }
 
     private View buildUi(String name, String body) {

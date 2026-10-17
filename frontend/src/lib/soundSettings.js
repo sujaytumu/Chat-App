@@ -4,6 +4,16 @@ const CALL_TONE_KEY = "talkies-call-tone";
 const MESSAGE_TONE_KEY = "talkies-message-tone";
 const CUSTOM_NAME_KEY_PREFIX = "talkies-custom-tone-name-";
 
+// One-time: the old built-in default ("Classic ring", a phone-style beep) becomes the Talkies tune.
+try {
+  if (!localStorage.getItem("talkies-tone-migrated-v1")) {
+    if (localStorage.getItem(CALL_TONE_KEY) === "classic") localStorage.setItem(CALL_TONE_KEY, "talkies");
+    localStorage.setItem("talkies-tone-migrated-v1", "1");
+  }
+} catch {
+  /* storage unavailable */
+}
+
 export function isMessageSoundEnabled() {
   return localStorage.getItem(MESSAGE_SOUND_KEY) !== "false"; // default on
 }
@@ -23,6 +33,7 @@ export function setCallRingtoneEnabled(enabled) {
 // ship). "custom" means a sound file the person picked from their device.
 
 export const CALL_TONES = [
+  { id: "talkies", label: "Talkies ringtone" }, // the tune bundled with the app: same on every phone
   { id: "classic", label: "Classic ring" },
   { id: "digital", label: "Digital beeps" },
   { id: "chime", label: "Chime" },
@@ -39,7 +50,7 @@ export const MESSAGE_TONES = [
 ];
 
 export function getCallTone() {
-  return localStorage.getItem(CALL_TONE_KEY) || "classic";
+  return localStorage.getItem(CALL_TONE_KEY) || "talkies";
 }
 export function setCallTone(id) {
   localStorage.setItem(CALL_TONE_KEY, id);

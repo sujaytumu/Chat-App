@@ -239,10 +239,17 @@ final class NotificationHelper {
         screen.putExtra(IncomingCallActivity.EXTRA_CALLER, callerId);
         screen.putExtra(IncomingCallActivity.EXTRA_PHOTO, photoUrl);
         screen.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId == null ? "" : callId);
+        screen.putExtra(IncomingCallActivity.EXTRA_STARTED, System.currentTimeMillis());
         screen.setData(Uri.parse("talkies://call/" + id));
         PendingIntent fullScreen = PendingIntent.getActivity(ctx, id + 3, screen, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-        PendingIntent full = openIntent(ctx, id, "open", callerId, "direct", callerId, true);
+        // Tapping the notification itself brings back the big call screen (same ringtone still going),
+        // exactly like WhatsApp — it does NOT open the chat list. Answer / Decline act directly.
+        Intent reopen = new Intent(ctx, IncomingCallActivity.class);
+        reopen.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        reopen.putExtras(screen);
+        reopen.setData(Uri.parse("talkies://callopen/" + id));
+        PendingIntent full = PendingIntent.getActivity(ctx, id + 4, reopen, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         // Answer opens the app and the page picks the call up by itself (no second tap).
         PendingIntent answer = openIntent(ctx, id + 1, "answer", callerId, "direct", callerId, true);
 
