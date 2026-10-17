@@ -76,7 +76,7 @@ const CALL_PUSH_OPTIONS = { urgency: "high", TTL: 60 };
 // app fundamentally can't wake a fully closed browser/phone the way a native
 // VoIP push can, so this is the closest practical approximation of that.
 const pendingCalls = new Map(); // toUserId -> { offer, callType, fromUser, fromUserId, timeout }
-const CALL_GRACE_PERIOD_MS = 45_000;
+const CALL_GRACE_PERIOD_MS = 40_000;
 const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
 const pairKey = (a, b) => [a, b].sort().join("_");
 // One entry per live 1:1 call (ringing or answered). Every call gets its own id, and every signal
