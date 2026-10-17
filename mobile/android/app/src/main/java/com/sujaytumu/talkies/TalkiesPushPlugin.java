@@ -51,15 +51,12 @@ public class TalkiesPushPlugin extends Plugin {
         // consume so rotating / re-delivering the same intent can't repeat it
         intent.removeExtra("tk_action");
         NotificationHelper.clearRecent(intent.getStringExtra("tk_chatId") == null ? "" : intent.getStringExtra("tk_chatId"));
-        // Deliver exactly once: to the live listener if the page is already listening,
-        // otherwise park it for getLaunchIntent(). (It used to do both, so "Answer" reached the
-        // page twice and the call had to be picked up a second time.)
-        if (instance != null && instance.hasListeners("nativeIntent")) {
-            pending = null;
-            instance.notifyListeners("nativeIntent", o, false);
-        } else {
-            pending = o;
-        }
+        // At least once: park it for getLaunchIntent() AND tell a live listener. If the page was just
+        // reloaded its old listener may be gone, so a single delivery could be lost and the person
+        // would have to answer a second time. The page ignores repeats (same timestamp) and stale ones.
+        o.put("ts", System.currentTimeMillis());
+        pending = o;
+        if (instance != null) instance.notifyListeners("nativeIntent", o, true);
     }
 
     @PluginMethod

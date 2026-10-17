@@ -40,7 +40,7 @@ import java.util.Map;
  * Answer / Decline) and per-chat message notifications.
  */
 final class NotificationHelper {
-    static final String CH_CALLS = "talkies_calls_v1";
+    static final String CH_CALLS = "talkies_calls_v2"; // v2: the bundled Talkies ringtone (a channel's sound can't be changed once created)
     static final String CH_MESSAGES = "talkies_messages_v1";
     static final String CH_MISSED = "talkies_missed_v1";
     static final String SITE = "https://chat-app-jjcg.onrender.com";
@@ -61,7 +61,9 @@ final class NotificationHelper {
         NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm == null) return;
 
-        Uri ringtone = Settings.System.DEFAULT_RINGTONE_URI;
+        // The phone's own ringtone is never used: calls ring with Talkies' own tune shipped in the app.
+        nm.deleteNotificationChannel("talkies_calls_v1");
+        Uri ringtone = Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring);
         AudioAttributes ring = new AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)

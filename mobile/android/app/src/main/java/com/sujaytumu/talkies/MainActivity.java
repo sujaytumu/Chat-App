@@ -170,6 +170,9 @@ public class MainActivity extends BridgeActivity {
         WebView web = getBridge() != null ? getBridge().getWebView() : null;
         if (web != null) {
             web.getSettings().setTextZoom(100);
+            // A call answered from the lock screen has had no tap inside the page: the other
+            // person's voice must still play by itself (no "tap to enable audio").
+            web.getSettings().setMediaPlaybackRequiresUserGesture(false);
             if (Build.VERSION.SDK_INT >= 29 && Build.VERSION.SDK_INT < 33) {
                 web.getSettings().setForceDark(WebSettings.FORCE_DARK_OFF);
             }
