@@ -179,6 +179,23 @@ function emitWithRetry(socket, event, payload, { timeoutMs = 4000, retries = 1 }
   });
 }
 
+// Every call has a server-issued id. A call that has ended / been declined / answered elsewhere is
+// remembered for a few minutes, so a late or re-delivered "incomingCall" for it (e.g. the server handing
+// a held call over again after a reconnect) never rings a second time, and a late "call ended" or
+// "declined" signal about an OLD call can never hang up a newer one.
+let currentCallId = null;
+const endedCallIds = new Map(); // callId -> time it ended
+const ENDED_CALL_TTL_MS = 5 * 60_000;
+const rememberEnded = (id) => {
+  if (!id) return;
+  const now = Date.now();
+  endedCallIds.set(id, now);
+  for (const [k, t] of endedCallIds) if (now - t > ENDED_CALL_TTL_MS) endedCallIds.delete(k);
+};
+const wasEnded = (id) => !!id && endedCallIds.has(id);
+// A signal that names a different call than the one on screen is about an old call: ignore it.
+const isOtherCall = (id) => !!id && !!currentCallId && id !== currentCallId;
+
 let pc = null;
 let callUsageBytes = 0; // approx. bytes sent + received in the current call (sampled every few seconds)
 let pendingCandidates = [];
@@ -376,6 +393,15 @@ export const useCallStore = create((set, get) => ({
         fromUser: { _id: authUser._id, fullName: authUser.fullName, profilePic: authUser.profilePic },
       }, { timeoutMs: 10000, retries: 0 });
 
+      if (result?.callId) {
+        if (isStale()) {
+          // hung up while the ack was in flight: make sure the server drops this call too
+          socket.emit("endCall", { toUserId: user._id, callId: result.callId });
+          rememberEnded(result.callId);
+        } else {
+          currentCallId = result.callId;
+        }
+      }
       if (!result.delivered && result.reason === "timeout") {
         console.warn("callUser wasn't acknowledged — continuing to wait anyway");
       }
@@ -438,7 +464,7 @@ export const useCallStore = create((set, get) => ({
       await pc.setLocalDescription(answer);
       initialNegotiationDone = true;
 
-      const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer }, {
+      const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer, callId: currentCallId || undefined }, {
         timeoutMs: 7000,
         retries: 2,
       });
@@ -464,7 +490,7 @@ export const useCallStore = create((set, get) => ({
     const { remoteUser } = get();
     get().stopRingtone();
     if (socket && remoteUser) {
-      socket.emit("rejectCall", { toUserId: remoteUser._id });
+      socket.emit("rejectCall", { toUserId: remoteUser._id, callId: currentCallId || undefined });
     }
     get().resetCall();
   },
@@ -473,7 +499,7 @@ export const useCallStore = create((set, get) => ({
     const socket = useAuthStore.getState().socket;
     const { remoteUser, callStatus } = get();
     if (socket && remoteUser && callStatus !== "idle") {
-      socket.emit("endCall", { toUserId: remoteUser._id });
+      socket.emit("endCall", { toUserId: remoteUser._id, callId: currentCallId || undefined });
     }
     get().resetCall();
   },
@@ -555,6 +581,8 @@ export const useCallStore = create((set, get) => ({
       /* ignore */
     }
     callUsageBytes = 0;
+    rememberEnded(currentCallId);
+    currentCallId = null;
     get().stopRingtone();
     voiceOriginShare = false;
     if (pc) {
@@ -862,10 +890,16 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
-    socket.on("incomingCall", ({ fromUser, offer, callType }) => {
+    socket.on("incomingCall", ({ fromUser, offer, callType, callId }) => {
+      // This exact call already ended / was declined / answered on this device: the server handed it
+      // over again (reconnect, app brought to the front) — never ring for it a second time.
+      if (wasEnded(callId)) {
+        socket.emit("rejectCall", { toUserId: fromUser._id, callId });
+        return;
+      }
       // In a group call: this is a busy signal for the caller.
       if (isGroupCallBusy()) {
-        socket.emit("rejectCall", { toUserId: fromUser._id });
+        socket.emit("rejectCall", { toUserId: fromUser._id, callId });
         return;
       }
       // Busy? auto-reject — but first self-heal a genuinely stale state
@@ -885,10 +919,11 @@ export const useCallStore = create((set, get) => ({
         return;
       }
       if (get().callStatus !== "idle") {
-        socket.emit("rejectCall", { toUserId: fromUser._id });
+        socket.emit("rejectCall", { toUserId: fromUser._id, callId });
         return;
       }
       callClaimedAt = Date.now();
+      currentCallId = callId || null;
       set({
         callStatus: "incoming",
         remoteUser: fromUser,
@@ -897,7 +932,7 @@ export const useCallStore = create((set, get) => ({
       });
       // Tell the caller our device actually got the call and is ringing —
       // lets their screen switch from "Calling…" to "Ringing…"
-      socket.emit("callRingingAck", { toUserId: fromUser._id });
+      socket.emit("callRingingAck", { toUserId: fromUser._id, callId });
 
       // They already pressed "Answer" on the notification: pick up right away
       // instead of ringing.
@@ -918,7 +953,8 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
-    socket.on("callAnswered", async ({ answer }) => {
+    socket.on("callAnswered", async ({ answer, callId }) => {
+      if (isOtherCall(callId)) return;
       if (!pc) {
         console.warn("Received callAnswered but no active peer connection — call may have already ended");
         return;
@@ -953,7 +989,8 @@ export const useCallStore = create((set, get) => ({
       set(patch);
     });
 
-    socket.on("remoteDeviceRinging", () => {
+    socket.on("remoteDeviceRinging", (payload) => {
+      if (isOtherCall(payload?.callId)) return;
       set({ isRemoteRinging: true });
     });
 
@@ -988,22 +1025,31 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
-    socket.on("callRejected", () => {
+    socket.on("callRejected", (payload) => {
+      if (isOtherCall(payload?.callId) || get().callStatus === "idle") return;
       toast("Call declined", { icon: "📵" });
       get().resetCall();
     });
 
-    socket.on("callEnded", () => {
+    socket.on("callEnded", (payload) => {
+      const id = payload?.callId;
+      // Remember it even if nothing is on screen: a late hand-over of this call must stay silent.
+      if (id && get().callStatus === "idle") rememberEnded(id);
+      if (isOtherCall(id)) return;
       if (Date.now() < handoffUntil) return;
+      if (get().callStatus === "idle") return;
       toast("Call ended", { icon: "📴" });
       get().resetCall();
     });
 
-    socket.on("callRinging", ({ reason }) => {
+    socket.on("callRinging", ({ reason, callId }) => {
+      if (isOtherCall(callId)) return;
       toast(reason || "Ringing…", { icon: "📞" });
     });
 
-    socket.on("callFailed", ({ reason }) => {
+    socket.on("callFailed", ({ reason, callId }) => {
+      if (isOtherCall(callId)) return;
+      if (get().callStatus === "idle") return;
       toast.error(reason || "Call failed");
       get().resetCall();
     });

@@ -33,8 +33,10 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
         if (d == null || d.isEmpty()) return;
 
         String tag = nz(d.get("tag"));
+        String callId = nz(d.get("callId"));
         if ("1".equals(d.get("cancel"))) {
-            NotificationHelper.cancel(this, tag);
+            // caller hung up / it was answered or declined elsewhere / nobody picked up in time
+            NotificationHelper.cancel(this, tag, callId);
             return;
         }
 
@@ -53,7 +55,7 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
         boolean isCall = "1".equals(d.get("isCall"));
 
         if (isCall) {
-            NotificationHelper.showIncomingCall(this, title, body, tag, nz(d.get("callerId")).isEmpty() ? chatId : nz(d.get("callerId")), nz(d.get("icon")));
+            NotificationHelper.showIncomingCall(this, title, body, tag, nz(d.get("callerId")).isEmpty() ? chatId : nz(d.get("callerId")), nz(d.get("icon")), callId);
         } else {
             boolean missed = body.toLowerCase().startsWith("missed");
             NotificationHelper.showMessage(this, title, body, tag, chatId, chatType, missed);

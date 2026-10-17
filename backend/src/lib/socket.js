@@ -1,6 +1,7 @@
 import CallLink from "../models/callLink.model.js";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import http from "http";
 import express from "express";
 import Group from "../models/group.model.js";
@@ -78,6 +79,18 @@ const pendingCalls = new Map(); // toUserId -> { offer, callType, fromUser, from
 const CALL_GRACE_PERIOD_MS = 45_000;
 const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
 const pairKey = (a, b) => [a, b].sort().join("_");
+// One entry per live 1:1 call (ringing or answered). Every call gets its own id, and every signal
+// about it (ring / answer / decline / end / cancel) carries that id, so a late or duplicated signal
+// from an OLD call can never ring again, end or decline a different one.
+const activeCalls = new Map(); // sorted pairKey -> { callId, callerId, calleeId, startedAt, answered }
+const DUPLICATE_CALL_WINDOW_MS = 8000;
+const newCallId = () => crypto.randomUUID();
+// true when a signal that names a call id belongs to some OTHER call between the same two people
+const isStaleSignal = (a, b, callId) => {
+  if (!callId) return false; // old clients don't send one
+  const cur = activeCalls.get(pairKey(a, b));
+  return !!cur && cur.callId !== callId; // no record at all = the server restarted; let signals through
+};
 
 // ---- Group call state (see the "groupCall:*" handlers) ----
 const MAX_GROUP_CALL = 10;
@@ -229,7 +242,7 @@ io.on("connection", (socket) => {
   // connects straight away instead of waiting on database queries.
   if (userId) {
     const held = pendingCalls.get(userId);
-    if (held) socket.emit("incomingCall", { fromUser: held.fromUser, offer: held.offer, callType: held.callType });
+    if (held) socket.emit("incomingCall", { fromUser: held.fromUser, offer: held.offer, callType: held.callType, callId: held.callId });
   }
 
   // ---- Typing indicators (1:1) ----
@@ -309,6 +322,20 @@ io.on("connection", (socket) => {
     // delay the ack past the client's timeout, which triggered duplicate
     // "callUser" retries and double-ringing / auto-reject on the callee.
     const callKey = pairKey(userId, toUserId);
+    // The same call arriving twice (a re-sent signal after a network blip) must ring ONCE: answer the
+    // duplicate with the existing call instead of creating a second call, log and ring.
+    const existing = activeCalls.get(callKey);
+    if (existing && !existing.answered && existing.callerId === userId && Date.now() - existing.startedAt < DUPLICATE_CALL_WINDOW_MS) {
+      if (typeof ack === "function") ack({ delivered: isOnline(String(toUserId)), callId: existing.callId, duplicate: true });
+      return;
+    }
+    // A previous call between these two that never got cleaned up must not leak into this one.
+    if (existing) {
+      clearHeldCall(String(existing.calleeId), String(existing.callerId));
+      activeCallLogs.delete(callKey);
+    }
+    const callId = newCallId();
+    activeCalls.set(callKey, { callId, callerId: userId, calleeId: String(toUserId), startedAt: Date.now(), answered: false });
     activeCallLogs.set(callKey, null); // tracked right away, DB id attached below
     const logPromise = CallLog.create({
       callerId: userId,
@@ -329,35 +356,25 @@ io.on("connection", (socket) => {
       });
     void logPromise;
 
-    // Keep the call alive on the server until the callee's device confirms it is ringing
-    // (or they answer / decline / the caller hangs up). If their socket was a zombie, the
-    // call is then handed to them the moment they reconnect, and the push wakes the phone.
+    // Keep the call alive on the server until the callee answers / declines / the caller hangs up.
+    // If their socket was a zombie, the call is handed to them the moment they reconnect, and the push
+    // wakes the phone. After CALL_GRACE_PERIOD_MS nobody picked up: it is a missed call everywhere.
     const holdForCallee = () => {
-      const timeout = setTimeout(() => {
-        pendingCalls.delete(toUserId);
-        socket.emit("callFailed", { reason: "No answer" });
-        if (isOnline(toUserId)) io.to(toUserId).emit("callEnded"); // stop it ringing on their screen
-        sendPushToUser(toUserId, {
-          title: fromUser?.fullName || "Someone",
-          body: `Missed ${callType === "video" ? "video" : "voice"} call`,
-          icon: fromUser?.profilePic || "/icon-v2-192.png",
-          tag: `incoming-call-${userId}`,
-          data: { url: "/", chatType: "direct", chatId: userId },
-        });
-        const logId = activeCallLogs.get(pairKey(userId, toUserId));
-        if (logId) {
-          CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
-        }
-        activeCallLogs.delete(pairKey(userId, toUserId));
-      }, CALL_GRACE_PERIOD_MS);
-
-      pendingCalls.set(toUserId, { offer, callType, fromUser, fromUserId: userId, timeout });
+      const previous = pendingCalls.get(String(toUserId));
+      if (previous) {
+        // never leave an orphaned timer behind: it would later end a DIFFERENT call
+        clearTimeout(previous.timeout);
+        if (previous.callId !== callId) expireHeldCall(String(toUserId), previous);
+      }
+      const timeout = setTimeout(() => expireHeldCall(String(toUserId), entry), CALL_GRACE_PERIOD_MS);
+      const entry = { offer, callType, fromUser, fromUserId: userId, callId, timeout };
+      pendingCalls.set(String(toUserId), entry);
     };
 
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType });
-      if (typeof ack === "function") ack({ delivered: true });
+      io.to(receiverSocketId).emit("incomingCall", { fromUser, offer, callType, callId });
+      if (typeof ack === "function") ack({ delivered: true, callId });
       holdForCallee(); // dropped again as soon as their device confirms it is ringing
       // Also push a system-level notification. Browsers block Web Audio
       // playback until a user gesture has happened on the page, so if the
@@ -371,12 +388,12 @@ io.on("connection", (socket) => {
         isCall: true,
         actions: CALL_PUSH_ACTIONS,
         tag: `incoming-call-${userId}`,
-        data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true },
+        data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true, callId },
       }, CALL_PUSH_OPTIONS);
       return;
     }
 
-    if (typeof ack === "function") ack({ delivered: false, reason: "offline" });
+    if (typeof ack === "function") ack({ delivered: false, reason: "offline", callId });
 
     // Not connected right now — push a notification and hold the call for a
     // short grace period in case they open the app in time. Tell the caller
@@ -388,20 +405,30 @@ io.on("connection", (socket) => {
       isCall: true,
       actions: CALL_PUSH_ACTIONS,
       tag: `incoming-call-${userId}`,
-      data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true },
+      data: { url: "/", chatType: "direct", chatId: userId, callerId: userId, isCall: true, callId },
     }, CALL_PUSH_OPTIONS);
 
     holdForCallee();
-    socket.emit("callRinging", { reason: "Waiting for them to come online" });
+    socket.emit("callRinging", { reason: "Waiting for them to come online", callId });
   });
 
-  socket.on("answerCall", ({ toUserId, answer }, ack) => {
-    socket.to(userId).emit("callEnded"); // stop ringing on my other devices
-    sendFcmCancelCall(userId, toUserId); // ...and on my Android phone
+  socket.on("answerCall", ({ toUserId, answer, callId }, ack) => {
+    toUserId = String(toUserId);
+    // An answer to a call that is already over (the caller hung up / it timed out) must not
+    // resurrect anything: tell this device to drop it.
+    if (isStaleSignal(userId, toUserId, callId) || !activeCalls.has(pairKey(userId, toUserId))) {
+      socket.emit("callEnded", { callId });
+      if (typeof ack === "function") ack({ delivered: false, reason: "call ended" });
+      return;
+    }
+    const cur = activeCalls.get(pairKey(userId, toUserId));
+    cur.answered = true;
+    socket.to(userId).emit("callEnded", { callId: cur.callId }); // stop ringing on my other devices
+    sendFcmCancelCall(userId, toUserId, cur.callId); // ...and on my Android phone(s)
     clearHeldCall(userId, toUserId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("callAnswered", { answer });
+      io.to(receiverSocketId).emit("callAnswered", { answer, callId: cur.callId });
       if (typeof ack === "function") ack({ delivered: true });
     } else if (typeof ack === "function") {
       ack({ delivered: false, reason: "caller disconnected" });
@@ -416,12 +443,13 @@ io.on("connection", (socket) => {
   // device is now audibly ringing — lets the caller's UI switch from
   // "Calling…" to "Ringing…", mirroring the sent → delivered distinction
   // used for message ticks.
-  socket.on("callRingingAck", ({ toUserId }) => {
+  socket.on("callRingingAck", ({ toUserId, callId }) => {
+    if (isStaleSignal(toUserId, userId, callId)) return;
     // Keep the call held (don't clear it here): the phone saying "ringing" doesn't mean the
     // person saw it. If they leave and re-open the app, "syncCalls" / reconnect hands it over again.
     const callerSocketId = roomFor(toUserId);
     if (callerSocketId) {
-      io.to(callerSocketId).emit("remoteDeviceRinging");
+      io.to(callerSocketId).emit("remoteDeviceRinging", { callId });
     }
   });
 
@@ -430,7 +458,7 @@ io.on("connection", (socket) => {
   socket.on("syncCalls", () => {
     const pending = pendingCalls.get(userId);
     if (!pending) return;
-    socket.emit("incomingCall", { fromUser: pending.fromUser, offer: pending.offer, callType: pending.callType });
+    socket.emit("incomingCall", { fromUser: pending.fromUser, offer: pending.offer, callType: pending.callType, callId: pending.callId });
   });
 
   socket.on("iceCandidate", ({ toUserId, candidate }) => {
@@ -472,20 +500,30 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("rejectCall", ({ toUserId }) => {
-    socket.to(userId).emit("callEnded"); // stop ringing on my other devices
-    sendFcmCancelCall(userId, toUserId);
+  socket.on("rejectCall", ({ toUserId, callId }) => {
+    toUserId = String(toUserId);
+    const key = pairKey(userId, toUserId);
+    const cur = activeCalls.get(key);
+    // A late / repeated decline for a call that is already over (or an older call) is ignored: it
+    // used to hang up the caller's NEXT call.
+    if (isStaleSignal(userId, toUserId, callId)) {
+      socket.emit("callEnded", { callId }); // make sure this device drops that old call too
+      return;
+    }
+    const id = cur?.callId || callId;
+    socket.to(userId).emit("callEnded", { callId: id }); // stop ringing on my other devices
+    sendFcmCancelCall(userId, toUserId, id); // ...and on my other Android phones
     clearHeldCall(userId, toUserId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("callRejected");
+      io.to(receiverSocketId).emit("callRejected", { callId: id });
     }
-    const key = pairKey(userId, toUserId);
     const logId = activeCallLogs.get(key);
     if (logId) {
       CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
     }
     activeCallLogs.delete(key);
+    activeCalls.delete(key);
   });
 
   // A client reports roughly how much data its call used (bytes sent + received) once it ends.
@@ -511,15 +549,25 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("endCall", async ({ toUserId }) => {
+  socket.on("endCall", async ({ toUserId, callId }) => {
+    toUserId = String(toUserId);
+    const key = pairKey(userId, toUserId);
+    const cur = activeCalls.get(key);
+    // Hang-up for a call that is not the current one (late / repeated): ignore it.
+    if (isStaleSignal(userId, toUserId, callId)) return;
+    const id = cur?.callId || callId;
+    const wasRingingForCallee = !!cur && !cur.answered && cur.callerId === userId;
     clearHeldCall(toUserId, userId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("callEnded");
+      io.to(receiverSocketId).emit("callEnded", { callId: id });
     }
-    const key = pairKey(userId, toUserId);
+    // The caller gave up before anyone picked up: stop the ring on EVERY phone of the callee —
+    // including a closed app, which only a push can reach.
+    if (wasRingingForCallee) sendFcmCancelCall(toUserId, userId, id);
     const logId = activeCallLogs.get(key);
     activeCallLogs.delete(key);
+    activeCalls.delete(key);
     if (logId) {
       try {
         const log = await CallLog.findById(logId);
@@ -821,11 +869,17 @@ io.on("connection", (socket) => {
 
       // Also clear any call this user placed that's still waiting in the
       // offline-callee grace period.
-      for (const [toUserId, pending] of pendingCalls.entries()) {
+      for (const [toUserId, pending] of [...pendingCalls.entries()]) {
         if (pending.fromUserId === userId) {
           clearTimeout(pending.timeout);
           pendingCalls.delete(toUserId);
+          // The caller dropped off: the callee must stop ringing (open app AND closed-app phone).
+          if (isOnline(toUserId)) io.to(toUserId).emit("callEnded", { callId: pending.callId });
+          sendFcmCancelCall(toUserId, userId, pending.callId);
         }
+      }
+      for (const [key, c] of [...activeCalls.entries()]) {
+        if (c.callerId === userId || c.calleeId === userId) activeCalls.delete(key);
       }
     }, DISCONNECT_CALL_GRACE_MS);
   });
@@ -891,23 +945,58 @@ function clearHeldCall(calleeId, callerId) {
   }
 }
 
+// Nobody picked up in time (or a newer call replaced this one): it becomes a missed call for the
+// callee on every device, the ring stops everywhere (open app, other tabs, closed Android app),
+// and the caller is told there was no answer.
+function expireHeldCall(calleeId, entry) {
+  const current = pendingCalls.get(calleeId);
+  if (current && current.callId === entry.callId) pendingCalls.delete(calleeId);
+  clearTimeout(entry.timeout);
+  const callerId = String(entry.fromUserId);
+  const key = pairKey(callerId, calleeId);
+  const live = activeCalls.get(key);
+  if (live && live.callId !== entry.callId) return; // a newer call between the two is already running
+  if (live && live.answered) return; // it was answered meanwhile
+  const callerRoom = roomFor(callerId);
+  if (callerRoom) io.to(callerRoom).emit("callFailed", { reason: "No answer", callId: entry.callId });
+  if (isOnline(calleeId)) io.to(calleeId).emit("callEnded", { callId: entry.callId }); // stop it ringing on their screen
+  sendFcmCancelCall(calleeId, callerId, entry.callId);
+  sendPushToUser(calleeId, {
+    title: entry.fromUser?.fullName || "Someone",
+    body: `Missed ${entry.callType === "video" ? "video" : "voice"} call`,
+    icon: entry.fromUser?.profilePic || "/icon-v2-192.png",
+    tag: `incoming-call-${callerId}`,
+    data: { url: "/", chatType: "direct", chatId: callerId },
+  });
+  const logId = activeCallLogs.get(key);
+  if (logId) CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+  activeCallLogs.delete(key);
+  activeCalls.delete(key);
+}
+
 // "Decline" pressed on an incoming-call notification while the app is closed
 // (so there is no socket to emit rejectCall on). Same effect as rejectCall.
-export function declineCallFor(userId, callerId) {
+export function declineCallFor(userId, callerId, callId) {
+  const key = pairKey(userId, callerId);
+  const cur = activeCalls.get(key);
+  // Already over / replaced by a newer call: a late "Decline" tap must not hang that one up.
+  if (cur && callId && cur.callId !== callId) return;
+  const id = cur?.callId || callId;
   const pending = pendingCalls.get(userId);
-  if (pending && pending.fromUserId === callerId) {
+  if (pending && String(pending.fromUserId) === String(callerId)) {
     clearTimeout(pending.timeout);
     pendingCalls.delete(userId);
   }
   const callerRoom = roomFor(callerId);
-  if (callerRoom) io.to(callerRoom).emit("callRejected");
-  if (isOnline(userId)) io.to(userId).emit("callEnded"); // stop ringing on their open devices
-  const key = pairKey(userId, callerId);
+  if (callerRoom) io.to(callerRoom).emit("callRejected", { callId: id });
+  if (isOnline(userId)) io.to(userId).emit("callEnded", { callId: id }); // stop ringing on their open devices
+  sendFcmCancelCall(userId, callerId, id); // ...and on their other Android phones
   const logId = activeCallLogs.get(key);
   if (logId) {
     CallLog.findByIdAndUpdate(logId, { status: "declined", endedAt: new Date() }).catch(() => {});
   }
   activeCallLogs.delete(key);
+  activeCalls.delete(key);
 }
 
 export { io, app, server };

@@ -82,11 +82,16 @@ function toData(payload) {
     messageId: d.messageId ? String(d.messageId) : "",
     url: d.url || "/",
     cancel: payload?.cancel ? "1" : "0",
+    callId: d.callId ? String(d.callId) : payload?.callId ? String(payload.callId) : "",
   };
   return out;
 }
 
 async function sendOne(token, payload, isCall) {
+  // A ring and its cancel share one collapse key: if the phone has no internet, FCM keeps only the
+  // NEWEST of them — so when it comes back online it gets "cancelled" (no ring) instead of ringing
+  // for a call that is already over. Only calls / cancels collapse; messages never do.
+  const collapse = (isCall || payload?.cancel) && payload?.tag ? String(payload.tag).slice(0, 60) : undefined;
   const acc = load();
   const at = await accessToken();
   const res = await fetch(`https://fcm.googleapis.com/v1/projects/${acc.project_id}/messages:send`, {
@@ -96,7 +101,11 @@ async function sendOne(token, payload, isCall) {
       message: {
         token,
         data: toData(payload),
-        android: { priority: "HIGH", ttl: isCall ? "45s" : "86400s" },
+        android: {
+          priority: "HIGH",
+          ttl: isCall ? "40s" : payload?.cancel ? "60s" : "86400s",
+          ...(collapse ? { collapse_key: collapse } : {}),
+        },
       },
     }),
   });
@@ -136,11 +145,11 @@ export async function sendFcmToUser(user, payload) {
 
 // Stop the ringing on this user's Android phone(s) — the call was answered /
 // declined elsewhere. Android only (the web app is told through its socket).
-export async function sendFcmCancelCall(userId, callerId) {
+export async function sendFcmCancelCall(userId, callerId, callId) {
   try {
     if (!load()) return;
     const user = await User.findById(userId).select("fcmTokens").lean();
-    await sendFcmToUser(user, { cancel: true, tag: `incoming-call-${callerId}`, isCall: false });
+    await sendFcmToUser(user, { cancel: true, tag: `incoming-call-${callerId}`, isCall: false, data: { callId } });
   } catch (e) {
     console.log("Error in sendFcmCancelCall:", e.message);
   }
