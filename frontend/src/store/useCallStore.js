@@ -4,7 +4,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { startRingtone, stopRingtoneSound, startRingback, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -366,12 +366,11 @@ export const useCallStore = create((set, get) => ({
     try {
       set({ localStream: stream });
 
-      // If we already know they're online, show "Ringing…" right away rather
-      // than waiting on the ack round-trip — only genuinely-offline calls
-      // should sit at a plain "Calling…" while the server holds it open.
-      if (useAuthStore.getState().onlineUsers.includes(user._id)) {
-        set({ isRemoteRinging: true });
-      }
+      // "Ringing…" is only shown once their device confirms it is ringing (callRingingAck).
+      // Being "online" is not proof: a phone with a stale connection looks online but never rings.
+      // Until then the caller hears the single "calling" tap.
+      primeAudio();
+      startCallingTone();
 
       pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
@@ -927,7 +926,7 @@ export const useCallStore = create((set, get) => ({
       }
       // In a group call: this is a busy signal for the caller.
       if (isGroupCallBusy()) {
-        socket.emit("rejectCall", { toUserId: fromUser._id, callId });
+        socket.emit("rejectCall", { toUserId: fromUser._id, callId, busy: true });
         return;
       }
       // Busy? auto-reject — but first self-heal a genuinely stale state
@@ -944,10 +943,13 @@ export const useCallStore = create((set, get) => ({
       // (e.g. a re-delivered offer) must be ignored — rejecting it would send
       // "callRejected" to the caller and hang up the real call.
       if (get().callStatus !== "idle" && get().remoteUser?._id === fromUser._id) {
+        // The first ack may have gone out on a dead connection: confirm again so the caller's
+        // screen moves from "Calling…" to "Ringing…" (harmless if they already got it).
+        if (get().callStatus === "incoming") socket.emit("callRingingAck", { toUserId: fromUser._id, callId });
         return;
       }
       if (get().callStatus !== "idle") {
-        socket.emit("rejectCall", { toUserId: fromUser._id, callId });
+        socket.emit("rejectCall", { toUserId: fromUser._id, callId, busy: true });
         return;
       }
       callClaimedAt = Date.now();
@@ -1057,8 +1059,10 @@ export const useCallStore = create((set, get) => ({
 
     socket.on("callRejected", (payload) => {
       if (isOtherCall(payload?.callId) || get().callStatus === "idle") return;
-      toast("Call declined", { icon: "📵" });
+      const busy = !!payload?.busy && get().callStatus === "calling";
+      toast(busy ? "They're on another call" : "Call declined", { icon: busy ? "📞" : "📵" });
       get().resetCall();
+      if (busy) startBusyTone(); // one long tone a few times, like a real busy line
     });
 
     socket.on("callEnded", (payload) => {
@@ -1074,7 +1078,7 @@ export const useCallStore = create((set, get) => ({
 
     socket.on("callRinging", ({ reason, callId }) => {
       if (isOtherCall(callId)) return;
-      toast(reason || "Ringing…", { icon: "📞" });
+      toast(reason || "Calling…", { icon: "📞" });
     });
 
     socket.on("callFailed", ({ reason, callId }) => {

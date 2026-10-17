@@ -525,7 +525,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("rejectCall", ({ toUserId, callId }) => {
+  socket.on("rejectCall", ({ toUserId, callId, busy }) => {
     toUserId = String(toUserId);
     const key = pairKey(userId, toUserId);
     const cur = activeCalls.get(key);
@@ -541,7 +541,7 @@ io.on("connection", (socket) => {
     clearHeldCall(userId, toUserId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
-      io.to(receiverSocketId).emit("callRejected", { callId: id });
+      io.to(receiverSocketId).emit("callRejected", { callId: id, busy: busy === true });
     }
     const logId = activeCallLogs.get(key);
     if (logId) {
