@@ -1,0 +1,59 @@
+/* ==========================================================================
+   Round 4 — UI refresh (CSS only, no behaviour changes). Loaded after
+   polish.css. Every rule targets classes that already exist in the app.
+   ========================================================================== */
+
+/* Slim, modern scrollbars that follow the theme */
+* { scrollbar-width: thin; scrollbar-color: var(--wa-scroll) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--wa-scroll); border-radius: 999px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--wa-scroll-hover); background-clip: content-box; border: 2px solid transparent; }
+
+/* Skeletons: replace the flat pulse with a travelling shimmer */
+.animate-pulse {
+  animation: shimmer 1.4s ease-in-out infinite;
+  background-image: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / .18) 50%, transparent 80%);
+  background-size: 220% 100%;
+}
+html:not(.wa-dark) .animate-pulse {
+  background-image: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / .7) 50%, transparent 80%);
+}
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+/* Message bubbles: softer corners and a clearer sent / received contrast */
+.msg-row .bg-wa-out.rounded-lg {
+  background-image: linear-gradient(160deg, rgb(255 255 255 / .12), rgb(255 255 255 / 0) 55%);
+  box-shadow: 0 1px 2px rgb(11 20 26 / .16), 0 6px 14px -10px rgb(0 168 132 / .5);
+}
+.msg-row .bg-wa-surface.rounded-lg { box-shadow: 0 1px 2px rgb(11 20 26 / .12), 0 6px 14px -12px rgb(11 20 26 / .35); }
+@media (hover: hover) {
+  .msg-row .bg-wa-out.rounded-lg, .msg-row .bg-wa-surface.rounded-lg { transition: box-shadow .2s ease, translate .2s ease; }
+  .msg-row:hover .bg-wa-out.rounded-lg, .msg-row:hover .bg-wa-surface.rounded-lg { translate: 0 -1px; }
+}
+
+/* Frosted top bar and composer area */
+.border-b.border-white\/5.bg-wa-bg, .border-b.border-white\/5.bg-wa-panel {
+  background-color: rgb(var(--wa-bg) / .82);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  backdrop-filter: saturate(160%) blur(14px);
+}
+
+/* Avatars: gentle zoom when hovering a chat row */
+@media (hover: hover) {
+  button.w-full.select-none img.rounded-full { transition: scale .2s ease; }
+  button.w-full.select-none:hover img.rounded-full { scale: 1.05; }
+}
+
+/* Modal backdrops: blur what is behind */
+.fixed.inset-0[class*="bg-black/"] { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* Keyboard users: visible focus on inputs too */
+input:focus-visible, textarea:focus-visible, select:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent) / .22); }
+
+/* Respect safe areas on notched phones */
+nav.fixed.bottom-0 { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
+
+/* Respect the OS "reduce motion" setting */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
