@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { optimizeImage } from "../lib/cdn";
-import { Plus, Loader2, Pencil, Camera, Lock, BellOff, Bell } from "lucide-react";
+import { Plus, Loader2, Pencil, Camera, Lock, BellOff, Bell, Bookmark } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import CreateStatusModal from "../components/CreateStatusModal";
 import StatusViewer from "../components/StatusViewer";
 import HighlightsRow from "../components/HighlightsRow";
 import HighlightSheet from "../components/HighlightSheet";
+import { HL_GRADIENT } from "../lib/highlightTheme";
 import { useScrollMemory } from "../lib/useScrollMemory";
 
 // "Today, 09:16" / "Yesterday, 21:40" like WhatsApp
@@ -122,9 +123,15 @@ const StatusPage = () => {
               </div>
             </button>
 
-            {/* Highlights: updates saved past the 24 hours (like Instagram highlights) */}
-            <div className="pt-1">
-              <p className="px-4 pt-3 pb-0.5 text-[12px] font-medium text-wa-muted">Highlights</p>
+            {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
+            <div className="mx-3 mt-3 rounded-2xl bg-wa-surface/60 pb-2 pt-3" style={{ boxShadow: "inset 0 0 0 1px rgb(255 255 255 / .05)" }}>
+              <div className="flex items-center gap-2 px-4 pb-1">
+                <span className="size-6 rounded-lg flex items-center justify-center text-white" style={{ background: HL_GRADIENT }}>
+                  <Bookmark size={13} />
+                </span>
+                <p className="text-[14px] font-semibold text-wa-text">Highlights</p>
+                <p className="ml-auto text-[11.5px] text-wa-muted">{myHighlights.length > 0 ? "Hold one to edit" : "Keep your best updates"}</p>
+              </div>
               <HighlightsRow
                 highlights={myHighlights}
                 isOwn
@@ -133,11 +140,14 @@ const StatusPage = () => {
                 onOpen={(h) => setViewing({ user: authUser, statuses: h.items, isOwn: true, highlight: h })}
               />
               {otherHighlights.length > 0 && (
-                <HighlightsRow
-                  showOwner
-                  highlights={otherHighlights.flatMap((g) => g.highlights.map((h) => ({ ...h, user: g.user })))}
-                  onOpen={(h) => setViewing({ user: h.user, statuses: h.items, isOwn: false, highlight: h })}
-                />
+                <>
+                  <p className="px-4 pt-2 text-[12px] font-medium text-wa-muted">From others</p>
+                  <HighlightsRow
+                    showOwner
+                    highlights={otherHighlights.flatMap((g) => g.highlights.map((h) => ({ ...h, user: g.user })))}
+                    onOpen={(h) => setViewing({ user: h.user, statuses: h.items, isOwn: false, highlight: h })}
+                  />
+                </>
               )}
             </div>
 

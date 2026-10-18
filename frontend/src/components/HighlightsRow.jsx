@@ -1,10 +1,11 @@
 import { useRef } from "react";
 import { Plus, Play, Headphones, FileText, Bookmark } from "lucide-react";
 import { optimizeImage } from "../lib/cdn";
+import { HL_GRADIENT, HL_ACCENT, HL_ACCENT_SOFT } from "../lib/highlightTheme";
 
 // A small picture of one update (a saved status or a status being picked): photo, colour card for text, icon otherwise.
 export const UpdateThumb = ({ item, size = 160, className = "" }) => {
-  if (!item) return <div className={`bg-[#00A884] flex items-center justify-center text-white ${className}`}><Bookmark size={22} /></div>;
+  if (!item) return <div className={`flex items-center justify-center text-white ${className}`} style={{ background: HL_GRADIENT }}><Bookmark size={22} /></div>;
   if (item.type === "image") {
     return <img src={optimizeImage(item.content, size)} loading="lazy" decoding="async" alt="" className={`object-cover ${className}`} draggable={false} />;
   }
@@ -42,13 +43,13 @@ const HighlightsRow = ({ highlights, isOwn, onOpen, onNew, onEdit, showOwner = f
   const endPress = () => clearTimeout(pressTimer.current);
 
   return (
-    <div className="flex gap-4 overflow-x-auto px-4 py-2 no-scrollbar">
+    <div className="flex gap-5 overflow-x-auto px-4 py-2 no-scrollbar">
       {isOwn && (
-        <button onClick={onNew} className="shrink-0 w-[68px] flex flex-col items-center gap-1.5 active:scale-95 transition-transform" aria-label="New highlight">
-          <span className="size-16 rounded-full border-2 border-dashed border-wa-muted/60 flex items-center justify-center text-wa-icon">
-            <Plus size={26} />
+        <button onClick={onNew} className="shrink-0 w-[76px] flex flex-col items-center gap-2 active:scale-95 transition-transform" aria-label="New highlight">
+          <span className="size-[76px] rounded-full flex items-center justify-center" style={{ border: `2px dashed ${HL_ACCENT}`, background: HL_ACCENT_SOFT, color: HL_ACCENT }}>
+            <Plus size={30} strokeWidth={2.2} />
           </span>
-          <span className="text-[11.5px] text-wa-text truncate w-full text-center">New</span>
+          <span className="text-[12.5px] font-medium text-wa-text truncate w-full text-center">New</span>
         </button>
       )}
       {highlights.map((h) => (
@@ -68,15 +69,15 @@ const HighlightsRow = ({ highlights, isOwn, onOpen, onNew, onEdit, showOwner = f
               onEdit(h);
             }
           }}
-          className="shrink-0 w-[68px] flex flex-col items-center gap-1.5 active:scale-95 transition-transform select-none"
+          className="shrink-0 w-[76px] flex flex-col items-center gap-2 active:scale-95 transition-transform select-none"
         >
-          <span className="size-16 rounded-full p-[2.5px] bg-gradient-to-br from-[#25D366] to-[#00A884]">
-            <span className="block size-full rounded-full overflow-hidden border-2 border-wa-bg">
-              <UpdateThumb item={coverItem(h)} className="size-full" />
+          <span className="size-[76px] rounded-full p-[3px]" style={{ background: HL_GRADIENT }}>
+            <span className="block size-full rounded-full overflow-hidden border-[3px] border-wa-bg">
+              <UpdateThumb item={coverItem(h)} size={200} className="size-full" />
             </span>
           </span>
-          <span className="text-[11.5px] text-wa-text truncate w-full text-center">{h.title}</span>
-          {showOwner && h.user?.fullName && <span className="-mt-1 text-[10px] text-wa-muted truncate w-full text-center">{h.user.fullName.split(" ")[0]}</span>}
+          <span className="text-[12.5px] font-medium text-wa-text truncate w-full text-center leading-tight">{h.title}</span>
+          {showOwner && h.user?.fullName && <span className="-mt-1.5 text-[10.5px] text-wa-muted truncate w-full text-center">{h.user.fullName.split(" ")[0]}</span>}
         </button>
       ))}
     </div>
