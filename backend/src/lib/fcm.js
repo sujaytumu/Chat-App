@@ -103,7 +103,7 @@ async function sendOne(token, payload, isCall) {
         data: toData(payload),
         android: {
           priority: "HIGH",
-          ttl: isCall ? "40s" : payload?.cancel ? "60s" : "86400s",
+          ttl: isCall ? "45s" : payload?.cancel ? "60s" : "86400s",
           ...(collapse ? { collapse_key: collapse } : {}),
         },
       },

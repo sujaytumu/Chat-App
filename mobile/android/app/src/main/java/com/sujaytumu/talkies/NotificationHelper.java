@@ -45,7 +45,7 @@ final class NotificationHelper {
     static final String CH_MISSED = "talkies_missed_v1";
     static final String SITE = "https://chat-app-jjcg.onrender.com";
     static final String ACTION_DECLINE = "com.sujaytumu.talkies.DECLINE_CALL";
-    private static final long CALL_RING_MS = 40_000;
+    private static final long CALL_RING_MS = 45_000;
 
     // Which call is ringing under each notification tag, and which calls were already cancelled.
     // A cancel that arrives before its ring (or twice) must never ring / re-ring a finished call, and a

@@ -138,7 +138,7 @@ self.addEventListener("push", (event) => {
       // The app is open and being looked at: it already plays its own sound /
       // shows the incoming-call screen, so a system notification on top would
       // just double-alert (and ring twice).
-      if (windows.some((c) => c.visibilityState === "visible" && c.focused)) return;
+      if (windows.some((c) => c.visibilityState === "visible" && (c.focused || isCall))) return; // calls: visible is enough, the full-screen call screen is already up
 
       // Desktop browsers keep a hidden/unfocused page alive, and that page plays
       // the person's chosen tone itself — so show the notification silently to

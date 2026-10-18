@@ -70,6 +70,124 @@ const CallAvatar = ({ user, size = "size-28" }) => {
   );
 };
 
+// Full-screen incoming call (the caller's photo behind). Each button can be tapped OR dragged: it follows the
+// finger, the whole screen washes into that action's colour (green = answering, red = declining), and letting go
+// past the threshold does it; letting go early springs the button back.
+const DRAG_MAX = 130;
+const DRAG_DO = 80;
+const IncomingCallScreen = ({ user, callType, onAccept, onReject }) => {
+  const [drag, setDrag] = useState({ kind: null, x: 0, y: 0 });
+  const start = useRef(null);
+  const done = useRef(false);
+  const dist = Math.min(DRAG_MAX, Math.hypot(drag.x, drag.y));
+  const strength = dist / DRAG_MAX;
+  const tint = drag.kind === "accept" ? "0 168 132" : drag.kind === "decline" ? "239 68 68" : null;
+
+  const fire = (kind) => {
+    if (done.current) return;
+    done.current = true;
+    if (kind === "accept") onAccept();
+    else onReject();
+  };
+
+  const handlers = (kind) => ({
+    onPointerDown: (e) => {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      start.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      setDrag({ kind, x: 0, y: 0 });
+    },
+    onPointerMove: (e) => {
+      const st = start.current;
+      if (!st || st.id !== e.pointerId) return;
+      let dx = e.clientX - st.x;
+      let dy = e.clientY - st.y;
+      const d = Math.hypot(dx, dy);
+      if (d > DRAG_MAX) {
+        dx = (dx / d) * DRAG_MAX;
+        dy = (dy / d) * DRAG_MAX;
+      }
+      setDrag({ kind, x: dx, y: dy });
+    },
+    onPointerUp: (e) => {
+      const st = start.current;
+      if (!st || st.id !== e.pointerId) return;
+      start.current = null;
+      const moved = Math.hypot(drag.x, drag.y);
+      setDrag({ kind: null, x: 0, y: 0 });
+      if (moved >= DRAG_DO || moved < 10) fire(kind); // dragged far enough, or a plain tap
+    },
+    onPointerCancel: () => {
+      start.current = null;
+      setDrag({ kind: null, x: 0, y: 0 });
+    },
+  });
+
+  const dragging = !!drag.kind && dist > 12;
+  const label = dragging ? (drag.kind === "accept" ? "Answering…" : "Declining…") : null;
+  const btnStyle = (kind) => {
+    const on = drag.kind === kind;
+    return {
+      transform: on ? `translate(${drag.x}px, ${drag.y}px) scale(${1 + strength * 0.18})` : drag.kind ? "scale(.9)" : undefined,
+      transition: on && start.current ? "none" : "transform .25s cubic-bezier(.2,1.2,.4,1), opacity .2s",
+      opacity: drag.kind && !on ? 0.45 : 1,
+      touchAction: "none",
+    };
+  };
+
+  return (
+    <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col isolate text-white select-none">
+      <CallBackdrop user={user} />
+      {/* colour wash that follows the drag */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: tint ? `rgb(${tint} / ${(0.08 + strength * 0.62).toFixed(2)})` : "transparent", transition: start.current ? "none" : "background .25s" }}
+      />
+
+      <div className="relative flex flex-col items-center pt-[calc(56px+env(safe-area-inset-top))] px-6 text-center">
+        <h3 className="text-[28px] leading-tight font-semibold drop-shadow max-w-[84vw] truncate">{user?.fullName}</h3>
+        <p className="text-[16px] text-white/90 mt-1 drop-shadow">{label || `Incoming ${callType === "video" ? "video" : "voice"} call…`}</p>
+        <p className="text-xs text-white/70 flex items-center gap-1 mt-1.5">
+          <Lock size={10} /> End-to-end encrypted
+        </p>
+      </div>
+
+      {!user?.profilePic && (
+        <div className="relative flex-1 flex items-center justify-center">
+          <span className="absolute size-44 rounded-full bg-[#00A884]/25 animate-ping" />
+          <CallAvatar user={user} size="size-36" />
+        </div>
+      )}
+      {user?.profilePic && <div className="flex-1" />}
+
+      <div className="relative flex items-end justify-between px-12 pb-[calc(56px+env(safe-area-inset-bottom))]">
+        <div className="flex flex-col items-center gap-2.5">
+          <button
+            {...handlers("decline")}
+            style={btnStyle("decline")}
+            className="size-[72px] rounded-full flex items-center justify-center bg-red-500 text-white shadow-[0_10px_30px_-8px_rgba(239,68,68,.8)] cursor-grab"
+            aria-label="Decline call"
+          >
+            <PhoneEnd size={30} />
+          </button>
+          <span className="text-[13px] text-white/90 drop-shadow">Decline</span>
+        </div>
+        <div className="flex flex-col items-center gap-2.5">
+          <button
+            {...handlers("accept")}
+            style={btnStyle("accept")}
+            className={`size-[72px] rounded-full flex items-center justify-center bg-[#25D366] text-white shadow-[0_10px_30px_-8px_rgba(37,211,102,.85)] cursor-grab ${drag.kind ? "" : "animate-pulse"}`}
+            aria-label="Answer call"
+          >
+            {callType === "video" ? <Video size={30} /> : <Phone size={28} />}
+          </button>
+          <span className="text-[13px] text-white/90 drop-shadow">Answer</span>
+        </div>
+      </div>
+      <p className="relative text-center text-[11.5px] text-white/60 -mt-9 pb-[calc(10px+env(safe-area-inset-bottom))]">Tap, or drag a button to answer or decline</p>
+    </div>
+  );
+};
+
 // Formats elapsed seconds as m:ss, or h:mm:ss once a call passes an hour.
 const formatDuration = (totalSeconds) => {
   const h = Math.floor(totalSeconds / 3600);
@@ -284,42 +402,7 @@ const CallManager = () => {
     );
   }
   if (callStatus === "incoming") {
-    return (
-      <div className="wa-dark fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
-        <div className="bg-wa-surface rounded-2xl p-8 w-full max-w-sm text-center shadow-2xl">
-          <div className="relative mx-auto mb-4 size-24">
-            <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
-            <div className="relative">
-              <CallAvatar user={remoteUser} size="size-24" />
-            </div>
-          </div>
-          <h3 className="text-xl font-semibold text-white">{remoteUser?.fullName}</h3>
-          <p className="text-sm text-wa-muted mb-6">
-            Incoming {callType === "video" ? "video" : "voice"} call…
-          </p>
-          <div className="flex items-center justify-center gap-10">
-            <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={rejectCall}
-                className="size-16 rounded-full flex items-center justify-center bg-red-500 hover:bg-red-600 text-white"
-              >
-                <PhoneEnd size={28} />
-              </button>
-              <span className="text-xs text-wa-muted">Decline</span>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={acceptCall}
-                className="size-16 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] text-white animate-pulse"
-              >
-                <Phone size={26} />
-              </button>
-              <span className="text-xs text-wa-muted">Accept</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <IncomingCallScreen user={remoteUser} callType={callType} onAccept={acceptCall} onReject={rejectCall} />;
   }
 
   // ---- Minimized pill (tap to expand) ----
