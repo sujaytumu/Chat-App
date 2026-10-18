@@ -16,6 +16,7 @@ import groupRoutes from "./routes/group.route.js";
 import pushRoutes from "./routes/push.route.js";
 import callRoutes from "./routes/call.route.js";
 import statusRoutes from "./routes/status.route.js";
+import highlightRoutes from "./routes/highlight.route.js";
 import scheduledRoutes from "./routes/scheduled.route.js";
 import broadcastRoutes from "./routes/broadcast.route.js";
 import { startScheduler } from "./lib/scheduler.js";
@@ -85,6 +86,7 @@ app.use("/api/groups", groupRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/status", statusRoutes);
+app.use("/api/highlights", highlightRoutes);
 app.use("/api/scheduled", scheduledRoutes);
 app.use("/api/broadcasts", broadcastRoutes);
 

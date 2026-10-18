@@ -2,7 +2,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
-import { X, Eye, Trash2, Loader2, ChevronUp, Heart, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { X, Eye, Trash2, Loader2, ChevronUp, Heart, Music, MapPin, Headphones, FileText, Download, Send, Bookmark, Pencil } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -32,7 +32,9 @@ const ago = (iso) => {
   return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${t}`;
 };
 
-const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
+// highlight: when set, this plays a saved highlight (read-only: no replies, hearts or view counts).
+// onAddToHighlight(status): my own live status -> "save to highlights". onEditHighlight(highlight): rename / manage.
+const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = null, onAddToHighlight, onEditHighlight, hold = false }) => {
   const [list, setList] = useState(initial);
   const [index, setIndex] = useState(0);
   const [progress, setProgress] = useState(0); // 0..1 of the current update
@@ -60,7 +62,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
   // Mark as seen when someone else's update comes up.
   useEffect(() => {
-    if (!isOwn && current) axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
+    if (!isOwn && !highlight && current) axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
     setProgress(0);
     setMediaMs(0);
     setVideoReady(false);
@@ -90,7 +92,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
 
   // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
-  const stop = paused || showViewers || confirmDelete || replyFocus;
+  const stop = paused || showViewers || confirmDelete || replyFocus || hold; // hold: a sheet on top (save to highlights) keeps it still
   const last = useRef(0);
   useEffect(() => {
     if (!current || stop) return;
@@ -184,8 +186,15 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await axiosInstance.delete(`/status/${current._id}`);
-      toast.success("Status deleted");
+      if (highlight) {
+        // take just this update out of the highlight (the highlight goes too if it was the last one)
+        const r = await axiosInstance.put(`/highlights/${highlight._id}`, { removeItemIds: [current._id] });
+        toast.success("Removed from highlight");
+        if (r.data?.deleted) return onClose();
+      } else {
+        await axiosInstance.delete(`/status/${current._id}`);
+        toast.success("Status deleted");
+      }
       const rest = list.filter((s) => s._id !== current._id);
       setConfirmDelete(false);
       if (rest.length === 0) return onClose();
@@ -220,7 +229,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       <div className="absolute top-[calc(18px+env(safe-area-inset-top))] inset-x-0 flex items-center gap-3 px-3 z-20 bg-gradient-to-b from-black/50 to-transparent pb-6 pt-1">
         <img src={optimizeImage(user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt={user.fullName} className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
-          <p className="text-white text-[13.5px] font-medium truncate">{isOwn ? "My status" : user.fullName}</p>
+          <p className="text-white text-[13.5px] font-medium truncate">{highlight ? highlight.title : isOwn ? "My status" : user.fullName}</p>
           <p className="text-white/80 text-[11px] truncate">{ago(current.createdAt)}</p>
           {current.song?.url && (
             <p className="flex items-center gap-1.5 text-white text-[11px] leading-5 min-w-0">
@@ -244,8 +253,18 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
             </a>
           )}
         </div>
+        {isOwn && !highlight && onAddToHighlight && (
+          <button onClick={() => onAddToHighlight(current)} className="size-10 flex items-center justify-center text-white" aria-label="Save to highlights">
+            <Bookmark size={22} />
+          </button>
+        )}
+        {isOwn && highlight && onEditHighlight && (
+          <button onClick={() => onEditHighlight(highlight)} className="size-10 flex items-center justify-center text-white" aria-label="Edit highlight">
+            <Pencil size={20} />
+          </button>
+        )}
         {isOwn && (
-          <button onClick={() => setConfirmDelete(true)} className="size-10 flex items-center justify-center text-white" aria-label="Delete status">
+          <button onClick={() => setConfirmDelete(true)} className="size-10 flex items-center justify-center text-white" aria-label={highlight ? "Remove from highlight" : "Delete status"}>
             <Trash2 size={22} />
           </button>
         )}
@@ -269,7 +288,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
           swipeStart.current = null;
           if (st && st.y - e.clientY > 70 && Math.abs(e.clientX - st.x) < 90) {
             swipedAt.current = Date.now();
-            if (isOwn) setShowViewers(true);
+            if (highlight) {
+              /* highlights have no viewers list or reply box */
+            } else if (isOwn) setShowViewers(true);
             else replyInput.current?.focus();
           }
           const a = songEl.current;
@@ -370,7 +391,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
 
         {/* Caption */}
         {current.caption && (
-          <p className={`absolute inset-x-0 ${isOwn ? "bottom-16" : "bottom-[calc(64px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
+          <p className={`absolute inset-x-0 ${highlight ? "bottom-[calc(24px+env(safe-area-inset-bottom))]" : isOwn ? "bottom-16" : "bottom-[calc(64px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
             {linkify(current.caption)}
           </p>
         )}
@@ -379,7 +400,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       </div>
 
       {/* Viewer: reply to this status (arrives in the chat with its owner) */}
-      {!isOwn && (
+      {!isOwn && !highlight && (
         <form
           onSubmit={sendReply}
           className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto flex items-center gap-2 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent"
@@ -419,7 +440,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       )}
 
       {/* Owner: who has seen it */}
-      {isOwn && (
+      {isOwn && !highlight && (
         <button
           onClick={() => setShowViewers(true)}
           className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center gap-0.5 pt-6 pb-[calc(14px+env(safe-area-inset-bottom))] text-white bg-gradient-to-t from-black/70 to-transparent"
@@ -479,14 +500,14 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose }) => {
       {confirmDelete && (
         <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center p-6" onClick={() => setConfirmDelete(false)}>
           <div className="w-full max-w-xs rounded-2xl bg-wa-pop p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[15.5px] text-wa-text mb-1">Delete this status update?</h3>
-            <p className="text-[12px] text-wa-muted mb-5">It will be removed for everyone who could see it.</p>
+            <h3 className="text-[15.5px] text-wa-text mb-1">{highlight ? "Remove from this highlight?" : "Delete this status update?"}</h3>
+            <p className="text-[12px] text-wa-muted mb-5">{highlight ? "It will no longer show in this highlight." : "It will be removed for everyone who could see it."}</p>
             <div className="flex justify-end gap-6 text-[13px]">
               <button onClick={() => setConfirmDelete(false)} className="text-[#21C063]" disabled={deleting}>
                 Cancel
               </button>
               <button onClick={handleDelete} className="text-[#F15C6D] flex items-center gap-1.5" disabled={deleting}>
-                {deleting && <Loader2 size={14} className="animate-spin" />} Delete
+                {deleting && <Loader2 size={14} className="animate-spin" />} {highlight ? "Remove" : "Delete"}
               </button>
             </div>
           </div>
