@@ -10,8 +10,8 @@ const ChatColorSheet = ({ chatKey, chatName, onClose }) => {
   const setColor = useChatColorStore((s) => s.setColor);
 
   return (
-    <div className="fixed inset-0 z-[120] bg-black/50 flex items-end justify-center" onClick={onClose}>
-      <div className="w-full max-w-md bg-wa-panel text-wa-text rounded-t-3xl pb-[calc(16px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[120] bg-black/50 flex items-end lg:items-center justify-center" onClick={onClose}>
+      <div className="w-full max-w-md bg-wa-panel text-wa-text rounded-t-3xl lg:rounded-3xl pb-[calc(16px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-black/20" />
         <div className="flex items-center gap-3 px-5 pt-3 pb-1">
           <Palette size={20} className="text-[#00A884]" />
