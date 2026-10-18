@@ -253,10 +253,18 @@ const CallManager = () => {
   // show that it is connecting (nothing to tap) instead of the home screen.
   if (callStatus === "idle" && autoAnswer && Date.now() < autoAnswer.until) {
     return (
-      <div className="wa-dark fixed inset-0 z-[200] bg-[#0b141a] flex flex-col items-center justify-center gap-5 text-white">
-        <div className="size-12 rounded-full border-[3px] border-white/20 border-t-[#25D366] animate-spin" />
-        <p className="text-[17px]">Connecting your call…</p>
-        <button onClick={() => useCallStore.setState({ autoAnswer: null })} className="mt-4 h-11 px-7 rounded-full bg-white/10 text-[14px]">
+      <div
+        className="wa-dark fixed inset-0 z-[200] flex flex-col items-center justify-center gap-5 text-white"
+        style={{ background: "linear-gradient(160deg, #0A7A67 0%, #00A884 55%, #25D366 130%)" }}
+      >
+        <img
+          src="/icon-v2-192.png"
+          alt="Talkies"
+          className="size-24 rounded-[26px] shadow-2xl"
+          style={{ boxShadow: "0 18px 40px -12px rgb(0 0 0 / .45)" }}
+        />
+        <p className="text-[19px] font-semibold tracking-wide">Opening…</p>
+        <button onClick={() => useCallStore.setState({ autoAnswer: null })} className="mt-2 h-10 px-7 rounded-full text-[14px]" style={{ background: "rgb(255 255 255 / .22)" }}>
           Cancel
         </button>
       </div>
