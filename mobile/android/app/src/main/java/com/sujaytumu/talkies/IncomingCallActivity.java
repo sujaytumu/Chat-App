@@ -92,7 +92,7 @@ public class IncomingCallActivity extends Activity {
         // stop showing the screen once the call itself would have timed out (counted from when it
         // started ringing, so re-opening it from the notification doesn't extend the call)
         long startedAt = in.getLongExtra(EXTRA_STARTED, 0L);
-        long left = startedAt > 0 ? 40_000 - (System.currentTimeMillis() - startedAt) : 40_000;
+        long left = startedAt > 0 ? 45_000 - (System.currentTimeMillis() - startedAt) : 45_000;
         main.postDelayed(new Runnable() {
             @Override
             public void run() {

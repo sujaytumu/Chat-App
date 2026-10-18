@@ -14,7 +14,7 @@ import { setGroupCallBusy } from "../lib/callBusy";
 // share at any moment without the two sides talking over each other.
 
 export const MAX_GROUP_CALL = 10;
-const RING_MS = 40_000;
+const RING_MS = 45_000;
 const NO_ONE_JOINED_MS = 60_000;
 
 // Laptop browsers (getDisplayMedia) and the Talkies Android app (native capture).
