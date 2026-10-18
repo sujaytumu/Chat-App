@@ -149,6 +149,29 @@ export const getStatusFeed = async (req, res) => {
   }
 };
 
+// My own history: every status I have posted, newest first (including ones that are no longer live).
+// Paged with `before` (ISO date of the last item received) so a long history stays fast.
+export const getStatusArchive = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 100);
+    const q = { userId: req.user._id };
+    const before = req.query.before ? new Date(String(req.query.before)) : null;
+    if (before && !Number.isNaN(before.getTime())) q.createdAt = { $lt: before };
+    const rows = await Status.find(q)
+      .select("-views -viewedBy -likes -audience.users")
+      .sort({ createdAt: -1 })
+      .limit(limit + 1)
+      .lean();
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    res.status(200).json({ items, hasMore, next: items.length ? items[items.length - 1].createdAt : null });
+  } catch (error) {
+    console.log("Error in getStatusArchive controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const markStatusViewed = async (req, res) => {
   try {
     const { id } = req.params;

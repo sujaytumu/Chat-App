@@ -59,9 +59,10 @@ const statusSchema = new mongoose.Schema(
 );
 
 statusSchema.index({ userId: 1, createdAt: -1 });
-// TTL index — MongoDB automatically deletes the document once expiresAt passes,
-// no cron job needed to clean up expired (24h) statuses.
-statusSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+// Statuses used to be deleted by a TTL index when they expired. They are now KEPT (so the owner can browse their
+// whole history and save any of it to a highlight); expiresAt only decides what other people can still see.
+// Every read of "live" statuses filters on expiresAt > now. (db.js drops the old TTL index on startup.)
+statusSchema.index({ expiresAt: 1 });
 
 const Status = mongoose.model("Status", statusSchema);
 export default Status;
