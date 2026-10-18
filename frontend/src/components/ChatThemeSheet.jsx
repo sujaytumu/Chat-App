@@ -89,8 +89,8 @@ const ChatThemeSheet = ({ scope = "default", chatName, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[125] bg-black/50 flex items-end justify-center" onClick={onClose}>
-      <div className="wa-dark w-full max-w-md h-[88vh] bg-wa-panel text-wa-text rounded-t-[28px] flex flex-col pb-[env(safe-area-inset-bottom)]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[125] bg-black/50 flex items-end lg:items-center justify-center" onClick={onClose}>
+      <div className="wa-dark w-full max-w-md lg:max-w-lg h-[88vh] lg:h-[84vh] bg-wa-panel text-wa-text rounded-t-[28px] lg:rounded-[28px] lg:shadow-2xl flex flex-col pb-[env(safe-area-inset-bottom)]" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/30" />
         <h3 className="text-center text-[17px] font-semibold pt-5 pb-3">{isDefault ? "Theme for all chats" : "Customise"}</h3>
         <div className="flex border-b border-white/10">

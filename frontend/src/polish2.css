@@ -26,17 +26,10 @@ html:not(.wa-dark) .animate-pulse {
   box-shadow: 0 1px 2px rgb(11 20 26 / .16), 0 6px 14px -10px rgb(0 168 132 / .5);
 }
 .msg-row .bg-wa-surface.rounded-lg { box-shadow: 0 1px 2px rgb(11 20 26 / .12), 0 6px 14px -12px rgb(11 20 26 / .35); }
-@media (hover: hover) {
-  .msg-row .bg-wa-out.rounded-lg, .msg-row .bg-wa-surface.rounded-lg { transition: box-shadow .2s ease, translate .2s ease; }
-  .msg-row:hover .bg-wa-out.rounded-lg, .msg-row:hover .bg-wa-surface.rounded-lg { translate: 0 -1px; }
-}
 
-/* Frosted top bar and composer area */
-.border-b.border-white\/5.bg-wa-bg, .border-b.border-white\/5.bg-wa-panel {
-  background-color: rgb(var(--wa-bg) / .82);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  backdrop-filter: saturate(160%) blur(14px);
-}
+/* NOTE: no backdrop-filter / transform / filter on the chat header or message bubbles. Any of those makes
+   position:fixed children (the theme, wallpaper and colour sheets, message menus) position inside that element
+   instead of the screen, which clipped them into the header strip on laptops. */
 
 /* Avatars: gentle zoom when hovering a chat row */
 @media (hover: hover) {
