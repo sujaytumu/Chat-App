@@ -5,6 +5,8 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import CreateStatusModal from "../components/CreateStatusModal";
 import StatusViewer from "../components/StatusViewer";
+import HighlightsRow from "../components/HighlightsRow";
+import HighlightSheet from "../components/HighlightSheet";
 import { useScrollMemory } from "../lib/useScrollMemory";
 
 // "Today, 09:16" / "Yesterday, 21:40" like WhatsApp
@@ -40,7 +42,22 @@ const StatusPage = () => {
       return next;
     });
   const [showCreate, setShowCreate] = useState(false); // false | "text" | "image"
-  const [viewing, setViewing] = useState(null); // { user, statuses, isOwn }
+  const [viewing, setViewing] = useState(null); // { user, statuses, isOwn, highlight? }
+  const [myHighlights, setMyHighlights] = useState([]);
+  const [otherHighlights, setOtherHighlights] = useState([]); // [{ user, highlights }]
+  const [highlightSheet, setHighlightSheet] = useState(null); // { preselect?, editing? }
+
+  const loadHighlights = useCallback(() => {
+    if (!authUser?._id) return;
+    axiosInstance
+      .get(`/highlights/user/${authUser._id}`, { params: { t: Date.now() } })
+      .then((res) => setMyHighlights(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+    axiosInstance
+      .get("/highlights/feed", { params: { t: Date.now() } })
+      .then((res) => setOtherHighlights(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, [authUser?._id]);
 
   const loadFeed = useCallback(() => {
     setIsLoading(true);
@@ -53,7 +70,8 @@ const StatusPage = () => {
 
   useEffect(() => {
     loadFeed();
-  }, [loadFeed]);
+    loadHighlights();
+  }, [loadFeed, loadHighlights]);
 
   return (
     <div className="relative flex-1 flex flex-col bg-wa-bg overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
@@ -103,6 +121,25 @@ const StatusPage = () => {
                 </p>
               </div>
             </button>
+
+            {/* Highlights: updates saved past the 24 hours (like Instagram highlights) */}
+            <div className="pt-1">
+              <p className="px-4 pt-3 pb-0.5 text-[12px] font-medium text-wa-muted">Highlights</p>
+              <HighlightsRow
+                highlights={myHighlights}
+                isOwn
+                onNew={() => setHighlightSheet({})}
+                onEdit={(h) => setHighlightSheet({ editing: h })}
+                onOpen={(h) => setViewing({ user: authUser, statuses: h.items, isOwn: true, highlight: h })}
+              />
+              {otherHighlights.length > 0 && (
+                <HighlightsRow
+                  showOwner
+                  highlights={otherHighlights.flatMap((g) => g.highlights.map((h) => ({ ...h, user: g.user })))}
+                  onOpen={(h) => setViewing({ user: h.user, statuses: h.items, isOwn: false, highlight: h })}
+                />
+              )}
+            </div>
 
             {[
               ["Recent updates", feed.others.filter((o) => o.hasUnseen && !muted.includes(o.user._id))],
@@ -182,9 +219,27 @@ const StatusPage = () => {
           user={viewing.user}
           statuses={viewing.statuses}
           isOwn={viewing.isOwn}
+          highlight={viewing.highlight || null}
+          hold={!!highlightSheet}
+          onAddToHighlight={(st) => setHighlightSheet({ preselect: st._id })}
+          onEditHighlight={(h) => setHighlightSheet({ editing: h })}
           onClose={() => {
             setViewing(null);
             loadFeed();
+            loadHighlights();
+          }}
+        />
+      )}
+      {highlightSheet && (
+        <HighlightSheet
+          statuses={feed.myStatuses}
+          highlights={myHighlights}
+          preselect={highlightSheet.preselect || null}
+          editing={highlightSheet.editing || null}
+          onClose={() => setHighlightSheet(null)}
+          onSaved={() => {
+            loadHighlights();
+            setViewing((v) => (v?.highlight ? null : v)); // an edited highlight reopens fresh from the row
           }}
         />
       )}
