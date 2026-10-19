@@ -1,6 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { optimizeImage } from "../lib/cdn";
-import { Plus, Loader2, Pencil, Camera, Lock, BellOff, Bell, Bookmark } from "lucide-react";
+import { Plus, Loader2, Pencil, Camera, Lock, BellOff, Bell, Bookmark, Eye } from "lucide-react";
+import { createPortal } from "react-dom";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import CreateStatusModal from "../components/CreateStatusModal";
@@ -9,6 +10,7 @@ import HighlightsRow from "../components/HighlightsRow";
 import HighlightSheet from "../components/HighlightSheet";
 import { HL_GRADIENT } from "../lib/highlightTheme";
 import { useScrollMemory } from "../lib/useScrollMemory";
+import toast from "react-hot-toast";
 
 // "Today, 09:16" / "Yesterday, 21:40" like WhatsApp
 const statusTime = (iso) => {
@@ -18,30 +20,98 @@ const statusTime = (iso) => {
   return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${t}`;
 };
 
+// WhatsApp-style bottom sheet for one person's updates: opened by holding (or right-clicking) their row.
+const StatusRowSheet = ({ entry, muted, onClose, onView, onMute }) => {
+  const { user } = entry;
+  const Row = ({ icon: Icon, label, onClick, danger }) => (
+    <button onClick={onClick} className={`w-full flex items-center gap-5 px-6 py-3.5 text-[15.5px] text-left hover:bg-white/5 active:bg-white/10 ${danger ? "text-[#F15C6D]" : "text-wa-text"}`}>
+      <Icon size={22} className={danger ? "" : "text-wa-icon"} />
+      {label}
+    </button>
+  );
+  return createPortal(
+    <div className="wa-dark fixed inset-0 z-[160] bg-black/60 flex items-end lg:items-center justify-center" onClick={onClose}>
+      <div className="w-full max-w-md bg-wa-panel text-wa-text rounded-t-3xl lg:rounded-2xl pb-[calc(8px+env(safe-area-inset-bottom))] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20 lg:hidden" />
+        <div className="flex items-center gap-3 px-6 pt-4 pb-3 border-b border-white/10">
+          <img src={optimizeImage(user.profilePic, 120) || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
+          <p className="text-[16px] font-medium truncate">{user.fullName}</p>
+        </div>
+        <div className="py-1">
+          <Row icon={Eye} label="View updates" onClick={onView} />
+          {muted ? (
+            <Row icon={Bell} label="Unmute" onClick={() => onMute("off")} />
+          ) : (
+            <>
+              <Row icon={BellOff} label="Mute for 8 hours" onClick={() => onMute("8h")} />
+              <Row icon={BellOff} label="Mute for 1 week" onClick={() => onMute("1w")} />
+              <Row icon={BellOff} label="Mute always" onClick={() => onMute("always")} />
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 const StatusPage = () => {
   const scrollRef = useScrollMemory("updates");
   const { authUser } = useAuthStore();
   const [feed, setFeed] = useState({ myStatuses: [], others: [] });
   const [isLoading, setIsLoading] = useState(true);
   // People whose updates you muted: they move to "Muted updates" at the bottom (kept on this device).
-  const [muted, setMuted] = useState(() => {
+  // "always" mutes are a list of ids; timed ones (8 hours / 1 week) are id -> end time and fade out by themselves.
+  const readLS = (key, fallback) => {
     try {
-      const raw = JSON.parse(localStorage.getItem("talkies.mutedStatus") || "[]");
-      return Array.isArray(raw) ? raw : [];
+      const raw = JSON.parse(localStorage.getItem(key) || "null");
+      return raw ?? fallback;
     } catch {
-      return [];
+      return fallback;
     }
+  };
+  const writeLS = (key, value) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* storage unavailable: still works until the page closes */
+    }
+  };
+  const [muted, setMuted] = useState(() => {
+    const raw = readLS("talkies.mutedStatus", []);
+    return Array.isArray(raw) ? raw : [];
   });
-  const toggleMute = (id) =>
-    setMuted((prev) => {
-      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
-      try {
-        localStorage.setItem("talkies.mutedStatus", JSON.stringify(next));
-      } catch {
-        /* storage unavailable: still works until the page closes */
-      }
-      return next;
-    });
+  const [mutedUntil, setMutedUntil] = useState(() => {
+    const raw = readLS("talkies.mutedStatusUntil", {});
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  });
+  const isMuted = (id) => muted.includes(id) || (mutedUntil[id] || 0) > Date.now();
+  const setMute = (id, mode) => {
+    // mode: "8h" | "1w" | "always" | "off"
+    const nextAlways = mode === "always" ? [...new Set([...muted, id])] : muted.filter((x) => x !== id);
+    const nextUntil = { ...mutedUntil };
+    if (mode === "8h") nextUntil[id] = Date.now() + 8 * 3600 * 1000;
+    else if (mode === "1w") nextUntil[id] = Date.now() + 7 * 24 * 3600 * 1000;
+    else delete nextUntil[id];
+    setMuted(nextAlways);
+    setMutedUntil(nextUntil);
+    writeLS("talkies.mutedStatus", nextAlways);
+    writeLS("talkies.mutedStatusUntil", nextUntil);
+  };
+  // long-press (or right-click) a person's row for options
+  const [rowSheet, setRowSheet] = useState(null); // { user, statuses }
+  const pressTimer = useRef(null);
+  const rowLongPressed = useRef(false);
+  const startRowPress = (entry) => {
+    rowLongPressed.current = false;
+    clearTimeout(pressTimer.current);
+    pressTimer.current = setTimeout(() => {
+      rowLongPressed.current = true;
+      navigator.vibrate?.(15);
+      setRowSheet(entry);
+    }, 450);
+  };
+  const endRowPress = () => clearTimeout(pressTimer.current);
   const [showCreate, setShowCreate] = useState(false); // false | "text" | "image"
   const [viewing, setViewing] = useState(null); // { user, statuses, isOwn, highlight? }
   const [myHighlights, setMyHighlights] = useState([]);
@@ -152,9 +222,9 @@ const StatusPage = () => {
             </div>
 
             {[
-              ["Recent updates", feed.others.filter((o) => o.hasUnseen && !muted.includes(o.user._id))],
-              ["Viewed updates", feed.others.filter((o) => !o.hasUnseen && !muted.includes(o.user._id))],
-              ["Muted updates", feed.others.filter((o) => muted.includes(o.user._id))],
+              ["Recent updates", feed.others.filter((o) => o.hasUnseen && !isMuted(o.user._id))],
+              ["Viewed updates", feed.others.filter((o) => !o.hasUnseen && !isMuted(o.user._id))],
+              ["Muted updates", feed.others.filter((o) => isMuted(o.user._id))],
             ].map(
               ([title, list]) =>
                 list.length > 0 && (
@@ -163,8 +233,19 @@ const StatusPage = () => {
                     {list.map(({ user, statuses, hasUnseen }) => (
                       <div key={user._id} className={`flex items-center hover:bg-white/5 ${title === "Muted updates" ? "opacity-70" : ""}`}>
                         <button
-                          onClick={() => setViewing({ user, statuses, isOwn: false })}
-                          className="flex-1 min-w-0 flex items-center gap-4 pl-4 py-3 active:bg-wa-surface"
+                          onClick={() => {
+                            if (rowLongPressed.current) return; // the long-press already opened the options
+                            setViewing({ user, statuses, isOwn: false });
+                          }}
+                          onPointerDown={() => startRowPress({ user, statuses })}
+                          onPointerUp={endRowPress}
+                          onPointerLeave={endRowPress}
+                          onPointerCancel={endRowPress}
+                          onContextMenu={(e) => {
+                            e.preventDefault();
+                            setRowSheet({ user, statuses });
+                          }}
+                          className="flex-1 min-w-0 flex items-center gap-4 px-4 py-3 active:bg-wa-surface select-none"
                         >
                           <img
                             src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
@@ -172,18 +253,12 @@ const StatusPage = () => {
                             className={`size-14 rounded-full object-cover ring-2 ${
                               hasUnseen && title !== "Muted updates" ? "ring-[#00A884]" : "ring-wa-muted/40"
                             } ring-offset-2 ring-offset-wa-bg`}
+                            draggable={false}
                           />
                           <div className="text-left min-w-0">
                             <p className="text-[14.5px] text-wa-text truncate">{user.fullName}</p>
                             <p className="text-[12px] text-wa-muted">{statusTime(statuses[statuses.length - 1].createdAt)}</p>
                           </div>
-                        </button>
-                        <button
-                          onClick={() => toggleMute(user._id)}
-                          className="size-11 mr-2 rounded-full flex items-center justify-center text-wa-icon hover:bg-white/10 active:bg-white/15 shrink-0"
-                          aria-label={muted.includes(user._id) ? `Unmute ${user.fullName}` : `Mute ${user.fullName}`}
-                        >
-                          {muted.includes(user._id) ? <Bell size={19} /> : <BellOff size={19} />}
                         </button>
                       </div>
                     ))}
@@ -237,6 +312,22 @@ const StatusPage = () => {
             setViewing(null);
             loadFeed();
             loadHighlights();
+          }}
+        />
+      )}
+      {rowSheet && (
+        <StatusRowSheet
+          entry={rowSheet}
+          muted={isMuted(rowSheet.user._id)}
+          onClose={() => setRowSheet(null)}
+          onView={() => {
+            setViewing({ user: rowSheet.user, statuses: rowSheet.statuses, isOwn: false });
+            setRowSheet(null);
+          }}
+          onMute={(mode) => {
+            setMute(rowSheet.user._id, mode);
+            setRowSheet(null);
+            toast(mode === "off" ? `Unmuted ${rowSheet.user.fullName}` : `Muted ${rowSheet.user.fullName}`, { icon: mode === "off" ? "🔔" : "🔕" });
           }}
         />
       )}
