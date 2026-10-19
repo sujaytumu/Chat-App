@@ -11,9 +11,11 @@ import { markGroupDelivered } from "../lib/groupReceipts.js";
 import { markDirectDeliveredFor } from "../lib/directReceipts.js";
 
 import cloudinary from "../lib/cloudinary.js";
-import { getReceiverSocketId, io, setPrivacyCache, refreshOnline } from "../lib/socket.js";
+import { getReceiverSocketId, io, setPrivacyCache, refreshOnline, onSocketConnection } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUser } from "../lib/webPush.js";
+import { getUserLean, getUserDoc } from "../lib/authCache.js";
+import { rememberMessage } from "../lib/recentMessages.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -154,70 +156,95 @@ export const getUsersForSidebar = async (req, res) => {
   }
 };
 
+// One page of a direct chat (newest first, `before` pages back). Shared by opening a chat and the
+// background prefetch. The three independent lookups run together (one round trip, not three).
+async function loadDirectMessages(me, userToChatId, { limit = 80, before } = {}) {
+  const myId = me._id;
+  const query = {
+    groupId: null,
+    deletedFor: { $ne: myId },
+    $or: [
+      { senderId: myId, receiverId: userToChatId },
+      { senderId: userToChatId, receiverId: myId },
+    ],
+    // disappearing messages can linger a minute before MongoDB removes them
+    $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }],
+  };
+  if (before && !Number.isNaN(Date.parse(before))) query.createdAt = { $lt: new Date(before) };
+  const [page, lastReply, other] = await Promise.all([
+    Message.find(query).sort({ createdAt: -1 }).limit(limit).populate("replyTo", "text image file senderId").lean(),
+    Message.findOne({ senderId: userToChatId, receiverId: myId, groupId: null }).sort({ createdAt: -1 }).select("createdAt").lean(),
+    getUserLean(userToChatId),
+  ]);
+  const messages = page.reverse();
+
+  // Self-heal old chats: anything I sent before their latest reply was obviously read.
+  if (lastReply) {
+    const cut = new Date(lastReply.createdAt);
+    const stale = messages.filter((m) => String(m.senderId) === String(myId) && (!m.seen || !m.delivered) && new Date(m.createdAt) <= cut);
+    if (stale.length) {
+      for (const m of stale) {
+        m.seen = true;
+        m.delivered = true;
+      }
+      Message.updateMany(
+        { senderId: myId, receiverId: userToChatId, groupId: null, createdAt: { $lte: cut }, $or: [{ seen: false }, { delivered: false }] },
+        { $set: { seen: true, seenAt: cut, delivered: true, deliveredAt: cut } }
+      ).catch(() => {});
+    }
+  }
+
+  // Read receipts are two-way, like WhatsApp: if either of us switched them
+  // off, neither of us sees "seen" on messages I sent in this chat.
+  if (other?.privacy?.readReceipts === false || me.privacy?.readReceipts === false) {
+    for (const m of messages) {
+      if (String(m.senderId) === String(myId)) {
+        m.seen = false;
+        m.seenAt = null;
+      }
+    }
+  }
+  return messages;
+}
+
 export const getMessages = async (req, res) => {
   try {
-    const { id: userToChatId } = req.params;
-    const myId = req.user._id;
-
     // Newest page first (fast even in very long chats); `before` loads older ones.
     const limit = Math.min(parseInt(req.query.limit, 10) || 80, 200);
-    const query = {
-      groupId: null,
-      deletedFor: { $ne: myId },
-      $or: [
-        { senderId: myId, receiverId: userToChatId },
-        { senderId: userToChatId, receiverId: myId },
-      ],
-      // disappearing messages can linger a minute before MongoDB removes them
-      $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }],
-    };
-    if (req.query.before && !Number.isNaN(Date.parse(req.query.before))) {
-      query.createdAt = { $lt: new Date(req.query.before) };
-    }
-    const page = await Message.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .populate("replyTo", "text image file senderId")
-      .lean();
-    const messages = page.reverse();
-
-    // Self-heal old chats: anything I sent before their latest reply was obviously read.
-    const lastReply = await Message.findOne({ senderId: userToChatId, receiverId: myId, groupId: null }).sort({ createdAt: -1 }).select("createdAt").lean();
-    if (lastReply) {
-      const cut = new Date(lastReply.createdAt);
-      const stale = messages.filter((m) => String(m.senderId) === String(myId) && (!m.seen || !m.delivered) && new Date(m.createdAt) <= cut);
-      if (stale.length) {
-        for (const m of stale) {
-          m.seen = true;
-          m.delivered = true;
-        }
-        Message.updateMany(
-          { senderId: myId, receiverId: userToChatId, groupId: null, createdAt: { $lte: cut }, $or: [{ seen: false }, { delivered: false }] },
-          { $set: { seen: true, seenAt: cut, delivered: true, deliveredAt: cut } }
-        ).catch(() => {});
-      }
-    }
-
-    // Read receipts are two-way, like WhatsApp: if either of us switched them
-    // off, neither of us sees "seen" on messages I sent in this chat.
-    const other = await User.findById(userToChatId).select("privacy").lean();
-    if (other?.privacy?.readReceipts === false || req.user.privacy?.readReceipts === false) {
-      for (const m of messages) {
-        if (String(m.senderId) === String(myId)) {
-          m.seen = false;
-          m.seenAt = null;
-        }
-      }
-    }
-
-    res.status(200).json(messages);
+    res.status(200).json(await loadDirectMessages(req.user, req.params.id, { limit, before: req.query.before }));
   } catch (error) {
     console.log("Error in getMessages controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-export const sendMessage = async (req, res) => {
+// Recent messages of several chats in ONE request: the app warms the top chats in the background so
+// opening them later is instant.
+export const prefetchMessages = async (req, res) => {
+  try {
+    const ids = [...new Set(String(req.query.ids || "").split(",").filter((x) => mongoose.isValidObjectId(x)))].slice(0, 8);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 30, 60);
+    const entries = await Promise.all(ids.map(async (id) => [id, await loadDirectMessages(req.user, id, { limit })]));
+    res.status(200).json(Object.fromEntries(entries));
+  } catch (error) {
+    console.log("Error in prefetchMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// The "disappearing messages" setting of a chat, remembered briefly so sending doesn't wait on it.
+const disappearCache = new Map(); // pairKey -> { seconds, at }
+async function getDisappearAfter(a, b) {
+  const key = pairKey(a, b);
+  const hit = disappearCache.get(key);
+  if (hit && Date.now() - hit.at < 30_000) return hit.seconds;
+  const row = await DirectChatSetting.findOne({ key }).select("disappearAfter").lean();
+  const seconds = row?.disappearAfter || 0;
+  disappearCache.set(key, { seconds, at: Date.now() });
+  return seconds;
+}
+
+const sendMessageCore = async (req, res) => {
   try {
     const { text, image, file, replyTo, viewOnce, forwarded } = req.body;
     const poll = sanitizePoll(req.body.poll);
@@ -225,11 +252,11 @@ export const sendMessage = async (req, res) => {
     const senderId = req.user._id;
     const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
     // Independent lookups run together instead of one after another.
-    const [contact, statusReply, receiver, dSetting] = await Promise.all([
+    const [contact, statusReply, receiver, disappearAfter] = await Promise.all([
       buildContact(req.body.contactUserId),
       buildStatusReply(req.body.statusId, receiverId),
-      User.findById(receiverId).select("blockedUsers").lean(),
-      DirectChatSetting.findOne({ key: pairKey(senderId, receiverId) }).select("disappearAfter").lean(),
+      getUserLean(receiverId), // remembered for a few seconds: no database trip while chatting
+      getDisappearAfter(senderId, receiverId),
     ]);
 
     if (!text?.trim() && !image && !file && !poll && !contact) {
@@ -272,7 +299,7 @@ export const sendMessage = async (req, res) => {
     const newMessage = new Message({
       senderId,
       receiverId,
-      expiresAt: dSetting?.disappearAfter > 0 ? new Date(Date.now() + dSetting.disappearAfter * 1000) : null,
+      expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
       text: poll ? `📊 ${poll.question}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
       contact: contact || undefined,
@@ -290,6 +317,7 @@ export const sendMessage = async (req, res) => {
     });
 
     await newMessage.save();
+    if (!isSelf) rememberMessage(newMessage); // lets "delivered" / "read" reach the sender instantly
     if (isSelf) {
       // Notes to yourself: nobody else to notify, no ticks to wait for, no push to send.
       newMessage.set("viewOnceUrl", undefined);
@@ -326,6 +354,43 @@ export const sendMessage = async (req, res) => {
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// The same message may arrive twice (sent over the live connection, then re-sent over HTTP because
+// no answer came back in time). `clientId` makes that harmless: the second copy gets the first one's
+// result instead of creating a duplicate.
+const sendDupes = new Map(); // "sender:clientId" -> Promise<{status, body}>
+export const sendMessage = async (req, res) => {
+  const cid = typeof req.body?.clientId === "string" ? req.body.clientId.slice(0, 64) : "";
+  if (!cid) return sendMessageCore(req, res);
+  const key = `${req.user._id}:${cid}`;
+  const earlier = sendDupes.get(key);
+  if (earlier) {
+    const r = await earlier;
+    return res.status(r.status).json(r.body);
+  }
+  let settle;
+  sendDupes.set(key, new Promise((resolve) => (settle = resolve)));
+  const timer = setTimeout(() => sendDupes.delete(key), 120_000);
+  timer.unref?.();
+  const proxy = {
+    _s: 200,
+    status(c) {
+      this._s = c;
+      res.status(c);
+      return this;
+    },
+    json(b) {
+      settle({ status: this._s, body: b });
+      if (this._s >= 400) sendDupes.delete(key); // a failure may be retried
+      return res.json(b);
+    },
+  };
+  try {
+    await sendMessageCore(req, proxy);
+  } finally {
+    settle({ status: 500, body: { error: "Internal server error" } }); // no-op if already answered
   }
 };
 
@@ -378,12 +443,10 @@ export const markMessagesAsSeen = async (req, res) => {
     const { id: senderId } = req.params;
     const myId = req.user._id;
 
-    const result = await Message.updateMany(
-      { senderId, receiverId: myId, seen: false },
-      { $set: { seen: true, seenAt: new Date(), delivered: true } }
-    );
-
-    const sender = result.modifiedCount > 0 ? await User.findById(senderId).select("privacy").lean() : null;
+    const [result, sender] = await Promise.all([
+      Message.updateMany({ senderId, receiverId: myId, seen: false }, { $set: { seen: true, seenAt: new Date(), delivered: true } }),
+      getUserLean(senderId),
+    ]);
     const receiptsOff = req.user.privacy?.readReceipts === false || sender?.privacy?.readReceipts === false;
     if (result.modifiedCount > 0 && !receiptsOff) {
       const senderSocketId = getReceiverSocketId(senderId);
@@ -1096,6 +1159,7 @@ export const setDirectDisappearing = async (req, res) => {
       { $set: { disappearAfter: seconds } },
       { upsert: true }
     );
+    disappearCache.set(pairKey(req.user._id, otherId), { seconds, at: Date.now() });
     const sid = getReceiverSocketId(otherId);
     if (sid) io.to(sid).emit("directDisappearing", { userId: String(req.user._id), seconds });
     res.status(200).json({ seconds });
@@ -1211,3 +1275,34 @@ export const firstMessageFrom = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// ---- Sending over the live connection ----
+// A text message used to travel as a separate HTTP request (new request, cookie check, user lookup…).
+// The phone already has an authenticated live connection open, so plain messages go through it
+// instead: same logic (it calls the very same sendMessage), noticeably faster.
+onSocketConnection((socket) => {
+  socket.on("sendDirect", async (payload, ack) => {
+    if (typeof ack !== "function") return;
+    try {
+      const to = String(payload?.to || "");
+      if (!mongoose.isValidObjectId(to)) return ack({ status: 400, body: { error: "Invalid chat" } });
+      const user = await getUserDoc(socket.data.userId);
+      if (!user || user.deleted) return ack({ status: 401, body: { error: "Unauthorized" } });
+      let status = 200;
+      const res = {
+        status(c) {
+          status = c;
+          return this;
+        },
+        json(body) {
+          ack({ status, body });
+          return this;
+        },
+      };
+      await sendMessage({ body: payload?.body || {}, params: { id: to }, user }, res);
+    } catch (e) {
+      console.log("Error in sendDirect:", e.message);
+      ack({ status: 500, body: { error: "Internal server error" } });
+    }
+  });
+});

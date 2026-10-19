@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
+import { getUserLean } from "../lib/authCache.js";
 
 export const protectRoute = async (req, res, next) => {
   try {
@@ -17,7 +18,7 @@ export const protectRoute = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized - Invalid Token" });
     }
 
-    const user = await User.findById(decoded.userId).select("-password -pushSubscriptions");
+    const user = await getUserLean(decoded.userId); // cached for a few seconds; any write to the user clears it
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -43,7 +44,7 @@ export const protectRoute = async (req, res, next) => {
       }
     }
 
-    req.user = user;
+    req.user = User.hydrate(user);
 
     next();
   } catch (error) {

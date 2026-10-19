@@ -33,7 +33,50 @@ function notifyIncoming(senderName, message, isGroup = false) {
   });
 }
 
-const PAGE_SIZE = 80; // messages fetched per page (newest first, older on demand)
+const PAGE_SIZE = 40; // messages fetched per page (newest first, older on demand) — small = opens fast
+// ---- speed helpers ----
+// "I read it": over the live connection when there is one (arrives at once), HTTP only as a fallback.
+const emitSeen = (senderId) => {
+  const socket = useAuthStore.getState().socket;
+  if (socket?.connected) socket.emit("markSeen", { from: senderId });
+  else axiosInstance.put(`/messages/seen/${senderId}`).catch(() => {});
+};
+// Send a plain text message over the live connection. Resolves like an HTTP call would; rejects with
+// `transport: true` when the connection didn't answer in time (the caller then retries over HTTP —
+// the shared clientId stops that from ever creating a duplicate).
+const sendOverSocket = (socket, to, body) =>
+  new Promise((resolve, reject) => {
+    socket.timeout(8000).emit("sendDirect", { to, body }, (err, r) => {
+      if (err || !r) return reject({ transport: true });
+      if (r.status >= 200 && r.status < 300) return resolve({ data: r.body });
+      reject({ response: { status: r.status, data: r.body } });
+    });
+  });
+// Warm the newest chats in ONE request, so opening them later is instant.
+let prefetchedFor = null;
+const prefetchTopChats = async (users) => {
+  const me = useAuthStore.getState().authUser?._id;
+  if (!me || prefetchedFor === me || !users?.length) return;
+  prefetchedFor = me;
+  const ids = users
+    .filter((u) => u.lastMessage && !u.isSelf && !msgCache.has(`d:${u._id}`))
+    .sort((a, b) => new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt))
+    .slice(0, 8)
+    .map((u) => u._id);
+  if (!ids.length) return;
+  try {
+    const res = await axiosInstance.get("/messages/prefetch", { params: { ids: ids.join(","), limit: PAGE_SIZE } });
+    for (const [id, list] of Object.entries(res.data || {})) {
+      const key = `d:${id}`;
+      if (!msgCache.has(key) && Array.isArray(list)) {
+        msgCache.set(key, list);
+        writeChatCache(me, `msgs-${key}`, list.slice(-40));
+      }
+    }
+  } catch {
+    /* best effort */
+  }
+};
 const msgCache = new Map(); // chatKey -> last known messages (instant re-open)
 const chatKeyOf = (chat) => `${chat.type === "group" ? "g" : "d"}:${chat.data._id}`;
 const FLAG_API = {
@@ -94,6 +137,7 @@ export const useChatStore = create((set, get) => ({
       const res = await axiosInstance.get("/messages/users");
       set({ users: res.data });
       writeChatCache(userId, "users", res.data);
+      setTimeout(() => prefetchTopChats(res.data), 400);
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to load users");
     } finally {
@@ -323,6 +367,7 @@ export const useChatStore = create((set, get) => ({
     const cached = msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [];
     set({ selectedChat: chat, messages: cached, hasMoreMessages: false, chatSearchOpen: false });
     if (useAuthStore.getState().authUser?.markedUnread?.includes(key)) get().setChatMarkedUnread(chat, false, { silent: true });
+    if (chat.type === "direct" && !chat.data?.isSelf) emitSeen(chat.data._id);
     get().getMessages();
   },
 
@@ -382,7 +427,7 @@ export const useChatStore = create((set, get) => ({
 
       if (chat.type === "direct") {
         // Mark as seen + clear unread badge locally
-        axiosInstance.put(`/messages/seen/${chat.data._id}`).catch(() => {});
+        emitSeen(chat.data._id);
         set((state) => ({
           users: state.users.map((u) => (u._id === chat.data._id ? { ...u, unreadCount: 0 } : u)),
         }));
@@ -452,7 +497,21 @@ export const useChatStore = create((set, get) => ({
       }
       let res;
       try {
-        res = await axiosInstance.post(url, payload);
+        if (simple && selectedChat.type === "direct" && !selectedChat.data?.isSelf) {
+          // Plain text goes over the live connection (no new request, no extra lookups); if it doesn't
+          // answer in time, the same message (same clientId) is sent over HTTP — never duplicated.
+          const live = useAuthStore.getState().socket;
+          const body = { ...payload, clientId: tmpId };
+          try {
+            if (!live?.connected) throw { transport: true };
+            res = await sendOverSocket(live, selectedChat.data._id, body);
+          } catch (e) {
+            if (!e?.transport) throw e;
+            res = await axiosInstance.post(url, body);
+          }
+        } else {
+          res = await axiosInstance.post(url, payload);
+        }
       } catch (err) {
         if (simple) set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
         throw err;
@@ -806,9 +865,7 @@ export const useChatStore = create((set, get) => ({
 
       if (isActiveChat) {
         set({ messages: [...messages, message] });
-        if (document.visibilityState === "visible") {
-          axiosInstance.put(`/messages/seen/${message.senderId}`).catch(() => {});
-        }
+        if (document.visibilityState === "visible") emitSeen(message.senderId);
       } else {
         set((state) => ({
           users: state.users.map((u) =>

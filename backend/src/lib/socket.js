@@ -11,7 +11,8 @@ import User from "../models/user.model.js";
 import { sendPushToUser, sendPushToUsers } from "./webPush.js";
 import { sendFcmCancelCall } from "./fcm.js";
 import { markGroupDelivered } from "./groupReceipts.js";
-import { ackDirectMessage } from "./directReceipts.js";
+import { ackDirectMessage, markDirectDeliveredFor } from "./directReceipts.js";
+import { recallMessage } from "./recentMessages.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -45,10 +46,14 @@ const userSockets = new Map(); // userId -> Set<socketId>
 const isOnline = (id) => (userSockets.get(id)?.size || 0) > 0;
 // Per-user privacy kept in memory for connected users: { typing, online, blocked:Set }
 const privacyCache = new Map();
+// Other modules add their own per-connection handlers here (kept out of this file to avoid import cycles).
+const connectionHooks = [];
+export const onSocketConnection = (fn) => connectionHooks.push(fn);
 export function setPrivacyCache(userId, user) {
   privacyCache.set(String(userId), {
     typing: user?.privacy?.typing !== false,
     online: user?.privacy?.online !== false,
+    readReceipts: user?.privacy?.readReceipts !== false,
     blocked: new Set((user?.blockedUsers || []).map(String)),
   });
 }
@@ -228,6 +233,7 @@ io.use(async (socket, next) => {
 
 io.on("connection", (socket) => {
   const userId = socket.data.userId;
+  for (const hook of connectionHooks) hook(socket);
 
   if (userId) {
     if (!userSockets.has(userId)) userSockets.set(userId, new Set());
@@ -294,6 +300,12 @@ io.on("connection", (socket) => {
       if (!messageId) return;
       if (groupId) {
         await markGroupDelivered(io, userId, { messageIds: [messageId] });
+      } else if (recallMessage(messageId)?.receiverId === userId) {
+        // We know this message: tell the sender straight away (their double tick), save in the background.
+        const m = recallMessage(messageId);
+        const room = roomFor(m.senderId);
+        if (room) io.to(room).emit("messagesDelivered", { by: userId });
+        markDirectDeliveredFor(() => {}, userId, { senderId: m.senderId, createdAt: { $lte: m.createdAt } }, { silent: true });
       } else {
         await ackDirectMessage((uid, ev, payload) => {
           const room = roomFor(uid);
@@ -302,6 +314,23 @@ io.on("connection", (socket) => {
       }
     } catch (e) {
       console.log("Error in messageReceived:", e.message);
+    }
+  });
+
+  // The person opened the chat / a message arrived while it is open: blue ticks for the sender. Sent over
+  // the live connection and relayed at once; the database catches up right after.
+  socket.on("markSeen", async ({ from } = {}) => {
+    try {
+      const sender = String(from || "");
+      if (!/^[a-f0-9]{24}$/.test(sender) || sender === userId) return;
+      const receiptsOff = privacyCache.get(userId)?.readReceipts === false || privacyCache.get(sender)?.readReceipts === false;
+      if (!receiptsOff) {
+        const room = roomFor(sender);
+        if (room) io.to(room).emit("messagesSeen", { by: userId });
+      }
+      await Message.updateMany({ senderId: sender, receiverId: userId, seen: false }, { $set: { seen: true, seenAt: new Date(), delivered: true } });
+    } catch (e) {
+      console.log("Error in markSeen:", e.message);
     }
   });
 
