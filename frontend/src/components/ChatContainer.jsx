@@ -11,6 +11,8 @@ import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
 import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
+import MessageContextMenu from "./MessageContextMenu";
+import { isDesktopNow } from "./ContextMenu";
 import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
@@ -204,6 +206,7 @@ const ChatContainer = () => {
   const galleryImages = useMemo(() => messages.filter((m) => m.image && !m.viewOnce && !m.deletedForEveryone).map((m) => m.image), [messages]);
   const [hoveredId, setHoveredId] = useState(null);
   const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [ctxMenu, setCtxMenu] = useState(null); // laptop: { message, isMe, menu, x, y, align }
   const [infoMessage, setInfoMessage] = useState(null);
   const prevChatKeyRef = useRef(null);
   const justOpenedRef = useRef(false);
@@ -486,6 +489,11 @@ const ChatContainer = () => {
               onTouchCancel={(e) => swipeEnd(e)}
               onContextMenu={(e) => {
                 e.preventDefault();
+                // laptop: right-click opens WhatsApp Web's menu; phones keep long-press selection + the bar on top
+                if (isDesktopNow() && !selectedMsgIds.length && !message.deletedForEveryone) {
+                  setCtxMenu({ message, isMe, menu: menuProps, x: e.clientX, y: e.clientY, align: "left" });
+                  return;
+                }
                 if (!selectedMsgIds.includes(message._id)) toggleSelectMessage(message._id);
               }}
               onClickCapture={(e) => {
@@ -577,6 +585,23 @@ const ChatContainer = () => {
                     >
                       {sender?.fullName || "Unknown"}
                     </span>
+                  )}
+                  {/* laptop: the little arrow WhatsApp Web shows on hover */}
+                  {!selectedMsgIds.length && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setCtxMenu({ message, isMe, menu: menuProps, x: isMe ? r.right : r.left, y: r.bottom + 4, align: isMe ? "right" : "left" });
+                      }}
+                      className={`hidden lg:flex absolute top-0 right-0 z-10 h-7 w-9 items-center justify-end pr-1.5 rounded-tr-xl opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-wa-text/70 hover:text-wa-text bg-gradient-to-l to-transparent ${
+                        isMe ? "from-wa-out via-wa-out/90" : "from-wa-surface via-wa-surface/90"
+                      }`}
+                      aria-label="Message options"
+                    >
+                      <ChevronDown size={18} />
+                    </button>
                   )}
                   {heartPopId === message._id && (
                     <span
@@ -803,6 +828,18 @@ const ChatContainer = () => {
       <ImageLightbox src={lightboxSrc} gallery={galleryImages} onClose={() => setLightboxSrc(null)} />
       {forwardingMessage && (
         <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
+      )}
+      {ctxMenu && (
+        <MessageContextMenu
+          message={ctxMenu.message}
+          isMe={ctxMenu.isMe}
+          authUserId={authUser._id}
+          menu={ctxMenu.menu}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          align={ctxMenu.align}
+          onClose={() => setCtxMenu(null)}
+        />
       )}
       {infoMessage && <MessageInfoModal
           message={infoMessage}
