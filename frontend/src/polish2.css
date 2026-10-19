@@ -41,7 +41,7 @@ html:not(.wa-dark) .animate-pulse {
 .fixed.inset-0[class*="bg-black/"] { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
 
 /* Keyboard users: visible focus on inputs too */
-input:focus-visible, textarea:focus-visible, select:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent) / .22); }
+input:focus-visible, textarea:focus-visible:not(.wa-input-field), select:focus-visible { box-shadow: 0 0 0 3px rgb(var(--accent) / .22); }
 
 /* Respect safe areas on notched phones */
 nav.fixed.bottom-0 { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
@@ -49,4 +49,16 @@ nav.fixed.bottom-0 { padding-bottom: max(env(safe-area-inset-bottom), 0px); }
 /* Respect the OS "reduce motion" setting */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* ==========================================================================
+   Message box. The typing field gets no focus rectangle on any screen; on laptops (lg+) the bar is the
+   WhatsApp Web layout: [emoji] [attach] [rounded field] [mic / send] on one full-width strip.
+   ========================================================================== */
+textarea.wa-input-field:focus-visible, textarea.wa-input-field:focus { box-shadow: none; outline: none; border-color: transparent; }
+@media (min-width: 1024px) {
+  .wa-input-field { background-color: rgb(var(--wa-field)); }
+  html:not(.wa-dark) .wa-input-field { background-color: #ffffff; }
+  /* the old floating-pill glow must not apply to the laptop bar */
+  form:focus-within .wa-input-field { box-shadow: none; }
 }
