@@ -2,7 +2,8 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
-import { X, Eye, Trash2, Loader2, ChevronUp, Heart, Music, MapPin, Headphones, FileText, Download, Send, Bookmark, Pencil } from "lucide-react";
+import { X, Eye, Loader2, ChevronUp, Heart, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { MoreVertical } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -41,6 +42,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const [paused, setPaused] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false); // the ⋮ menu
   const [deleting, setDeleting] = useState(false);
   const current = list[index];
   const [mediaMs, setMediaMs] = useState(0); // length of the current video / audio
@@ -92,7 +94,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
 
   // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
-  const stop = paused || showViewers || confirmDelete || replyFocus || hold; // hold: a sheet on top (save to highlights) keeps it still
+  const stop = paused || showViewers || confirmDelete || replyFocus || hold || menuOpen; // hold: a sheet on top (save to highlights) keeps it still
   const last = useRef(0);
   useEffect(() => {
     if (!current || stop) return;
@@ -253,20 +255,33 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </a>
           )}
         </div>
-        {isOwn && !highlight && onAddToHighlight && (
-          <button onClick={() => onAddToHighlight(current)} className="size-10 flex items-center justify-center text-white" aria-label="Save to highlights">
-            <Bookmark size={22} />
-          </button>
-        )}
-        {isOwn && highlight && onEditHighlight && (
-          <button onClick={() => onEditHighlight(highlight)} className="size-10 flex items-center justify-center text-white" aria-label="Edit highlight">
-            <Pencil size={20} />
-          </button>
-        )}
         {isOwn && (
-          <button onClick={() => setConfirmDelete(true)} className="size-10 flex items-center justify-center text-white" aria-label={highlight ? "Remove from highlight" : "Delete status"}>
-            <Trash2 size={22} />
-          </button>
+          <div className="relative">
+            <button onClick={() => setMenuOpen((o) => !o)} className="size-10 flex items-center justify-center text-white" aria-label="More options">
+              <MoreVertical size={22} />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                {/* WhatsApp-style dropdown: plain text rows, destructive one last */}
+                <div className="absolute right-0 top-11 z-30 min-w-[220px] rounded-xl bg-wa-pop text-wa-text shadow-2xl py-2 text-[15px]" onPointerDown={(e) => e.stopPropagation()}>
+                  {!highlight && onAddToHighlight && (
+                    <button onClick={() => { setMenuOpen(false); onAddToHighlight(current); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
+                      Add to highlights
+                    </button>
+                  )}
+                  {highlight && onEditHighlight && (
+                    <button onClick={() => { setMenuOpen(false); onEditHighlight(highlight); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
+                      Edit highlight
+                    </button>
+                  )}
+                  <button onClick={() => { setMenuOpen(false); setConfirmDelete(true); }} className="w-full text-left px-5 py-3 text-[#F15C6D] hover:bg-white/5 active:bg-white/10">
+                    {highlight ? "Remove from highlight" : "Delete"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         )}
         <button onClick={onClose} className="size-10 flex items-center justify-center text-white" aria-label="Close">
           <X size={26} />
