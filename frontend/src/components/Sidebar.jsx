@@ -22,7 +22,8 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { Lock, Megaphone, QrCode } from "lucide-react";
+import { Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import { useDraftStore } from "../store/useDraftStore";
@@ -363,36 +364,58 @@ const Sidebar = () => {
   }, []);
 
   const selectedItems = items.filter((i) => selected.has(i.key));
-  const allPinned = selectedItems.length > 0 && selectedItems.every((i) => i.pinned);
+  const allPinnedOf = (t) => t.length > 0 && t.every((i) => i.pinned);
   const allMuted = selectedItems.length > 0 && selectedItems.every((i) => i.muted);
+  const allPinned = allPinnedOf(selectedItems);
+  const [ctx, setCtx] = useState(null); // laptop: { item, x, y, align } chat-row menu
   const chatOf = (i) => ({ type: i.type, data: i.data });
 
-  const bulk = async (run, message) => {
-    const targets = selectedItems;
+  const bulk = async (run, message, targets = selectedItems) => {
     clearSelected();
     const results = await Promise.all(targets.map((i) => run(i)));
     if (results.every(Boolean) && message) toast(message(targets.length));
   };
-  const onPin = () => {
-    if (!allPinned) {
-      const already = [...pinnedSet].filter((k) => !selectedItems.some((i) => `${i.type === "group" ? "g" : "d"}:${i.data._id}` === k)).length;
-      if (already + selectedItems.length > 3) return toast.error("You can only pin 3 chats");
+  const onPin = (targets = selectedItems) => {
+    const pinned = allPinnedOf(targets);
+    if (!pinned) {
+      const already = [...pinnedSet].filter((k) => !targets.some((i) => `${i.type === "group" ? "g" : "d"}:${i.data._id}` === k)).length;
+      if (already + targets.length > 3) return toast.error("You can only pin 3 chats");
     }
-    bulk((i) => setChatPinned(chatOf(i), !allPinned, { silent: true }), () => (allPinned ? "Chat unpinned" : "Chat pinned"));
+    bulk((i) => setChatPinned(chatOf(i), !pinned, { silent: true }), () => (pinned ? "Chat unpinned" : "Chat pinned"), targets);
   };
   const [muteSheet, setMuteSheet] = useState(false);
-  const onMute = () => {
-    if (!allMuted) return setMuteSheet(true);
-    bulk((i) => setChatMuted(chatOf(i), false, { silent: true }), () => "Notifications on");
+  const [muteTargets, setMuteTargets] = useState([]);
+  const onMute = (targets = selectedItems) => {
+    if (!targets.every((i) => i.muted)) {
+      setMuteTargets(targets);
+      return setMuteSheet(true);
+    }
+    bulk((i) => setChatMuted(chatOf(i), false, { silent: true }), () => "Notifications on", targets);
   };
   const doMute = (until) => {
     setMuteSheet(false);
-    bulk((i) => setChatMuted(chatOf(i), true, { silent: true, until }), () => "Notifications muted");
+    bulk((i) => setChatMuted(chatOf(i), true, { silent: true, until }), () => "Notifications muted", muteTargets);
   };
-  const onArchive = () =>
+  const onArchive = (targets = selectedItems) =>
     bulk((i) => setChatArchived(chatOf(i), !showArchived, { silent: true }), (n) =>
       showArchived ? `${n} chat${n > 1 ? "s" : ""} unarchived` : `${n} chat${n > 1 ? "s" : ""} archived`
-    );
+    , targets);
+  const toggleUnread = async (targets) => {
+    const makeRead = targets.every((i) => i.markedUnread || i.unreadCount > 0);
+    clearSelected();
+    for (const i of targets) {
+      if (makeRead) {
+        if (i.markedUnread) await setChatMarkedUnread(chatOf(i), false, { silent: true });
+        if (i.unreadCount > 0) await markChatRead(chatOf(i));
+      } else await setChatMarkedUnread(chatOf(i), true, { silent: true });
+    }
+    toast(makeRead ? "Marked as read" : "Marked as unread");
+  };
+  const [deleteTargets, setDeleteTargets] = useState([]);
+  const askDelete = (targets = selectedItems) => {
+    setDeleteTargets(targets);
+    setConfirmDelete(true);
+  };
   // ---- Lists ----
   const keyOf = (i) => `${i.type === "group" ? "g" : "d"}:${i.data._id}`;
   const candidates = useMemo(
@@ -418,7 +441,7 @@ const Sidebar = () => {
   };
   const onDelete = async () => {
     setConfirmDelete(false);
-    const targets = selectedItems;
+    const targets = deleteTargets;
     clearSelected();
     for (const i of targets) await deleteChat(chatOf(i));
     toast(`${targets.length} chat${targets.length > 1 ? "s" : ""} deleted`);
@@ -456,16 +479,16 @@ const Sidebar = () => {
             <WaBack size={24} />
           </button>
           <span className="flex-1 text-[18.5px] leading-none font-normal text-wa-text pl-5">{selected.size}</span>
-          <button onClick={onPin} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
+          <button onClick={() => onPin()} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allPinned ? "Unpin" : "Pin"} title={allPinned ? "Unpin" : "Pin"}>
             {allPinned ? <WaUnpinAction /> : <WaPinAction />}
           </button>
-          <button onClick={() => setConfirmDelete(true)} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Delete" title="Delete">
+          <button onClick={() => askDelete()} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Delete" title="Delete">
             <WaTrash />
           </button>
-          <button onClick={onMute} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
+          <button onClick={() => onMute()} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={allMuted ? "Unmute" : "Mute"} title={allMuted ? "Unmute" : "Mute"}>
             {allMuted ? <WaBell /> : <WaBellOff />}
           </button>
-          <button onClick={onArchive} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
+          <button onClick={() => onArchive()} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label={showArchived ? "Unarchive" : "Archive"} title={showArchived ? "Unarchive" : "Archive"}>
             <WaArchive up={showArchived} />
           </button>
           <div className="relative">
@@ -731,6 +754,7 @@ const Sidebar = () => {
               onTouchCancel={cancelPress}
               onContextMenu={(e) => {
                 e.preventDefault(); // right-click on desktop / long-press on Android
+                if (isDesktopNow() && !selecting) return setCtx({ item, x: e.clientX, y: e.clientY, align: "left" });
                 addSelected(item.key);
               }}
               style={{ WebkitTouchCallout: "none" }}
@@ -812,6 +836,21 @@ const Sidebar = () => {
                 </div>
               </div>
             </button>
+            {/* laptop: the little arrow WhatsApp Web shows on hover */}
+            {!selecting && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setCtx({ item, x: r.right, y: r.bottom + 4, align: "right" });
+                }}
+                className="hidden lg:flex absolute right-3 bottom-2 h-5 w-6 items-center justify-center rounded text-wa-muted hover:text-wa-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                aria-label="Chat options"
+              >
+                <ChevronDown size={18} />
+              </button>
+            )}
             </div>
           );
         })}
@@ -870,7 +909,7 @@ const Sidebar = () => {
         )}
       </div>
 
-      {muteSheet && <MuteSheet name={selectedItems.length === 1 ? selectedItems[0].name : "these chats"} onClose={() => setMuteSheet(false)} onPick={doMute} />}
+      {muteSheet && <MuteSheet name={muteTargets.length === 1 ? muteTargets[0].name : "these chats"} onClose={() => setMuteSheet(false)} onPick={doMute} />}
       {searchOpen && <SearchScreen onClose={() => setSearchOpen(false)} />}
 
       {/* Floating action button */}
@@ -915,14 +954,34 @@ const Sidebar = () => {
         );
       })()}
 
+      {ctx && (() => {
+        const t = [ctx.item];
+        const unreadNow = ctx.item.markedUnread || ctx.item.unreadCount > 0;
+        return (
+          <ContextMenu
+            x={ctx.x}
+            y={ctx.y}
+            align={ctx.align}
+            onClose={() => setCtx(null)}
+            items={[
+              { label: showArchived ? "Unarchive chat" : "Archive chat", icon: showArchived ? ArchiveRestore : Archive, onClick: () => onArchive(t) },
+              { label: ctx.item.muted ? "Unmute notifications" : "Mute notifications", icon: ctx.item.muted ? Bell : BellOff, onClick: () => onMute(t) },
+              { label: ctx.item.pinned ? "Unpin chat" : "Pin chat", icon: ctx.item.pinned ? PinOff : Pin, onClick: () => onPin(t) },
+              { label: unreadNow ? "Mark as read" : "Mark as unread", icon: unreadNow ? MailOpen : Mail, onClick: () => toggleUnread(t) },
+              { label: "Delete chat", icon: Trash2, divider: true, onClick: () => askDelete(t) },
+            ]}
+          />
+        );
+      })()}
+
       {confirmDelete && (
         <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4" onClick={() => setConfirmDelete(false)}>
           <div className="bg-wa-pop rounded-2xl w-full max-w-xs p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-[14.5px] font-medium text-wa-text">
-              Delete {selected.size > 1 ? `${selected.size} chats` : "this chat"}?
+              Delete {deleteTargets.length > 1 ? `${deleteTargets.length} chats` : "this chat"}?
             </h3>
             <p className="text-sm text-wa-muted mt-2">
-              Messages are removed from your account only. {selected.size > 1 ? "Others keep their copies." : "The other side keeps their copy."}
+              Messages are removed from your account only. {deleteTargets.length > 1 ? "Others keep their copies." : "The other side keeps their copy."}
             </p>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setConfirmDelete(false)} className="px-4 h-10 rounded-full text-[#25D366] hover:bg-white/5">
