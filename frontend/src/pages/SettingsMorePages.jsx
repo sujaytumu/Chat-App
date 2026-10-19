@@ -877,20 +877,25 @@ export const HelpPage = () => {
 export default AccountPage;
 
 /* ---------------- Linked devices ---------------- */
-const sinceText = (d) => {
+// "Last active today at 6:55 pm" / "yesterday at ..." / "12 Oct at ..."
+const lastActiveText = (d) => {
   if (!d) return "";
-  const m = Math.round((Date.now() - new Date(d).getTime()) / 60000);
-  if (m < 2) return "Active now";
-  if (m < 60) return `Last active ${m} min ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `Last active ${h} hr ago`;
-  return `Last active ${new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short" })}`;
+  const t = new Date(d);
+  const mins = Math.round((Date.now() - t.getTime()) / 60000);
+  if (mins < 2) return "Active now";
+  const time = t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }).toLowerCase();
+  const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(new Date()) - startOfDay(t)) / 86400000);
+  if (days <= 0) return `Last active today at ${time}`;
+  if (days === 1) return `Last active yesterday at ${time}`;
+  return `Last active ${t.toLocaleDateString(undefined, { day: "numeric", month: "short" })} at ${time}`;
 };
+const linkedOnText = (d) => (d ? new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" }) : "");
 
 export const LinkedDevicesPage = () => {
   const [list, setList] = useState(null);
-  const [busy, setBusy] = useState(null);
-  const [confirm, setConfirm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(null); // the device whose sheet is open
   const [scanning, setScanning] = useState(false);
 
   const load = () =>
@@ -902,103 +907,114 @@ export const LinkedDevicesPage = () => {
     load();
   }, []);
 
-  const logout = async (sid) => {
-    setBusy(sid);
+  const logout = async (d) => {
+    setBusy(true);
     try {
-      await axiosInstance.delete(`/auth/sessions/${sid}`);
+      await axiosInstance.delete(`/auth/sessions/${d.sid}`);
       toast.success("Device logged out");
-      setConfirm(null);
+      setOpen(null);
       await load();
     } catch (err) {
       toast.error(err?.response?.data?.message || "Couldn't log that device out");
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
   };
 
   const me = list?.find((x) => x.current);
   const others = (list || []).filter((x) => !x.current);
-  const Icon = (d) => (/Android|iPhone|app/i.test(d) ? Smartphone : Monitor);
+  const isPhone = (d) => /Android|iPhone|app/i.test(d);
+  const DeviceIcon = ({ device, className }) => (isPhone(device) ? <Smartphone size={24} strokeWidth={1.6} className={className} /> : <Monitor size={24} strokeWidth={1.6} className={className} />);
 
   return (
-    <SettingsShell title="Linked devices" back="/profile">
+    <SettingsShell title="Linked devices" back="/profile" flush>
       {!list ? (
         <p className="text-center text-wa-muted py-10">
           <Loader2 className="animate-spin inline" size={18} />
         </p>
       ) : (
         <>
+          {/* Intro + the big green button, like WhatsApp */}
+          <div className="flex flex-col items-center text-center px-8 pt-4 pb-6">
+            <div className="relative h-[120px] w-[190px] mb-4">
+              <Monitor size={118} strokeWidth={1} className="absolute left-0 top-1 text-wa-muted" />
+              <div className="absolute right-2 bottom-0 w-[54px] h-[98px] rounded-[12px] border-2 border-[#25D366] bg-wa-bg flex items-center justify-center">
+                <QrCode size={26} className="text-[#25D366]" />
+              </div>
+            </div>
+            <h2 className="text-[18px] font-medium">Use Talkies on other devices</h2>
+            <p className="text-[13.5px] text-wa-muted mt-1.5 max-w-[320px]">
+              Open Talkies in a browser, choose “Log in with QR code”, then scan the code it shows with this phone.
+            </p>
+            <button onClick={() => setScanning(true)} className="mt-5 h-12 px-8 rounded-full bg-[#25D366] text-[#06210f] text-[15px] font-semibold active:opacity-80">
+              Link a device
+            </button>
+          </div>
+
+          <div className="h-2 bg-black/20" />
+
           {me && (
-            <div className="px-4 pt-3">
-              <p className="text-[12.5px] text-wa-muted mb-2">This device</p>
-              <div className={`${card} flex items-center gap-3`}>
-                {(() => {
-                  const I = Icon(me.device);
-                  return <I size={26} strokeWidth={1.7} className="text-[#25D366] shrink-0" />;
-                })()}
+            <div className="px-5 pt-5">
+              <p className="text-[13.5px] text-wa-muted mb-3">This device</p>
+              <div className="flex items-center gap-4">
+                <span className="size-11 rounded-full bg-wa-surface flex items-center justify-center shrink-0">
+                  <DeviceIcon device={me.device} className="text-[#25D366]" />
+                </span>
                 <div className="min-w-0">
-                  <p className="text-[14.5px] text-wa-text truncate">{me.device}</p>
-                  <p className="text-[12px] text-wa-muted">Active now</p>
+                  <p className="text-[16px] truncate">{me.device}</p>
+                  <p className="text-[13px] text-[#25D366]">Active now</p>
                 </div>
               </div>
             </div>
           )}
-          <div className="px-4 pt-4">
-            <button
-              onClick={() => setScanning(true)}
-              className="w-full h-12 rounded-full bg-[#25D366] text-black font-medium flex items-center justify-center gap-2"
-            >
-              <QrCode size={19} /> Link a device
-            </button>
-            <p className="text-[12px] text-wa-muted mt-2 text-center">
-              Open Talkies in a browser, choose “Log in with QR code”, then scan it here.
-            </p>
-          </div>
-          {scanning && <LinkDeviceSheet onClose={() => setScanning(false)} onDone={load} />}
-          <div className="px-4 pt-5">
-            <p className="text-[12.5px] text-wa-muted mb-2">Other devices</p>
+
+          <div className="px-5 pt-6">
+            <p className="text-[13.5px] text-wa-muted mb-1">Device status</p>
             {others.length === 0 ? (
-              <p className="text-[13px] text-wa-muted py-4">No other devices are signed in to your account.</p>
+              <p className="text-[14px] text-wa-muted py-5">No linked devices yet. Tap “Link a device” to add one.</p>
             ) : (
-              <div className="space-y-2.5">
-                {others.map((d) => {
-                  const I = Icon(d.device);
-                  return (
-                    <div key={d.sid} className={card}>
-                      <div className="flex items-center gap-3">
-                        <I size={26} strokeWidth={1.7} className="text-wa-muted shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[14.5px] text-wa-text truncate">{d.device}</p>
-                          <p className="text-[12px] text-wa-muted">{sinceText(d.lastActive)}</p>
-                        </div>
-                        {confirm !== d.sid && (
-                          <button className="text-[13px] text-red-500 px-2 py-1" onClick={() => setConfirm(d.sid)}>
-                            Log out
-                          </button>
-                        )}
-                      </div>
-                      {confirm === d.sid && (
-                        <div className="flex justify-end gap-2 mt-3">
-                          <button type="button" className="px-4 h-10 rounded-full text-wa-muted hover:bg-wa-pop" onClick={() => setConfirm(null)}>
-                            Cancel
-                          </button>
-                          <button type="button" className={primaryBtn} disabled={busy === d.sid} onClick={() => logout(d.sid)}>
-                            {busy === d.sid ? <Loader2 className="animate-spin" size={18} /> : "Log out device"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div>
+                {others.map((d) => (
+                  <button key={d.sid} onClick={() => setOpen(d)} className="w-full flex items-center gap-4 py-3.5 text-left active:bg-white/5 -mx-2 px-2 rounded-xl">
+                    <span className="size-11 rounded-full bg-wa-surface flex items-center justify-center shrink-0">
+                      <DeviceIcon device={d.device} className="text-wa-muted" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[16px] truncate">{d.device}</span>
+                      <span className="block text-[13px] text-wa-muted">{lastActiveText(d.lastActive)}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
             )}
           </div>
-          <p className="px-5 pt-4 text-[11.5px] text-wa-muted">
-            Devices appear here when you sign in on them. Logging one out signs it out of Talkies right away. Devices signed in before this
-            list existed show up after their next sign-in.
-          </p>
+
+          <p className="px-5 pt-4 pb-6 text-[12.5px] text-wa-muted text-center">Tap a device to see details or log it out.</p>
         </>
       )}
+
+      {open && (
+        <div className="fixed inset-0 z-[120] bg-black/55 flex items-end justify-center" onClick={() => !busy && setOpen(null)}>
+          <div className="w-full max-w-md bg-wa-panel text-wa-text rounded-t-[28px] p-6 pb-[calc(24px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto size-16 rounded-full bg-wa-surface flex items-center justify-center mb-3">
+              <DeviceIcon device={open.device} className="text-wa-muted" />
+            </div>
+            <h3 className="text-center text-[18px] font-medium">{open.device}</h3>
+            <p className="text-center text-[13.5px] text-wa-muted mt-1">{lastActiveText(open.lastActive)}</p>
+            <p className="text-center text-[13.5px] text-wa-muted">Linked on {linkedOnText(open.createdAt)}</p>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setOpen(null)} disabled={busy} className="flex-1 h-12 rounded-full bg-wa-surface text-[15px] font-medium">
+                Close
+              </button>
+              <button onClick={() => logout(open)} disabled={busy} className="flex-1 h-12 rounded-full bg-[#F15C6D] text-white text-[15px] font-semibold flex items-center justify-center">
+                {busy ? <Loader2 className="animate-spin" size={18} /> : "Log out"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scanning && <LinkDeviceSheet onClose={() => setScanning(false)} onDone={load} />}
     </SettingsShell>
   );
 };
