@@ -147,6 +147,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
       if (e.key === "Escape") onClose();
       if (e.key === "ArrowRight") next();
       if (e.key === "ArrowLeft") prev();
+      if (e.key === " " && e.target?.tagName !== "BUTTON") {
+        e.preventDefault(); // laptop: Space pauses / resumes the status
+        setPaused((p) => !p);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
