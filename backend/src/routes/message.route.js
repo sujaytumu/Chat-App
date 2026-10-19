@@ -3,6 +3,7 @@ import { lockStatus, setLockPin, verifyLockPin, setChatLocked, resetChatLock } f
 import { protectRoute } from "../middleware/auth.middleware.js";
 import {
   getMessages,
+  prefetchMessages,
   getUsersForSidebar,
   sendMessage,
   markMessagesAsSeen,
@@ -51,6 +52,7 @@ router.put("/disappearing/:id", protectRoute, setDirectDisappearing);
 router.get("/link-preview", protectRoute, linkPreview);
 router.get("/storage-usage", protectRoute, getStorageUsage);
 router.get("/export", protectRoute, exportChats);
+router.get("/prefetch", protectRoute, prefetchMessages);
 router.get("/:id", protectRoute, getMessages);
 
 router.post("/send/:id", protectRoute, sendMessage);

@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { userWritten } from "../lib/authCacheBus.js";
 
 const userSchema = new mongoose.Schema(
   {
@@ -110,6 +111,17 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Keep the short-lived auth cache honest: any write to a user clears that user's cached record.
+const idOf = (v) => (v && (typeof v === "string" || v instanceof mongoose.Types.ObjectId) ? String(v) : null);
+for (const op of ["updateOne", "updateMany", "findOneAndUpdate", "findOneAndDelete", "findOneAndReplace", "replaceOne", "deleteOne", "deleteMany"]) {
+  userSchema.post(op, function () {
+    userWritten(idOf(this.getFilter?.()?._id));
+  });
+}
+userSchema.post("save", function (doc) {
+  userWritten(String(doc._id));
+});
 
 const User = mongoose.model("User", userSchema);
 
