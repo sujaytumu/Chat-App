@@ -234,7 +234,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           <p className="text-white text-[13.5px] font-medium truncate">{highlight ? highlight.title : isOwn ? "My status" : user.fullName}</p>
           <p className="text-white/80 text-[11px] truncate">{ago(current.createdAt)}</p>
           {current.song?.url && (
-            <p className="flex items-center gap-1.5 text-white text-[11px] leading-5 min-w-0">
+            <p className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/35 pl-2 pr-3 py-0.5 text-white text-[11.5px] leading-5 min-w-0">
               <Music size={13} className="shrink-0" />
               <span className="truncate">{current.song.name || "Song"}</span>
             </p>
