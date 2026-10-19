@@ -7,6 +7,8 @@ import { useBackToClose } from "../lib/useBackToClose";
 // a corner to resize it. "Free" lets you pick any shape. Whatever is inside the
 // frame is what you get.
 const MIN = 70;
+const PAD = 22; // WhatsApp variant: breathing room around the picture so edge handles are reachable
+const RATIOS = [["Free", null], ["Square", 1], ["4:5", 4 / 5], ["3:4", 3 / 4], ["9:16", 9 / 16], ["16:9", 16 / 9]];
 
 const screenAspect = () => {
   const w = window.innerWidth;
@@ -28,6 +30,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const [box, setBox] = useState(null); // crop box in stage px
   const drag = useRef(null);
   const [resetN, setResetN] = useState(0); // bumps to re-frame after a rotate
+  const [ratioName, setRatioName] = useState("Free");
   const ar = useRef(aspectRatio || screenAspect());
 
   // Load the picture
@@ -54,7 +57,8 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   // Where the picture sits inside the stage
   const fit = img && stage.w
     ? (() => {
-        const s = Math.min(stage.w / img.naturalWidth, stage.h / img.naturalHeight);
+        const pad = wa ? PAD : 0;
+        const s = Math.min((stage.w - pad * 2) / img.naturalWidth, (stage.h - pad * 2) / img.naturalHeight);
         const w = img.naturalWidth * s;
         const h = img.naturalHeight * s;
         return { s, w, h, x: (stage.w - w) / 2, y: (stage.h - h) / 2 };
@@ -65,7 +69,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const fitKey = fit ? `${Math.round(fit.w)}x${Math.round(fit.h)}` : "";
   useEffect(() => {
     if (!fit) return;
-    if (wa && !initialLocked) {
+    if (wa && !locked) {
       setBox({ x: fit.x, y: fit.y, w: fit.w, h: fit.h });
       return;
     }
@@ -191,9 +195,20 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
     im.onload = () => {
       setUrl(u);
       setImg(im);
+      if (locked && !aspectRatio) ar.current = 1 / ar.current; // a turned picture wants the turned frame
       setResetN((n) => n + 1);
     };
     im.src = u;
+  };
+
+  const pickRatio = ([name, r]) => {
+    setRatioName(name);
+    if (r == null) setLocked(false);
+    else {
+      ar.current = r;
+      setLocked(true);
+    }
+    setResetN((n) => n + 1);
   };
 
   const handle = (mode, style) => (
@@ -207,7 +222,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
     </span>
   );
   const edge = (mode, style) => (
-    <span key={mode} onPointerDown={(e) => startDrag(mode, e)} className="absolute w-11 h-11 touch-none" style={style} />
+    <span key={mode} onPointerDown={(e) => startDrag(mode, e)} className="absolute touch-none" style={style} />
   );
 
   return (
@@ -277,10 +292,10 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
               className="absolute cursor-move touch-none"
               style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
             />
-            {wa && !locked && edge("l", { left: box.x - 18, top: box.y + box.h / 2 - 22 })}
-            {wa && !locked && edge("r", { left: box.x + box.w - 18, top: box.y + box.h / 2 - 22 })}
-            {wa && !locked && edge("t", { left: box.x + box.w / 2 - 22, top: box.y - 18 })}
-            {wa && !locked && edge("b", { left: box.x + box.w / 2 - 22, top: box.y + box.h - 18 })}
+            {wa && !locked && edge("l", { left: box.x - 16, top: box.y + 18, width: 32, height: Math.max(0, box.h - 36) })}
+            {wa && !locked && edge("r", { left: box.x + box.w - 16, top: box.y + 18, width: 32, height: Math.max(0, box.h - 36) })}
+            {wa && !locked && edge("t", { left: box.x + 18, top: box.y - 16, width: Math.max(0, box.w - 36), height: 32 })}
+            {wa && !locked && edge("b", { left: box.x + 18, top: box.y + box.h - 16, width: Math.max(0, box.w - 36), height: 32 })}
             {handle("tl", { left: box.x - 18, top: box.y - 18 })}
             {handle("tr", { left: box.x + box.w - 18, top: box.y - 18 })}
             {handle("bl", { left: box.x - 18, top: box.y + box.h - 18 })}
@@ -290,7 +305,21 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
       </div>
 
       {wa ? (
-        <div className="shrink-0 h-[72px] pb-[env(safe-area-inset-bottom)] box-content flex items-center justify-between px-8">
+        <div className="shrink-0 pb-[env(safe-area-inset-bottom)] box-content">
+        {!aspectRatio && (
+          <div className="flex gap-2 px-4 pb-1 overflow-x-auto no-scrollbar justify-start sm:justify-center">
+            {RATIOS.map((r) => (
+              <button
+                key={r[0]}
+                onClick={() => pickRatio(r)}
+                className={`shrink-0 h-8 px-3.5 rounded-full text-[12.5px] ${ratioName === r[0] ? "bg-white text-black font-medium" : "bg-white/10 text-white/85"}`}
+              >
+                {r[0]}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="h-[64px] flex items-center justify-between px-8">
           <button onClick={onCancel} className="text-[16px] text-[#21C063] py-3 pr-4">
             Cancel
           </button>
@@ -300,6 +329,7 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
           <button onClick={done} disabled={!box} className="text-[16px] text-[#21C063] py-3 pl-4 disabled:opacity-40">
             Done
           </button>
+        </div>
         </div>
       ) : (
       <div className="shrink-0 px-4 pt-3 pb-[calc(14px+env(safe-area-inset-bottom))] flex flex-col items-center gap-2">
