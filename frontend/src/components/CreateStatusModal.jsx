@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette } from "lucide-react";
+import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette, Play, Pause } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import StatusMusicSheet from "./StatusMusicSheet";
@@ -140,6 +140,36 @@ const LocationSheet = ({ onPick, onClose }) => {
   );
 };
 
+// Plays the chosen song while composing, so you hear it before posting (loops, like it will on the status).
+const useSongPreview = (song, suspended) => {
+  const audio = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!song?.data) return undefined;
+    const a = new Audio(song.data);
+    a.loop = true;
+    a.onplay = () => setPlaying(true);
+    a.onpause = () => setPlaying(false);
+    audio.current = a;
+    a.play().catch(() => {}); // blocked autoplay: the play button still works
+    return () => {
+      a.pause();
+      audio.current = null;
+      setPlaying(false);
+    };
+  }, [song?.data]);
+  useEffect(() => {
+    if (suspended) audio.current?.pause();
+  }, [suspended]);
+  const toggle = () => {
+    const a = audio.current;
+    if (!a) return;
+    if (a.paused) a.play().catch(() => {});
+    else a.pause();
+  };
+  return { playing, toggle };
+};
+
 const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [kind, setKind] = useState("text"); // text | image | video | audio | file
   // "pick" = WhatsApp's Add status sheet (Text / Music / Voice + Camera / Gallery); "compose" = the editor
@@ -165,6 +195,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const audioRef = useRef(null);
   const fileRef = useRef(null);
   const songRef = useRef(null);
+  const songPlay = useSongPreview(song, showMusic);
   useBackToClose(true, onClose);
 
   const take = async (e, as) => {
@@ -381,7 +412,9 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           <div className="flex flex-wrap gap-2 mt-3">
             {song && (
               <span className="flex items-center gap-1.5 rounded-full bg-wa-field pl-3 pr-1.5 py-1.5 text-[11.5px] max-w-full">
-                <Music size={14} className="text-[#21C063] shrink-0" />
+                <button onClick={songPlay.toggle} className="size-6 rounded-full bg-[#21C063] text-black flex items-center justify-center shrink-0" aria-label={songPlay.playing ? "Pause preview" : "Play preview"}>
+                  {songPlay.playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
+                </button>
                 <span className="truncate">{song.name}</span>
                 <button onClick={() => setSong(null)} className="size-5 rounded-full flex items-center justify-center text-wa-muted" aria-label="Remove song">
                   <X size={13} />
@@ -408,7 +441,9 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
             <div className="flex flex-wrap gap-2 px-4 pb-2.5">
               {song && (
                 <span className="flex items-center gap-1.5 text-[13px] text-white max-w-full">
-                  <Music size={18} className="text-[#21C063] shrink-0" />
+                  <button onClick={songPlay.toggle} className="size-8 rounded-full bg-[#21C063] text-black flex items-center justify-center shrink-0" aria-label={songPlay.playing ? "Pause preview" : "Play preview"}>
+                    {songPlay.playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
+                  </button>
                   <span className="truncate">{song.name}</span>
                   <button onClick={() => setSong(null)} className="size-6 flex items-center justify-center text-white/70" aria-label="Remove song"><X size={16} /></button>
                 </span>
