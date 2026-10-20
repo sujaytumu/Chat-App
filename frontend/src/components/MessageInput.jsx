@@ -24,6 +24,7 @@ import Avatar from "./Avatar";
 import PollModal from "./PollModal";
 import LocationSheet from "./LocationSheet";
 import { liveShares } from "../lib/liveShare";
+import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
 import EventModal from "./EventModal";
 import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
@@ -50,6 +51,7 @@ const MessageInput = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSharingLocation, setIsSharingLocation] = useState(false);
   const [showLocSheet, setShowLocSheet] = useState(false);
+  const [dismissedQuick, setDismissedQuick] = useState(null);
   const [showVideoNote, setShowVideoNote] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -77,6 +79,7 @@ const MessageInput = () => {
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
   const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
   const attachMenuRef = useRef(null);
+  const messages = useChatStore((st) => st.messages);
   const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore();
 
   const typingTimeoutRef = useRef(null);
@@ -833,6 +836,35 @@ const MessageInput = () => {
           </button>
         </div>
       )}
+      {(() => {
+        const last = messages[messages.length - 1];
+        if (!last || !getQuickReplies() || text.trim() || replyingTo || editingMessage || isRecording) return null;
+        if (dismissedQuick === last._id || String(last.senderId) === String(authUser?._id)) return null;
+        if (!last.text || last.image || last.file || last.poll || last.event || last.liveLocation || last.contact || last.deletedForEveryone) return null;
+        if (Date.now() - new Date(last.createdAt).getTime() > 30 * 60 * 1000) return null;
+        const options = suggestReplies(last.text);
+        if (!options.length) return null;
+        return (
+          <div className="flex items-center gap-2 px-3 pt-2 overflow-x-auto no-scrollbar">
+            {options.map((o) => (
+              <button
+                key={o}
+                type="button"
+                onClick={() => {
+                  setDismissedQuick(last._id);
+                  sendMessage({ text: o });
+                }}
+                className="shrink-0 h-9 px-4 rounded-full bg-wa-field text-wa-text text-[13.5px] active:scale-95 transition-transform"
+              >
+                {o}
+              </button>
+            ))}
+            <button type="button" aria-label="Hide suggestions" onClick={() => setDismissedQuick(last._id)} className="shrink-0 size-8 flex items-center justify-center text-wa-muted">
+              <X size={16} />
+            </button>
+          </div>
+        );
+      })()}
       {replyingTo && (
         <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
           <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">

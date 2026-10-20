@@ -4,6 +4,7 @@ import { Loader2, Camera, ExternalLink, RefreshCw, Smartphone, Monitor, QrCode }
 import toast from "react-hot-toast";
 import LinkDeviceSheet from "../components/LinkDeviceSheet";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
+import { getQuickReplies, setQuickReplies } from "../lib/quickReplies";
 import Avatar from "../components/Avatar";
 import { InstallAppControl } from "./SettingsPage";
 import { useAuthStore } from "../store/useAuthStore";
@@ -607,6 +608,7 @@ export const PrivacyPage = () => {
 /* ---------------- Chats: archive / unarchive everything ---------------- */
 export const ChatsSettingsPage = () => {
   const [enterSends, setEnter] = useState(getEnterSends());
+  const [quick, setQuick] = useState(getQuickReplies());
   const [fontSize, setFont] = useState(getFontSize());
   const { authUser } = useAuthStore();
   const { users, groups, setChatArchived } = useChatStore();
@@ -629,6 +631,15 @@ export const ChatsSettingsPage = () => {
 
   return (
     <SettingsShell title="Chats">
+      <ToggleRow
+        title="Quick replies"
+        sub="Tap-to-send suggestions under a new message. Made on your device; nothing is sent anywhere."
+        checked={quick}
+        onChange={(v) => {
+          setQuick(v);
+          setQuickReplies(v);
+        }}
+      />
       <ToggleRow
         title="Enter is send"
         sub="Enter key sends your message. Turn off to make Enter start a new line (Ctrl/Cmd + Enter then sends)."
