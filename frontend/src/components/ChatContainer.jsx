@@ -211,6 +211,33 @@ const ChatContainer = () => {
   const prevChatKeyRef = useRef(null);
   const justOpenedRef = useRef(false);
   const scrollRef = useRef(null);
+  // Instagram-style Vanish mode: pull up past the bottom of a 1:1 chat and let go to switch it on / off
+  const vanishPeer = selectedChat?.type === "direct" && selectedChat.data._id !== authUser?._id ? selectedChat.data._id : null;
+  const vanishOn = useChatStore((s) => (vanishPeer ? !!s.directVanish[vanishPeer] : false));
+  const [vanishPull, setVanishPull] = useState(0); // 0..1
+  const pullStart = useRef(null);
+  const onPullStart = (e) => {
+    const el = scrollRef.current;
+    pullStart.current = vanishPeer && el && el.scrollHeight - el.scrollTop - el.clientHeight < 3 ? e.touches[0].clientY : null;
+  };
+  const onPullMove = (e) => {
+    if (pullStart.current == null) return;
+    const dy = pullStart.current - e.touches[0].clientY;
+    setVanishPull(dy > 12 ? Math.min(dy / 120, 1) : 0);
+  };
+  const onPullEnd = () => {
+    const done = vanishPull >= 1;
+    pullStart.current = null;
+    setVanishPull(0);
+    if (done && vanishPeer) {
+      try {
+        navigator.vibrate?.(20);
+      } catch {
+        /* no haptics */
+      }
+      useChatStore.getState().setDirectVanish(vanishPeer, !vanishOn);
+    }
+  };
   const nearBottomRef = useRef(true); // is the reader at (or close to) the latest message?
   const [showJump, setShowJump] = useState(false);
   const [newWhileAway, setNewWhileAway] = useState(0);
@@ -400,9 +427,21 @@ const ChatContainer = () => {
       )}
 
       <div className="relative flex-1 min-h-0 flex flex-col">
+      {vanishPull > 0 && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center" style={{ opacity: 0.35 + vanishPull * 0.65 }}>
+          <span className="flex items-center gap-2 rounded-full bg-[#1C1C1E]/90 text-white px-4 py-2 text-[12.5px] shadow-lg" style={{ transform: `translateY(${-vanishPull * 14}px) scale(${0.9 + vanishPull * 0.15})` }}>
+            <span className="text-[18px] leading-none">👻</span>
+            {vanishPull >= 1 ? "Release to " : "Swipe up to "}turn {vanishOn ? "off" : "on"} Vanish mode
+          </span>
+        </div>
+      )}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        onTouchStart={onPullStart}
+        onTouchMove={onPullMove}
+        onTouchEnd={onPullEnd}
+        onTouchCancel={onPullEnd}
         style={{ overflowAnchor: "none" }}
         className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[5%] lg:px-8 py-3 lg:py-5 lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto"
       >
