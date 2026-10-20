@@ -1,3 +1,4 @@
+import { canSee } from "../lib/visibility.js";
 import jwt from "jsonwebtoken";
 import { generateToken, deviceLabel } from "../lib/utils.js";
 import User from "../models/user.model.js";
@@ -481,7 +482,7 @@ export const findByUsername = async (req, res) => {
     const { name, error } = checkName(req.params.username);
     if (error) return res.status(404).json({ message: "No one with that username" });
     const user = await User.findOne({ username: name, deleted: { $ne: true } }).select("fullName profilePic about username").lean();
-    if (!user) return res.status(404).json({ message: "No one with that username" });
+    if (!user || !(String(user._id) === String(req.user._id) || (await canSee(req.user, user._id)))) return res.status(404).json({ message: "No one with that username" }); // the owner decides who can see whom
     res.status(200).json(user);
   } catch (error) {
     console.log("error in findByUsername:", error.message);
