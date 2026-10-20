@@ -390,7 +390,7 @@ const ChatHeader = () => {
       )}
     </div>
     {!isGroup && vanishOn && (
-      <div className="px-4 py-1.5 text-center text-[12px] text-white bg-[#5B3FD1]">👻 Vanish mode — messages disappear after they are seen and you leave the chat</div>
+      <div className="px-4 py-1.5 text-center text-[12px] text-white bg-[#5B3FD1]">👻 Vanish mode — messages disappear after they are seen and you leave the chat · swipe up in the chat to turn off</div>
     )}
     {isGroup && <GroupCallBanner group={data} />}
     </>
