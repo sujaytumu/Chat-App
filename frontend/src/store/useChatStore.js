@@ -46,7 +46,7 @@ const emitSeen = (senderId) => {
 // the shared clientId stops that from ever creating a duplicate).
 const sendOverSocket = (socket, to, body) =>
   new Promise((resolve, reject) => {
-    socket.timeout(8000).emit("sendDirect", { to, body }, (err, r) => {
+    socket.timeout(2500).emit("sendDirect", { to, body }, (err, r) => {
       if (err || !r) return reject({ transport: true });
       if (r.status >= 200 && r.status < 300) return resolve({ data: r.body });
       reject({ response: { status: r.status, data: r.body } });
@@ -428,7 +428,12 @@ export const useChatStore = create((set, get) => ({
       const fresh = res.data;
       const firstFresh = fresh[0]?.createdAt;
       const older = firstFresh ? get().messages.filter((m) => m.createdAt < firstFresh) : [];
-      const merged = older.length ? [...older, ...fresh] : fresh;
+      const base = older.length ? [...older, ...fresh] : fresh;
+      // Messages still on their way (clock) stay visible; never show the same message twice.
+      const seenIds = new Set(base.map((m) => m._id));
+      const clientIds = new Set(base.map((m) => m.clientId).filter(Boolean));
+      const inFlight = get().messages.filter((m) => m.pending && !seenIds.has(m._id) && !clientIds.has(m._id));
+      const merged = inFlight.length ? [...base, ...inFlight] : base;
       set((state) => ({
         messages: merged,
         hasMoreMessages: older.length ? state.hasMoreMessages : fresh.length >= PAGE_SIZE,
@@ -536,7 +541,19 @@ export const useChatStore = create((set, get) => ({
         emitSeen(selectedChat.data._id);
       }
       if (simple && me) {
-        set((state) => ({ messages: state.messages.map((m) => (m._id === tmpId ? res.data : m)) }));
+        set((state) => {
+          // swap the clock copy for the real message — and drop any copy a refresh already brought in
+          let used = false;
+          const out = [];
+          for (const m of state.messages) {
+            if (m._id === tmpId || m._id === res.data._id) {
+              if (used) continue;
+              used = true;
+              out.push(res.data);
+            } else out.push(m);
+          }
+          return { messages: out };
+        });
       } else {
         set((state) =>
           state.selectedChat?.data?._id === selectedChat.data._id
@@ -898,6 +915,7 @@ export const useChatStore = create((set, get) => ({
         (message.senderId === selectedChat.data._id || message.receiverId === selectedChat.data._id);
 
       if (isActiveChat) {
+        if (messages.some((m) => m._id === message._id)) return;
         set({ messages: [...messages, message] });
         if (document.visibilityState === "visible") emitSeen(message.senderId);
       } else {
