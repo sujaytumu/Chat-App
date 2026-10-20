@@ -35,6 +35,7 @@ import {
   setDirectDisappearing,
   setNote,
   rsvpEvent,
+  updateLiveLocation,
   setDirectVanish,
   clearVanish,
 } from "../controllers/message.controller.js";
@@ -44,6 +45,8 @@ const router = express.Router();
 router.get("/users", protectRoute, getUsersForSidebar);
 router.put("/note", protectRoute, setNote);
 router.put("/event/:id/rsvp", protectRoute, rsvpEvent);
+router.put("/live-location/:id", protectRoute, updateLiveLocation);
+router.put("/live-location/:id/stop", protectRoute, updateLiveLocation);
 router.put("/vanish/:id", protectRoute, setDirectVanish);
 router.post("/vanish/clear/:id", protectRoute, clearVanish);
 router.get("/starred/all", protectRoute, getStarredMessages);

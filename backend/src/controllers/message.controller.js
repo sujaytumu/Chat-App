@@ -18,6 +18,7 @@ import { getUserLean, getUserDoc } from "../lib/authCache.js";
 import { rememberMessage } from "../lib/recentMessages.js";
 import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
 import { sanitizeEvent } from "../lib/event.js";
+import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -275,6 +276,7 @@ const sendMessageCore = async (req, res) => {
     }
     const poll = sanitizePoll(req.body.poll);
     const event = sanitizeEvent(req.body.event);
+    const liveLocation = sanitizeLiveLocation(req.body.liveLocation);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
     const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
@@ -286,7 +288,7 @@ const sendMessageCore = async (req, res) => {
       getDisappearAfter(senderId, receiverId),
     ]);
 
-    if (!text?.trim() && !image && !file && !poll && !event && !contact) {
+    if (!text?.trim() && !image && !file && !poll && !event && !liveLocation && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -330,9 +332,10 @@ const sendMessageCore = async (req, res) => {
       receiverId,
       vanish,
       expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
-      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
       event: event || undefined,
+      liveLocation: liveLocation || undefined,
       contact: contact || undefined,
       image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
       viewOnce: !!(viewOnce && imageUrl && !fileAttachment),
@@ -945,6 +948,61 @@ export const rsvpEvent = async (req, res) => {
     res.status(200).json(payload);
   } catch (error) {
     console.log("Error in rsvpEvent controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Live location: only the sender moves it. Everyone in the chat gets the new position live.
+const liveRecipients = (message) => {
+  if (message.groupId) return null;
+  return [message.senderId.toString(), message.receiverId.toString()];
+};
+const emitLive = (message, payload) => {
+  if (message.groupId) return io.to(message.groupId.toString()).emit("messageLive", payload);
+  liveRecipients(message).forEach((uid) => {
+    const socketId = getReceiverSocketId(uid);
+    if (socketId) io.to(socketId).emit("messageLive", payload);
+  });
+};
+const liveLastPush = new Map(); // messageId -> ms of the last accepted update (keeps a runaway client from flooding)
+
+export const updateLiveLocation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const stop = req.path.endsWith("/stop");
+    const pos = stop ? null : cleanPosition(req.body);
+    if (!stop && !pos) return res.status(400).json({ error: "Invalid position" });
+    const message = await Message.findById(id).select("liveLocation senderId receiverId groupId deletedForEveryone");
+    if (!message?.liveLocation || message.deletedForEveryone) return res.status(404).json({ error: "Live location not found" });
+    if (String(message.senderId) !== String(req.user._id)) return res.status(403).json({ error: "Not allowed" });
+    const live = message.liveLocation;
+    const expired = new Date(live.expiresAt).getTime() <= Date.now();
+    if (!live.active || expired) {
+      if (live.active) {
+        message.liveLocation.active = false;
+        await message.save();
+        emitLive(message, { _id: message._id, liveLocation: message.liveLocation });
+      }
+      return res.status(200).json({ _id: message._id, liveLocation: message.liveLocation });
+    }
+    if (!stop) {
+      const last = liveLastPush.get(id) || 0;
+      if (Date.now() - last < 3000) return res.status(200).json({ _id: message._id, liveLocation: message.liveLocation, skipped: true });
+      liveLastPush.set(id, Date.now());
+      Object.assign(message.liveLocation, pos, { updatedAt: new Date() });
+    } else {
+      message.liveLocation.active = false;
+      message.liveLocation.updatedAt = new Date();
+      liveLastPush.delete(id);
+    }
+    message.markModified("liveLocation");
+    await message.save();
+    const payload = { _id: message._id, liveLocation: message.liveLocation };
+    emitLive(message, payload);
+    res.status(200).json(payload);
+  } catch (error) {
+    console.log("Error in updateLiveLocation controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

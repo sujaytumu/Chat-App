@@ -493,7 +493,7 @@ export const useChatStore = create((set, get) => ({
       // Plain text shows up in the chat at once (with a clock) and is swapped
       // for the real message when the server confirms — no waiting on the network.
       const me = useAuthStore.getState().authUser;
-      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.event && !messageData.contactUserId && !messageData.statusId;
+      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.event && !messageData.liveLocation && !messageData.contactUserId && !messageData.statusId;
       const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       if (simple && me) {
         const temp = {
@@ -567,6 +567,7 @@ export const useChatStore = create((set, get) => ({
           return { groups: updated };
         });
       }
+      return res.data;
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to send message");
       throw error;
@@ -994,6 +995,9 @@ export const useChatStore = create((set, get) => ({
     socket.on("messageEvent", ({ _id, event }) =>
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, event } : m)) }))
     );
+    socket.on("messageLive", ({ _id, liveLocation }) =>
+      set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, liveLocation } : m)) }))
+    );
     socket.on("messagePoll", ({ _id, poll }) =>
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, poll } : m)) }))
     );
@@ -1170,6 +1174,7 @@ export const useChatStore = create((set, get) => ({
       "messageEdited",
       "messagePoll",
       "messageEvent",
+      "messageLive",
       "messageViewOnce",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });

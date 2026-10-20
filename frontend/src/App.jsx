@@ -13,6 +13,7 @@ try {
 }
 import GroupCallManager from "./components/GroupCallManager";
 import CallKeepAlive from "./components/CallKeepAlive";
+import LiveLocationManager from "./components/LiveLocationManager";
 import BackgroundCallSetup from "./components/BackgroundCallSetup";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
@@ -204,6 +205,11 @@ const App = () => {
       {authUser && <NotificationManager />}
       <UpdatePopup />
       {authUser && <CallKeepAlive />}
+      {authUser && (
+        <ErrorBoundary silent>
+          <LiveLocationManager />
+        </ErrorBoundary>
+      )}
       {authUser && <BackgroundCallSetup />}
       {authUser && (
         <ErrorBoundary silent>

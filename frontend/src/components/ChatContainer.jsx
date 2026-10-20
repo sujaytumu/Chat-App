@@ -32,6 +32,8 @@ import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
 import EventCard from "./EventCard";
+import LiveLocationCard from "./LiveLocationCard";
+import { stopLiveShare } from "./LiveLocationManager";
 import { replyWithPhoto } from "../lib/replyWithPhoto";
 import ContactCard from "./ContactCard";
 import toast from "react-hot-toast";
@@ -480,7 +482,7 @@ const ChatContainer = () => {
           // The first bubble of a run from the same person gets a tail and a
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
-          const hasText = !!message.text && !location && !message.poll && !message.event && !message.contact;
+          const hasText = !!message.text && !location && !message.poll && !message.event && !message.liveLocation && !message.contact;
 
           const menuProps = {
             message,
@@ -733,6 +735,8 @@ const ChatContainer = () => {
                         else toast("That's you");
                       }}
                     />
+                  ) : message.liveLocation ? (
+                    <LiveLocationCard message={message} isMe={isMe} onStop={() => stopLiveShare(message._id)} />
                   ) : message.event ? (
                     <EventCard message={message} authUserId={authUser._id} onRsvp={(a) => useChatStore.getState().rsvpEvent(message._id, a)} />
                   ) : message.poll ? (
