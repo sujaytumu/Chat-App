@@ -424,7 +424,7 @@ final class NotificationHelper {
         }
     }
 
-    static void showMessage(Context ctx, String title, String body, String tag, String chatId, String chatType, boolean missedCall) {
+    static void showMessage(Context ctx, String title, String body, String tag, String chatId, String chatType, boolean missedCall, String photoUrl) {
         if (missedCall) {
             // "Missed call" replaces the ringing notification: the full-screen call screen must go too.
             synchronized (RINGING) {
@@ -453,19 +453,59 @@ final class NotificationHelper {
         }
 
         PendingIntent tap = openIntent(ctx, id, "open", chatId, chatType, "", false);
+
+        // WhatsApp-style: the sender's round photo, their messages as a conversation, and Reply / Mark as read / Mute.
+        Bitmap avatar = null;
+        try {
+            Bitmap raw = loadPhoto(ctx, photoUrl, "msg_" + (chatId.isEmpty() ? title : chatId), 192);
+            if (raw != null) avatar = roundAvatar(raw, 192);
+        } catch (Exception ignored) {
+        }
+        Person.Builder pb = new Person.Builder().setName(title == null || title.isEmpty() ? "Talkies" : title).setKey(key);
+        if (avatar != null) pb.setIcon(IconCompat.createWithBitmap(avatar));
+        Person sender = pb.build();
+        NotificationCompat.MessagingStyle conv = new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build());
+        synchronized (RECENT) {
+            ArrayDeque<String> q = RECENT.get(key);
+            if (q != null) for (String line : q) conv.addMessage(line, System.currentTimeMillis(), sender);
+        }
+        boolean canAct = !missedCall && !chatId.isEmpty();
+
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, missedCall ? CH_MISSED : CH_MESSAGES)
                 .setSmallIcon(R.drawable.ic_stat_talkies)
                 .setColor(Color.parseColor("#00A884"))
                 .setContentTitle(title)
                 .setContentText(text)
-                .setStyle(style)
+                .setStyle(missedCall ? style : conv)
                 .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(false)
                 .setContentIntent(tap);
+        if (avatar != null) b.setLargeIcon(avatar);
+        if (canAct) {
+            androidx.core.app.RemoteInput remote = new androidx.core.app.RemoteInput.Builder(MessageActionReceiver.KEY_REPLY).setLabel("Reply").build();
+            b.addAction(new NotificationCompat.Action.Builder(0, "Reply", actionIntent(ctx, id, id, MessageActionReceiver.ACTION_REPLY, chatId, chatType, key, true))
+                    .addRemoteInput(remote).setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY).setShowsUserInterface(false).build());
+            b.addAction(new NotificationCompat.Action.Builder(0, "Mark as read", actionIntent(ctx, id + 1, id, MessageActionReceiver.ACTION_READ, chatId, chatType, key, false))
+                    .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ).setShowsUserInterface(false).build());
+            b.addAction(new NotificationCompat.Action.Builder(0, "Mute", actionIntent(ctx, id + 2, id, MessageActionReceiver.ACTION_MUTE, chatId, chatType, key, false))
+                    .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MUTE).setShowsUserInterface(false).build());
+        }
         notifySafe(ctx, id, b.build());
+    }
+
+    private static PendingIntent actionIntent(Context ctx, int requestCode, int notifId, String action, String chatId, String chatType, String key, boolean mutable) {
+        Intent i = new Intent(ctx, MessageActionReceiver.class);
+        i.setAction(action);
+        i.setData(Uri.parse("talkies://act/" + requestCode + "/" + action));
+        i.putExtra("chatId", chatId);
+        i.putExtra("chatType", chatType == null || chatType.isEmpty() ? "direct" : chatType);
+        i.putExtra("key", key);
+        i.putExtra("notifId", notifId);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT | (mutable ? (Build.VERSION.SDK_INT >= 31 ? PendingIntent.FLAG_MUTABLE : 0) : PendingIntent.FLAG_IMMUTABLE);
+        return PendingIntent.getBroadcast(ctx, requestCode, i, flags);
     }
 
     static void clearRecent(String key) {

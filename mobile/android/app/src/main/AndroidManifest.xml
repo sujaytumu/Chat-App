@@ -49,6 +49,10 @@
             android:name=".CallActionReceiver"
             android:exported="false" />
 
+        <receiver
+            android:name=".MessageActionReceiver"
+            android:exported="false" />
+
         <!-- Owns the screen capture while sharing (Android requires a foreground service) -->
         <service
             android:name=".ScreenShareService"
