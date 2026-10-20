@@ -16,6 +16,7 @@ import {
   Smile,
   Camera,
 } from "lucide-react";
+import { isDesktopNow } from "./ContextMenu";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
@@ -819,7 +820,7 @@ const MessageInput = () => {
 
       <form
         onSubmit={handleSendMessage}
-        className={`flex items-end gap-1 ${isRecording ? "" : "bg-wa-surface rounded-[28px] px-1.5 py-1 shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:gap-2 lg:items-center"}`}
+        className={`flex items-end gap-2 ${isRecording ? "" : "lg:gap-2 lg:items-center"}`}
       >
         {isRecording ? (
           <div className="flex-1 flex items-center gap-3 bg-wa-surface rounded-full px-4 py-2 min-h-[48px]">
@@ -836,8 +837,8 @@ const MessageInput = () => {
             <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
           </div>
         ) : (
-          <div className="relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5">
-            <div className="relative lg:order-2" ref={attachMenuRef}>
+          <div className="relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5 bg-wa-surface rounded-[26px] px-1.5 py-1 min-h-[52px] shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:min-h-0">
+            <div className="relative order-3 lg:order-2" ref={attachMenuRef}>
               {showAttachMenu && (
                 <div className="absolute bottom-full left-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
                   <button
@@ -953,7 +954,7 @@ const MessageInput = () => {
               </button>
             </div>
 
-            <div className="relative lg:order-1">
+            <div className="relative order-1 lg:order-1">
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker((s) => !s)}
@@ -998,11 +999,11 @@ const MessageInput = () => {
               onPaste={handlePaste}
               onSelect={checkSel}
               onBlur={() => setTimeout(() => setHasSel(false), 150)}
-              placeholder="Type a message"
+              placeholder={isDesktopNow() ? "Type a message" : "Message"}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
-              className="wa-input-field flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[13.5px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none lg:order-3 lg:rounded-lg lg:px-3.5 lg:py-[9px] lg:min-h-[42px] lg:text-[14.5px]"
+              className="wa-input-field flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[13.5px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none order-2 text-[16px] lg:text-[14.5px] lg:order-3 lg:rounded-lg lg:px-3.5 lg:py-[9px] lg:min-h-[42px] lg:text-[14.5px]"
               style={{ overflow: "hidden" }}
             />
 
@@ -1010,7 +1011,7 @@ const MessageInput = () => {
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="lg:hidden size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                className="lg:hidden order-4 size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
                 disabled={isProcessingAttachment}
                 aria-label="Take a photo"
                 title="Camera"
@@ -1024,7 +1025,7 @@ const MessageInput = () => {
         {!isRecording && (text.trim() || hasAttachment) ? (
           <button
             type="submit"
-            className="size-10 mb-0 rounded-full flex items-center justify-center bg-[#00A884] hover:bg-[#02906f] active:scale-95 text-white shrink-0 transition-all lg:order-4 lg:!bg-transparent lg:!bg-none lg:!shadow-none lg:hover:!bg-white/10 lg:!text-[#00A884]"
+            className="size-[52px] lg:size-10 mb-0 rounded-full flex items-center justify-center bg-[#21C063] hover:bg-[#1daa56] active:scale-95 text-[#0B141A] shrink-0 transition-all shadow-md lg:shadow-none lg:order-4 lg:!bg-transparent lg:!bg-none lg:!shadow-none lg:hover:!bg-white/10 lg:!text-[#00A884]"
             disabled={isSending}
             onPointerDown={sendPressStart}
             onPointerUp={sendPressEnd}
@@ -1050,7 +1051,7 @@ const MessageInput = () => {
           <button
             type="button"
             onClick={isRecording ? () => stopRecording(false) : startRecording}
-            className={`size-10 lg:order-4 rounded-full flex items-center justify-center active:scale-95 shrink-0 transition-all ${isRecording ? "bg-[#00A884] hover:bg-[#02906f] text-white" : "text-wa-muted hover:bg-white/10"}`}
+            className={`size-[52px] lg:size-10 lg:order-4 rounded-full flex items-center justify-center active:scale-95 shrink-0 transition-all ${isRecording ? "bg-[#00A884] hover:bg-[#02906f] text-white" : "bg-[#21C063] text-[#0B141A] shadow-md lg:shadow-none lg:bg-transparent lg:text-wa-muted lg:hover:bg-white/10"}`}
             disabled={isSending}
             aria-label={isRecording ? "Send voice message" : "Record voice message"}
             title={isRecording ? "Send voice message" : "Record voice message"}
