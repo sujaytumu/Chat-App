@@ -9,14 +9,24 @@ export const AUDIENCE_KEY = "status-audience";
 export const readAudience = () => {
   try {
     const a = JSON.parse(localStorage.getItem(AUDIENCE_KEY) || "null");
-    if (a && ["all", "except", "only"].includes(a.mode)) return { mode: a.mode, users: Array.isArray(a.users) ? a.users : [] };
+    if (a && ["all", "except", "only"].includes(a.mode)) return { mode: a.mode, users: Array.isArray(a.users) ? a.users : [], ...(a.close && a.mode === "only" ? { close: true } : {}) };
   } catch {
     /* private mode */
   }
   return { mode: "all", users: [] };
 };
+// Close friends: a list kept on this device, like Instagram's. Statuses shared with it carry a green star.
+const CF_KEY = "status-close-friends";
+const readClose = () => {
+  try {
+    const l = JSON.parse(localStorage.getItem(CF_KEY) || "[]");
+    return Array.isArray(l) ? l : [];
+  } catch {
+    return [];
+  }
+};
 export const audienceLabel = (a) =>
-  a.mode === "all" ? "Contacts" : a.mode === "except" ? `Contacts except ${a.users.length}` : `Only ${a.users.length}`;
+  a.close ? "Close friends" : a.mode === "all" ? "Contacts" : a.mode === "except" ? `Contacts except ${a.users.length}` : `Only ${a.users.length}`;
 
 const Radio = ({ on }) => (
   <span className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${on ? "border-[#21C063]" : "border-[#8E9AA2]"}`}>
@@ -36,6 +46,7 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
 
   const choose = (m) => {
     setMode(m);
+    if (m === "close") setPicked(new Set(readClose()));
     if (m === "all") onSave({ mode: "all", users: [] });
     else setPicking(true);
   };
@@ -46,7 +57,15 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
       return n;
     });
   const done = () => {
-    if (mode === "only" && picked.size === 0) return;
+    if ((mode === "only" || mode === "close") && picked.size === 0) return;
+    if (mode === "close") {
+      try {
+        localStorage.setItem(CF_KEY, JSON.stringify([...picked]));
+      } catch {
+        /* private mode */
+      }
+      return onSave({ mode: "only", users: [...picked], close: true });
+    }
     onSave({ mode, users: [...picked] });
   };
 
@@ -54,7 +73,7 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
     return (
       <div className="absolute inset-0 z-[70] bg-[#0B141A] flex flex-col text-white">
         <div className="px-4 pt-4 pb-2">
-          <p className="text-[18px]">{mode === "except" ? "Hide status from…" : "Share status with…"}</p>
+          <p className="text-[18px]">{mode === "except" ? "Hide status from…" : mode === "close" ? "Close friends" : "Share status with…"}</p>
           <p className="text-[12.5px] text-[#8E9AA2]">{picked.size} selected</p>
         </div>
         <div className="mx-3.5 mb-2 flex items-center gap-3 h-[42px] rounded-full bg-[#171C20] px-4">
@@ -83,7 +102,7 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
           </button>
           <button
             onClick={done}
-            disabled={mode === "only" && picked.size === 0}
+            disabled={(mode === "only" || mode === "close") && picked.size === 0}
             aria-label="Done"
             className="size-12 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center disabled:opacity-50 active:scale-95"
           >
@@ -96,6 +115,7 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
 
   const rows = [
     ["all", "My contacts"],
+    ["close", "Close friends ★"],
     ["except", "My contacts except…"],
     ["only", "Only share with…"],
   ];
@@ -106,9 +126,9 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
         <p className="px-5 pb-2 text-[12.5px] text-[#8E9AA2]">Who can see my status updates</p>
         {rows.map(([m, label]) => (
           <button key={m} onClick={() => choose(m)} className="w-full flex items-center gap-4 px-5 py-3.5 text-left active:bg-white/5">
-            <Radio on={value.mode === m} />
+            <Radio on={m === "close" ? !!value.close : m === "only" ? value.mode === "only" && !value.close : value.mode === m} />
             <span className="flex-1 text-[16px]">{label}</span>
-            {m !== "all" && value.mode === m && <span className="text-[12.5px] text-[#8E9AA2]">{value.users.length} selected</span>}
+            {m !== "all" && (m === "close" ? !!value.close : value.mode === m && !value.close) && <span className="text-[12.5px] text-[#8E9AA2]">{value.users.length} selected</span>}
           </button>
         ))}
       </div>
