@@ -2,7 +2,8 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
-import { X, Eye, Loader2, ChevronUp, Heart, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { X, Eye, Loader2, ChevronUp, ChevronRight, Heart, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { SongBars, SongSheet } from "./StatusSong";
 import { MoreVertical } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -34,7 +35,7 @@ const ago = (iso) => {
   return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${t}`;
 };
 
-// highlight: when set, this plays a saved highlight (read-only: no replies, hearts or view counts).
+// highlight: when set, this plays a saved highlight. It works like a live status: viewers can reply and heart it, the owner sees views and hearts.
 // onAddToHighlight(status): my own live status -> "save to highlights". onEditHighlight(highlight): rename / manage.
 const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = null, onAddToHighlight, onEditHighlight, hold = false }) => {
   const [list, setList] = useState(initial);
@@ -54,6 +55,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const advancedRef = useRef(null); // status id already moved on from (end / trim end can both fire)
   const songEl = useRef(null);
   const [songBlocked, setSongBlocked] = useState(false);
+  const [showSong, setShowSong] = useState(false); // the song sheet (tap the song line)
+  const [songMuted, setSongMuted] = useState(false);
   const swipeStart = useRef(null);
   const swipedAt = useRef(0);
   const replyInput = useRef(null);
@@ -65,7 +68,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
 
   // My own update: new views and hearts show up live (like WhatsApp / Instagram) instead of only after a reload.
   useEffect(() => {
-    if (!isOwn || highlight) return undefined;
+    if (!isOwn) return undefined;
     const socket = useAuthStore.getState().socket;
     if (!socket) return undefined;
     const onViewed = ({ statusId, user: who, at }) =>
@@ -90,11 +93,11 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
       socket.off("statusViewed", onViewed);
       socket.off("statusLiked", onLiked);
     };
-  }, [isOwn, highlight]);
+  }, [isOwn]);
 
   // Mark as seen when someone else's update comes up.
   useEffect(() => {
-    if (!isOwn && !highlight && current) axiosInstance.put(`/status/${current._id}/view`).catch(() => {});
+    if (!isOwn && current) axiosInstance.put(highlight ? `/highlights/${highlight._id}/items/${current._id}/view` : `/status/${current._id}/view`).catch(() => {});
     setProgress(0);
     setMediaMs(0);
     setVideoReady(false);
@@ -124,7 +127,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
 
   // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
-  const stop = paused || showViewers || confirmDelete || replyFocus || hold || menuOpen; // hold: a sheet on top (save to highlights) keeps it still
+  const stop = paused || showViewers || showSong || confirmDelete || replyFocus || hold || menuOpen; // hold: a sheet on top (save to highlights) keeps it still
   const last = useRef(0);
   useEffect(() => {
     if (!current || stop) return;
@@ -196,7 +199,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
     setList((l) => l.map((s) => (s._id === id ? { ...s, liked: next } : s)));
     if (next) setHeartPop((n) => n + 1);
     try {
-      await axiosInstance.put(`/status/${id}/like`, { liked: next });
+      await axiosInstance.put(highlight ? `/highlights/${highlight._id}/items/${id}/like` : `/status/${id}/like`, { liked: next });
     } catch {
       setList((l) => l.map((s) => (s._id === id ? { ...s, liked: !next } : s)));
       toast.error("Couldn't update your like");
@@ -214,7 +217,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
     }
     setSendingReply(true);
     try {
-      await axiosInstance.post(`/messages/send/${user._id}`, { text: t, statusId: current._id });
+      await axiosInstance.post(`/messages/send/${user._id}`, highlight ? { text: t, highlightId: highlight._id, itemId: current._id } : { text: t, statusId: current._id });
       setReplyText("");
       setReplyFocus(false);
       document.activeElement?.blur?.();
@@ -273,16 +276,25 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
         <img src={optimizeImage(user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt={user.fullName} className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="text-white text-[13.5px] font-medium truncate">{highlight ? highlight.title : isOwn ? "My status" : user.fullName}</p>
-          <p className="text-white/80 text-[11px] truncate">
-            {ago(current.createdAt)}
-            {current.closeFriends && <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#21C063] text-[#0B141A] px-2 py-px text-[10px] font-semibold">★ Close friends</span>}
+          <p className="flex items-center gap-1.5 text-white/85 text-[12px] min-w-0">
+            <span className="shrink-0">{ago(current.createdAt)}</span>
+            {current.song?.url && (
+              <>
+                <span className="shrink-0">•</span>
+                <button
+                  type="button"
+                  onClick={() => setShowSong(true)}
+                  className="flex items-center gap-1.5 min-w-0 text-white text-[13.5px] leading-5 active:opacity-70"
+                  aria-label="Song details"
+                >
+                  <SongBars playing={!stop && !songBlocked && !songMuted} className="shrink-0" />
+                  <span className="truncate">{current.song.name || "Song"}</span>
+                  <ChevronRight size={16} className="shrink-0" />
+                </button>
+              </>
+            )}
+            {current.closeFriends && <span className="ml-1 shrink-0 inline-flex items-center gap-1 rounded-full bg-[#21C063] text-[#0B141A] px-2 py-px text-[10px] font-semibold">★ Close friends</span>}
           </p>
-          {current.song?.url && (
-            <p className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/35 pl-2 pr-3 py-0.5 text-white text-[11.5px] leading-5 min-w-0">
-              <Music size={13} className="shrink-0" />
-              <span className="truncate">{current.song.name || "Song"}</span>
-            </p>
-          )}
           {current.location?.name && (
             <a
               href={
@@ -347,9 +359,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           swipeStart.current = null;
           if (st && st.y - e.clientY > 70 && Math.abs(e.clientX - st.x) < 90) {
             swipedAt.current = Date.now();
-            if (highlight) {
-              /* highlights have no viewers list or reply box */
-            } else if (isOwn) setShowViewers(true);
+            if (isOwn) setShowViewers(true);
             else replyInput.current?.focus();
           }
           const a = songEl.current;
@@ -437,7 +447,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </a>
           </div>
         )}
-        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} autoPlay loop preload="auto" onPlaying={() => setSongBlocked(false)} onCanPlay={(e) => { if (!stop && e.currentTarget.paused) e.currentTarget.play().catch((err) => { if (err?.name === "NotAllowedError") setSongBlocked(true); }); }} />}
+        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} muted={songMuted} autoPlay loop preload="auto" onPlaying={() => setSongBlocked(false)} onCanPlay={(e) => { if (!stop && e.currentTarget.paused) e.currentTarget.play().catch((err) => { if (err?.name === "NotAllowedError") setSongBlocked(true); }); }} />}
         {current.song?.url && songBlocked && (
           <button
             onClick={(e) => { e.stopPropagation(); songEl.current?.play?.().then(() => setSongBlocked(false)).catch(() => {}); }}
@@ -450,7 +460,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
 
         {/* Caption */}
         {current.caption && (
-          <p className={`absolute inset-x-0 ${highlight ? "bottom-[calc(24px+env(safe-area-inset-bottom))]" : isOwn ? "bottom-16" : "bottom-[calc(64px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
+          <p className={`absolute inset-x-0 ${isOwn ? "bottom-24" : "bottom-[calc(64px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
             {linkify(current.caption)}
           </p>
         )}
@@ -459,7 +469,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
       </div>
 
       {/* Viewer: reply to this status (arrives in the chat with its owner) */}
-      {!isOwn && !highlight && (
+      {!isOwn && (
         <form
           onSubmit={sendReply}
           className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto flex items-center gap-2 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent"
@@ -519,22 +529,33 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
         </span>
       )}
 
-      {/* Owner: who has seen it */}
-      {isOwn && !highlight && (
-        <button
-          onClick={() => setShowViewers(true)}
-          className="absolute bottom-0 inset-x-0 z-20 flex flex-col items-center gap-0.5 pt-6 pb-[calc(14px+env(safe-area-inset-bottom))] text-white bg-gradient-to-t from-black/70 to-transparent"
-        >
-          <ChevronUp size={20} className="text-white/80" />
-          <span className="flex items-center gap-1.5 text-[13px]">
-            <Eye size={18} /> {viewCount}
-            {likeCount > 0 && (
-              <span className="flex items-center gap-1 ml-3 text-[#FF8FA3]">
-                <Heart size={16} fill="currentColor" /> {likeCount}
-              </span>
-            )}
-          </span>
-        </button>
+      {/* Owner: views and hearts, like WhatsApp's pill at the bottom-left */}
+      {isOwn && (
+        <div className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto pt-8 pb-[calc(14px+env(safe-area-inset-bottom))] px-3 bg-gradient-to-t from-black/75 to-transparent">
+          <button onClick={() => setShowViewers(true)} className="mx-auto flex flex-col items-center text-white/85" aria-label="Who viewed this">
+            <ChevronUp size={20} />
+          </button>
+          <button
+            onClick={() => setShowViewers(true)}
+            className="mt-1 h-12 pl-4 pr-5 rounded-full bg-[#1F2C34]/90 backdrop-blur flex items-center gap-2 text-white text-[14.5px] active:bg-[#2A3942]"
+            aria-label={`${viewCount} views, ${likeCount} likes`}
+          >
+            <Eye size={22} />
+            <span>{viewCount}</span>
+            <Heart size={20} className={likeCount > 0 ? "ml-2 text-[#FF3B5C]" : "ml-2 text-white/80"} fill={likeCount > 0 ? "currentColor" : "none"} />
+            <span>{likeCount}</span>
+          </button>
+        </div>
+      )}
+
+      {showSong && current.song?.url && (
+        <SongSheet
+          song={current.song}
+          playing={!songBlocked}
+          muted={songMuted}
+          onToggleMute={() => setSongMuted((m) => !m)}
+          onClose={() => setShowSong(false)}
+        />
       )}
 
       {/* Viewers sheet */}

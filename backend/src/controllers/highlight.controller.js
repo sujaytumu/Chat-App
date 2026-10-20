@@ -2,6 +2,8 @@ import { visibleUserIds } from "../lib/visibility.js";
 import mongoose from "mongoose";
 import Highlight from "../models/highlight.model.js";
 import Status from "../models/status.model.js";
+import { io, getReceiverSocketId } from "../lib/socket.js";
+import { sendPushToUser } from "../lib/webPush.js";
 
 const MAX_HIGHLIGHTS = 20;
 const MAX_ITEMS = 50;
@@ -30,6 +32,10 @@ const toItem = (s) => ({
   font: s.font,
   audience: s.audience?.mode ? { mode: s.audience.mode, users: s.audience.users || [] } : undefined,
   postedAt: s.createdAt || new Date(),
+  // keep the views and hearts the status already had
+  viewedBy: s.viewedBy || [],
+  views: (s.views || []).filter((v) => v.user).map((v) => ({ user: v.user, at: v.at })),
+  likes: (s.likes || []).filter((l) => l.user).map((l) => ({ user: l.user, at: l.at })),
 });
 
 const ids = (arr) => [...new Set((Array.isArray(arr) ? arr : []).map(String))].filter((id) => mongoose.isValidObjectId(id));
@@ -43,7 +49,14 @@ const present = (h, viewerId) => {
     .map((it) => {
       const o = it.toObject ? it.toObject() : { ...it };
       o.createdAt = o.postedAt;
-      if (!mine) delete o.audience; // nobody else learns who was left out
+      if (!mine) {
+        delete o.audience; // nobody else learns who was left out
+        // other people only learn whether THEY hearted it
+        o.liked = (o.likes || []).some((l) => String(l.user?._id || l.user) === String(viewerId));
+        delete o.likes;
+        delete o.views;
+        delete o.viewedBy;
+      }
       return o;
     });
   return { _id: h._id, title: h.title, cover: h.cover || "", updatedAt: h.updatedAt, user: h.userId?._id ? h.userId : undefined, items };
@@ -56,7 +69,9 @@ export const getUserHighlights = async (req, res) => {
     if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ error: "Invalid user" });
     res.set("Cache-Control", "no-store");
     const mine = String(userId) === String(req.user._id);
-    const list = await Highlight.find({ userId }).sort({ createdAt: 1 });
+    let q = Highlight.find({ userId }).sort({ createdAt: 1 });
+    if (mine) q = q.populate("items.views.user items.likes.user", "fullName profilePic"); // the owner sees who viewed / hearted
+    const list = await q;
     const out = list.map((h) => present(h, req.user._id)).filter((h) => mine || h.items.length > 0);
     res.status(200).json(out);
   } catch (error) {
@@ -164,6 +179,89 @@ export const deleteHighlight = async (req, res) => {
     res.status(200).json({ message: "Highlight deleted" });
   } catch (error) {
     console.log("Error in deleteHighlight controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// A highlight item the viewer is allowed to open (owner or in the item's audience).
+const findItem = async (req) => {
+  const { id, itemId } = req.params;
+  if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(itemId)) return null;
+  const h = await Highlight.findById(id).select("userId items._id items.audience");
+  const item = h?.items.id(itemId);
+  if (!h || !item) return null;
+  if (String(h.userId) !== String(req.user._id) && !canSee(item, req.user._id)) return null;
+  return { h, item };
+};
+
+// Someone opened an item of a highlight: count it once and tell the owner right away.
+export const markHighlightItemViewed = async (req, res) => {
+  try {
+    const found = await findItem(req);
+    if (!found) return res.status(404).json({ error: "Highlight not found" });
+    const myId = req.user._id;
+    if (String(found.h.userId) !== String(myId)) {
+      const r = await Highlight.updateOne(
+        { _id: found.h._id, items: { $elemMatch: { _id: req.params.itemId, viewedBy: { $ne: myId } } } },
+        { $push: { "items.$.viewedBy": myId, "items.$.views": { user: myId, at: new Date() } } }
+      );
+      if (r.modifiedCount > 0) {
+        const socketId = getReceiverSocketId(String(found.h.userId));
+        if (socketId) {
+          io.to(socketId).emit("statusViewed", {
+            statusId: req.params.itemId,
+            user: { _id: String(myId), fullName: req.user.fullName, profilePic: req.user.profilePic },
+            at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+    res.status(200).json({ message: "Marked as viewed" });
+  } catch (error) {
+    console.log("Error in markHighlightItemViewed controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Heart / un-heart a highlight item. The owner is told when it is hearted.
+export const likeHighlightItem = async (req, res) => {
+  try {
+    const found = await findItem(req);
+    if (!found) return res.status(404).json({ error: "Highlight not found" });
+    const myId = req.user._id;
+    if (String(found.h.userId) === String(myId)) return res.status(400).json({ error: "You can't like your own highlight" });
+    const liked = req.body?.liked !== false;
+    if (liked) {
+      const r = await Highlight.updateOne(
+        { _id: found.h._id, items: { $elemMatch: { _id: req.params.itemId, "likes.user": { $ne: myId } } } },
+        { $push: { "items.$.likes": { user: myId, at: new Date() } } }
+      );
+      if (r.modifiedCount > 0) {
+        const ownerId = String(found.h.userId);
+        const socketId = getReceiverSocketId(ownerId);
+        if (socketId) {
+          io.to(socketId).emit("statusLiked", {
+            statusId: req.params.itemId,
+            user: { _id: String(myId), fullName: req.user.fullName, profilePic: req.user.profilePic },
+          });
+        }
+        sendPushToUser(ownerId, {
+          title: "Talkies",
+          body: `❤️ ${req.user.fullName} liked your highlight`,
+          icon: req.user.profilePic || "/icon-v2-192.png",
+          tag: `highlight-like-${req.params.itemId}`,
+          data: { url: "/status" },
+        });
+      }
+    } else {
+      await Highlight.updateOne(
+        { _id: found.h._id, "items._id": req.params.itemId },
+        { $pull: { "items.$.likes": { user: myId } } }
+      );
+    }
+    res.status(200).json({ liked });
+  } catch (error) {
+    console.log("Error in likeHighlightItem controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

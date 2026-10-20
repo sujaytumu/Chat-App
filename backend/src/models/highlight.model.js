@@ -20,6 +20,10 @@ const itemSchema = new mongoose.Schema({
     users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },
   postedAt: { type: Date, required: true }, // when the status was originally posted
+  // Views and hearts on the highlight itself (the original status' ones are gone with it)
+  viewedBy: [{ type: mongoose.Schema.Types.ObjectId }],
+  views: [{ user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, at: Date, _id: false }],
+  likes: [{ user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, at: Date, _id: false }],
 });
 
 const highlightSchema = new mongoose.Schema(
