@@ -136,7 +136,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
       if (stop) el.pause();
       else {
         const pr = el.play?.();
-        if (pr && pr.catch) pr.catch(() => { if (el === songEl.current) setSongBlocked(true); });
+        // Only a genuine autoplay block needs the "tap" prompt. An interrupted / not-yet-loaded play
+        // is retried by the audio's own canplay handler below.
+        if (pr && pr.catch) pr.catch((err) => { if (el === songEl.current && err?.name === "NotAllowedError") setSongBlocked(true); });
       }
     }
   }, [stop, current?._id, mediaMs]);
@@ -405,7 +407,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </a>
           </div>
         )}
-        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} autoPlay loop preload="auto" onPlaying={() => setSongBlocked(false)} />}
+        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} autoPlay loop preload="auto" onPlaying={() => setSongBlocked(false)} onCanPlay={(e) => { if (!stop && e.currentTarget.paused) e.currentTarget.play().catch((err) => { if (err?.name === "NotAllowedError") setSongBlocked(true); }); }} />}
         {current.song?.url && songBlocked && (
           <button
             onClick={(e) => { e.stopPropagation(); songEl.current?.play?.().then(() => setSongBlocked(false)).catch(() => {}); }}
