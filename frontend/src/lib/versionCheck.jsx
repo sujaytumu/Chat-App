@@ -1,25 +1,11 @@
-import toast from "react-hot-toast";
+import { useSyncExternalStore, useState } from "react";
 import { useCallStore } from "../store/useCallStore";
 
-// Keeps every device on the newest build.
-//
-// The app shell is a single hashed entry script (assets/index-<hash>.js). If a
-// browser/phone/installed app is still running (or was handed) an older copy,
-// the UI looks "old" until someone reloads. This compares the entry script this
-// page is running with the one the server is serving *right now* (fetched with
-// no-store) and moves to the new one:
-//   - just opened the app (first seconds)  -> reload straight away, silently
-//   - been open a while                    -> ask first, and apply when the
-//                                             tab is hidden and no call is on
+// Keeps every device on the newest build. When a newer build exists, ONE big popup asks the person to
+// update (never during a call); otherwise the app just runs normally. Nothing reloads by itself.
 
 const ENTRY_RE = /assets\/index-[A-Za-z0-9_-]+\.js/;
 const RELOAD_LOG_KEY = "talkies-auto-reloads";
-// "Not touched yet": until the person taps / types / scrolls, switching builds is invisible,
-// so it is done straight away however long the (possibly cold) server took to answer.
-let touched = false;
-["pointerdown", "keydown", "touchstart", "wheel"].forEach((ev) =>
-  window.addEventListener(ev, () => (touched = true), { once: true, passive: true, capture: true })
-);
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 
 function currentEntry() {
@@ -45,48 +31,30 @@ async function latestEntry() {
   return entry;
 }
 
-// Guard against a reload loop (e.g. a stale replica still serving the old
-// HTML): at most 2 automatic reloads in 10 minutes.
-function canAutoReload() {
-  try {
-    const now = Date.now();
-    const log = JSON.parse(sessionStorage.getItem(RELOAD_LOG_KEY) || "[]").filter((t) => now - t < 10 * 60 * 1000);
-    if (log.length >= 2) return false;
-    log.push(now);
-    sessionStorage.setItem(RELOAD_LOG_KEY, JSON.stringify(log));
-    return true;
-  } catch {
-    return true;
-  }
-}
-
 const inCall = () => useCallStore.getState().callStatus !== "idle";
 
-function reloadNow() {
-  if (canAutoReload()) window.location.reload();
-}
-
 let updateReady = false;
+const listeners = new Set();
+const setReady = (v) => {
+  if (updateReady === v) return;
+  updateReady = v;
+  listeners.forEach((l) => l());
+};
 
-function offerUpdate() {
-  updateReady = true;
-  toast(
-    (t) => (
-      <span className="flex items-center gap-3">
-        New version available
-        <button
-          className="px-3 py-1 rounded-full bg-white text-[#0B6E5F] text-sm font-semibold shadow-sm"
-          onClick={() => {
-            toast.dismiss(t.id);
-            window.location.reload();
-          }}
-        >
-          Update
-        </button>
-      </span>
-    ),
-    { id: "app-update", duration: Infinity, icon: "⬆️" }
-  );
+// Refresh the saved app copy first, so the reload opens the NEW build and never a half-old one.
+export async function applyUpdate() {
+  try {
+    await latestEntry();
+  } catch {
+    /* offline or slow — the reload below still tries */
+  }
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    await reg?.update();
+  } catch {
+    /* ignore */
+  }
+  window.location.reload();
 }
 
 async function check() {
@@ -99,31 +67,18 @@ async function check() {
     return; // offline
   }
   if (!latest || latest === mine) return;
-
-  // Also refresh the service worker so notifications use the new code.
   navigator.serviceWorker?.getRegistration().then((reg) => reg?.update()).catch(() => {});
-
-  if (!touched && !inCall()) {
-    reloadNow();
-  } else if (!updateReady) {
-    offerUpdate();
-  }
+  setReady(true);
 }
 
 export function startVersionWatcher() {
   check();
-
   const onVisible = () => {
-    if (document.visibilityState === "visible") {
-      check();
-    } else if (updateReady && !inCall()) {
-      reloadNow(); // they've left the tab — a safe moment to switch builds
-    }
+    if (document.visibilityState === "visible") check();
   };
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("online", check);
   const id = setInterval(check, CHECK_EVERY_MS);
-
   return () => {
     document.removeEventListener("visibilitychange", onVisible);
     window.removeEventListener("online", check);
@@ -131,14 +86,43 @@ export function startVersionWatcher() {
   };
 }
 
-// Settings → Help: check right now and move to the newest build if there is one.
+// The big "update available" popup. Shown only when a newer build exists and no call is on.
+export function UpdatePopup() {
+  const ready = useSyncExternalStore((cb) => (listeners.add(cb), () => listeners.delete(cb)), () => updateReady);
+  const busyCall = useCallStore((s) => s.callStatus !== "idle");
+  const [updating, setUpdating] = useState(false);
+  if (!ready || (busyCall && !updating)) return null;
+  return (
+    <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/70">
+      <div className="w-full max-w-sm rounded-3xl bg-wa-pop text-wa-text p-7 text-center shadow-2xl">
+        <div className="mx-auto size-20 rounded-[22px] flex items-center justify-center text-4xl" style={{ background: "linear-gradient(160deg,#0A7A67,#25D366)" }}>
+          ⬆️
+        </div>
+        <h2 className="mt-5 text-[22px] font-semibold">Update available</h2>
+        <p className="mt-2 text-[14.5px] text-wa-muted">A new version of Talkies is ready with the latest features and fixes.</p>
+        <button
+          disabled={updating}
+          onClick={() => {
+            setUpdating(true);
+            applyUpdate();
+          }}
+          className="mt-6 w-full h-12 rounded-full bg-[#25D366] text-[#0b141a] text-[16px] font-semibold disabled:opacity-70"
+        >
+          {updating ? "Updating…" : "Update now"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Settings → Help: check right now and show the update popup if there is a newer build.
 export async function checkForUpdateNow() {
   try {
     const latest = await latestEntry();
     const current = currentEntry();
     if (!latest || !current) return "unknown";
     if (latest === current) return "latest";
-    window.location.reload();
+    setReady(true);
     return "updating";
   } catch {
     return "unknown";
