@@ -21,6 +21,7 @@ import highlightRoutes from "./routes/highlight.route.js";
 import scheduledRoutes from "./routes/scheduled.route.js";
 import broadcastRoutes from "./routes/broadcast.route.js";
 import mediaRoutes from "./routes/media.route.js";
+import playlistRoutes from "./routes/playlist.route.js";
 import { maskJsonMiddleware } from "./lib/privateMedia.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { app, server } from "./lib/socket.js";
@@ -88,6 +89,7 @@ app.use("/api", maskJsonMiddleware); // from here on, chat file addresses never 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/groups", groupRoutes);
+app.use("/api/playlists", playlistRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/calls", callRoutes);
 app.use("/api/status", statusRoutes);
