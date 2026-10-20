@@ -19,6 +19,7 @@ import { rememberMessage } from "../lib/recentMessages.js";
 import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
 import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
+import Reminder from "../models/reminder.model.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
@@ -1479,3 +1480,69 @@ onSocketConnection((socket) => {
     }
   });
 });
+
+
+// ---- Message reminders: "remind me about this" ----
+const previewOf = (m) =>
+  (m.text && m.text.trim().slice(0, 120)) ||
+  (m.image ? "📷 Photo" : m.file?.videoNote ? "🎥 Video message" : m.file ? `📎 ${m.file.name || "File"}` : m.poll ? "📊 Poll" : m.event ? "📅 Event" : "Message");
+
+export const createReminder = async (req, res) => {
+  try {
+    const { messageId } = req.body || {};
+    const remindAt = new Date(req.body?.remindAt);
+    if (!mongoose.isValidObjectId(messageId)) return res.status(400).json({ error: "Invalid message" });
+    const t = remindAt.getTime();
+    if (!Number.isFinite(t) || t < Date.now() + 30_000 || t > Date.now() + 366 * 24 * 3600_000) {
+      return res.status(400).json({ error: "Pick a time between now and a year from now" });
+    }
+    const me = req.user._id;
+    const m = await Message.findById(messageId).select("senderId receiverId groupId text image file poll event deletedFor deletedForEveryone").lean();
+    if (!m || m.deletedForEveryone || (m.deletedFor || []).some((id) => String(id) === String(me))) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+    let chatType = "direct";
+    let chatId;
+    if (m.groupId) {
+      const g = await Group.exists({ _id: m.groupId, members: me });
+      if (!g) return res.status(403).json({ error: "Not allowed" });
+      chatType = "group";
+      chatId = m.groupId;
+    } else {
+      const mine = String(m.senderId) === String(me) || String(m.receiverId) === String(me);
+      if (!mine) return res.status(403).json({ error: "Not allowed" });
+      chatId = String(m.senderId) === String(me) ? m.receiverId : m.senderId;
+    }
+    if ((await Reminder.countDocuments({ userId: me })) >= 50) return res.status(400).json({ error: "You have too many reminders (max 50)" });
+    const reminder = await Reminder.findOneAndUpdate(
+      { userId: me, messageId },
+      { userId: me, messageId, chatType, chatId, preview: previewOf(m), remindAt },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+    res.status(201).json(reminder);
+  } catch (error) {
+    console.log("Error in createReminder controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const listReminders = async (req, res) => {
+  try {
+    const items = await Reminder.find({ userId: req.user._id }).sort({ remindAt: 1 }).limit(50).lean();
+    res.status(200).json(items);
+  } catch (error) {
+    console.log("Error in listReminders controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const deleteReminder = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ error: "Invalid reminder" });
+    await Reminder.deleteOne({ _id: req.params.id, userId: req.user._id });
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in deleteReminder controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

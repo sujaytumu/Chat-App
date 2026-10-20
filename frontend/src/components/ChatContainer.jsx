@@ -34,6 +34,7 @@ import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
 import EventCard from "./EventCard";
 import LiveLocationCard from "./LiveLocationCard";
+import ReminderSheet from "./ReminderSheet";
 import { stopLiveShare } from "./LiveLocationManager";
 import { replyWithPhoto } from "../lib/replyWithPhoto";
 import ContactCard from "./ContactCard";
@@ -113,6 +114,7 @@ const ChatContainer = () => {
   const lp = useRef({ timer: null, fired: false, moved: false });
   const lastTap = useRef({ id: null, t: 0 });
   const [heartFor, setHeartFor] = useState(null);
+  const [reminderFor, setReminderFor] = useState(null);
   // Double-tap a message to ❤️ it.
   const heartMessage = (m) => {
     if (m.deletedForEveryone || useChatStore.getState().selectedMsgIds.length) return;
@@ -515,6 +517,7 @@ const ChatContainer = () => {
                 ? () => setEditingMessage(message)
                 : undefined,
             onTranslate: hasText ? () => translateAndToast(message.text) : undefined,
+            onRemind: !message.deletedForEveryone ? () => setReminderFor(message) : undefined,
           };
 
           return (
@@ -898,6 +901,7 @@ const ChatContainer = () => {
           onClose={() => setCtxMenu(null)}
         />
       )}
+      {reminderFor && <ReminderSheet message={reminderFor} onClose={() => setReminderFor(null)} />}
       {infoMessage && <MessageInfoModal
           message={infoMessage}
           members={isGroup ? data.members : undefined}

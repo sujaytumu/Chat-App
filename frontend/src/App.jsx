@@ -15,6 +15,7 @@ import GroupCallManager from "./components/GroupCallManager";
 import CallKeepAlive from "./components/CallKeepAlive";
 import LiveLocationManager from "./components/LiveLocationManager";
 import ProfileLinkHandler, { rememberProfileLink } from "./components/ProfileLinkHandler";
+import ReminderListener from "./components/ReminderListener";
 import BackgroundCallSetup from "./components/BackgroundCallSetup";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
@@ -209,6 +210,7 @@ const App = () => {
       <UpdatePopup />
       {authUser && <CallKeepAlive />}
       {authUser && <ProfileLinkHandler />}
+      {authUser && <ReminderListener />}
       {authUser && (
         <ErrorBoundary silent>
           <LiveLocationManager />
