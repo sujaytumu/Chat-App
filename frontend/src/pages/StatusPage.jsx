@@ -276,7 +276,7 @@ const StatusPage = () => {
               <p className="text-center text-wa-muted py-10 text-sm">No status updates yet</p>
             )}
 
-            <p className="flex items-center justify-center gap-1.5 px-6 py-6 text-[11.5px] text-wa-muted text-center border-t border-white/10 mt-4">
+            <p className="flex items-center justify-center gap-1.5 px-6 pt-6 pb-40 text-[11.5px] text-wa-muted text-center border-t border-white/10 mt-4">
               <Lock size={13} className="shrink-0" /> Your status updates are{" "}
               <span className="text-[#00A884]">end-to-end encrypted</span>
             </p>
