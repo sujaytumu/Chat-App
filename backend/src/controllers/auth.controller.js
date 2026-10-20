@@ -418,3 +418,73 @@ export const endSession = async (req, res) => {
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
+// ---- @username: find people without an email, share a profile link / QR ----
+const USERNAME_RE = /^[a-z0-9](?:[a-z0-9._]{1,22})[a-z0-9]$/; // 3-24 characters, starts and ends with a letter or digit
+const RESERVED = new Set(["admin", "talkies", "support", "help", "system", "official", "root", "me", "you", "null", "undefined"]);
+
+const checkName = (raw) => {
+  if (typeof raw !== "string") return { error: "Invalid username" };
+  const name = raw.trim().replace(/^@/, "").toLowerCase();
+  if (!USERNAME_RE.test(name) || name.includes("..") || name.includes("__") || name.includes("._") || name.includes("_.")) {
+    return { error: "Use 3-24 letters, numbers, . or _ (start and end with a letter or number)" };
+  }
+  if (RESERVED.has(name)) return { error: "That username isn't available" };
+  return { name };
+};
+
+// GET /auth/username/check?u=name  ->  { available, error? }
+export const checkUsername = async (req, res) => {
+  try {
+    const { name, error } = checkName(req.query.u);
+    if (error) return res.status(200).json({ available: false, error });
+    if (req.user.username === name) return res.status(200).json({ available: true, mine: true });
+    const taken = await User.exists({ username: name, _id: { $ne: req.user._id } });
+    res.status(200).json(taken ? { available: false, error: "Already taken" } : { available: true });
+  } catch (error) {
+    console.log("error in checkUsername:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// PUT /auth/username { username }  (empty string removes it)
+export const setUsername = async (req, res) => {
+  try {
+    const raw = req.body?.username;
+    let update;
+    if (raw === "" || raw === null) {
+      update = { $unset: { username: 1 } };
+    } else {
+      const { name, error } = checkName(raw);
+      if (error) return res.status(400).json({ message: error });
+      if (await User.exists({ username: name, _id: { $ne: req.user._id } })) {
+        return res.status(409).json({ message: "That username is already taken" });
+      }
+      update = { username: name };
+    }
+    try {
+      const updated = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password -pushSubscriptions");
+      return res.status(200).json(updated);
+    } catch (e) {
+      if (e?.code === 11000) return res.status(409).json({ message: "That username is already taken" });
+      throw e;
+    }
+  } catch (error) {
+    console.log("error in setUsername:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// GET /auth/u/:username  ->  the person's public card (same details the chat list already shows)
+export const findByUsername = async (req, res) => {
+  try {
+    const { name, error } = checkName(req.params.username);
+    if (error) return res.status(404).json({ message: "No one with that username" });
+    const user = await User.findOne({ username: name, deleted: { $ne: true } }).select("fullName profilePic about username").lean();
+    if (!user) return res.status(404).json({ message: "No one with that username" });
+    res.status(200).json(user);
+  } catch (error) {
+    console.log("error in findByUsername:", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

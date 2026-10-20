@@ -262,7 +262,7 @@ const Sidebar = () => {
     const q = search.trim().toLowerCase();
 
     const directItems = users
-      .filter((u) => u.fullName.toLowerCase().includes(q))
+      .filter((u) => (q.startsWith("@") ? (u.username || "").includes(q.slice(1)) : u.fullName.toLowerCase().includes(q) || (!!u.username && u.username.includes(q))))
       .map((u) => ({
         type: "direct",
         data: u,

@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone } from "lucide-react";
+import { Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import Avatar from "../components/Avatar";
+import UsernameSheet, { profileLink } from "../components/UsernameSheet";
 import { useScrollMemory } from "../lib/useScrollMemory";
 
 const iconCls = "text-wa-icon";
@@ -19,7 +20,8 @@ const ProfilePage = () => {
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
 
-  const handle = `@${(authUser?.email || "").split("@")[0]}`;
+  const [showUsername, setShowUsername] = useState(false);
+  const handle = authUser?.username ? `@${authUser.username}` : "Set a username";
 
   const onPickPhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -35,7 +37,9 @@ const ProfilePage = () => {
   };
 
   const share = async () => {
-    const data = { title: "Talkies", text: "Chat with me on Talkies", url: window.location.origin };
+    const data = authUser?.username
+      ? { title: "Talkies", text: `Chat with me on Talkies: @${authUser.username}`, url: profileLink(authUser.username) }
+      : { title: "Talkies", text: "Chat with me on Talkies", url: window.location.origin };
     try {
       if (navigator.share) await navigator.share(data);
       else {
@@ -48,6 +52,7 @@ const ProfilePage = () => {
   };
 
   const rows = [
+    { icon: QrCode, title: "Username and QR code", sub: authUser?.username ? `@${authUser.username} · share your profile` : "Pick a username so people can find you", onClick: () => setShowUsername(true) },
     { icon: KeyRound, title: "Account", sub: "Name, about, password, two-step verification", to: "/settings/account" },
     { icon: Smartphone, title: "Linked devices", sub: "Phones and browsers signed in to your account", to: "/settings/devices" },
     { icon: Lock, title: "Privacy", sub: "Read receipts, typing, blocked contacts", to: "/settings/privacy" },
@@ -153,7 +158,7 @@ const ProfilePage = () => {
                 <h2 className="text-[24px] leading-8 font-normal text-wa-text truncate">{authUser?.fullName}</h2>
                 <ChevronDown size={22} className="text-wa-muted shrink-0" />
               </div>
-              <p className="mt-1 text-[14.5px] text-wa-muted truncate max-w-full px-6">{handle}</p>
+              <button onClick={() => setShowUsername(true)} className={`mt-1 text-[14.5px] truncate max-w-full px-6 ${authUser?.username ? "text-wa-muted" : "text-[#21C063]"}`}>{handle}</button>
             </div>
           </div>
         )}
@@ -171,6 +176,7 @@ const ProfilePage = () => {
           )
         )}
 
+        {showUsername && <UsernameSheet onClose={() => setShowUsername(false)} />}
         {rows.length === 0 && <p className="text-center text-wa-muted py-10 text-[13px]">No results</p>}
 
         {!query && (
