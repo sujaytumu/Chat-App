@@ -204,6 +204,7 @@ export const useAuthStore = create((set, get) => ({
       if (selectedChat) {
         useChatStore.getState().getMessages();
       }
+      useChatStore.getState().retryFailed?.();
     });
 
     // Wire up chat-related socket listeners (messages, typing, groups) once

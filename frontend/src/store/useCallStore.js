@@ -916,6 +916,12 @@ export const useCallStore = create((set, get) => ({
 
     // Coming back to the app (tapping the call notification, unlocking, switching back) while a call is
     // still ringing: play the same ringtone right away, whether it was held back or got blocked.
+    // Wi-Fi <-> mobile data switch or signal back mid-call: reconnect the call's media path at once.
+    window.addEventListener("online", () => {
+      try {
+        if (pc && get().callStatus === "in-call" && pc.restartIce) pc.restartIce();
+      } catch { /* ignore */ }
+    });
     const resumeRing = () => {
       if (document.visibilityState !== "visible" || get().callStatus !== "incoming" || get().isAnswering) return;
       primeAudio();
