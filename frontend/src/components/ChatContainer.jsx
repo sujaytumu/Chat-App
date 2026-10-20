@@ -32,6 +32,7 @@ import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
 import EventCard from "./EventCard";
+import { replyWithPhoto } from "../lib/replyWithPhoto";
 import ContactCard from "./ContactCard";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
@@ -489,6 +490,7 @@ const ChatContainer = () => {
             onTogglePin: () => useChatStore.getState().requestPin(message),
             onDelete: (mode) => deleteMessage(message._id, mode),
             onReply: () => setReplyingTo(message),
+            onReplyPhoto: () => replyWithPhoto(message),
             onToggleStar: () => toggleStarMessage(message._id),
             onForward: () => setForwardingMessage(message),
             onInfo: () => setInfoMessage(message),
