@@ -22,6 +22,8 @@ import android.provider.Settings;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
+import androidx.core.content.pm.ShortcutInfoCompat;
+import androidx.core.content.pm.ShortcutManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
 
 import java.io.File;
@@ -239,12 +241,39 @@ final class NotificationHelper {
 
     /** Asks the image host for a big, screen-sized version of the photo when it supports resizing. */
     private static String resolvePhotoUrl(String url, int width) {
+        return resolvePhotoUrl(url, width, width * 16 / 9);
+    }
+
+    private static String resolvePhotoUrl(String url, int width, int height) {
         if (url == null || url.isEmpty()) return "";
         if (url.startsWith("/")) return SITE + url;
         if (url.contains("res.cloudinary.com") && url.contains("/upload/") && !url.contains("/upload/c_")) {
-            return url.replace("/upload/", "/upload/c_fill,g_auto,w_" + width + ",h_" + (width * 16 / 9) + ",f_jpg,q_auto/");
+            return url.replace("/upload/", "/upload/c_fill,g_auto,w_" + width + ",h_" + height + ",f_jpg,q_auto/");
         }
         return url;
+    }
+
+    /** True when the push carries a real profile photo (not the Talkies logo / the generic avatar it falls back to). */
+    private static boolean isRealPhoto(String url) {
+        if (url == null || url.isEmpty()) return false;
+        String u = url.toLowerCase();
+        return !(u.endsWith("/icon-v2-192.png") || u.endsWith("/icon-v2-512.png") || u.endsWith("/avatar.png") || u.endsWith("/icon.jpg"));
+    }
+
+    /** WhatsApp's stand-in for a contact with no photo: a round grey avatar with a person silhouette. */
+    private static Bitmap defaultAvatar(int size) {
+        Bitmap out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(out);
+        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        android.graphics.Path clip = new android.graphics.Path();
+        clip.addCircle(size / 2f, size / 2f, size / 2f, android.graphics.Path.Direction.CW);
+        c.clipPath(clip);
+        p.setColor(Color.parseColor("#6B7C85"));
+        c.drawRect(0, 0, size, size, p);
+        p.setColor(Color.parseColor("#E4E9EB"));
+        c.drawCircle(size * 0.5f, size * 0.38f, size * 0.18f, p); // head
+        c.drawCircle(size * 0.5f, size * 1.02f, size * 0.36f, p); // shoulders
+        return out;
     }
 
     /**
@@ -258,7 +287,7 @@ final class NotificationHelper {
                 Bitmap cached = BitmapFactory.decodeFile(f.getAbsolutePath());
                 if (cached != null) return cached;
             }
-            String resolved = resolvePhotoUrl(url, width);
+            String resolved = callerId != null && callerId.startsWith("msg_") ? resolvePhotoUrl(url, width, width) : resolvePhotoUrl(url, width);
             if (resolved.isEmpty() || !resolved.startsWith("https://")) return null;
             HttpURLConnection c = (HttpURLConnection) new URL(resolved).openConnection();
             c.setConnectTimeout(5000);
@@ -455,16 +484,24 @@ final class NotificationHelper {
         PendingIntent tap = openIntent(ctx, id, "open", chatId, chatType, "", false);
 
         // WhatsApp-style: the sender's round photo, their messages as a conversation, and Reply / Mark as read / Mute.
+        // Their photo as a round avatar; with no photo, the same grey person avatar WhatsApp uses (never the app logo).
         Bitmap avatar = null;
-        try {
-            Bitmap raw = loadPhoto(ctx, photoUrl, "msg_" + (chatId.isEmpty() ? title : chatId), 192);
-            if (raw != null) avatar = roundAvatar(raw, 192);
-        } catch (Exception ignored) {
+        if (isRealPhoto(photoUrl)) {
+            try {
+                Bitmap raw = loadPhoto(ctx, photoUrl, "msg_" + (chatId.isEmpty() ? title : chatId), 192);
+                if (raw != null) avatar = roundAvatar(raw, 192);
+            } catch (Exception ignored) {
+            }
         }
-        Person.Builder pb = new Person.Builder().setName(title == null || title.isEmpty() ? "Talkies" : title).setKey(key);
-        if (avatar != null) pb.setIcon(IconCompat.createWithBitmap(avatar));
-        Person sender = pb.build();
-        NotificationCompat.MessagingStyle conv = new NotificationCompat.MessagingStyle(new Person.Builder().setName("You").build());
+        if (avatar == null) avatar = defaultAvatar(192);
+        Person sender = new Person.Builder()
+                .setName(title == null || title.isEmpty() ? "Talkies" : title)
+                .setKey(key)
+                .setIcon(IconCompat.createWithBitmap(avatar))
+                .build();
+        // "You" (your own replies shown in the conversation) gets an avatar too, instead of the system's blank one
+        Person me = new Person.Builder().setName("You").setKey("talkies_me").setIcon(IconCompat.createWithBitmap(defaultAvatar(192))).build();
+        NotificationCompat.MessagingStyle conv = new NotificationCompat.MessagingStyle(me);
         synchronized (RECENT) {
             ArrayDeque<String> q = RECENT.get(key);
             if (q != null) for (String line : q) conv.addMessage(line, System.currentTimeMillis(), sender);
@@ -483,7 +520,27 @@ final class NotificationHelper {
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(false)
                 .setContentIntent(tap);
-        if (avatar != null) b.setLargeIcon(avatar);
+        b.setLargeIcon(avatar);
+        // Android 11+: a conversation notification (long-lived shortcut + person) is what shows the sender's photo
+        // with the small app badge on its corner and puts it in the Conversations section, like WhatsApp.
+        if (!missedCall && !chatId.isEmpty()) {
+            try {
+                String shortcutId = "talkies_chat_" + key;
+                Intent open = mainIntent(ctx, "open", chatId, chatType, "", false);
+                open.setAction(Intent.ACTION_VIEW);
+                ShortcutInfoCompat sc = new ShortcutInfoCompat.Builder(ctx, shortcutId)
+                        .setShortLabel(title == null || title.isEmpty() ? "Talkies" : title)
+                        .setLongLived(true)
+                        .setPerson(sender)
+                        .setIcon(IconCompat.createWithBitmap(avatar))
+                        .setIntent(open)
+                        .build();
+                ShortcutManagerCompat.pushDynamicShortcut(ctx, sc);
+                b.setShortcutId(shortcutId);
+            } catch (Exception ignored) {
+                // no shortcut: it still shows as a normal message notification
+            }
+        }
         if (canAct) {
             androidx.core.app.RemoteInput remote = new androidx.core.app.RemoteInput.Builder(MessageActionReceiver.KEY_REPLY).setLabel("Reply").build();
             b.addAction(new NotificationCompat.Action.Builder(0, "Reply", actionIntent(ctx, id, id, MessageActionReceiver.ACTION_REPLY, chatId, chatType, key, true))
