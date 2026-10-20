@@ -1103,6 +1103,8 @@ export const useChatStore = create((set, get) => ({
       set((st) => ({ messages: st.messages.filter((m) => !gone.has(m._id)) }));
     });
 
+    socket.on("visibilityChanged", () => get().getUsers()); // the owner changed who I can see
+
     socket.on("userNote", ({ userId, note }) => {
       set((st) => ({ users: st.users.map((u) => (u._id === userId ? { ...u, note } : u)) }));
       useAuthStore.setState((st) => (st.authUser && String(st.authUser._id) === String(userId) ? { authUser: { ...st.authUser, note } } : {}));

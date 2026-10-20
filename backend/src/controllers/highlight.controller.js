@@ -1,3 +1,4 @@
+import { visibleUserIds } from "../lib/visibility.js";
 import mongoose from "mongoose";
 import Highlight from "../models/highlight.model.js";
 import Status from "../models/status.model.js";
@@ -69,7 +70,8 @@ export const getHighlightsFeed = async (req, res) => {
   try {
     const myId = req.user._id;
     res.set("Cache-Control", "no-store");
-    const list = await Highlight.find({ userId: { $ne: myId } })
+    const visible = await visibleUserIds(req.user);
+    const list = await Highlight.find({ userId: visible ? { $in: [...visible], $ne: myId } : { $ne: myId } })
       .sort({ updatedAt: -1 })
       .limit(150)
       .populate("userId", "fullName profilePic");

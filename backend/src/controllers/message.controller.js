@@ -19,6 +19,7 @@ import { rememberMessage } from "../lib/recentMessages.js";
 import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
 import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
+import { visibleUserIds, canSee } from "../lib/visibility.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -80,7 +81,8 @@ export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
     markDirectDelivered(loggedInUserId); // opening the app = all waiting messages have arrived
-    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId }, deleted: { $ne: true } })
+    const visible = await visibleUserIds(req.user); // only the people the owner has allowed (or you already chat with)
+    const filteredUsers = await User.find({ _id: visible ? { $in: [...visible], $ne: loggedInUserId } : { $ne: loggedInUserId }, deleted: { $ne: true } })
       .select("-tokenVersion -deleted -password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
       .lean();
 
@@ -315,6 +317,9 @@ const sendMessageCore = async (req, res) => {
 
     // If the receiver currently has an active socket, the message will land
     // instantly, so we can mark it delivered right away.
+    if (!isSelf && !(await canSee(req.user, receiverId))) {
+      return res.status(403).json({ error: "You can't message this person" });
+    }
     if ((req.user.blockedUsers || []).some((b) => String(b) === String(receiverId))) {
       return res.status(403).json({ error: "You blocked this contact. Unblock them to send messages." });
     }
