@@ -103,7 +103,7 @@ export default function LinkDeviceSheet({ onClose, onDone, initialCode }) {
         ) : (
           <>
             <div className="relative rounded-2xl overflow-hidden bg-black aspect-square">
-              <video ref={video} playsInline muted className="size-full object-cover" />
+              <video ref={video} playsInline muted poster="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" className="size-full object-cover" />
               <div className="absolute inset-[18%] border-2 border-white/80 rounded-2xl pointer-events-none" />
             </div>
             <p className="text-center text-[13px] text-wa-muted mt-3">Point your camera at the QR code on the login page of the other device.</p>

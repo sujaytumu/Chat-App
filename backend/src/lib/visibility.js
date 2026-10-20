@@ -35,9 +35,27 @@ export async function visibleUserIds(me) {
   return ids;
 }
 
+// Quick yes/no for one person (used on every send): a short-lived cache, then a couple of indexed single-row lookups
+// instead of building the whole visible list.
+const seenCache = new Map(); // "me:other" -> expires
 export async function canSee(me, otherId) {
-  const ids = await visibleUserIds(me);
-  return ids === null || ids.has(String(otherId));
+  const myId = String(me._id || me);
+  const other = String(otherId);
+  if (me.email !== undefined && isOwner(me)) return true;
+  const ck = `${myId}:${other}`;
+  const hit = seenCache.get(ck);
+  if (hit && hit > Date.now()) return true;
+  const [owner, existing, allowed] = await Promise.all([
+    ownerId(),
+    Message.exists({ $or: [{ senderId: myId, receiverId: other }, { senderId: other, receiverId: myId }], groupId: null }),
+    Visibility.exists({ key: pairKey(myId, other) }),
+  ]);
+  const ok = other === myId || other === owner || !!existing || !!allowed;
+  if (ok) {
+    if (seenCache.size > 5000) seenCache.clear();
+    seenCache.set(ck, Date.now() + 10 * 60_000);
+  }
+  return ok;
 }
 
 export { Visibility, pairKey };

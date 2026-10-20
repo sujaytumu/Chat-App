@@ -530,6 +530,11 @@ export const useChatStore = create((set, get) => ({
         if (simple) set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
         throw err;
       }
+      // Replying means I've read their messages: clear the unread badge right away (the server does the same).
+      if (selectedChat.type === "direct") {
+        set((state) => ({ users: state.users.map((u) => (u._id === selectedChat.data._id && u.unreadCount ? { ...u, unreadCount: 0 } : u)) }));
+        emitSeen(selectedChat.data._id);
+      }
       if (simple && me) {
         set((state) => ({ messages: state.messages.map((m) => (m._id === tmpId ? res.data : m)) }));
       } else {
