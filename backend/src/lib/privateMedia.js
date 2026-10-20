@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import cloudinary from "./cloudinary.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
+import Status from "../models/status.model.js";
+import Highlight from "../models/highlight.model.js";
 
 // Chat photos / videos / documents / voice notes are PRIVATE to the people in that chat.
 //  - They are uploaded to Cloudinary as "authenticated" assets (no public address at all).
@@ -69,8 +71,32 @@ export const tokenToUrl = (token) => {
 };
 
 // May this person open this file? Only people in the chat the file was sent in, and not if they removed it.
+// Statuses and highlights keep their song / media in the same private area, so a file used there is
+// open to whoever the owner shared that update with (the owner always).
+const audienceAllows = (aud, ownerId, me) => {
+  if (String(ownerId) === me) return true;
+  if (!aud || !aud.mode || aud.mode === "all") return true;
+  const listed = (aud.users || []).some((u) => String(u) === me);
+  return aud.mode === "only" ? listed : !listed;
+};
+
+async function canAccessStatusMedia(me, url) {
+  const statuses = await Status.find({ $or: [{ "song.url": url }, { content: url }] }).select("userId audience expiresAt").limit(10).lean();
+  for (const st of statuses) {
+    if (String(st.userId) === me || (st.expiresAt > new Date() && audienceAllows(st.audience, st.userId, me))) return true;
+  }
+  const hls = await Highlight.find({ $or: [{ "items.song.url": url }, { "items.content": url }] }).select("userId items").limit(10).lean();
+  for (const h of hls) {
+    for (const it of h.items || []) {
+      if ((it.song?.url === url || it.content === url) && audienceAllows(it.audience, h.userId, me)) return true;
+    }
+  }
+  return false;
+}
+
 export async function canAccessMedia(userId, url) {
   const me = String(userId);
+  if (await canAccessStatusMedia(me, url)) return true;
   const rows = await Message.find({ $or: [{ image: url }, { "file.url": url }] })
     .select("senderId receiverId groupId deletedFor deletedForEveryone")
     .limit(10)

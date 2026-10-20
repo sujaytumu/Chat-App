@@ -7,6 +7,7 @@ import { MoreVertical } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
+import { useAuthStore } from "../store/useAuthStore";
 
 const DURATION_MS = 15000; // how long a picture / text stays up, like WhatsApp
 
@@ -61,6 +62,35 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const [sendingReply, setSendingReply] = useState(false);
   const [heartPop, setHeartPop] = useState(0); // bumps to replay the little pop animation
   useBackToClose(true, onClose);
+
+  // My own update: new views and hearts show up live (like WhatsApp / Instagram) instead of only after a reload.
+  useEffect(() => {
+    if (!isOwn || highlight) return undefined;
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return undefined;
+    const onViewed = ({ statusId, user: who, at }) =>
+      setList((prev) =>
+        prev.map((st) =>
+          String(st._id) !== String(statusId) || (st.views || []).some((v) => String(v.user?._id || v.user) === String(who._id))
+            ? st
+            : { ...st, views: [...(st.views || []), { user: who, at }], viewedBy: [...(st.viewedBy || []), who._id] }
+        )
+      );
+    const onLiked = ({ statusId, user: who }) =>
+      setList((prev) =>
+        prev.map((st) =>
+          String(st._id) !== String(statusId) || (st.likes || []).some((l) => String(l.user?._id || l.user) === String(who._id))
+            ? st
+            : { ...st, likes: [...(st.likes || []), { user: who, at: new Date().toISOString() }] }
+        )
+      );
+    socket.on("statusViewed", onViewed);
+    socket.on("statusLiked", onLiked);
+    return () => {
+      socket.off("statusViewed", onViewed);
+      socket.off("statusLiked", onLiked);
+    };
+  }, [isOwn, highlight]);
 
   // Mark as seen when someone else's update comes up.
   useEffect(() => {

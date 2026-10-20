@@ -178,7 +178,7 @@ export const markStatusViewed = async (req, res) => {
     const { id } = req.params;
     const myId = req.user._id;
 
-    await Status.updateOne(
+    const viewResult = await Status.updateOne(
       {
         _id: id,
         userId: { $ne: myId },
@@ -191,6 +191,23 @@ export const markStatusViewed = async (req, res) => {
       },
       { $push: { viewedBy: myId, views: { user: myId, at: new Date() } } }
     );
+
+    // Tell the owner right away, so their view count moves while they are looking at it.
+    if (viewResult.modifiedCount > 0) {
+      try {
+        const st = await Status.findById(id).select("userId").lean();
+        const socketId = st && getReceiverSocketId(String(st.userId));
+        if (socketId) {
+          io.to(socketId).emit("statusViewed", {
+            statusId: id,
+            user: { _id: String(myId), fullName: req.user.fullName, profilePic: req.user.profilePic },
+            at: new Date().toISOString(),
+          });
+        }
+      } catch {
+        /* the count still shows on the next load */
+      }
+    }
 
     res.status(200).json({ message: "Marked as viewed" });
   } catch (error) {
