@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Clock, Timer, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
+import { Music2, Clock, Timer, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -13,6 +13,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 
 const WallpaperPicker = lazy(() => import("./WallpaperPicker"));
 const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
+const PlaylistPanel = lazy(() => import("./PlaylistPanel"));
 const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
 const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
 const ScheduledPanel = lazy(() => import("./ScheduledPanel"));
@@ -57,6 +58,7 @@ const ChatHeader = () => {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
   const [showColor, setShowColor] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
@@ -290,6 +292,15 @@ const ChatHeader = () => {
               >
                 <Clock size={18} className="text-wa-icon" /> Scheduled messages
               </button>
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowPlaylist(true);
+                }}
+              >
+                <Music2 size={18} className="text-wa-icon" /> Shared playlist
+              </button>
               {selectedChat.type === "direct" && (
                 <button
                   className={menuItem}
@@ -371,6 +382,11 @@ const ChatHeader = () => {
       {showColor && (
         <Suspense fallback={null}>
           <ChatColorSheet chatKey={`${isGroup ? "g" : "d"}:${data._id}`} chatName={name} onClose={() => setShowColor(false)} />
+        </Suspense>
+      )}
+      {showPlaylist && (
+        <Suspense fallback={null}>
+          <PlaylistPanel chat={selectedChat} onClose={() => setShowPlaylist(false)} />
         </Suspense>
       )}
       {showScheduled && (
