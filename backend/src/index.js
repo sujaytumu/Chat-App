@@ -28,6 +28,14 @@ import { app, server } from "./lib/socket.js";
 import { configureWebPush } from "./lib/webPush.js";
 
 dotenv.config();
+
+// One stray error in a socket handler must never take the whole server (and every chat/call) down.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
 configureWebPush();
 
 const PORT = process.env.PORT || 5001;

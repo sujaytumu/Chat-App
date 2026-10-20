@@ -19,7 +19,11 @@ const CallKeepAlive = () => {
   const groupName = useGroupCallStore((s) => s.groupName);
   const groupVideo = useGroupCallStore((s) => s.cameraOn);
 
-  const oneToOne = callStatus === "calling" || callStatus === "in-call";
+  // Only start the Android foreground service once the mic/camera stream exists, i.e. after the
+  // permission prompt was answered. Starting it earlier asks Android for a microphone service
+  // without the permission, which it refuses.
+  const hasMedia = useCallStore((s) => !!s.localStream);
+  const oneToOne = (callStatus === "calling" && hasMedia) || callStatus === "in-call";
   const group = groupStatus !== "idle";
   const active = oneToOne || group;
   const video = oneToOne ? callType === "video" : groupVideo;

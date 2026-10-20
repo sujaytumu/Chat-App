@@ -336,7 +336,15 @@ io.on("connection", (socket) => {
   });
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
-  socket.on("callUser", async ({ toUserId, offer, callType }, ack) => {
+  socket.on("callUser", async (payload, ack) => {
+    try {
+      await handleCallUser(payload || {}, ack);
+    } catch (err) {
+      console.log("Error in callUser:", err?.message);
+      if (typeof ack === "function") ack({ delivered: false, reason: "error" });
+    }
+  });
+  const handleCallUser = async ({ toUserId, offer, callType }, ack) => {
     const fromUser = socket.data.profile; // never trust a client-supplied caller identity
     let blocked = !canSignal(userId, String(toUserId));
     if (!blocked && !isOnline(String(toUserId))) {
@@ -440,7 +448,7 @@ io.on("connection", (socket) => {
 
     holdForCallee();
     socket.emit("callRinging", { reason: "Waiting for them to come online", callId });
-  });
+  };
 
   // Lets each phone measure how far its clock is from the server's (see useCallStore).
   socket.on("timeSync", (ack) => {
