@@ -119,6 +119,19 @@ const messageSchema = new mongoose.Schema(
       },
       default: undefined,
     },
+    // Live location: a moving position that the sender updates until it expires or is stopped.
+    liveLocation: {
+      type: {
+        lat: Number,
+        lng: Number,
+        accuracy: Number,
+        startedAt: Date,
+        updatedAt: Date,
+        expiresAt: Date,
+        active: { type: Boolean, default: true },
+      },
+      default: undefined,
+    },
     // View-once photo: the picture lives in viewOnceUrl (never sent in lists) until the receiver opens it once.
     viewOnce: { type: Boolean, default: false },
     viewOnceOpened: { type: Boolean, default: false },

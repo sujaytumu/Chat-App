@@ -22,6 +22,8 @@ import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import PollModal from "./PollModal";
+import LocationSheet from "./LocationSheet";
+import { liveShares } from "../lib/liveShare";
 import EventModal from "./EventModal";
 import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
@@ -46,6 +48,7 @@ const MessageInput = () => {
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSharingLocation, setIsSharingLocation] = useState(false);
+  const [showLocSheet, setShowLocSheet] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
@@ -306,14 +309,17 @@ const MessageInput = () => {
       toast.error("Location isn't available in this browser");
       return;
     }
+    setShowLocSheet(true);
+  };
+
+  // one position fix, then hand it to `send`
+  const withPosition = (send) => {
+    setShowLocSheet(false);
     setIsSharingLocation(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
         try {
-          await sendMessage({
-            text: `📍 Current location\nhttps://www.google.com/maps?q=${latitude},${longitude}`,
-          });
+          await send(position.coords);
         } catch {
           // toast already shown by store
         } finally {
@@ -327,6 +333,20 @@ const MessageInput = () => {
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
+
+  const sendCurrentLocation = () =>
+    withPosition(({ latitude, longitude }) =>
+      sendMessage({ text: `📍 Current location\nhttps://www.google.com/maps?q=${latitude},${longitude}` })
+    );
+
+  const startLiveLocation = (minutes) =>
+    withPosition(async ({ latitude, longitude, accuracy }) => {
+      const msg = await sendMessage({ liveLocation: { lat: latitude, lng: longitude, accuracy, minutes } });
+      if (msg?._id && msg.liveLocation?.expiresAt) {
+        liveShares.add(msg._id, msg.liveLocation.expiresAt);
+        toast.success("Live location started");
+      }
+    });
 
   const handleEmojiSelect = (emoji) => {
     setText((prev) => prev + emoji);
@@ -704,6 +724,14 @@ const MessageInput = () => {
         />
       )}
       {showEvent && <EventModal onClose={() => setShowEvent(false)} onSend={(event) => sendMessage({ event })} />}
+      {showLocSheet && (
+        <LocationSheet
+          allowLive={!selectedChat?.data?.isSelf}
+          onCurrent={sendCurrentLocation}
+          onLive={startLiveLocation}
+          onClose={() => setShowLocSheet(false)}
+        />
+      )}
       {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
       {mentionCandidates.length > 0 && (
         <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
