@@ -41,6 +41,62 @@ const emitSeen = (senderId) => {
   if (socket?.connected) socket.emit("markSeen", { from: senderId });
   else axiosInstance.put(`/messages/seen/${senderId}`).catch(() => {});
 };
+// Messages that couldn't reach the server (offline). Resent automatically when the connection returns.
+const outbox = new Map(); // tmpId -> { to, body }
+let flushing = false;
+const flushOutbox = async () => {
+  if (flushing || !outbox.size) return;
+  flushing = true;
+  try {
+    for (const [tmpId, job] of [...outbox]) {
+      useChatStore.setState((st) => ({ messages: st.messages.map((m) => (m._id === tmpId ? { ...m, pending: true, failed: false } : m)) }));
+      try {
+        const live = useAuthStore.getState().socket;
+        let res;
+        try {
+          if (!live?.connected) throw { transport: true };
+          res = await sendOverSocket(live, job.to, job.body);
+        } catch (e) {
+          if (!e?.transport) throw e;
+          res = await axiosInstance.post(`/messages/send/${job.to}`, job.body);
+        }
+        outbox.delete(tmpId);
+        const real = res.data;
+        useChatStore.setState((st) => {
+          const active = st.selectedChat?.type === "direct" && st.selectedChat.data._id === job.to;
+          let used = false;
+          const out = [];
+          for (const m of st.messages) {
+            if (m._id === tmpId || m._id === real._id) {
+              if (used) continue;
+              used = true;
+              out.push(real);
+            } else out.push(m);
+          }
+          if (!used && active) out.push(real);
+          return {
+            messages: out,
+            users: st.users.map((u) => (u._id === job.to ? { ...u, lastMessage: real } : u)),
+          };
+        });
+      } catch (err) {
+        if (err?.response) {
+          // the server refused it (blocked, not allowed…): stop trying
+          outbox.delete(tmpId);
+          useChatStore.setState((st) => ({ messages: st.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
+          toast.error(err.response?.data?.error || "Message not sent");
+        } else {
+          useChatStore.setState((st) => ({ messages: st.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
+          break; // still offline — try again later
+        }
+      }
+    }
+  } finally {
+    flushing = false;
+  }
+};
+if (typeof window !== "undefined") window.addEventListener("online", () => setTimeout(flushOutbox, 300));
+
 // Send a plain text message over the live connection. Resolves like an HTTP call would; rejects with
 // `transport: true` when the connection didn't answer in time (the caller then retries over HTTP —
 // the shared clientId stops that from ever creating a duplicate).
@@ -432,7 +488,7 @@ export const useChatStore = create((set, get) => ({
       // Messages still on their way (clock) stay visible; never show the same message twice.
       const seenIds = new Set(base.map((m) => m._id));
       const clientIds = new Set(base.map((m) => m.clientId).filter(Boolean));
-      const inFlight = get().messages.filter((m) => m.pending && !seenIds.has(m._id) && !clientIds.has(m._id));
+      const inFlight = get().messages.filter((m) => (m.pending || m.failed) && !seenIds.has(m._id) && !clientIds.has(m._id));
       const merged = inFlight.length ? [...base, ...inFlight] : base;
       set((state) => ({
         messages: merged,
@@ -485,6 +541,8 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  retryFailed: () => flushOutbox(),
+
   sendMessage: async (messageData) => {
     const { selectedChat, messages, replyingTo } = get();
     if (!selectedChat) return;
@@ -532,6 +590,13 @@ export const useChatStore = create((set, get) => ({
           res = await axiosInstance.post(url, payload);
         }
       } catch (err) {
+        // No answer at all (offline / bad signal): keep the message on screen with a "tap to retry" mark and
+        // send it by itself the moment the connection is back — never lose what was typed.
+        if (simple && me && selectedChat.type === "direct" && !selectedChat.data?.isSelf && !err?.response) {
+          outbox.set(tmpId, { to: selectedChat.data._id, body: { ...payload, clientId: tmpId } });
+          set((state) => ({ messages: state.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
+          return;
+        }
         if (simple) set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
         throw err;
       }

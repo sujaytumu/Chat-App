@@ -1,8 +1,15 @@
-import { Check, CheckCheck, Clock } from "lucide-react";
+import { Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
+import { useChatStore } from "../store/useChatStore";
 
 // WhatsApp-style receipt ticks for direct messages:
 // single gray = sent, double gray = delivered, double blue = seen
 const MessageTicks = ({ message }) => {
+  if (message.failed)
+    return (
+      <button type="button" onClick={() => useChatStore.getState().retryFailed()} className="flex items-center gap-0.5 text-red-400" title="Tap to retry">
+        <AlertCircle size={14} /> <span className="text-[10px]">Tap to retry</span>
+      </button>
+    );
   if (message.pending) return <Clock size={13} className="opacity-70" />;
   if (message.seen) return <CheckCheck size={15} className="text-[#53BDEB]" />;
   if (message.delivered) return <CheckCheck size={15} className="opacity-80" />;
