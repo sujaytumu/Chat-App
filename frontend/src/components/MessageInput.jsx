@@ -59,6 +59,10 @@ const MessageInput = () => {
   const recordingStreamRef = useRef(null);
   const recordingIntervalRef = useRef(null);
   const discardRecordingRef = useRef(false);
+  const holdRef = useRef(null); // press-and-hold gesture on the mic (phones): { x, y, t, locked, done }
+  const pendingStopRef = useRef(null); // released before the microphone was ready: "send" | "discard"
+  const suppressClickRef = useRef(false);
+  const [holding, setHolding] = useState(false); // finger is down on the mic (not locked yet)
 
   const photoInputRef = useRef(null);
   const cameraInputRef = useRef(null);
@@ -370,6 +374,50 @@ const MessageInput = () => {
     }
   };
 
+  // WhatsApp-style: press and HOLD the mic to record, release to send, slide left to cancel, slide up to lock.
+  const finishHold = (how) => {
+    const h = holdRef.current;
+    holdRef.current = null;
+    setHolding(false);
+    suppressClickRef.current = true;
+    setTimeout(() => (suppressClickRef.current = false), 80);
+    if (!h || h.done) return;
+    h.done = true;
+    const mr = mediaRecorderRef.current;
+    const live = mr && mr.state !== "inactive";
+    if (how === "lock") return;
+    const tooShort = Date.now() - h.t < 500;
+    if (how === "cancel" || tooShort) {
+      if (tooShort && how !== "cancel") toast("Hold the mic to record, release to send", { id: "hold-hint" });
+      if (live) stopRecording(true);
+      else pendingStopRef.current = "discard";
+    } else if (live) stopRecording(false);
+    else pendingStopRef.current = "send";
+  };
+  const micDown = (e) => {
+    if (e.pointerType === "mouse" || isRecording || isSending) return; // laptop: click to start / click to send
+    holdRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), locked: false, done: false };
+    pendingStopRef.current = null;
+    setHolding(true);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    startRecording();
+  };
+  const micMove = (e) => {
+    const h = holdRef.current;
+    if (!h || h.done || h.locked) return;
+    if (h.x - e.clientX > 90) finishHold("cancel");
+    else if (h.y - e.clientY > 80) {
+      h.locked = true;
+      setHolding(false);
+      if (navigator.vibrate) navigator.vibrate(15);
+      finishHold("lock");
+    }
+  };
+  const micUp = () => {
+    const h = holdRef.current;
+    if (h && !h.done) finishHold("send");
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -458,6 +506,11 @@ const MessageInput = () => {
       recorder.start();
       setIsRecording(true);
       setRecordingSeconds(0);
+      if (pendingStopRef.current) {
+        const how = pendingStopRef.current;
+        pendingStopRef.current = null;
+        setTimeout(() => stopRecording(how === "discard"), 0);
+      }
       recordingIntervalRef.current = setInterval(() => {
         setRecordingSeconds((s) => s + 1);
       }, 1000);
@@ -879,7 +932,11 @@ const MessageInput = () => {
             </button>
             <span className="size-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
             <span className="text-wa-text2 text-sm tabular-nums">{formatDuration(recordingSeconds)}</span>
-            <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
+            {holding ? (
+              <span className="text-wa-muted text-xs ml-auto">‹ Slide to cancel · ↑ Lock</span>
+            ) : (
+              <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
+            )}
           </div>
         ) : (
           <div className="relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5 bg-wa-surface rounded-[26px] px-1.5 py-1 min-h-[52px] shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:min-h-0">
@@ -1121,9 +1178,19 @@ const MessageInput = () => {
         ) : (
           <button
             type="button"
-            onClick={isRecording ? () => stopRecording(false) : startRecording}
-            className={`size-[52px] lg:size-10 lg:order-4 rounded-full flex items-center justify-center active:scale-95 shrink-0 transition-all ${isRecording ? "bg-[#00A884] hover:bg-[#02906f] text-white" : "bg-[#21C063] text-[#0B141A] shadow-md lg:shadow-none lg:bg-transparent lg:text-wa-muted lg:hover:bg-white/10"}`}
-            disabled={isSending}
+            onClick={() => {
+              if (suppressClickRef.current) return;
+              if (isRecording) stopRecording(false);
+              else startRecording();
+            }}
+            onPointerDown={micDown}
+            onPointerMove={micMove}
+            onPointerUp={micUp}
+            onPointerCancel={() => finishHold("cancel")}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ touchAction: "none", WebkitTouchCallout: "none", userSelect: "none" }}
+            className={`${holding ? "scale-125" : ""} size-[52px] lg:size-10 lg:order-4 rounded-full flex items-center justify-center active:scale-95 shrink-0 transition-all ${isRecording ? "bg-[#00A884] hover:bg-[#02906f] text-white" : "bg-[#21C063] text-[#0B141A] shadow-md lg:shadow-none lg:bg-transparent lg:text-wa-muted lg:hover:bg-white/10"}`}
+            disabled={isSending && !isRecording}
             aria-label={isRecording ? "Send voice message" : "Record voice message"}
             title={isRecording ? "Send voice message" : "Record voice message"}
           >
