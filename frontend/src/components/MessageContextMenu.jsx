@@ -1,6 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { isPinned } from "../lib/pin";
+import { Camera } from "lucide-react";
 import ContextMenu, { ConfirmDialog } from "./ContextMenu";
 import { Reply, Copy, Pin, PinOff, Star, StarOutline, Forward, Info, Languages, Pencil, Trash2 } from "./icons/WaGlyphs";
 import { WaCheck as Check } from "./icons/WaIcons";
@@ -49,6 +50,7 @@ const MessageContextMenu = ({ message, isMe, authUserId, menu, x, y, align, onCl
   const items = [
     { label: "Message info", icon: Info, onClick: menu.onInfo },
     { label: "Reply", icon: Reply, onClick: menu.onReply },
+    { label: "Reply with photo", icon: Camera, hidden: !menu.onReplyPhoto || message.deletedForEveryone, onClick: menu.onReplyPhoto },
     {
       label: "Copy",
       icon: Copy,

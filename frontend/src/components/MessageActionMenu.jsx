@@ -1,11 +1,12 @@
 import { isPinned } from "../lib/pin";
 import { useState, useRef, useEffect } from "react";
+import { Camera } from "lucide-react";
 import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, StarOutline, Forward, Info, Languages, Pencil } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 
 // Hover trigger + dropdown for per-message actions, matching WhatsApp's
 // long-press/hover message menu.
-const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onToggleStar, onForward, onInfo, onTranslate, onReact, onEdit, onSelect }) => {
+const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, onDelete, onReply, onReplyPhoto, onToggleStar, onForward, onInfo, onTranslate, onReact, onEdit, onSelect }) => {
   const [open, setOpen] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const menuRef = useRef(null);
@@ -93,6 +94,18 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 >
                   <Pencil size={20} />
                   Edit
+                </button>
+              )}
+              {onReplyPhoto && !message.deletedForEveryone && (
+                <button
+                  onClick={() => {
+                    onReplyPhoto();
+                    close();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
+                >
+                  <Camera size={20} />
+                  Reply with photo
                 </button>
               )}
               {message.text && (
