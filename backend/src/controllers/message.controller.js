@@ -21,7 +21,7 @@ import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
 import Reminder from "../models/reminder.model.js";
 import { summarizeTranscript } from "../lib/chatSummary.js";
-import { visibleUserIds, canSee } from "../lib/visibility.js";
+import { visibleUserIds, canSee, forgetPair } from "../lib/visibility.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -358,6 +358,7 @@ const sendMessageCore = async (req, res) => {
     });
 
     await newMessage.save();
+    forgetPair(senderId, receiverId); // a first message makes them appear in each other's lists
     if (!isSelf) rememberMessage(newMessage); // lets "delivered" / "read" reach the sender instantly
     if (isSelf) {
       // Notes to yourself: nobody else to notify, no ticks to wait for, no push to send.

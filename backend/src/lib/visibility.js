@@ -18,7 +18,20 @@ async function ownerId() {
 }
 
 // null = everybody (the owner); otherwise the set of user ids this person may see.
+const listCache = new Map(); // userId -> { ids, at }  (a few seconds, so the chat list opens fast)
+export const forgetPair = (a, b) => { listCache.delete(String(a)); listCache.delete(String(b)); };
+export const forgetVisibility = () => { listCache.clear(); seenCache.clear(); };
 export async function visibleUserIds(me) {
+  if (me.email !== undefined && isOwner(me)) return null;
+  const k = String(me._id || me);
+  const c = listCache.get(k);
+  if (c && Date.now() - c.at < 8000) return c.ids;
+  const ids = await computeVisible(me);
+  if (listCache.size > 2000) listCache.clear();
+  listCache.set(k, { ids, at: Date.now() });
+  return ids;
+}
+async function computeVisible(me) {
   const myId = new mongoose.Types.ObjectId(String(me._id || me));
   if (me.email !== undefined && isOwner(me)) return null;
   const [pairs, sentTo, gotFrom, owner] = await Promise.all([
