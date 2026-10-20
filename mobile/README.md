@@ -48,3 +48,5 @@ One-time setup (free):
 
 On Android 14+ also allow **full-screen notifications** for Talkies when asked
 (App settings → Notifications), so calls can take over a locked screen.
+
+The app loads the live website, so web features (live location, video messages) need no new APK; reinstall from the link above only to refresh the shell.
