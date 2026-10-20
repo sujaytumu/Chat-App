@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FileText, Download, AlertCircle } from "lucide-react";
 import VoiceMessagePlayer from "./VoiceMessagePlayer";
 import SpeedVideo from "./SpeedVideo";
+import VideoNotePlayer from "./VideoNotePlayer";
 import { formatFileSize, fileIconKind } from "../lib/fileUtils";
 
 const DownloadFallbackCard = ({ file, label }) => (
@@ -35,6 +36,7 @@ const AttachmentContent = ({ file, onMediaLoaded, incoming, messageId, transcrip
 
   if (file.type === "video") {
     if (videoFailed) return <DownloadFallbackCard file={file} label="Video" />;
+    if (file.videoNote) return <VideoNotePlayer file={file} onError={() => setVideoFailed(true)} onLoadedMetadata={onMediaLoaded} />;
     return (
       <SpeedVideo
         wrapperClassName="mb-1 max-w-[240px]"

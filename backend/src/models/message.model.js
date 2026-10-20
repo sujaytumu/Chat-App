@@ -81,6 +81,8 @@ const messageSchema = new mongoose.Schema(
       // Voice notes
       duration: { type: Number },
       waveform: { type: [Number], default: undefined },
+      // Video message: a short round clip recorded inside the chat
+      videoNote: { type: Boolean, default: undefined },
     },
     // Voice notes: the written-out words, made on request (shown under the voice note)
     transcript: { type: { text: String, at: Date }, default: undefined, _id: false },

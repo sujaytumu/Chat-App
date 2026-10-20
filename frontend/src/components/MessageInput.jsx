@@ -37,6 +37,7 @@ import ScheduleSheet, { fmtWhen } from "./ScheduleSheet";
 import { axiosInstance } from "../lib/axios";
 
 const EmojiStickerPicker = lazy(() => import("./EmojiStickerPicker"));
+const VideoNoteRecorder = lazy(() => import("./VideoNoteRecorder"));
 
 const MessageInput = () => {
   const [text, setText] = useState("");
@@ -49,6 +50,7 @@ const MessageInput = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isSharingLocation, setIsSharingLocation] = useState(false);
   const [showLocSheet, setShowLocSheet] = useState(false);
+  const [showVideoNote, setShowVideoNote] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
@@ -346,6 +348,12 @@ const MessageInput = () => {
         liveShares.add(msg._id, msg.liveLocation.expiresAt);
         toast.success("Live location started");
       }
+    });
+
+  const sendVideoNote = ({ data, mimeType, size, duration }) =>
+    sendMessage({
+      text: "",
+      file: { data, name: `Video message.${mimeType.includes("mp4") ? "mp4" : "webm"}`, mimeType, size, duration, videoNote: true },
     });
 
   const handleEmojiSelect = (emoji) => {
@@ -724,6 +732,11 @@ const MessageInput = () => {
         />
       )}
       {showEvent && <EventModal onClose={() => setShowEvent(false)} onSend={(event) => sendMessage({ event })} />}
+      {showVideoNote && (
+        <Suspense fallback={null}>
+          <VideoNoteRecorder onSend={sendVideoNote} onClose={() => setShowVideoNote(false)} />
+        </Suspense>
+      )}
       {showLocSheet && (
         <LocationSheet
           allowLive={!selectedChat?.data?.isSelf}
@@ -902,6 +915,19 @@ const MessageInput = () => {
                       <Music size={16} className="text-white" />
                     </span>
                     Audio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowVideoNote(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                  >
+                    <span className="size-8 rounded-full bg-[#F15C6D] flex items-center justify-center shrink-0">
+                      <VideoIcon size={16} className="text-white" />
+                    </span>
+                    Video message
                   </button>
                   <button
                     type="button"
