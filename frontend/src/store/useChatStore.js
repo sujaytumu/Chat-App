@@ -493,7 +493,7 @@ export const useChatStore = create((set, get) => ({
       // Plain text shows up in the chat at once (with a clock) and is swapped
       // for the real message when the server confirms — no waiting on the network.
       const me = useAuthStore.getState().authUser;
-      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.contactUserId && !messageData.statusId;
+      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.event && !messageData.contactUserId && !messageData.statusId;
       const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       if (simple && me) {
         const temp = {
@@ -634,6 +634,14 @@ export const useChatStore = create((set, get) => ({
     const res = await axiosInstance.put(`/messages/edit/${messageId}`, { text });
     get().applyEdit(res.data);
     set({ editingMessage: null });
+  },
+  rsvpEvent: async (messageId, answer) => {
+    try {
+      const res = await axiosInstance.put(`/messages/event/${messageId}/rsvp`, { answer });
+      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, event: res.data.event } : m)) }));
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't save your answer");
+    }
   },
   votePoll: async (messageId, optionIds) => {
     try {
@@ -983,6 +991,9 @@ export const useChatStore = create((set, get) => ({
     socket.on("directDisappearing", ({ userId, seconds }) =>
       set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: seconds || 0 } }))
     );
+    socket.on("messageEvent", ({ _id, event }) =>
+      set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, event } : m)) }))
+    );
     socket.on("messagePoll", ({ _id, poll }) =>
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, poll } : m)) }))
     );
@@ -1158,6 +1169,7 @@ export const useChatStore = create((set, get) => ({
       "messageReacted",
       "messageEdited",
       "messagePoll",
+      "messageEvent",
       "messageViewOnce",
     ].forEach((event) => socket.off(event));
     set({ socketSubscribed: false });

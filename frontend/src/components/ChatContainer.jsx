@@ -31,6 +31,7 @@ import { useStatusBarColor } from "../lib/useStatusBarColor";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
+import EventCard from "./EventCard";
 import ContactCard from "./ContactCard";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
@@ -478,7 +479,7 @@ const ChatContainer = () => {
           // The first bubble of a run from the same person gets a tail and a
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
-          const hasText = !!message.text && !location && !message.poll && !message.contact;
+          const hasText = !!message.text && !location && !message.poll && !message.event && !message.contact;
 
           const menuProps = {
             message,
@@ -563,7 +564,7 @@ const ChatContainer = () => {
                   <div className="w-7 mr-3 shrink-0" />
                 ))}
 
-              {isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && (
+              {isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && !message.event && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -730,6 +731,8 @@ const ChatContainer = () => {
                         else toast("That's you");
                       }}
                     />
+                  ) : message.event ? (
+                    <EventCard message={message} authUserId={authUser._id} onRsvp={(a) => useChatStore.getState().rsvpEvent(message._id, a)} />
                   ) : message.poll ? (
                     <PollCard message={message} authUserId={authUser._id} onVote={(ids) => votePoll(message._id, ids)} />
                   ) : location ? (
@@ -784,7 +787,7 @@ const ChatContainer = () => {
                 </div>
               )}
 
-              {!isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && (
+              {!isMe && (message.image || message.file || message.forwarded || firstLink(message.text)) && !message.deletedForEveryone && !message.viewOnce && !message.poll && !message.event && (
                 <button
                   type="button"
                   onClick={(e) => {

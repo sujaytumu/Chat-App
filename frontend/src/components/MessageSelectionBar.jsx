@@ -34,11 +34,11 @@ const MessageSelectionBar = () => {
   const live = sel.filter((m) => !m.deletedForEveryone);
   const allStarred = live.length > 0 && live.every((m) => m.starredBy?.includes(authUser._id));
   const allMine = sel.length > 0 && sel.every((m) => m.senderId === authUser._id && !m.deletedForEveryone);
-  const canForward = live.length > 0 && live.every((m) => !m.viewOnce && !m.poll);
+  const canForward = live.length > 0 && live.every((m) => !m.viewOnce && !m.poll && !m.event);
   const texts = live.filter((m) => m.text).map((m) => m.text);
   const isGroup = selectedChat?.type === "group";
   const canEdit =
-    !!single && single.senderId === authUser._id && !!single.text && !single.file && !single.image && !single.poll && !single.contact && !single.deletedForEveryone && Date.now() - new Date(single.createdAt).getTime() < 15 * 60 * 1000;
+    !!single && single.senderId === authUser._id && !!single.text && !single.file && !single.image && !single.poll && !single.event && !single.contact && !single.deletedForEveryone && Date.now() - new Date(single.createdAt).getTime() < 15 * 60 * 1000;
 
   const doStar = () => {
     const st = useChatStore.getState();

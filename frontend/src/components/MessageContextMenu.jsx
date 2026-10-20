@@ -59,7 +59,7 @@ const MessageContextMenu = ({ message, isMe, authUserId, menu, x, y, align, onCl
           () => toast.error("Couldn't copy")
         ),
     },
-    { label: "Forward", icon: Forward, hidden: !!message.viewOnce || !!message.poll, onClick: menu.onForward },
+    { label: "Forward", icon: Forward, hidden: !!message.viewOnce || !!message.poll || !!message.event, onClick: menu.onForward },
     { label: isPinned(message) ? "Unpin" : "Pin", icon: isPinned(message) ? PinOff : Pin, onClick: menu.onTogglePin },
     { label: starred ? "Unstar" : "Star", icon: starred ? Star : StarOutline, onClick: menu.onToggleStar },
     { label: "Edit", icon: Pencil, hidden: !menu.onEdit, onClick: menu.onEdit },

@@ -17,6 +17,7 @@ import { sendPushToUser } from "../lib/webPush.js";
 import { getUserLean, getUserDoc } from "../lib/authCache.js";
 import { rememberMessage } from "../lib/recentMessages.js";
 import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
+import { sanitizeEvent } from "../lib/event.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -273,6 +274,7 @@ const sendMessageCore = async (req, res) => {
       return res.status(e.status || 400).json({ error: e.message });
     }
     const poll = sanitizePoll(req.body.poll);
+    const event = sanitizeEvent(req.body.event);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
     const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
@@ -284,7 +286,7 @@ const sendMessageCore = async (req, res) => {
       getDisappearAfter(senderId, receiverId),
     ]);
 
-    if (!text?.trim() && !image && !file && !poll && !contact) {
+    if (!text?.trim() && !image && !file && !poll && !event && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -328,8 +330,9 @@ const sendMessageCore = async (req, res) => {
       receiverId,
       vanish,
       expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
-      text: poll ? `📊 ${poll.question}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
+      event: event || undefined,
       contact: contact || undefined,
       image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
       viewOnce: !!(viewOnce && imageUrl && !fileAttachment),
@@ -912,6 +915,40 @@ export const searchMessages = async (req, res) => {
 };
 
 // Vote in a poll (choose / change / clear). Body: { optionIds: [...] }
+// RSVP to an event message: going / maybe / no (answering again replaces the earlier answer).
+export const rsvpEvent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const field = { going: "going", maybe: "maybe", no: "declined" }[req.body?.answer];
+    if (!field) return res.status(400).json({ error: "Invalid answer" });
+    const message = await Message.findById(id).select("event senderId receiverId groupId deletedForEveryone");
+    if (!message?.event || message.deletedForEveryone) return res.status(404).json({ error: "Event not found" });
+    if (message.groupId) {
+      if (!(await Group.exists({ _id: message.groupId, members: myId }))) return res.status(403).json({ error: "Not a member" });
+    } else if (![message.senderId, message.receiverId].some((u) => String(u) === String(myId))) {
+      return res.status(403).json({ error: "Not allowed" });
+    }
+    for (const f of ["going", "maybe", "declined"]) message.event[f] = message.event[f].filter((u) => String(u) !== String(myId));
+    message.event[field].push(myId);
+    await message.save();
+    const payload = { _id: message._id, event: message.event };
+    if (message.groupId) {
+      io.to(message.groupId.toString()).emit("messageEvent", payload);
+    } else {
+      [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+        const socketId = getReceiverSocketId(uid);
+        if (socketId) io.to(socketId).emit("messageEvent", payload);
+      });
+    }
+    res.status(200).json(payload);
+  } catch (error) {
+    console.log("Error in rsvpEvent controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const votePoll = async (req, res) => {
   try {
     const { id } = req.params;
