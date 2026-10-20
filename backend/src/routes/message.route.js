@@ -36,6 +36,9 @@ import {
   setNote,
   rsvpEvent,
   updateLiveLocation,
+  createReminder,
+  listReminders,
+  deleteReminder,
   setDirectVanish,
   clearVanish,
 } from "../controllers/message.controller.js";
@@ -45,6 +48,9 @@ const router = express.Router();
 router.get("/users", protectRoute, getUsersForSidebar);
 router.put("/note", protectRoute, setNote);
 router.put("/event/:id/rsvp", protectRoute, rsvpEvent);
+router.post("/reminders", protectRoute, createReminder);
+router.get("/reminders", protectRoute, listReminders);
+router.delete("/reminders/:id", protectRoute, deleteReminder);
 router.put("/live-location/:id", protectRoute, updateLiveLocation);
 router.put("/live-location/:id/stop", protectRoute, updateLiveLocation);
 router.put("/vanish/:id", protectRoute, setDirectVanish);

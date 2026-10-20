@@ -4,7 +4,8 @@ import { sendMessage } from "../controllers/message.controller.js";
 import { sendGroupMessage } from "../controllers/group.controller.js";
 import { io } from "./socket.js";
 import CallLink from "../models/callLink.model.js";
-import { sendPushToUsers } from "./webPush.js";
+import { sendPushToUsers, sendPushToUser } from "./webPush.js";
+import Reminder from "../models/reminder.model.js";
 
 // Every few seconds: send whatever has come due, through the normal send code
 // (so ticks, push notifications, blocking and disappearing timers all behave).
@@ -64,7 +65,25 @@ async function callReminders() {
   }
 }
 
+// "Remind me about this message" that have come due: push + a live event for open apps.
+async function messageReminders() {
+  const due = await Reminder.find({ remindAt: { $lte: new Date() } }).sort({ remindAt: 1 }).limit(50).lean();
+  for (const r of due) {
+    const claimed = await Reminder.findOneAndDelete({ _id: r._id });
+    if (!claimed) continue;
+    io.to(String(r.userId)).emit("reminderDue", { _id: r._id, messageId: r.messageId, chatType: r.chatType, chatId: r.chatId, preview: r.preview });
+    sendPushToUser(r.userId, {
+      title: "Reminder",
+      body: r.preview || "You asked to be reminded about a message",
+      icon: "/icon-v2-192.png",
+      tag: `reminder-${r._id}`,
+      data: { url: "/" },
+    });
+  }
+}
+
 async function tick() {
+  await messageReminders().catch((e) => console.log("Message reminder error:", e.message));
   await callReminders().catch((e) => console.log("Call reminder error:", e.message));
   await endExpiredMutes().catch((e) => console.log("Mute expiry error:", e.message));
   const due = await ScheduledMessage.find({ sendAt: { $lte: new Date() } }).sort({ sendAt: 1 }).limit(30).lean();
