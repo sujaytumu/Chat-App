@@ -16,6 +16,7 @@ import android.webkit.WebView;
 import androidx.activity.OnBackPressedCallback;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
 import com.getcapacitor.BridgeWebViewClient;
 
 public class MainActivity extends BridgeActivity {
@@ -60,6 +61,17 @@ public class MainActivity extends BridgeActivity {
                 if (!isFinishing() && !isDestroyed()) view.loadUrl(url);
             }
         }, 20000);
+    }
+
+    /** No big grey play-circle while a video is still buffering: use a clear 1x1 poster instead. */
+    private void installClearVideoPoster() {
+        if (getBridge() == null || getBridge().getWebView() == null) return;
+        getBridge().getWebView().setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+            @Override
+            public Bitmap getDefaultVideoPoster() {
+                return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888);
+            }
+        });
     }
 
     private void installLoadFailureHandler() {
@@ -186,6 +198,7 @@ public class MainActivity extends BridgeActivity {
             web.setHorizontalScrollBarEnabled(false);
         }
         installLoadFailureHandler();
+        installClearVideoPoster();
         AppChromePlugin.applySaved(this);
 
         // Back button = go back inside the web app (close the open chat, search,
