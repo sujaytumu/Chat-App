@@ -61,6 +61,7 @@ const HelpPage = more("HelpPage");
 const ProfilePage = lazy(loaders.ProfilePage);
 const CallsPage = lazy(loaders.CallsPage);
 const CallJoinPage = lazy(() => import("./pages/CallJoinPage"));
+const ChannelsPage = lazy(() => import("./pages/ChannelsPage"));
 
 // Someone opened a call link while signed out: remember it, sign in, then land on the call.
 const CallLinkLogin = () => {
@@ -325,6 +326,10 @@ const App = () => {
           <Route
             path="/settings/help"
             element={authUser ? <MainLayout><HelpPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/channels"
+            element={authUser ? <MainLayout><ChannelsPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/starred"
