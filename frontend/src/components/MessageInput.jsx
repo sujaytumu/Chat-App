@@ -15,12 +15,14 @@ import {
   UserRound,
   Smile,
   Camera,
+  CalendarDays,
 } from "lucide-react";
 import { isDesktopNow } from "./ContextMenu";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import PollModal from "./PollModal";
+import EventModal from "./EventModal";
 import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
 import { createPortal } from "react-dom";
@@ -61,6 +63,7 @@ const MessageInput = () => {
   const authUser = useAuthStore((st) => st.authUser);
   const [showContacts, setShowContacts] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
+  const [showEvent, setShowEvent] = useState(false);
   const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
   const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
@@ -700,6 +703,7 @@ const MessageInput = () => {
           }}
         />
       )}
+      {showEvent && <EventModal onClose={() => setShowEvent(false)} onSend={(event) => sendMessage({ event })} />}
       {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
       {mentionCandidates.length > 0 && (
         <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
@@ -898,6 +902,19 @@ const MessageInput = () => {
                       <BarChart3 size={16} className="text-white" />
                     </span>
                     Poll
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowEvent(true);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                  >
+                    <span className="size-8 rounded-full bg-[#ef4d7c] flex items-center justify-center shrink-0">
+                      <CalendarDays size={16} className="text-white" />
+                    </span>
+                    Event
                   </button>
                   <button
                     type="button"

@@ -7,6 +7,7 @@ import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUsers } from "../lib/webPush.js";
 import { sanitizePoll } from "../lib/poll.js";
+import { sanitizeEvent } from "../lib/event.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupSeen } from "../lib/groupReceipts.js";
 
@@ -171,11 +172,12 @@ export const sendGroupMessage = async (req, res) => {
       return res.status(e.status || 400).json({ error: e.message });
     }
     const poll = sanitizePoll(req.body.poll);
+    const event = sanitizeEvent(req.body.event);
     const contact = await buildContact(req.body.contactUserId);
     const { id: groupId } = req.params;
     const senderId = req.user._id;
 
-    if (!text?.trim() && !image && !file && !poll && !contact) {
+    if (!text?.trim() && !image && !file && !poll && !event && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -225,8 +227,9 @@ export const sendGroupMessage = async (req, res) => {
       senderId,
       groupId,
       deliveredTo,
-      text: poll ? `📊 ${poll.question}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
+      event: event || undefined,
       contact: contact || undefined,
       image: imageUrl,
       file: fileAttachment,
