@@ -5,6 +5,12 @@
 const MARK = "/image/upload/";
 
 export function optimizeImage(url, width) {
+  // Private chat pictures come from /api/media/<token>: the server resizes them when asked (?w=)
+  if (typeof url === "string" && url.startsWith("/api/media/")) {
+    if (!width || url.includes("?")) return url;
+    const r = typeof window !== "undefined" ? Math.min(Math.ceil(window.devicePixelRatio || 1), 2) : 1;
+    return `${url}?w=${Math.round(width * r)}`;
+  }
   if (!url || typeof url !== "string" || !url.includes("res.cloudinary.com") || !url.includes(MARK)) return url;
   if (url.includes(`${MARK}f_auto`)) return url; // already transformed
   const dpr = typeof window !== "undefined" ? Math.min(Math.ceil(window.devicePixelRatio || 1), 2) : 1;

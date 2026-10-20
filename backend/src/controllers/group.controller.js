@@ -1,6 +1,7 @@
 import Report from "../models/report.model.js";
 import Group from "../models/group.model.js";
 import Message from "../models/message.model.js";
+import { resolveMediaRef } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
@@ -160,7 +161,15 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image, file, replyTo, mentions, forwarded } = req.body;
+    const { text, replyTo, mentions, forwarded } = req.body;
+    let { image, file } = req.body;
+    try {
+      // forwarding hands back the /api/media/ address it was shown: check access, turn it into a fetchable one
+      if (image) image = await resolveMediaRef(image, req.user._id);
+      if (file?.data) file = { ...file, data: await resolveMediaRef(file.data, req.user._id) };
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message });
+    }
     const poll = sanitizePoll(req.body.poll);
     const contact = await buildContact(req.body.contactUserId);
     const { id: groupId } = req.params;
@@ -197,6 +206,7 @@ export const sendGroupMessage = async (req, res) => {
     if (image) {
       const uploadResponse = await cloudinary.uploader.upload(image, {
         folder: "chat-app/messages",
+        type: "authenticated", // private: only reachable through the chat-checked /api/media route
         resource_type: "image",
       });
       imageUrl = uploadResponse.secure_url;
