@@ -198,7 +198,7 @@ const StatusPage = () => {
             <NotesRow />
 
             {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
-            <div className="mx-3 mt-3 rounded-2xl bg-wa-surface/60 pb-2 pt-3" style={{ boxShadow: "inset 0 0 0 1px rgb(255 255 255 / .05)" }}>
+            <div className="mt-3 pb-1 border-t border-white/5 pt-3">
               <div className="flex items-center gap-2 px-4 pb-1">
                 <span className="size-6 rounded-lg flex items-center justify-center text-white" style={{ background: HL_GRADIENT }}>
                   <Bookmark size={13} />
