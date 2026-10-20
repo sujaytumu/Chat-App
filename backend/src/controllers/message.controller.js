@@ -3,7 +3,7 @@ import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import Group from "../models/group.model.js";
 import DirectChatSetting, { pairKey } from "../models/directChatSetting.model.js";
-import { buildStatusReply } from "../lib/statusReply.js";
+import { buildStatusReply, buildHighlightReply } from "../lib/statusReply.js";
 import { getLinkPreview } from "../lib/linkPreview.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { buildContact } from "../lib/contactCard.js";
@@ -285,7 +285,7 @@ const sendMessageCore = async (req, res) => {
     // Independent lookups run together instead of one after another.
     const [contact, statusReply, receiver, disappearAfter] = await Promise.all([
       buildContact(req.body.contactUserId),
-      buildStatusReply(req.body.statusId, receiverId),
+      req.body.highlightId ? buildHighlightReply(req.body.highlightId, req.body.itemId, receiverId, senderId) : buildStatusReply(req.body.statusId, receiverId),
       getUserLean(receiverId), // remembered for a few seconds: no database trip while chatting
       getDisappearAfter(senderId, receiverId),
     ]);
