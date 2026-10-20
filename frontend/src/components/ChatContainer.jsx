@@ -15,7 +15,7 @@ import MessageContextMenu from "./MessageContextMenu";
 import PinDurationSheet from "./PinDurationSheet";
 import { isPinned } from "../lib/pin";
 import { isDesktopNow } from "./ContextMenu";
-import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
+import { emojiOnlyCount, emojiFontSize, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
@@ -467,8 +467,11 @@ const ChatContainer = () => {
           const isMe = message.senderId === authUser._id;
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
           const location = message.text ? parseLocationMessage(message.text) : null;
-          const isSticker =
-            !message.image && !message.file && !location && isStickerMessage(message.text);
+          // emoji-only text stays in the normal bubble (like WhatsApp), just a bit larger
+          const emojiPx =
+            !message.image && !message.file && !location && !message.replyTo && !message.mentions?.length
+              ? emojiFontSize(emojiOnlyCount(message.text))
+              : null;
           const replyFromMe = message.replyTo?.senderId === authUser._id;
           const replySender = message.replyTo
             ? isGroup
@@ -594,17 +597,6 @@ const ChatContainer = () => {
                   } ${isFirstInGroup ? (isMe ? "rounded-tr-none" : "rounded-tl-none") : ""}`}
                 >
                   🚫 This message was deleted
-                </div>
-              ) : isSticker ? (
-                <div className="flex flex-col items-center px-1">
-                  <span className="text-6xl leading-none">{message.text.trim()}</span>
-                  <span className="text-[9.4px] text-wa-muted mt-1 flex items-center gap-1">
-                    {formatMessageTime(message.createdAt)}
-                    {isMe && !isGroup && <MessageTicks message={message} />}
-                    {isMe && isGroup && (
-                      <GroupMessageTicks message={message} members={data.members} senderId={authUser._id} />
-                    )}
-                  </span>
                 </div>
               ) : (
                 <div
@@ -747,7 +739,10 @@ const ChatContainer = () => {
                     message.text && (
                       <>
                       {!message.deletedForEveryone && !message.viewOnce && firstLink(message.text) && <LinkPreview url={firstLink(message.text)} />}
-                      <span className="msg-text text-[13px] leading-[21px] lg:text-[15.5px] lg:leading-[23px]" style={{ whiteSpace: "pre-wrap" }}>
+                      <span
+                        className={`msg-text ${emojiPx ? "" : "text-[13px] leading-[21px] lg:text-[15.5px] lg:leading-[23px]"}`}
+                        style={emojiPx ? { whiteSpace: "pre-wrap", fontSize: emojiPx, lineHeight: `${Math.round(emojiPx * 1.2)}px` } : { whiteSpace: "pre-wrap" }}
+                      >
                         {(() => {
                           const long = message.text.length > READ_MORE_AT && !expandedIds.has(message._id);
                           const shown = long ? `${message.text.slice(0, READ_MORE_AT).trimEnd()}…` : message.text;

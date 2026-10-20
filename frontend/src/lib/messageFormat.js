@@ -11,6 +11,25 @@ export function isStickerMessage(text) {
   return EMOJI_REGEX.test(trimmed);
 }
 
+// How many emoji an emoji-only message holds (0 if it has any other text).
+export function emojiOnlyCount(text) {
+  if (!text) return 0;
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.length > 40 || !EMOJI_REGEX.test(trimmed)) return 0;
+  const seg = typeof Intl !== "undefined" && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+  return seg ? [...seg.segment(trimmed)].length : [...trimmed].length;
+}
+
+// WhatsApp keeps emoji-only messages inside the normal bubble and only nudges the
+// size up a little (fewer emoji -> a bit bigger). Returns the font size in px.
+export function emojiFontSize(count) {
+  if (count <= 0) return null;
+  if (count === 1) return 36;
+  if (count <= 3) return 32;
+  if (count <= 8) return 28;
+  return 22;
+}
+
 const LOCATION_REGEX = /^📍 Current location\nhttps:\/\/www\.google\.com\/maps\?q=(-?\d+\.?\d*),(-?\d+\.?\d*)$/;
 
 export function parseLocationMessage(text) {
