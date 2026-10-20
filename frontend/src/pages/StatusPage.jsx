@@ -9,6 +9,7 @@ import StatusViewer from "../components/StatusViewer";
 import HighlightsRow from "../components/HighlightsRow";
 import HighlightSheet from "../components/HighlightSheet";
 import PlaylistsCard from "../components/PlaylistsCard";
+import NotesRow from "../components/NotesRow";
 import { HL_GRADIENT } from "../lib/highlightTheme";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import toast from "react-hot-toast";
@@ -193,6 +194,8 @@ const StatusPage = () => {
                 </p>
               </div>
             </button>
+
+            <NotesRow />
 
             {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
             <div className="mx-3 mt-3 rounded-2xl bg-wa-surface/60 pb-2 pt-3" style={{ boxShadow: "inset 0 0 0 1px rgb(255 255 255 / .05)" }}>
