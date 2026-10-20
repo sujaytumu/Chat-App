@@ -18,6 +18,7 @@ export async function uploadFileAttachment({ data, name, mimeType, size, duratio
 
   const uploadResponse = await cloudinary.uploader.upload(data, {
     folder: "chat-app/files",
+    type: "authenticated", // private: only reachable through the chat-checked /api/media route
     resource_type: resourceType,
     use_filename: true,
     filename_override: name,

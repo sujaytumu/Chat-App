@@ -19,6 +19,8 @@ import statusRoutes from "./routes/status.route.js";
 import highlightRoutes from "./routes/highlight.route.js";
 import scheduledRoutes from "./routes/scheduled.route.js";
 import broadcastRoutes from "./routes/broadcast.route.js";
+import mediaRoutes from "./routes/media.route.js";
+import { maskJsonMiddleware } from "./lib/privateMedia.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { app, server } from "./lib/socket.js";
 import { configureWebPush } from "./lib/webPush.js";
@@ -80,6 +82,8 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
 app.use("/api/auth/change-password", authLimiter);
 
+app.use("/api/media", mediaRoutes); // private chat files (checks you are in the chat, then redirects)
+app.use("/api", maskJsonMiddleware); // from here on, chat file addresses never leave the server as-is
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/groups", groupRoutes);

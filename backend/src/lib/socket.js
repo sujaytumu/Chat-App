@@ -1,3 +1,4 @@
+import { maskPayload } from "./privateMedia.js";
 import CallLink from "../models/callLink.model.js";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
@@ -1054,6 +1055,19 @@ export function declineCallFor(userId, callerId, callId) {
   }
   activeCallLogs.delete(key);
   activeCalls.delete(key);
+}
+
+// Chat file addresses never go out over the socket either: payloads are rewritten to /api/media/… first.
+{
+  const origTo = io.to.bind(io);
+  io.to = (...rooms) => {
+    const op = origTo(...rooms);
+    const emit = op.emit.bind(op);
+    op.emit = (ev, ...args) => emit(ev, ...args.map(maskPayload));
+    return op;
+  };
+  const origEmit = io.emit.bind(io);
+  io.emit = (ev, ...args) => origEmit(ev, ...args.map(maskPayload));
 }
 
 export { io, app, server };

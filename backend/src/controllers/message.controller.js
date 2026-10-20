@@ -16,6 +16,7 @@ import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUser } from "../lib/webPush.js";
 import { getUserLean, getUserDoc } from "../lib/authCache.js";
 import { rememberMessage } from "../lib/recentMessages.js";
+import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -246,7 +247,15 @@ async function getDisappearAfter(a, b) {
 
 const sendMessageCore = async (req, res) => {
   try {
-    const { text, image, file, replyTo, viewOnce, forwarded } = req.body;
+    const { text, replyTo, viewOnce, forwarded } = req.body;
+    let { image, file } = req.body;
+    try {
+      // forwarding hands back the /api/media/ address it was shown: check access, turn it into a fetchable one
+      if (image) image = await resolveMediaRef(image, req.user._id);
+      if (file?.data) file = { ...file, data: await resolveMediaRef(file.data, req.user._id) };
+    } catch (e) {
+      return res.status(e.status || 400).json({ error: e.message });
+    }
     const poll = sanitizePoll(req.body.poll);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
@@ -273,6 +282,7 @@ const sendMessageCore = async (req, res) => {
     if (image) {
       const uploadResponse = await cloudinary.uploader.upload(image, {
         folder: "chat-app/messages",
+        type: "authenticated", // private: only reachable through the chat-checked /api/media route
         resource_type: "image",
       });
       imageUrl = uploadResponse.secure_url;
@@ -937,7 +947,8 @@ export const openViewOnce = async (req, res) => {
       const socketId = getReceiverSocketId(uid);
       if (socketId) io.to(socketId).emit("messageViewOnce", { _id: id });
     });
-    res.status(200).json({ image: url });
+    res.locals.noMask = true; // this one is the real (signed) address, shown once
+    res.status(200).json({ image: deliveryUrl(url) });
   } catch (error) {
     console.log("Error in openViewOnce controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -1206,7 +1217,7 @@ export const transcribeMessage = async (req, res) => {
     const openai = process.env.OPENAI_API_KEY;
     if (!groq && !openai) return res.status(501).json({ error: "not_configured" });
 
-    const audio = await fetch(message.file.url);
+    const audio = await fetch(deliveryUrl(message.file.url));
     if (!audio.ok) return res.status(502).json({ error: "Couldn't load that voice message" });
     const buf = Buffer.from(await audio.arrayBuffer());
     if (!buf.length || buf.length > MAX_TRANSCRIBE_BYTES) return res.status(413).json({ error: "That voice message is too long to transcribe" });
