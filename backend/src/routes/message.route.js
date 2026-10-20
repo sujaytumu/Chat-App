@@ -33,11 +33,13 @@ import {
   getDirectDisappearing,
   linkPreview,
   setDirectDisappearing,
+  setNote,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
 
 router.get("/users", protectRoute, getUsersForSidebar);
+router.put("/note", protectRoute, setNote);
 router.get("/starred/all", protectRoute, getStarredMessages);
 router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
 router.get("/search/all", protectRoute, searchMessages);

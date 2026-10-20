@@ -1062,6 +1062,11 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
+    socket.on("userNote", ({ userId, note }) => {
+      set((st) => ({ users: st.users.map((u) => (u._id === userId ? { ...u, note } : u)) }));
+      useAuthStore.setState((st) => (st.authUser && String(st.authUser._id) === String(userId) ? { authUser: { ...st.authUser, note } } : {}));
+    });
+
     socket.on("statusLiked", ({ user }) => {
       toast(`${user?.fullName || "Someone"} liked your status`, { icon: "❤️" });
     });

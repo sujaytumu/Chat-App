@@ -60,6 +60,20 @@ export async function markImpliedRead(replier, other, upTo = new Date()) {
 // Sidebar: direct-message contacts, each with last message + unread count.
 // Uses two aggregations (not one query per contact) so this stays fast
 // regardless of how many contacts/messages exist.
+// Set (or clear, with empty text) my Note. It lasts 24 hours and is pushed live to everyone online.
+export const setNote = async (req, res) => {
+  try {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, 60) : "";
+    const note = text ? { text, expiresAt: new Date(Date.now() + 24 * 3600 * 1000) } : { text: "", expiresAt: null };
+    await User.findByIdAndUpdate(req.user._id, { $set: { note } });
+    io.emit("userNote", { userId: String(req.user._id), note });
+    res.status(200).json({ note });
+  } catch (error) {
+    console.log("Error in setNote controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const getUsersForSidebar = async (req, res) => {
   try {
     const loggedInUserId = req.user._id;
@@ -126,6 +140,7 @@ export const getUsersForSidebar = async (req, res) => {
       const hideSeen = iHideReceipts || privacy?.readReceipts === false;
       // "Last seen" is hidden both ways when either side turned online status off.
       if (privacy?.online === false || req.user.privacy?.online === false) user.lastSeen = null;
+      if (user.note && (!user.note.text || !user.note.expiresAt || new Date(user.note.expiresAt) < new Date())) user.note = null; // expired notes are gone
       return {
         ...user,
         lastMessage: lm
