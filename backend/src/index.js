@@ -9,6 +9,7 @@ import rateLimit from "express-rate-limit";
 import path from "path";
 
 import { connectDB } from "./lib/db.js";
+import { wipeChatMediaOnce } from "./lib/wipeChatMedia.js";
 
 import authRoutes from "./routes/auth.route.js";
 import messageRoutes from "./routes/message.route.js";
@@ -138,5 +139,8 @@ if (process.env.NODE_ENV === "production") {
 
 server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);
-  connectDB().then(() => startScheduler());
+  connectDB().then(() => {
+    startScheduler();
+    wipeChatMediaOnce().catch((e) => console.log("wipe error:", e.message)); // one-time, owner-approved clean-up
+  });
 });
