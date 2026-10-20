@@ -9,6 +9,7 @@ import { sendPushToUsers } from "../lib/webPush.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation } from "../lib/liveLocation.js";
+import { visibleUserIds } from "../lib/visibility.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupSeen } from "../lib/groupReceipts.js";
 
@@ -37,6 +38,8 @@ export const createGroup = async (req, res) => {
       groupPicUrl = uploadResponse.secure_url;
     }
 
+    const seeAll = await visibleUserIds(req.user);
+    if (seeAll && memberIds.some((id) => !seeAll.has(String(id)))) return res.status(403).json({ error: "You can only add people you are allowed to see" });
     const uniqueMembers = Array.from(new Set([...memberIds, myId.toString()]));
 
     const group = await Group.create({
@@ -303,6 +306,8 @@ export const addMembers = async (req, res) => {
       return res.status(403).json({ error: "Only admins can add members" });
     }
 
+    const seeAll = await visibleUserIds(req.user);
+    if (seeAll && memberIds.some((id) => !seeAll.has(String(id)))) return res.status(403).json({ error: "You can only add people you are allowed to see" });
     const newMembers = memberIds.filter((id) => !group.members.some((m) => m.equals(id)));
     group.members.push(...newMembers);
     await group.save();

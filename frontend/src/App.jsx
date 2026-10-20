@@ -48,6 +48,7 @@ const NotificationsPage = lazy(loaders.NotificationsPage);
 const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.AppearancePage })));
 const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
 const AccountPage = more("AccountPage");
+const AccessPage = lazy(() => import("./pages/AccessPage"));
 const StarredPage = more("StarredPage");
 const PrivacyPage = more("PrivacyPage");
 const TwoStepPage = more("TwoStepPage");
@@ -282,6 +283,10 @@ const App = () => {
           <Route
             path="/settings/account"
             element={authUser ? <MainLayout><AccountPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/access"
+            element={authUser ? <MainLayout><AccessPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/settings/two-step"
