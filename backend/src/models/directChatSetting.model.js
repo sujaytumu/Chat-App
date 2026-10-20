@@ -5,6 +5,7 @@ const schema = new mongoose.Schema(
   {
     key: { type: String, required: true, unique: true },
     disappearAfter: { type: Number, default: 0 },
+    vanish: { type: Boolean, default: false }, // Vanish mode: seen messages disappear once the reader leaves the chat
   },
   { timestamps: true }
 );

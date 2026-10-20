@@ -22,6 +22,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
   const startCall = useCallStore((s) => s.startCall);
   const callBusy = useCallStore((s) => s.callStatus !== "idle");
   const secs = useChatStore((s) => s.directDisappear[user._id] || 0);
+  const vanish = useChatStore((s) => !!s.directVanish[user._id]);
   const [viewPhoto, setViewPhoto] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
@@ -115,6 +116,16 @@ const ContactInfoModal = ({ user, status, onClose }) => {
               aria-hidden="true"
             >
               <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${muted ? "left-[18px]" : "left-0.5"}`} />
+            </span>
+          </button>
+          <button onClick={() => useChatStore.getState().setDirectVanish(user._id, !vanish)} className={row}>
+            <span className="text-[20px] leading-none w-[22px] text-center">👻</span>
+            <span className="flex-1">
+              <span className="block text-[13.5px]">Vanish mode</span>
+              <span className="block text-[11.5px] text-wa-muted">Messages disappear after they are seen and the chat is closed</span>
+            </span>
+            <span className={`relative w-10 h-6 rounded-full transition-colors ${vanish ? "bg-[#21C063]" : "bg-wa-field"}`}>
+              <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${vanish ? "left-[18px]" : "left-0.5"}`} />
             </span>
           </button>
           <button onClick={() => setShowDisappear(true)} className={row}>

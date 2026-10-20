@@ -249,16 +249,17 @@ export const prefetchMessages = async (req, res) => {
 };
 
 // The "disappearing messages" setting of a chat, remembered briefly so sending doesn't wait on it.
-const disappearCache = new Map(); // pairKey -> { seconds, at }
-async function getDisappearAfter(a, b) {
+const disappearCache = new Map(); // pairKey -> { seconds, vanish, at }
+async function getDirectSetting(a, b) {
   const key = pairKey(a, b);
   const hit = disappearCache.get(key);
-  if (hit && Date.now() - hit.at < 30_000) return hit.seconds;
-  const row = await DirectChatSetting.findOne({ key }).select("disappearAfter").lean();
-  const seconds = row?.disappearAfter || 0;
-  disappearCache.set(key, { seconds, at: Date.now() });
-  return seconds;
+  if (hit && Date.now() - hit.at < 30_000) return hit;
+  const row = await DirectChatSetting.findOne({ key }).select("disappearAfter vanish").lean();
+  const entry = { seconds: row?.disappearAfter || 0, vanish: !!row?.vanish, at: Date.now() };
+  disappearCache.set(key, entry);
+  return entry;
 }
+const getDisappearAfter = async (a, b) => (await getDirectSetting(a, b)).seconds;
 
 const sendMessageCore = async (req, res) => {
   try {
@@ -321,9 +322,11 @@ const sendMessageCore = async (req, res) => {
     // looks connected — e.g. the phone just lost signal — must not count.
     const isDelivered = false;
 
+    const vanish = !isSelf && (await getDirectSetting(senderId, receiverId)).vanish;
     const newMessage = new Message({
       senderId,
       receiverId,
+      vanish,
       expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
       text: poll ? `📊 ${poll.question}` : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
@@ -1161,12 +1164,53 @@ export const exportChats = async (req, res) => {
   }
 };
 
+// Vanish mode (Instagram): either person can switch it on/off for the chat; messages sent while it is on
+// disappear for both once the person they were sent to has read them and left the chat.
+export const setDirectVanish = async (req, res) => {
+  try {
+    const otherId = req.params.id;
+    if (!mongoose.isValidObjectId(otherId)) return res.status(400).json({ error: "Invalid user" });
+    const on = req.body?.on === true;
+    await DirectChatSetting.findOneAndUpdate({ key: pairKey(req.user._id, otherId) }, { $set: { vanish: on } }, { upsert: true });
+    disappearCache.delete(pairKey(req.user._id, otherId));
+    for (const [uid, peer] of [[otherId, req.user._id], [req.user._id, otherId]]) {
+      const sid = getReceiverSocketId(uid);
+      if (sid) io.to(sid).emit("directVanish", { userId: String(peer), on });
+    }
+    res.status(200).json({ on });
+  } catch (error) {
+    console.log("Error in setDirectVanish controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// The reader left the chat: what was sent to them in Vanish mode and has been seen is deleted for both.
+export const clearVanish = async (req, res) => {
+  try {
+    const otherId = req.params.id;
+    if (!mongoose.isValidObjectId(otherId)) return res.status(400).json({ error: "Invalid user" });
+    const filter = { vanish: true, seen: true, groupId: null, senderId: otherId, receiverId: req.user._id };
+    const rows = await Message.find(filter).select("_id").lean();
+    if (!rows.length) return res.status(200).json({ ids: [] });
+    const ids = rows.map((r) => String(r._id));
+    await Message.deleteMany({ _id: { $in: ids } });
+    for (const uid of [otherId, String(req.user._id)]) {
+      const sid = getReceiverSocketId(uid);
+      if (sid) io.to(sid).emit("vanishCleared", { ids });
+    }
+    res.status(200).json({ ids });
+  } catch (error) {
+    console.log("Error in clearVanish controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 const DIRECT_DISAPPEAR_OPTIONS = [0, 24 * 3600, 7 * 24 * 3600, 90 * 24 * 3600];
 
 export const getDirectDisappearing = async (req, res) => {
   try {
-    const doc = await DirectChatSetting.findOne({ key: pairKey(req.user._id, req.params.id) }).select("disappearAfter").lean();
-    res.status(200).json({ seconds: doc?.disappearAfter || 0 });
+    const doc = await DirectChatSetting.findOne({ key: pairKey(req.user._id, req.params.id) }).select("disappearAfter vanish").lean();
+    res.status(200).json({ seconds: doc?.disappearAfter || 0, vanish: !!doc?.vanish });
   } catch (error) {
     console.log("Error in getDirectDisappearing controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -1185,7 +1229,7 @@ export const setDirectDisappearing = async (req, res) => {
       { $set: { disappearAfter: seconds } },
       { upsert: true }
     );
-    disappearCache.set(pairKey(req.user._id, otherId), { seconds, at: Date.now() });
+    disappearCache.delete(pairKey(req.user._id, otherId));
     const sid = getReceiverSocketId(otherId);
     if (sid) io.to(sid).emit("directDisappearing", { userId: String(req.user._id), seconds });
     res.status(200).json({ seconds });

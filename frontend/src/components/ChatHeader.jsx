@@ -104,6 +104,7 @@ const ChatHeader = () => {
     else if (wasOnline.current) setWentOffline(new Date().toISOString());
     wasOnline.current = peerOnline;
   }, [peerOnline, peerId]);
+  const vanishOn = useChatStore((s) => (selectedChat?.type === "direct" ? !!s.directVanish[selectedChat.data._id] : false));
   if (!selectedChat) return null;
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
@@ -388,6 +389,9 @@ const ChatHeader = () => {
         </Suspense>
       )}
     </div>
+    {!isGroup && vanishOn && (
+      <div className="px-4 py-1.5 text-center text-[12px] text-white bg-[#5B3FD1]">👻 Vanish mode — messages disappear after they are seen and you leave the chat</div>
+    )}
     {isGroup && <GroupCallBanner group={data} />}
     </>
   );

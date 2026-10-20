@@ -27,6 +27,7 @@ const messageSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    vanish: { type: Boolean, default: false }, // sent in Vanish mode
     // Direct messages: has this been seen / delivered to the receiver?
     seen: {
       type: Boolean,
