@@ -70,16 +70,16 @@ const NotesRow = () => {
   const others = users.filter((u) => active(u.note));
 
   const bubble = (text, on) => (
-    <span className={`absolute -top-1 left-1/2 -translate-x-1/2 max-w-[84px] px-2.5 py-1 rounded-2xl text-[11px] leading-tight text-center shadow ${on ? "bg-wa-surface text-wa-text" : "bg-wa-field text-wa-muted"}`}>
-      <span className="line-clamp-2 break-words">{text}</span>
+    <span className={`absolute -top-1 left-1/2 -translate-x-1/2 max-w-[76px] px-2.5 py-1 rounded-2xl text-[11px] leading-tight text-center shadow ${on ? "bg-wa-surface text-wa-text" : "bg-wa-field text-wa-muted"}`}>
+      <span className="block truncate">{text}</span>
       <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 size-2 rotate-45 bg-inherit" />
     </span>
   );
 
   return (
     <>
-      <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pt-4 pb-1">
-        <button onClick={() => setSheet(true)} className="shrink-0 w-16 flex flex-col items-center gap-1 pt-7 relative" aria-label="Your note">
+      <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pt-1 pb-1">
+        <button onClick={() => setSheet(true)} className="shrink-0 w-16 flex flex-col items-center gap-1 pt-6 relative" aria-label="Your note">
           {bubble(mine || "Note…", !!mine)}
           <span className="relative">
             <Avatar src={authUser.profilePic} name={authUser.fullName} size="size-14" />
@@ -92,7 +92,7 @@ const NotesRow = () => {
           <span className="text-[11px] text-wa-muted truncate w-full text-center">Your note</span>
         </button>
         {others.map((u) => (
-          <button key={u._id} onClick={() => setSelectedChat({ type: "direct", data: u })} className="shrink-0 w-16 flex flex-col items-center gap-1 pt-7 relative">
+          <button key={u._id} onClick={() => setSelectedChat({ type: "direct", data: u })} className="shrink-0 w-16 flex flex-col items-center gap-1 pt-6 relative">
             {bubble(u.note.text, true)}
             <Avatar src={u.profilePic} name={u.fullName} size="size-14" />
             <span className="text-[11px] text-wa-muted truncate w-full text-center">{u.fullName.split(" ")[0]}</span>
