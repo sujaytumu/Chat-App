@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // Public @username (a-z, 0-9, . and _): lets people find and message each other without sharing an email.
+    username: { type: String, lowercase: true, trim: true, unique: true, sparse: true },
     password: {
       type: String,
       required: true,
