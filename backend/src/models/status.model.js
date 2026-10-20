@@ -29,6 +29,7 @@ const statusSchema = new mongoose.Schema(
       lat: { type: Number },
       lng: { type: Number },
     },
+    closeFriends: { type: Boolean, default: false }, // shared with the owner's Close friends list (green star)
     // Who may see it: everyone (my contacts), everyone except some people, or only some people
     audience: {
       mode: { type: String, enum: ["all", "except", "only"], default: "all" },

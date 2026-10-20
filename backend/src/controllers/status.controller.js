@@ -88,6 +88,7 @@ export const createStatus = async (req, res) => {
       const ids = [...new Set(audience.users.map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(myId)).slice(0, 1000);
       if (audience.mode === "only" && !ids.length) return res.status(400).json({ error: "Pick at least one person to share with" });
       doc.audience = { mode: audience.mode, users: ids };
+      if (audience.mode === "only" && audience.close === true) doc.closeFriends = true;
     }
 
     const status = await Status.create(doc);

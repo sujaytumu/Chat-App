@@ -171,17 +171,22 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
     }
   };
 
-  const sendReply = async (e) => {
+  const [burst, setBurst] = useState(null); // an emoji reaction floating up after it is sent
+  const sendReply = async (e, quick) => {
     e?.preventDefault();
-    const t = replyText.trim();
+    const t = (quick || replyText).trim();
     if (!t || sendingReply) return;
+    if (quick) {
+      setBurst({ e: quick, k: Date.now() });
+      setTimeout(() => setBurst(null), 1200);
+    }
     setSendingReply(true);
     try {
       await axiosInstance.post(`/messages/send/${user._id}`, { text: t, statusId: current._id });
       setReplyText("");
       setReplyFocus(false);
       document.activeElement?.blur?.();
-      toast.success("Reply sent");
+      if (!quick) toast.success("Reply sent");
     } catch (err) {
       toast.error(err.response?.data?.error || "Couldn't send the reply");
     } finally {
@@ -236,7 +241,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
         <img src={optimizeImage(user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt={user.fullName} className="size-10 rounded-full object-cover" />
         <div className="min-w-0 flex-1">
           <p className="text-white text-[13.5px] font-medium truncate">{highlight ? highlight.title : isOwn ? "My status" : user.fullName}</p>
-          <p className="text-white/80 text-[11px] truncate">{ago(current.createdAt)}</p>
+          <p className="text-white/80 text-[11px] truncate">
+            {ago(current.createdAt)}
+            {current.closeFriends && <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[#21C063] text-[#0B141A] px-2 py-px text-[10px] font-semibold">★ Close friends</span>}
+          </p>
           {current.song?.url && (
             <p className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-black/35 pl-2 pr-3 py-0.5 text-white text-[11.5px] leading-5 min-w-0">
               <Music size={13} className="shrink-0" />
@@ -424,6 +432,21 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           onSubmit={sendReply}
           className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto flex items-center gap-2 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent"
         >
+          {/* Instagram-style quick reactions: open while the reply box is focused */}
+          {replyFocus && !replyText.trim() && (
+            <div
+              className="absolute bottom-full inset-x-0 flex justify-center gap-1.5 px-3 pb-2"
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {["❤️", "🔥", "😂", "😮", "😢", "👏"].map((em) => (
+                <button key={em} type="button" onClick={() => sendReply(null, em)} className="size-11 rounded-full bg-black/40 backdrop-blur text-[24px] leading-none flex items-center justify-center active:scale-125 transition-transform" aria-label={`React ${em}`}>
+                  {em}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             ref={replyInput}
             value={replyText}
@@ -456,6 +479,12 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </button>
           )}
         </form>
+      )}
+
+      {burst && (
+        <span key={burst.k} className="pointer-events-none absolute left-1/2 bottom-28 z-30 -translate-x-1/2 text-[64px] leading-none animate-[heartpop_1.1s_ease-out_forwards]">
+          {burst.e}
+        </span>
       )}
 
       {/* Owner: who has seen it */}
