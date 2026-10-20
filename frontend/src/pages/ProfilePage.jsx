@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
 import Avatar from "../components/Avatar";
-import ProfileHighlights from "../components/ProfileHighlights";
 import { useScrollMemory } from "../lib/useScrollMemory";
 
 const iconCls = "text-wa-icon";
@@ -159,7 +158,6 @@ const ProfilePage = () => {
           </div>
         )}
 
-        {!query && authUser && <ProfileHighlights user={authUser} />}
 
         {rows.map((r) =>
           r.to ? (

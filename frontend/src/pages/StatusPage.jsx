@@ -8,6 +8,7 @@ import CreateStatusModal from "../components/CreateStatusModal";
 import StatusViewer from "../components/StatusViewer";
 import HighlightsRow from "../components/HighlightsRow";
 import HighlightSheet from "../components/HighlightSheet";
+import PlaylistsCard from "../components/PlaylistsCard";
 import { HL_GRADIENT } from "../lib/highlightTheme";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import toast from "react-hot-toast";
@@ -220,6 +221,8 @@ const StatusPage = () => {
                 </>
               )}
             </div>
+
+            <PlaylistsCard />
 
             {[
               ["Recent updates", feed.others.filter((o) => o.hasUnseen && !isMuted(o.user._id))],
