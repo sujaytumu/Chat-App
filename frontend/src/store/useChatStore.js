@@ -174,10 +174,20 @@ export const useChatStore = create((set, get) => ({
   // Returns true when it worked. `silent` skips the toast (bulk actions).
   // Disappearing-message timer per 1:1 chat: { [otherUserId]: seconds }
   directDisappear: {},
+  directVanish: {}, // Vanish mode per 1:1 chat: { [otherUserId]: boolean }
+  setDirectVanish: async (userId, on) => {
+    try {
+      await axiosInstance.put(`/messages/vanish/${userId}`, { on });
+      set((state) => ({ directVanish: { ...state.directVanish, [userId]: on } }));
+      toast(on ? "Vanish mode on" : "Vanish mode off", { icon: "👻" });
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't change Vanish mode");
+    }
+  },
   loadDirectDisappear: async (userId) => {
     try {
       const res = await axiosInstance.get(`/messages/disappearing/${userId}`);
-      set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: res.data.seconds || 0 } }));
+      set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: res.data.seconds || 0 }, directVanish: { ...state.directVanish, [userId]: !!res.data.vanish } }));
     } catch {
       /* keep what we had */
     }
@@ -340,6 +350,10 @@ export const useChatStore = create((set, get) => ({
     // Leaving a chat means its messages were read: remember that in the quick-reopen copy,
     // so the "N unread messages" divider doesn't come back the next time it's opened.
     const prev = get().selectedChat;
+    // Vanish mode: leaving the chat removes what you have read (the server deletes it for both of you)
+    if (prev?.type === "direct" && get().directVanish[prev.data._id] && (!chat || chatKeyOf(prev) !== chatKeyOf(chat))) {
+      axiosInstance.post(`/messages/vanish/clear/${prev.data._id}`).catch(() => {});
+    }
     if (prev && (!chat || chatKeyOf(prev) !== chatKeyOf(chat)) && get().messages.length) {
       const me = useAuthStore.getState().authUser?._id;
       const key = chatKeyOf(prev);
@@ -1060,6 +1074,12 @@ export const useChatStore = create((set, get) => ({
       socket.on(field, (list) => {
         useAuthStore.setState((st) => (st.authUser ? { authUser: { ...st.authUser, [field]: list } } : {}));
       });
+    });
+
+    socket.on("directVanish", ({ userId, on }) => set((st) => ({ directVanish: { ...st.directVanish, [userId]: on } })));
+    socket.on("vanishCleared", ({ ids }) => {
+      const gone = new Set(ids || []);
+      set((st) => ({ messages: st.messages.filter((m) => !gone.has(m._id)) }));
     });
 
     socket.on("userNote", ({ userId, note }) => {
