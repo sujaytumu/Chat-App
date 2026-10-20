@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Clock, Timer, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
+import { Clock, Timer, Ghost, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -302,6 +302,18 @@ const ChatHeader = () => {
                   <span className="ml-auto text-[11.5px] text-wa-muted">{directSecs ? (directSecs === 86400 ? "24 hours" : directSecs === 604800 ? "7 days" : "90 days") : "Off"}</span>
                 </button>
               )}
+              {selectedChat.type === "direct" && selectedChat.data._id !== authUser?._id && (
+                <button
+                  className={menuItem}
+                  onClick={() => {
+                    setShowMenu(false);
+                    useChatStore.getState().setDirectVanish(selectedChat.data._id, !vanishOn);
+                  }}
+                >
+                  <Ghost size={18} className="text-wa-icon" /> Vanish mode
+                  <span className="ml-auto text-[11.5px] text-wa-muted">{vanishOn ? "On" : "Off"}</span>
+                </button>
+              )}
               <button
                 className={menuItem}
                 onClick={() => {
@@ -390,7 +402,7 @@ const ChatHeader = () => {
       )}
     </div>
     {!isGroup && vanishOn && (
-      <div className="px-4 py-1.5 text-center text-[12px] text-white bg-[#5B3FD1]">👻 Vanish mode — messages disappear after they are seen and you leave the chat · swipe up in the chat to turn off</div>
+      <div className="px-4 py-1.5 text-center text-[12px] text-white bg-[#5B3FD1]">👻 Vanish mode is on — seen messages disappear when you leave the chat</div>
     )}
     {isGroup && <GroupCallBanner group={data} />}
     </>

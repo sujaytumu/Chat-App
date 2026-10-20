@@ -20,6 +20,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
+import { VanishPullIndicator, VanishBottomHint } from "./VanishPull";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
@@ -232,17 +233,22 @@ const ChatContainer = () => {
     const dy = pullStart.current - e.touches[0].clientY;
     setVanishPull(dy > 12 ? Math.min(dy / 120, 1) : 0);
   };
-  const onPullEnd = () => {
+  const [vanishBusy, setVanishBusy] = useState(null); // "on" | "off" while the switch is being made
+  const onPullEnd = async () => {
     const done = vanishPull >= 1;
     pullStart.current = null;
     setVanishPull(0);
-    if (done && vanishPeer) {
+    if (done && vanishPeer && !vanishBusy) {
       try {
         navigator.vibrate?.(20);
       } catch {
         /* no haptics */
       }
-      useChatStore.getState().setDirectVanish(vanishPeer, !vanishOn);
+      const started = Date.now();
+      setVanishBusy(vanishOn ? "off" : "on");
+      await useChatStore.getState().setDirectVanish(vanishPeer, !vanishOn);
+      // keep the spinner up long enough to be seen, like Instagram's
+      setTimeout(() => setVanishBusy(null), Math.max(0, 650 - (Date.now() - started)));
     }
   };
   const nearBottomRef = useRef(true); // is the reader at (or close to) the latest message?
@@ -434,13 +440,16 @@ const ChatContainer = () => {
       )}
 
       <div className="relative flex-1 min-h-0 flex flex-col">
-      {vanishPull > 0 && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center" style={{ opacity: 0.35 + vanishPull * 0.65 }}>
-          <span className="flex items-center gap-2 rounded-full bg-[#1C1C1E]/90 text-white px-4 py-2 text-[12.5px] shadow-lg" style={{ transform: `translateY(${-vanishPull * 14}px) scale(${0.9 + vanishPull * 0.15})` }}>
-            <span className="text-[18px] leading-none">👻</span>
-            {vanishPull >= 1 ? "Release to " : "Swipe up to "}turn {vanishOn ? "off" : "on"} Vanish mode
-          </span>
-        </div>
+      {vanishPeer && (
+        // Vanish mode turns the chat dark, like Instagram
+        <div className={`pointer-events-none absolute inset-0 bg-black transition-opacity duration-500 ${vanishOn ? "opacity-75" : "opacity-0"}`} />
+      )}
+      {vanishPeer && (vanishPull > 0 || vanishBusy) && (
+        <VanishPullIndicator
+          pull={vanishPull}
+          busy={!!vanishBusy}
+          turningOn={vanishBusy ? vanishBusy === "on" : !vanishOn}
+        />
       )}
       <div
         ref={scrollRef}
@@ -450,7 +459,7 @@ const ChatContainer = () => {
         onTouchEnd={onPullEnd}
         onTouchCancel={onPullEnd}
         style={{ overflowAnchor: "none" }}
-        className="flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[5%] lg:px-8 py-3 lg:py-5 lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto"
+        className="relative flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[5%] lg:px-8 py-3 lg:py-5 lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto"
       >
         {hasMoreMessages && (
           <div className="flex justify-center pb-3">
@@ -831,6 +840,7 @@ const ChatContainer = () => {
             <span className="size-2 rounded-full bg-wa-muted animate-bounce" />
           </div>
         )}
+        {vanishPeer && vanishPull === 0 && !vanishBusy && <VanishBottomHint on={vanishOn} />}
         <div ref={messageEndRef} />
       </div>
 
