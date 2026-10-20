@@ -227,6 +227,8 @@ let voiceOriginShare = false; // screen share started from a voice call (no came
 let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
 let speakerNoticeShown = false; // the "phone decides the speaker" hint is shown once per page load
+let ringing = false; // our own ringtone is (meant to be) playing for an incoming call
+let ringKicked = false; // already re-started once by a tap on the incoming screen
 let ringDeferred = false; // incoming ring held back while a phone's system notification is alerting
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
@@ -592,6 +594,8 @@ export const useCallStore = create((set, get) => ({
 
   stopRingtone: () => {
     ringDeferred = false;
+    ringing = false;
+    ringKicked = false;
     stopRingtoneSound();
   },
 
@@ -910,12 +914,34 @@ export const useCallStore = create((set, get) => ({
     syncClock(socket);
     getIceConfig(); // warm the cache so answering/placing a call isn't delayed
 
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible" && ringDeferred && get().callStatus === "incoming") {
+    // Coming back to the app (tapping the call notification, unlocking, switching back) while a call is
+    // still ringing: play the same ringtone right away, whether it was held back or got blocked.
+    const resumeRing = () => {
+      if (document.visibilityState !== "visible" || get().callStatus !== "incoming" || get().isAnswering) return;
+      primeAudio();
+      if (ringDeferred || !ringing) {
         ringDeferred = false;
+        ringing = true;
         startRingtone();
       }
-    });
+    };
+    document.addEventListener("visibilitychange", resumeRing);
+    window.addEventListener("focus", resumeRing);
+    window.addEventListener("pageshow", resumeRing);
+    // Browsers only allow sound after a touch: the first tap on the incoming-call screen unlocks audio and
+    // restarts the ringtone, so it is never silent.
+    const kick = () => {
+      if (get().callStatus !== "incoming" || get().isAnswering || ringKicked) return;
+      ringKicked = true;
+      primeAudio();
+      if (ringing || ringDeferred) {
+        ringDeferred = false;
+        ringing = true;
+        startRingtone();
+      }
+    };
+    document.addEventListener("pointerdown", kick, true);
+    document.addEventListener("touchstart", kick, true);
 
     socket.on("incomingCall", ({ fromUser, offer, callType, callId }) => {
       // This exact call already ended / was declined / answered on this device: the server handed it
@@ -976,9 +1002,11 @@ export const useCallStore = create((set, get) => ({
       primeAudio();
       // Phone in the background: the system notification is already ringing —
       // hold our own ring until the app is brought to the front.
+      ringKicked = false;
       if (shouldLeaveToSystemAlert()) {
         ringDeferred = true;
       } else {
+        ringing = true;
         startRingtone(); // plays the tone chosen in Settings (or their own file) and vibrates
       }
     });
