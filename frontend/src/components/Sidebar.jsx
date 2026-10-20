@@ -23,6 +23,7 @@ import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
 import { Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import NotesRow from "./NotesRow";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -630,6 +631,8 @@ const Sidebar = () => {
             : "These chats stay archived when new messages are received."}
         </p>
       )}
+
+      {!folderOpen && !selecting && <NotesRow />}
 
       {/* Search pill */}
       {!folderOpen && (

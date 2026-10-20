@@ -23,6 +23,8 @@ const userSchema = new mongoose.Schema(
     },
     // Short "about" line shown on their profile (max 139 chars, like WhatsApp)
     about: { type: String, default: "", maxlength: 139 },
+    // Instagram-style "Note": a short line shown above their picture in chat lists for 24 hours.
+    note: { text: { type: String, default: "", maxlength: 60 }, expiresAt: { type: Date, default: null } },
     // Chats this user has archived, as "d:<userId>" (direct) / "g:<groupId>"
     // (group) keys. Per-user, so it follows them across devices.
     archivedChats: {
