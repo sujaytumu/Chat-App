@@ -120,6 +120,7 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    pinUntil: { type: Date, default: null }, // pins can expire (8 hours / 24 hours / 7 days)
     deletedForEveryone: {
       type: Boolean,
       default: false,

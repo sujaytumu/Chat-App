@@ -444,8 +444,11 @@ export const togglePinMessage = async (req, res) => {
       }
     }
 
-    message.pinned = !message.pinned;
+    const stillPinned = message.pinned && (!message.pinUntil || message.pinUntil > new Date());
+    message.pinned = !stillPinned;
+    const hours = [8, 24, 168].includes(Number(req.body?.hours)) ? Number(req.body.hours) : 168;
     message.pinnedAt = message.pinned ? new Date() : null;
+    message.pinUntil = message.pinned ? new Date(Date.now() + hours * 3600 * 1000) : null;
     await message.save();
 
     const eventName = message.pinned ? "messagePinned" : "messageUnpinned";

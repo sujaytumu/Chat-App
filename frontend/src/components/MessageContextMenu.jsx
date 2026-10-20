@@ -1,5 +1,6 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { isPinned } from "../lib/pin";
 import ContextMenu, { ConfirmDialog } from "./ContextMenu";
 import { Reply, Copy, Pin, PinOff, Star, StarOutline, Forward, Info, Languages, Pencil, Trash2 } from "./icons/WaGlyphs";
 import { WaCheck as Check } from "./icons/WaIcons";
@@ -59,7 +60,7 @@ const MessageContextMenu = ({ message, isMe, authUserId, menu, x, y, align, onCl
         ),
     },
     { label: "Forward", icon: Forward, hidden: !!message.viewOnce || !!message.poll, onClick: menu.onForward },
-    { label: message.pinned ? "Unpin" : "Pin", icon: message.pinned ? PinOff : Pin, onClick: menu.onTogglePin },
+    { label: isPinned(message) ? "Unpin" : "Pin", icon: isPinned(message) ? PinOff : Pin, onClick: menu.onTogglePin },
     { label: starred ? "Unstar" : "Star", icon: starred ? Star : StarOutline, onClick: menu.onToggleStar },
     { label: "Edit", icon: Pencil, hidden: !menu.onEdit, onClick: menu.onEdit },
     { label: "Translate", icon: Languages, hidden: !menu.onTranslate, onClick: menu.onTranslate },
