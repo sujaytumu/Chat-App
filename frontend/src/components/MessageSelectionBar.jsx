@@ -1,6 +1,7 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
+import { isPinned } from "../lib/pin";
 import { useAuthStore } from "../store/useAuthStore";
 import { useBackToClose } from "../lib/useBackToClose";
 import { translateAndToast } from "../lib/translate";
@@ -141,12 +142,12 @@ const MessageSelectionBar = () => {
                     className={item}
                     onClick={() => {
                       setMenu(false);
-                      useChatStore.getState().togglePinMessage(single._id);
+                      useChatStore.getState().requestPin(single);
                       clear();
                     }}
                   >
                     
-                    {single.pinned ? "Unpin" : "Pin"}
+                    {isPinned(single) ? "Unpin" : "Pin"}
                   </button>
                 )}
                 {single?.text && (

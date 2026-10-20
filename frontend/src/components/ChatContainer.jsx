@@ -12,6 +12,8 @@ import LocationCard from "./LocationCard";
 import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
 import MessageContextMenu from "./MessageContextMenu";
+import PinDurationSheet from "./PinDurationSheet";
+import { isPinned } from "../lib/pin";
 import { isDesktopNow } from "./ContextMenu";
 import { isStickerMessage, parseLocationMessage } from "../lib/messageFormat";
 import { useAuthStore } from "../store/useAuthStore";
@@ -206,6 +208,7 @@ const ChatContainer = () => {
   const galleryImages = useMemo(() => messages.filter((m) => m.image && !m.viewOnce && !m.deletedForEveryone).map((m) => m.image), [messages]);
   const [hoveredId, setHoveredId] = useState(null);
   const [forwardingMessage, setForwardingMessage] = useState(null);
+  const pinPicker = useChatStore((s) => s.pinPicker);
   const [ctxMenu, setCtxMenu] = useState(null); // laptop: { message, isMe, menu, x, y, align }
   const [infoMessage, setInfoMessage] = useState(null);
   const prevChatKeyRef = useRef(null);
@@ -266,7 +269,7 @@ const ChatContainer = () => {
     : (typingUsers[data._id]?.size ?? 0) > 0;
 
   const pinnedMessage = useMemo(() => {
-    const pinned = messages.filter((m) => m.pinned);
+    const pinned = messages.filter((m) => isPinned(m));
     return pinned.length > 0 ? pinned[pinned.length - 1] : null;
   }, [messages]);
 
@@ -482,7 +485,7 @@ const ChatContainer = () => {
             isMe,
             authUserId: authUser._id,
             visible: hoveredId === message._id,
-            onTogglePin: () => togglePinMessage(message._id),
+            onTogglePin: () => useChatStore.getState().requestPin(message),
             onDelete: (mode) => deleteMessage(message._id, mode),
             onReply: () => setReplyingTo(message),
             onToggleStar: () => toggleStarMessage(message._id),
@@ -655,7 +658,7 @@ const ChatContainer = () => {
                       <Forward size={12} /> Forwarded
                     </span>
                   )}
-                  {message.pinned && (
+                  {isPinned(message) && (
                     <span className="flex items-center gap-1 text-[9.4px] mb-0.5 text-wa-muted">
                       <Pin size={10} /> Pinned
                     </span>
@@ -868,6 +871,7 @@ const ChatContainer = () => {
       {forwardingMessage && (
         <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
       )}
+      {pinPicker && <PinDurationSheet message={pinPicker} onClose={() => useChatStore.setState({ pinPicker: null })} />}
       {ctxMenu && (
         <MessageContextMenu
           message={ctxMenu.message}

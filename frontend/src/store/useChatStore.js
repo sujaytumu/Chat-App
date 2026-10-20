@@ -573,9 +573,15 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
-  togglePinMessage: async (messageId) => {
+  // Pinning asks "how long?" first (8 hours / 24 hours / 7 days); unpinning is immediate.
+  pinPicker: null,
+  requestPin: (message) => {
+    if (message.pinned && (!message.pinUntil || new Date(message.pinUntil) > new Date())) get().togglePinMessage(message._id);
+    else set({ pinPicker: message });
+  },
+  togglePinMessage: async (messageId, hours) => {
     try {
-      const res = await axiosInstance.put(`/messages/pin/${messageId}`);
+      const res = await axiosInstance.put(`/messages/pin/${messageId}`, { hours });
       get().applyMessageUpdate(res.data);
     } catch (error) {
       toast.error(error.response?.data?.error || "Failed to update pin");

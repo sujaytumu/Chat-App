@@ -1,3 +1,4 @@
+import { isPinned } from "../lib/pin";
 import { useState, useRef, useEffect } from "react";
 import { MoreVertical, Pin, PinOff, Trash2, Reply, Copy, Star, StarOutline, Forward, Info, Languages, Pencil } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
@@ -122,8 +123,8 @@ const MessageActionMenu = ({ message, isMe, visible, authUserId, onTogglePin, on
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
               >
-                {message.pinned ? <PinOff size={20} /> : <Pin size={20} />}
-                {message.pinned ? "Unpin" : "Pin"}
+                {isPinned(message) ? <PinOff size={20} /> : <Pin size={20} />}
+                {isPinned(message) ? "Unpin" : "Pin"}
               </button>
               <button
                 onClick={() => {
