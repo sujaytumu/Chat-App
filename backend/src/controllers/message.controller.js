@@ -20,6 +20,7 @@ import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
 import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
 import Reminder from "../models/reminder.model.js";
+import { summarizeTranscript } from "../lib/chatSummary.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
@@ -1543,6 +1544,61 @@ export const deleteReminder = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.log("Error in deleteReminder controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
+// ---- Summarize chat (AI recap of the latest messages; runs only on request) ----
+const summaryUse = new Map(); // userId -> timestamps, max 15 per hour
+export const summarizeChat = async (req, res) => {
+  try {
+    const { chatType, chatId } = req.body || {};
+    const count = Math.min(200, Math.max(20, Number(req.body?.count) || 100));
+    if (!["direct", "group"].includes(chatType) || !mongoose.isValidObjectId(chatId)) return res.status(400).json({ error: "Invalid chat" });
+    const me = req.user._id;
+    const hits = (summaryUse.get(String(me)) || []).filter((t) => Date.now() - t < 3600_000);
+    if (hits.length >= 15) return res.status(429).json({ error: "You've used the summary a lot. Try again in a while." });
+
+    let filter;
+    if (chatType === "group") {
+      if (!(await Group.exists({ _id: chatId, members: me }))) return res.status(403).json({ error: "Not allowed" });
+      filter = { groupId: chatId };
+    } else {
+      filter = { groupId: null, $or: [{ senderId: me, receiverId: chatId }, { senderId: chatId, receiverId: me }] };
+    }
+    const rows = await Message.find({ ...filter, deletedFor: { $ne: me }, deletedForEveryone: { $ne: true } })
+      .sort({ createdAt: -1 })
+      .limit(count)
+      .select("senderId text image file poll event liveLocation contact transcript createdAt")
+      .lean();
+    rows.reverse();
+    if (rows.filter((m) => m.text || m.transcript?.text).length < 3) return res.status(200).json({ summary: "", tooShort: true });
+
+    const ids = [...new Set(rows.map((m) => String(m.senderId)))];
+    const users = await User.find({ _id: { $in: ids } }).select("fullName").lean();
+    const nameOf = new Map(users.map((u) => [String(u._id), u.fullName]));
+    let transcript = rows
+      .map((m) => {
+        const who = String(m.senderId) === String(me) ? "Me" : nameOf.get(String(m.senderId)) || "Someone";
+        const body =
+          (m.text && m.text.slice(0, 300)) ||
+          (m.transcript?.text ? `[voice message] ${m.transcript.text.slice(0, 300)}` : m.image ? "[photo]" : m.file ? "[file]" : m.poll ? "[poll]" : m.event ? "[event]" : m.liveLocation ? "[live location]" : "");
+        if (!body) return "";
+        const d = new Date(m.createdAt).toISOString().slice(0, 16).replace("T", " ");
+        return `[${d}] ${who}: ${body}`;
+      })
+      .filter(Boolean)
+      .join("\n");
+    if (transcript.length > 14000) transcript = transcript.slice(-14000);
+
+    summaryUse.set(String(me), [...hits, Date.now()]);
+    const out = await summarizeTranscript(transcript);
+    if (out.error === "not_configured") return res.status(501).json({ error: "not_configured" });
+    if (out.error) return res.status(502).json({ error: "The summary service couldn't answer. Try again." });
+    res.status(200).json({ summary: out.text, count: rows.length, from: rows[0].createdAt, to: rows[rows.length - 1].createdAt });
+  } catch (error) {
+    console.log("Error in summarizeChat controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

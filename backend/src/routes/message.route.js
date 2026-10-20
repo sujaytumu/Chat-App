@@ -39,6 +39,7 @@ import {
   createReminder,
   listReminders,
   deleteReminder,
+  summarizeChat,
   setDirectVanish,
   clearVanish,
 } from "../controllers/message.controller.js";
@@ -48,6 +49,7 @@ const router = express.Router();
 router.get("/users", protectRoute, getUsersForSidebar);
 router.put("/note", protectRoute, setNote);
 router.put("/event/:id/rsvp", protectRoute, rsvpEvent);
+router.post("/summary", protectRoute, summarizeChat);
 router.post("/reminders", protectRoute, createReminder);
 router.get("/reminders", protectRoute, listReminders);
 router.delete("/reminders/:id", protectRoute, deleteReminder);

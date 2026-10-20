@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { Clock, Timer, Ghost, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen } from "lucide-react";
+import { Clock, Timer, Ghost, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen, Sparkles } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
@@ -16,6 +16,7 @@ const GroupInfoModal = lazy(() => import("./GroupInfoModal"));
 const DisappearingPanel = lazy(() => import("./DisappearingPanel"));
 const ContactInfoModal = lazy(() => import("./ContactInfoModal"));
 const ScheduledPanel = lazy(() => import("./ScheduledPanel"));
+const ChatSummarySheet = lazy(() => import("./ChatSummarySheet"));
 const ChatColorSheet = lazy(() => import("./ChatColorSheet"));
 const ChatThemeSheet = lazy(() => import("./ChatThemeSheet"));
 
@@ -57,6 +58,7 @@ const ChatHeader = () => {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [showContactInfo, setShowContactInfo] = useState(false);
   const [showScheduled, setShowScheduled] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [showColor, setShowColor] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   useBackToClose(showMenu, () => setShowMenu(false));
@@ -207,6 +209,15 @@ const ChatHeader = () => {
                   <Info size={18} className="text-wa-icon" /> Group info
                 </button>
               )}
+              <button
+                className={menuItem}
+                onClick={() => {
+                  setShowMenu(false);
+                  setShowSummary(true);
+                }}
+              >
+                <Sparkles size={18} className="text-wa-icon" /> Catch me up
+              </button>
               <button
                 className={menuItem}
                 onClick={() => {
@@ -383,6 +394,11 @@ const ChatHeader = () => {
       {showColor && (
         <Suspense fallback={null}>
           <ChatColorSheet chatKey={`${isGroup ? "g" : "d"}:${data._id}`} chatName={name} onClose={() => setShowColor(false)} />
+        </Suspense>
+      )}
+      {showSummary && (
+        <Suspense fallback={null}>
+          <ChatSummarySheet chat={selectedChat} onClose={() => setShowSummary(false)} />
         </Suspense>
       )}
       {showScheduled && (
