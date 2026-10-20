@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
-import { Visibility, pairKey, isOwner } from "../lib/visibility.js";
+import { Visibility, pairKey, isOwner, forgetVisibility } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 
 // Owner only: see everyone, and choose who can see whom.
@@ -31,6 +31,7 @@ export const setAccess = async (req, res) => {
     } else {
       await Visibility.deleteOne({ key });
     }
+    forgetVisibility();
     for (const uid of [String(a), String(b)]) {
       const sid = getReceiverSocketId(uid);
       if (sid) io.to(sid).emit("visibilityChanged"); // their contact list reloads
