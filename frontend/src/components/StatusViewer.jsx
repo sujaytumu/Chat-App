@@ -2,8 +2,9 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { STATUS_FONTS } from "../lib/statusFonts";
-import { X, Eye, Loader2, ChevronUp, ChevronRight, Heart, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { X, Eye, Loader2, ChevronUp, ChevronRight, Heart, MessageCircle, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
 import { SongBars, SongSheet } from "./StatusSong";
+import StatusComments from "./StatusComments";
 import { MoreVertical } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -57,6 +58,8 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const [songBlocked, setSongBlocked] = useState(false);
   const [showSong, setShowSong] = useState(false); // the song sheet (tap the song line)
   const [songMuted, setSongMuted] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentCounts, setCommentCounts] = useState({}); // { [statusOrItemId]: number }
   const swipeStart = useRef(null);
   const swipedAt = useRef(0);
   const replyInput = useRef(null);
@@ -95,6 +98,27 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
     };
   }, [isOwn]);
 
+  // How many comments the current update has (for the icon's count)
+  useEffect(() => {
+    if (!current?._id) return;
+    const id = current._id;
+    axiosInstance
+      .get(`/status-comments/${id}`)
+      .then((r) => setCommentCounts((m) => ({ ...m, [id]: r.data.total || 0 })))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?._id]);
+
+  // A new comment on one of my updates shows up live
+  useEffect(() => {
+    if (!isOwn) return undefined;
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return undefined;
+    const onComment = ({ targetId }) => setCommentCounts((m) => (targetId in m ? { ...m, [targetId]: m[targetId] + 1 } : m));
+    socket.on("statusComment", onComment);
+    return () => socket.off("statusComment", onComment);
+  }, [isOwn]);
+
   // Mark as seen when someone else's update comes up.
   useEffect(() => {
     if (!isOwn && current) axiosInstance.put(highlight ? `/highlights/${highlight._id}/items/${current._id}/view` : `/status/${current._id}/view`).catch(() => {});
@@ -127,7 +151,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
 
   // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
-  const stop = paused || showViewers || showSong || confirmDelete || replyFocus || hold || menuOpen; // hold: a sheet on top (save to highlights) keeps it still
+  const stop = paused || showViewers || showSong || showComments || confirmDelete || replyFocus || hold || menuOpen; // hold: a sheet on top (save to highlights) keeps it still
   const last = useRef(0);
   useEffect(() => {
     if (!current || stop) return;
@@ -502,6 +526,21 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           {!replyText.trim() && (
             <button
               type="button"
+              onClick={() => setShowComments(true)}
+              className="relative size-11 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+              aria-label="Comments"
+            >
+              <MessageCircle size={22} className="text-white" />
+              {(commentCounts[current._id] || 0) > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#3897F0] text-white text-[10.5px] font-semibold flex items-center justify-center">
+                  {commentCounts[current._id] > 99 ? "99+" : commentCounts[current._id]}
+                </span>
+              )}
+            </button>
+          )}
+          {!replyText.trim() && (
+            <button
+              type="button"
               onClick={toggleLike}
               className="size-11 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0 active:scale-90 transition-transform"
               aria-label={current.liked ? "Unlike status" : "Like status"}
@@ -535,9 +574,10 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           <button onClick={() => setShowViewers(true)} className="mx-auto flex flex-col items-center text-white/85" aria-label="Who viewed this">
             <ChevronUp size={20} />
           </button>
+          <div className="mt-1 flex items-center gap-2">
           <button
             onClick={() => setShowViewers(true)}
-            className="mt-1 h-12 pl-4 pr-5 rounded-full bg-[#1F2C34]/90 backdrop-blur flex items-center gap-2 text-white text-[14.5px] active:bg-[#2A3942]"
+            className="h-12 pl-4 pr-5 rounded-full bg-[#1F2C34]/90 backdrop-blur flex items-center gap-2 text-white text-[14.5px] active:bg-[#2A3942]"
             aria-label={`${viewCount} views, ${likeCount} likes`}
           >
             <Eye size={22} />
@@ -545,7 +585,24 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             <Heart size={20} className={likeCount > 0 ? "ml-2 text-[#FF3B5C]" : "ml-2 text-white/80"} fill={likeCount > 0 ? "currentColor" : "none"} />
             <span>{likeCount}</span>
           </button>
+          <button
+            onClick={() => setShowComments(true)}
+            className="h-12 pl-4 pr-5 rounded-full bg-[#1F2C34]/90 backdrop-blur flex items-center gap-2 text-white text-[14.5px] active:bg-[#2A3942]"
+            aria-label={`${commentCounts[current._id] || 0} comments`}
+          >
+            <MessageCircle size={21} />
+            <span>{commentCounts[current._id] || 0}</span>
+          </button>
+          </div>
         </div>
+      )}
+
+      {showComments && (
+        <StatusComments
+          targetId={current._id}
+          onTotal={(n) => setCommentCounts((m) => ({ ...m, [current._id]: n }))}
+          onClose={() => setShowComments(false)}
+        />
       )}
 
       {showSong && current.song?.url && (
