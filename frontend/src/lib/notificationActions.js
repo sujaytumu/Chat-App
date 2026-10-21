@@ -82,6 +82,19 @@ export function handleNotificationAction({ action, data = {} }, goHome) {
     window.location.assign(`/call/${data.callCode}`); // scheduled-call reminder
     return;
   }
+  if (action === "callback" && data.chatId) {
+    // "Call back" on a missed-call notification: open the chat, then ring them straight away.
+    let tries = 0;
+    const t = setInterval(() => {
+      const u = useChatStore.getState().users.find((x) => x._id === data.chatId);
+      if (u) {
+        clearInterval(t);
+        goHome?.();
+        if (useCallStore.getState().callStatus === "idle") useCallStore.getState().startCall(u, "audio");
+      } else if (++tries > 40) clearInterval(t);
+    }, 500);
+    return;
+  }
   if (data.isCall || action === "answer") {
     if (action === "answer" && data.callerId) answerCall(data.callerId);
     return; // the incoming-call screen handles the rest
