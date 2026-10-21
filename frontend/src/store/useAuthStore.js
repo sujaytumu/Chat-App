@@ -221,8 +221,15 @@ export const useAuthStore = create((set, get) => ({
     // died, and nothing nudged it to reconnect the moment they came back.
     // Force an immediate reconnect attempt as soon as the tab is visible
     // again, instead of waiting on that backoff timer to catch up.
+    let lastListSync = 0;
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible" || !socket) return;
+      // Back in the app: bring the chat list (latest messages, ticks, unread counts) up to date right away.
+      if (Date.now() - lastListSync > 4000) {
+        lastListSync = Date.now();
+        useChatStore.getState().getUsers();
+        useChatStore.getState().getGroups();
+      }
       if (!socket.connected) {
         socket.connect();
         return;
