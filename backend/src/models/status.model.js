@@ -22,6 +22,8 @@ const statusSchema = new mongoose.Schema(
     song: {
       url: { type: String },
       name: { type: String },
+      start: { type: Number, default: 0 }, // where in the song to begin (seconds)
+      length: { type: Number, default: 0 }, // how long it plays = how long a picture / text status stays (15 – 30 s)
     },
     // A place tag (e.g. "Chennai, Tamil Nadu")
     location: {
