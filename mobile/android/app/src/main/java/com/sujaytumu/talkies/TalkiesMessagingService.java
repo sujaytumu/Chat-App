@@ -34,6 +34,11 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
 
         String tag = nz(d.get("tag"));
         String callId = nz(d.get("callId"));
+        if ("1".equals(d.get("clear"))) {
+            // that chat was read somewhere: the notification only ever shows what is still unread
+            NotificationHelper.clearChat(this, nz(d.get("chatId")));
+            return;
+        }
         if ("1".equals(d.get("cancel"))) {
             // caller hung up / it was answered or declined elsewhere / nobody picked up in time
             NotificationHelper.cancel(this, tag, callId);

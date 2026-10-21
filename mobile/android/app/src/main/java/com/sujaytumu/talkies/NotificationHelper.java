@@ -569,6 +569,15 @@ final class NotificationHelper {
         return PendingIntent.getBroadcast(ctx, requestCode, i, flags);
     }
 
+    static void clearChat(Context ctx, String chatId) {
+        if (chatId == null || chatId.isEmpty()) return;
+        clearRecent(chatId);
+        try {
+            NotificationManagerCompat.from(ctx).cancel(idFor("dm-" + chatId));
+        } catch (Exception ignored) {
+        }
+    }
+
     static void clearRecent(String key) {
         synchronized (RECENT) {
             RECENT.remove(key);
