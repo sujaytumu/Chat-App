@@ -9,21 +9,25 @@ import { ChevronUp } from "lucide-react";
 const R = 15;
 const C = 2 * Math.PI * R;
 
-export const VanishPullIndicator = ({ pull, busy, turningOn }) => {
-  const progress = busy ? 0.28 : pull;
-  const ready = !busy && pull >= 1;
+// Sits in the space the chat leaves behind as it is pulled up: the circle grows and fills with the pull; once the
+// pull is far enough the arrow flips and the circle spins freely — let go and Vanish mode switches.
+export const VanishPullIndicator = ({ px, pull, busy, turningOn }) => {
+  const ready = busy || pull >= 1;
   const label = busy
     ? `Turning ${turningOn ? "on" : "off"} Vanish mode…`
-    : `${ready ? "Release to" : "Swipe up to"} turn ${turningOn ? "on" : "off"} Vanish mode`;
+    : ready
+      ? `Release to turn ${turningOn ? "on" : "off"} Vanish mode`
+      : `Keep swiping up to turn ${turningOn ? "on" : "off"} Vanish mode`;
+  const scale = busy ? 1 : 0.45 + Math.min(pull, 1) * 0.55;
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-3 z-30 flex flex-col items-center gap-1.5"
-      style={{ opacity: busy ? 1 : 0.35 + pull * 0.65, transform: `translateY(${busy ? 0 : -pull * 16}px)` }}
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center justify-center gap-2 overflow-hidden"
+      style={{ height: px, opacity: busy ? 1 : Math.min(1, pull * 1.6), transition: busy ? "height 200ms ease" : undefined }}
       aria-live="polite"
     >
-      <div className="relative size-10 rounded-full bg-black/55 backdrop-blur-sm flex items-center justify-center">
-        <svg viewBox="0 0 36 36" className={`absolute inset-0 size-full ${busy ? "animate-spin" : ""}`} style={{ transform: busy ? undefined : "rotate(-90deg)" }}>
-          <circle cx="18" cy="18" r={R} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="2.5" />
+      <div className="relative size-11 flex items-center justify-center" style={{ transform: `scale(${scale})` }}>
+        <svg viewBox="0 0 36 36" className={`absolute inset-0 size-full ${ready ? "animate-spin" : ""}`} style={{ transform: ready ? undefined : "rotate(-90deg)", animationDuration: "0.9s" }}>
+          <circle cx="18" cy="18" r={R} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5" />
           <circle
             cx="18"
             cy="18"
@@ -33,21 +37,16 @@ export const VanishPullIndicator = ({ pull, busy, turningOn }) => {
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeDasharray={C}
-            strokeDashoffset={C * (1 - progress)}
-            style={{ transition: busy ? undefined : "stroke-dashoffset 60ms linear" }}
+            strokeDashoffset={ready ? C * 0.25 : C * (1 - Math.min(pull, 1))}
           />
         </svg>
         <ChevronUp
           size={20}
           className="text-white"
-          style={{
-            transform: `rotate(${busy ? 180 : Math.round(pull * 180)}deg)`,
-            opacity: busy ? 0.5 : 1,
-            transition: busy ? "transform 250ms ease, opacity 250ms ease" : "transform 60ms linear",
-          }}
+          style={{ transform: `rotate(${ready ? 180 : Math.round(pull * 180)}deg)`, transition: ready ? "transform 220ms ease" : "transform 40ms linear" }}
         />
       </div>
-      <span className="rounded-full bg-black/55 backdrop-blur-sm text-white px-3 py-1 text-[12px] leading-none">{label}</span>
+      <span className="text-white/90 text-[12px] leading-none">{label}</span>
     </div>
   );
 };
