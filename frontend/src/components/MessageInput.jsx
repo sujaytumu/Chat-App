@@ -764,7 +764,7 @@ const MessageInput = () => {
   const hasAttachment = imagePreview || imageFallback || filePreview;
 
   return (
-<div className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 lg:px-4 lg:py-2.5 lg:bg-wa-surface w-full lg:[&>*]:w-full">
+<div data-chat-composer className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 lg:px-4 lg:py-2.5 lg:bg-wa-surface w-full lg:[&>*]:w-full">
       {dragging &&
         createPortal(
           <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center pointer-events-none" style={{ animation: "m-fade .15s ease-out" }}>

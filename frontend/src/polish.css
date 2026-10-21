@@ -268,3 +268,16 @@ html[data-accent] .toggle:checked { box-shadow: 0 0 12px -2px color-mix(in srgb,
 .chat-themed .text-\[\#25D366\] { color: rgb(var(--ct-accent)); }
 .chat-themed .bg-wa-out .border-\[\#25D366\] { border-color: rgb(var(--ct-out-text) / .55); }
 .chat-themed .bg-wa-out .text-\[\#25D366\] { color: rgb(var(--ct-out-text)); }
+
+/* A themed chat is one picture: the top bar and the composer melt into the wallpaper (Instagram-style) instead of
+   sitting on it as solid bars. The bar colour only fades out, so it still joins the phone's status bar. */
+.chat-themed [data-chat-header] {
+  background: linear-gradient(to bottom, rgb(var(--wa-bg) / 1) 0%, rgb(var(--wa-bg) / .72) 45%, rgb(var(--wa-bg) / 0) 100%) !important;
+  border-color: transparent !important;
+  padding-bottom: 14px;
+  margin-bottom: -6px;
+}
+.chat-themed [data-chat-composer] {
+  background: linear-gradient(to top, rgb(var(--wa-bg) / .85) 0%, rgb(var(--wa-bg) / 0) 100%) !important;
+  border-color: transparent !important;
+}
