@@ -148,6 +148,7 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    system: { type: String, default: undefined }, // a centred notice in the chat, e.g. "vanish_on" / "vanish_off" (senderId = who did it)
     clientId: { type: String, default: undefined }, // the sender's own id for a just-typed message (lets the app match its clock copy)
     pinUntil: { type: Date, default: null }, // pins can expire (8 hours / 24 hours / 7 days)
     deletedForEveryone: {

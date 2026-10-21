@@ -1205,6 +1205,18 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
+    // The centred "… turned on disappearing messages" line: shown in the chat and the list, never counted as unread.
+    socket.on("systemMessage", (m) => {
+      const me = useAuthStore.getState().authUser?._id;
+      const peer = m.senderId === me ? m.receiverId : m.senderId;
+      set((st) => {
+        const active = st.selectedChat?.type === "direct" && st.selectedChat.data._id === peer;
+        return {
+          messages: active && !st.messages.some((x) => x._id === m._id) ? [...st.messages, m] : st.messages,
+          users: st.users.map((u) => (u._id === peer ? { ...u, lastMessage: m } : u)),
+        };
+      });
+    });
     socket.on("directVanish", ({ userId, on }) => set((st) => ({ directVanish: { ...st.directVanish, [userId]: on } })));
     socket.on("vanishCleared", ({ ids }) => {
       const gone = new Set(ids || []);
@@ -1260,6 +1272,7 @@ export const useChatStore = create((set, get) => ({
       "newGroupMessage",
       "messagesSeen",
       "messagesDelivered",
+      "systemMessage",
       "messagePinned",
       "messageUnpinned",
       "messageDeleted",
