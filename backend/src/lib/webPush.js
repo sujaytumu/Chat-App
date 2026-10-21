@@ -31,7 +31,7 @@ export async function sendPushToUser(userId, payload, options = {}, muteKey) {
 export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
   if (!userIds?.length) return;
   try {
-    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats").lean();
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats profilePic").lean();
     await Promise.all(
       users
         .filter((u) => !(muteKey && (u.mutedChats || []).includes(muteKey)))
@@ -41,7 +41,7 @@ export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
           const safe = locked
             ? { title: "Talkies", body: "You have a new message", icon: "/icon-v2-192.png", tag: "locked-chat", data: { url: "/", messageId: payload.data?.messageId } }
             : payload;
-          return Promise.all([configured ? pushToSubscriptions(u, safe, options) : null, sendFcmToUser(u, safe)]);
+          return Promise.all([configured ? pushToSubscriptions(u, safe, options) : null, sendFcmToUser(u, { ...safe, myIcon: u.profilePic || "" })]);
         })
     );
   } catch (error) {

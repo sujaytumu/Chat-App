@@ -453,7 +453,7 @@ final class NotificationHelper {
         }
     }
 
-    static void showMessage(Context ctx, String title, String body, String tag, String chatId, String chatType, boolean missedCall, String photoUrl) {
+    static void showMessage(Context ctx, String title, String body, String tag, String chatId, String chatType, boolean missedCall, String photoUrl, String myPhotoUrl) {
         if (missedCall) {
             // "Missed call" replaces the ringing notification: the full-screen call screen must go too.
             synchronized (RINGING) {
@@ -500,7 +500,16 @@ final class NotificationHelper {
                 .setIcon(IconCompat.createWithBitmap(avatar))
                 .build();
         // "You" (your own replies shown in the conversation) gets an avatar too, instead of the system's blank one
-        Person me = new Person.Builder().setName("You").setKey("talkies_me").setIcon(IconCompat.createWithBitmap(defaultAvatar(192))).build();
+        Bitmap myAvatar = null;
+        if (isRealPhoto(myPhotoUrl)) {
+            try {
+                Bitmap raw = loadPhoto(ctx, myPhotoUrl, "me_" + Math.abs(myPhotoUrl.hashCode()), 192);
+                if (raw != null) myAvatar = roundAvatar(raw, 192);
+            } catch (Exception ignored) {
+            }
+        }
+        if (myAvatar == null) myAvatar = defaultAvatar(192);
+        Person me = new Person.Builder().setName("You").setKey("talkies_me").setIcon(IconCompat.createWithBitmap(myAvatar)).build();
         NotificationCompat.MessagingStyle conv = new NotificationCompat.MessagingStyle(me);
         synchronized (RECENT) {
             ArrayDeque<String> q = RECENT.get(key);

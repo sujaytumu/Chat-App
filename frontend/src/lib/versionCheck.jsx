@@ -2,7 +2,7 @@ import { useSyncExternalStore, useState } from "react";
 import { useCallStore } from "../store/useCallStore";
 
 // Keeps every device on the newest build. When a newer build exists, ONE big popup asks the person to
-// update (never during a call); otherwise the app just runs normally. Nothing reloads by itself.
+// update (never during a call); otherwise the app just runs normally. It installs quietly the next time the app returns to the front.
 
 const ENTRY_RE = /assets\/index-[A-Za-z0-9_-]+\.js/;
 const RELOAD_LOG_KEY = "talkies-auto-reloads";
@@ -73,8 +73,23 @@ async function check() {
 
 export function startVersionWatcher() {
   check();
+  let hiddenAt = 0;
   const onVisible = () => {
-    if (document.visibilityState === "visible") check();
+    if (document.visibilityState === "hidden") {
+      hiddenAt = Date.now();
+      return;
+    }
+    check().then(() => {
+      // Back after being away for a while and a new version is waiting: install it quietly now.
+      if (updateReady && hiddenAt && Date.now() - hiddenAt > 15000 && !inCall()) {
+        let last = 0;
+        try { last = Number(sessionStorage.getItem("talkies-auto-update") || 0); } catch { /* ignore */ }
+        if (Date.now() - last > 60000) {
+          try { sessionStorage.setItem("talkies-auto-update", String(Date.now())); } catch { /* ignore */ }
+          applyUpdate();
+        }
+      }
+    });
   };
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("online", check);
@@ -86,31 +101,30 @@ export function startVersionWatcher() {
   };
 }
 
-// The big "update available" popup. Shown only when a newer build exists and no call is on.
+// A small, quiet bar at the bottom (not a blocking popup). The update also installs by itself the next time
+// the app comes back to the front after being away, so most people never need to tap anything.
 export function UpdatePopup() {
   const ready = useSyncExternalStore((cb) => (listeners.add(cb), () => listeners.delete(cb)), () => updateReady);
   const busyCall = useCallStore((s) => s.callStatus !== "idle");
   const [updating, setUpdating] = useState(false);
-  if (!ready || (busyCall && !updating)) return null;
+  const [hidden, setHidden] = useState(false);
+  if (!ready || hidden || (busyCall && !updating)) return null;
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center p-6 bg-black/70">
-      <div className="w-full max-w-sm rounded-3xl bg-wa-pop text-wa-text p-7 text-center shadow-2xl">
-        <div className="mx-auto size-20 rounded-[22px] flex items-center justify-center text-4xl" style={{ background: "linear-gradient(160deg,#0A7A67,#25D366)" }}>
-          ⬆️
-        </div>
-        <h2 className="mt-5 text-[22px] font-semibold">Update available</h2>
-        <p className="mt-2 text-[14.5px] text-wa-muted">A new version of Talkies is ready with the latest features and fixes.</p>
-        <button
-          disabled={updating}
-          onClick={() => {
-            setUpdating(true);
-            applyUpdate();
-          }}
-          className="mt-6 w-full h-12 rounded-full bg-[#25D366] text-[#0b141a] text-[16px] font-semibold disabled:opacity-70"
-        >
-          {updating ? "Updating…" : "Update now"}
-        </button>
-      </div>
+    <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(76px+env(safe-area-inset-bottom))] lg:bottom-6 z-[500] flex items-center gap-3 rounded-full bg-wa-pop text-wa-text pl-4 pr-2 py-1.5 shadow-xl border border-white/10 max-w-[92vw]">
+      <span className="text-[13.5px] whitespace-nowrap">New version ready</span>
+      <button
+        disabled={updating}
+        onClick={() => {
+          setUpdating(true);
+          applyUpdate();
+        }}
+        className="h-8 px-4 rounded-full bg-[#25D366] text-[#0b141a] text-[13.5px] font-semibold disabled:opacity-70"
+      >
+        {updating ? "Updating…" : "Update"}
+      </button>
+      <button onClick={() => setHidden(true)} className="size-8 rounded-full text-wa-muted flex items-center justify-center" aria-label="Later">
+        ✕
+      </button>
     </div>
   );
 }
