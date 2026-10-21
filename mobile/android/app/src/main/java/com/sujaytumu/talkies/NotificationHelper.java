@@ -521,6 +521,10 @@ final class NotificationHelper {
                 .setOnlyAlertOnce(false)
                 .setContentIntent(tap);
         b.setLargeIcon(avatar);
+        if (missedCall && !chatId.isEmpty()) {
+            b.addAction(new NotificationCompat.Action.Builder(0, "Call back", openIntent(ctx, id + 3, "callback", chatId, chatType, "", false)).build());
+            b.addAction(new NotificationCompat.Action.Builder(0, "Message", openIntent(ctx, id + 4, "open", chatId, chatType, "", false)).build());
+        }
         // Android 11+: a conversation notification (long-lived shortcut + person) is what shows the sender's photo
         // with the small app badge on its corner and puts it in the Conversations section, like WhatsApp.
         if (!missedCall && !chatId.isEmpty()) {

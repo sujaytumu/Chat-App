@@ -16,6 +16,7 @@ import {
   Smile,
   Camera,
   CalendarDays,
+  CalendarClock,
 } from "lucide-react";
 import { isDesktopNow } from "./ContextMenu";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
@@ -1058,6 +1059,20 @@ const MessageInput = () => {
                       <CalendarDays size={16} className="text-white" />
                     </span>
                     Event
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      if (canSchedule) setShowSchedule(true);
+                      else toast("Type your message first, then pick Send later", { icon: "🕒" });
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                  >
+                    <span className="size-8 rounded-full bg-[#0ea5a4] flex items-center justify-center shrink-0">
+                      <CalendarClock size={16} className="text-white" />
+                    </span>
+                    Send later
                   </button>
                   <button
                     type="button"
