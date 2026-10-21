@@ -20,7 +20,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
-import { VanishPullIndicator, VanishBottomHint } from "./VanishPull";
+import { VanishPullIndicator, VanishBottomHint, VanishNotice, VanishIntro } from "./VanishPull";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
@@ -236,12 +236,19 @@ const ChatContainer = () => {
     const dy = pullStart.current - e.touches[0].clientY;
     setVanishPx(dy > 8 ? Math.min((dy - 8) * 0.8, 130) : 0); // the chat follows the finger, with a little resistance
   };
+  const [showVanishIntro, setShowVanishIntro] = useState(false);
   const [vanishBusy, setVanishBusy] = useState(null); // "on" | "off" while the switch is being made
   const onPullEnd = async () => {
     const done = vanishPull >= 1;
     pullStart.current = null;
     setVanishPx(0);
     if (done && vanishPeer && !vanishBusy) {
+      let seenIntro = true;
+      try { seenIntro = localStorage.getItem("talkies-vanish-intro") === "1"; } catch { /* ignore */ }
+      if (!seenIntro && !vanishOn) {
+        setShowVanishIntro(true); // first time: explain, and OK turns it on
+        return;
+      }
       try {
         navigator.vibrate?.(20);
       } catch {
@@ -447,6 +454,20 @@ const ChatContainer = () => {
         // Vanish mode turns the chat dark, like Instagram
         <div className={`pointer-events-none absolute inset-0 bg-black transition-opacity duration-500 ${vanishOn ? "opacity-75" : "opacity-0"}`} />
       )}
+      {showVanishIntro && (
+        <VanishIntro
+          onClose={() => setShowVanishIntro(false)}
+          onOk={async () => {
+            try { localStorage.setItem("talkies-vanish-intro", "1"); } catch { /* ignore */ }
+            setShowVanishIntro(false);
+            if (vanishPeer) {
+              setVanishBusy("on");
+              await useChatStore.getState().setDirectVanish(vanishPeer, true);
+              setTimeout(() => setVanishBusy(null), 650);
+            }
+          }}
+        />
+      )}
       {vanishPeer && (vanishPx > 0 || vanishBusy) && (
         <VanishPullIndicator
           px={vanishBusy ? 92 : vanishPx}
@@ -482,6 +503,17 @@ const ChatContainer = () => {
         )}
         {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
+          if (message.system) {
+            return (
+              <VanishNotice
+                key={message._id}
+                message={message}
+                mine={isMe}
+                name={data?.fullName}
+                onToggle={() => vanishPeer && useChatStore.getState().setDirectVanish(vanishPeer, message.system !== "vanish_on")}
+              />
+            );
+          }
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
           const location = message.text ? parseLocationMessage(message.text) : null;
           // emoji-only text stays in the normal bubble (like WhatsApp), just a bit larger

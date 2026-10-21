@@ -1282,11 +1282,28 @@ export const setDirectVanish = async (req, res) => {
     const otherId = req.params.id;
     if (!mongoose.isValidObjectId(otherId)) return res.status(400).json({ error: "Invalid user" });
     const on = req.body?.on === true;
-    await DirectChatSetting.findOneAndUpdate({ key: pairKey(req.user._id, otherId) }, { $set: { vanish: on } }, { upsert: true });
+    const before = await DirectChatSetting.findOneAndUpdate({ key: pairKey(req.user._id, otherId) }, { $set: { vanish: on } }, { upsert: true, new: false }).lean();
     disappearCache.delete(pairKey(req.user._id, otherId));
     for (const [uid, peer] of [[otherId, req.user._id], [req.user._id, otherId]]) {
       const sid = getReceiverSocketId(uid);
       if (sid) io.to(sid).emit("directVanish", { userId: String(peer), on });
+    }
+    // Like Instagram: a centred line in the chat says who turned it on / off.
+    if (!!before?.vanish !== on && String(otherId) !== String(req.user._id)) {
+      const note = await Message.create({
+        senderId: req.user._id,
+        receiverId: otherId,
+        system: on ? "vanish_on" : "vanish_off",
+        text: on ? "Disappearing messages turned on" : "Disappearing messages turned off",
+        seen: true,
+        seenAt: new Date(),
+        delivered: true,
+        deliveredAt: new Date(),
+      });
+      for (const uid of [otherId, String(req.user._id)]) {
+        const sid = getReceiverSocketId(uid);
+        if (sid) io.to(sid).emit("systemMessage", note);
+      }
     }
     res.status(200).json({ on });
   } catch (error) {

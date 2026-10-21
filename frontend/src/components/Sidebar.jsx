@@ -733,7 +733,7 @@ const Sidebar = () => {
           const isSelected = selectedChat?.type === item.type && selectedChat.data._id === item.data._id;
           const hasUnread = item.unreadCount > 0;
           const draftText = !isSelected ? drafts[`${item.type === "group" ? "g" : "d"}:${item.data._id}`] : "";
-          const sentByMe = item.lastMessage && item.lastMessage.senderId === authUser?._id;
+          const sentByMe = item.lastMessage && !item.lastMessage.system && item.lastMessage.senderId === authUser?._id;
           const isRecordingNow = item.type === "direct" && (typingUsers[`rec:${item.data._id}`]?.size ?? 0) > 0;
           const isTyping =
             (typingUsers[item.type === "group" ? `group:${item.data._id}` : item.data._id]?.size ?? 0) > 0;

@@ -81,6 +81,7 @@ const MessageInput = () => {
   const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
   const attachMenuRef = useRef(null);
   const messages = useChatStore((st) => st.messages);
+  const vanishActive = useChatStore((s) => (s.selectedChat?.type === "direct" ? !!s.directVanish[s.selectedChat.data._id] : false));
   const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore();
 
   const typingTimeoutRef = useRef(null);
@@ -972,7 +973,7 @@ const MessageInput = () => {
             )}
           </div>
         ) : (
-          <div className="relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5 bg-wa-surface rounded-[26px] px-1.5 py-1 min-h-[52px] shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:min-h-0">
+          <div className={`relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5 bg-wa-surface rounded-[26px] ${vanishActive ? "border border-dashed border-white/45 lg:border-0" : ""} px-1.5 py-1 min-h-[52px] shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:min-h-0`}>
             <div className="relative order-3 lg:order-2" ref={attachMenuRef}>
               {showAttachMenu && (
                 <div className="absolute bottom-full left-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
@@ -1174,7 +1175,7 @@ const MessageInput = () => {
               onPaste={handlePaste}
               onSelect={checkSel}
               onBlur={() => setTimeout(() => setHasSel(false), 150)}
-              placeholder={isDesktopNow() ? "Type a message" : "Message"}
+              placeholder={vanishActive ? "Disappearing messages…" : isDesktopNow() ? "Type a message" : "Message"}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
