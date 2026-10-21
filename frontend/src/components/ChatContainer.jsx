@@ -817,7 +817,7 @@ const ChatContainer = () => {
                         {/* reserves room so the last line never runs under the time */}
                         <span
                           aria-hidden="true"
-                          className={`inline-block ${isMe ? "w-[66px]" : "w-[44px]"}`}
+                          className={`inline-block ${isMe ? (message.editedAt ? "w-[108px]" : "w-[66px]") : message.editedAt ? "w-[86px]" : "w-[44px]"}`}
                         />
                       </span>
                       </>
