@@ -503,6 +503,18 @@ export const useChatStore = create((set, get) => ({
         hasMoreMessages: older.length ? state.hasMoreMessages : fresh.length >= PAGE_SIZE,
       }));
 
+      // The chat list shows the latest message's ticks: bring it up to date with what we just loaded, so a
+      // read receipt seen inside the chat is never missing from the list.
+      if (chat.type === "direct" && fresh.length) {
+        const last = fresh[fresh.length - 1];
+        set((state) => ({
+          users: state.users.map((u) =>
+            u._id === chat.data._id && u.lastMessage && (u.lastMessage._id === last._id || new Date(last.createdAt) > new Date(u.lastMessage.createdAt))
+              ? { ...u, lastMessage: { ...u.lastMessage, ...last } }
+              : u
+          ),
+        }));
+      }
       const key = chatKeyOf(chat);
       msgCache.set(key, fresh);
       const userId = useAuthStore.getState().authUser?._id;
