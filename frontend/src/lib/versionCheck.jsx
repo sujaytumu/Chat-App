@@ -101,31 +101,23 @@ export function startVersionWatcher() {
   };
 }
 
-// A small, quiet bar at the bottom (not a blocking popup). The update also installs by itself the next time
-// the app comes back to the front after being away, so most people never need to tap anything.
-export function UpdatePopup() {
+// A small "Update" pill for the top of the Chats page: casual, never inside a chat or a call.
+export function UpdateButton() {
   const ready = useSyncExternalStore((cb) => (listeners.add(cb), () => listeners.delete(cb)), () => updateReady);
   const busyCall = useCallStore((s) => s.callStatus !== "idle");
   const [updating, setUpdating] = useState(false);
-  const [hidden, setHidden] = useState(false);
-  if (!ready || hidden || (busyCall && !updating)) return null;
+  if (!ready || busyCall) return null;
   return (
-    <div className="fixed left-1/2 -translate-x-1/2 bottom-[calc(76px+env(safe-area-inset-bottom))] lg:bottom-6 z-[500] flex items-center gap-3 rounded-full bg-wa-pop text-wa-text pl-4 pr-2 py-1.5 shadow-xl border border-white/10 max-w-[92vw]">
-      <span className="text-[13.5px] whitespace-nowrap">New version ready</span>
-      <button
-        disabled={updating}
-        onClick={() => {
-          setUpdating(true);
-          applyUpdate();
-        }}
-        className="h-8 px-4 rounded-full bg-[#25D366] text-[#0b141a] text-[13.5px] font-semibold disabled:opacity-70"
-      >
-        {updating ? "Updating…" : "Update"}
-      </button>
-      <button onClick={() => setHidden(true)} className="size-8 rounded-full text-wa-muted flex items-center justify-center" aria-label="Later">
-        ✕
-      </button>
-    </div>
+    <button
+      disabled={updating}
+      onClick={() => {
+        setUpdating(true);
+        applyUpdate();
+      }}
+      className="h-8 px-3.5 mr-1 rounded-full bg-[#25D366] text-[#0b141a] text-[13px] font-semibold disabled:opacity-70 active:scale-95 transition-transform"
+    >
+      {updating ? "Updating…" : "Update"}
+    </button>
   );
 }
 
