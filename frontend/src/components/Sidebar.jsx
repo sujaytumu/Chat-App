@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
+import { UpdateButton } from "../lib/versionCheck";
 import { useBackToClose } from "../lib/useBackToClose";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
@@ -577,7 +578,8 @@ const Sidebar = () => {
           <h1 className="text-[24px] lg:text-[20.5px] leading-none font-bold tracking-tight text-wa-text">Talkies</h1>
         )}
 
-        <div className="relative" ref={menuRef}>
+        <div className="relative flex items-center" ref={menuRef}>
+          <UpdateButton />
           <button
             onClick={() => setShowMenu((s) => !s)}
             className="size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors"

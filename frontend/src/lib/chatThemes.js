@@ -138,6 +138,7 @@ export const getTheme = (id) => CHAT_THEMES.find((t) => t.id === id) || null;
 
 const rgb = (a) => a.join(" ");
 const shade = (a, k) => a.map((v) => Math.max(0, Math.min(255, Math.round(v * k))));
+const mix = (a, b, k) => a.map((v, i) => Math.round(v * (1 - k) + b[i] * k));
 const hex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
 
 // The colour of the header / status bar for a theme: a deeper shade of the received-bubble tone,
@@ -194,6 +195,9 @@ export function themeStyle(theme, font) {
     style["--wa-pop"] = rgb(shade(theme.inn, 0.8));
     style["--ct-out-text"] = rgb(theme.outText);
     style["--ct-seen"] = seenTickColor(theme.out);
+    // Names, "online", reply bars and the header follow the theme's own colour instead of fixed green / white.
+    style["--ct-accent"] = rgb(mix(theme.out, [255, 255, 255], 0.35));
+    style["--ct-head"] = rgb(mix([255, 255, 255], theme.out, 0.12));
   }
   if (font?.css) style["--chat-font"] = font.css;
   return style;

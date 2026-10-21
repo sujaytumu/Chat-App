@@ -257,3 +257,14 @@ html[data-accent] .toggle:checked { box-shadow: 0 0 12px -2px color-mix(in srgb,
 .chat-themed .bg-wa-out .text-wa-muted2 { opacity: .72; }
 /* the header and composer sit on the theme, with a soft edge instead of a hard navy bar */
 .chat-themed .border-white\/5 { border-color: rgb(255 255 255 / .08); }
+
+/* Themed chats: header, names, reply bars and ticks follow the theme's colours */
+.chat-themed .chat-header h3,
+.chat-themed .chat-header button,
+.chat-themed .chat-header svg { color: rgb(var(--ct-head)); }
+.chat-themed .chat-header .text-wa-muted { color: rgb(var(--ct-head) / .7); }
+.chat-themed .chat-header .text-\[\#25D366\] { color: rgb(var(--ct-accent)); }
+.chat-themed .border-\[\#25D366\] { border-color: rgb(var(--ct-accent)); }
+.chat-themed .text-\[\#25D366\] { color: rgb(var(--ct-accent)); }
+.chat-themed .bg-wa-out .border-\[\#25D366\] { border-color: rgb(var(--ct-out-text) / .55); }
+.chat-themed .bg-wa-out .text-\[\#25D366\] { color: rgb(var(--ct-out-text)); }
