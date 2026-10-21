@@ -224,7 +224,8 @@ const ChatContainer = () => {
   // Instagram-style Vanish mode: pull up past the bottom of a 1:1 chat and let go to switch it on / off
   const vanishPeer = selectedChat?.type === "direct" && selectedChat.data._id !== authUser?._id ? selectedChat.data._id : null;
   const vanishOn = useChatStore((s) => (vanishPeer ? !!s.directVanish[vanishPeer] : false));
-  const [vanishPull, setVanishPull] = useState(0); // 0..1
+  const [vanishPx, setVanishPx] = useState(0); // how far the chat has been pulled up (px)
+  const vanishPull = Math.min(vanishPx / 100, 1); // 0..1 — 1 means "let go now"
   const pullStart = useRef(null);
   const onPullStart = (e) => {
     const el = scrollRef.current;
@@ -233,13 +234,13 @@ const ChatContainer = () => {
   const onPullMove = (e) => {
     if (pullStart.current == null) return;
     const dy = pullStart.current - e.touches[0].clientY;
-    setVanishPull(dy > 12 ? Math.min(dy / 120, 1) : 0);
+    setVanishPx(dy > 8 ? Math.min((dy - 8) * 0.8, 130) : 0); // the chat follows the finger, with a little resistance
   };
   const [vanishBusy, setVanishBusy] = useState(null); // "on" | "off" while the switch is being made
   const onPullEnd = async () => {
     const done = vanishPull >= 1;
     pullStart.current = null;
-    setVanishPull(0);
+    setVanishPx(0);
     if (done && vanishPeer && !vanishBusy) {
       try {
         navigator.vibrate?.(20);
@@ -441,13 +442,14 @@ const ChatContainer = () => {
         </button>
       )}
 
-      <div className="relative flex-1 min-h-0 flex flex-col">
+      <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
       {vanishPeer && (
         // Vanish mode turns the chat dark, like Instagram
         <div className={`pointer-events-none absolute inset-0 bg-black transition-opacity duration-500 ${vanishOn ? "opacity-75" : "opacity-0"}`} />
       )}
-      {vanishPeer && (vanishPull > 0 || vanishBusy) && (
+      {vanishPeer && (vanishPx > 0 || vanishBusy) && (
         <VanishPullIndicator
+          px={vanishBusy ? 92 : vanishPx}
           pull={vanishPull}
           busy={!!vanishBusy}
           turningOn={vanishBusy ? vanishBusy === "on" : !vanishOn}
@@ -460,7 +462,11 @@ const ChatContainer = () => {
         onTouchMove={onPullMove}
         onTouchEnd={onPullEnd}
         onTouchCancel={onPullEnd}
-        style={{ overflowAnchor: "none" }}
+        style={{
+          overflowAnchor: "none",
+          transform: vanishPeer && (vanishPx > 0 || vanishBusy) ? `translateY(${-(vanishBusy ? 92 : vanishPx)}px)` : undefined,
+          transition: vanishPx > 0 && !vanishBusy ? undefined : "transform 280ms cubic-bezier(.2,.8,.2,1)",
+        }}
         className="relative flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[5%] lg:px-8 py-3 lg:py-5 lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto"
       >
         {hasMoreMessages && (
@@ -843,7 +849,7 @@ const ChatContainer = () => {
             <span className="size-2 rounded-full bg-wa-muted animate-bounce" />
           </div>
         )}
-        {vanishPeer && vanishPull === 0 && !vanishBusy && <VanishBottomHint on={vanishOn} />}
+        {vanishPeer && vanishPx === 0 && !vanishBusy && <VanishBottomHint on={vanishOn} />}
         <div ref={messageEndRef} />
       </div>
 
