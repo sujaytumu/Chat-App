@@ -285,11 +285,12 @@ const sendMessageCore = async (req, res) => {
     const senderId = req.user._id;
     const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
     // Independent lookups run together instead of one after another.
-    const [contact, statusReply, receiver, disappearAfter] = await Promise.all([
+    const [contact, statusReply, receiver, disappearAfter, allowedToSee] = await Promise.all([
       buildContact(req.body.contactUserId),
       req.body.highlightId ? buildHighlightReply(req.body.highlightId, req.body.itemId, receiverId, senderId) : buildStatusReply(req.body.statusId, receiverId),
       getUserLean(receiverId), // remembered for a few seconds: no database trip while chatting
       getDisappearAfter(senderId, receiverId),
+      isSelf ? true : canSee(req.user, receiverId), // checked alongside the other lookups, not after them
     ]);
 
     if (!text?.trim() && !image && !file && !poll && !event && !liveLocation && !contact) {
@@ -319,7 +320,7 @@ const sendMessageCore = async (req, res) => {
 
     // If the receiver currently has an active socket, the message will land
     // instantly, so we can mark it delivered right away.
-    if (!isSelf && !(await canSee(req.user, receiverId))) {
+    if (!isSelf && !allowedToSee) {
       return res.status(403).json({ error: "You can't message this person" });
     }
     if ((req.user.blockedUsers || []).some((b) => String(b) === String(receiverId))) {
@@ -333,7 +334,7 @@ const sendMessageCore = async (req, res) => {
     // looks connected — e.g. the phone just lost signal — must not count.
     const isDelivered = false;
 
-    const vanish = !isSelf && (await getDirectSetting(senderId, receiverId)).vanish;
+    const vanish = !isSelf && (await getDirectSetting(senderId, receiverId)).vanish; // cached by the lookup above
     const newMessage = new Message({
       senderId,
       receiverId,
