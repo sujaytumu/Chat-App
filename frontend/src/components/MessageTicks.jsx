@@ -11,9 +11,9 @@ const MessageTicks = ({ message }) => {
       </button>
     );
   if (message.pending) return <Clock size={13} className="opacity-70" />;
-  if (message.seen) return <CheckCheck size={15} className="text-[#53BDEB]" />;
-  if (message.delivered) return <CheckCheck size={15} className="opacity-80" />;
-  return <Check size={15} className="opacity-80" />;
+  if (message.seen) return <CheckCheck size={15} strokeWidth={2.4} style={{ color: "var(--ct-seen, #53BDEB)" }} />;
+  if (message.delivered) return <CheckCheck size={15} className="opacity-90" strokeWidth={2.2} />;
+  return <Check size={15} className="opacity-90" strokeWidth={2.2} />;
 };
 
 // Group version: double blue only once EVERY member has read it, double grey
@@ -33,9 +33,9 @@ export const receiptsFor = (message, members = [], senderId) => {
 export const GroupMessageTicks = ({ message, members, senderId }) => {
   if (message.pending) return <Clock size={13} className="opacity-70" />;
   const { others, seen, delivered } = receiptsFor(message, members, senderId);
-  if (others.length > 0 && seen.length === others.length) return <CheckCheck size={15} className="text-[#53BDEB]" />;
-  if (others.length > 0 && delivered.length === others.length) return <CheckCheck size={15} className="opacity-80" />;
-  return <Check size={15} className="opacity-80" />;
+  if (others.length > 0 && seen.length === others.length) return <CheckCheck size={15} strokeWidth={2.4} style={{ color: "var(--ct-seen, #53BDEB)" }} />;
+  if (others.length > 0 && delivered.length === others.length) return <CheckCheck size={15} className="opacity-90" strokeWidth={2.2} />;
+  return <Check size={15} className="opacity-90" strokeWidth={2.2} />;
 };
 
 export default MessageTicks;
