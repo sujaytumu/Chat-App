@@ -73,7 +73,14 @@ export const createStatus = async (req, res) => {
       if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
       const songMime = typeof song.mime === "string" && song.mime.startsWith("audio/") ? song.mime : "audio/mpeg";
       const uploaded = await uploadFileAttachment({ data: song.data, name: song.name, mimeType: songMime, size: song.size });
-      doc.song = { url: uploaded.url, name: String(song.name || "Song").slice(0, 80) };
+      const sLen = Number(song.length);
+      const sStart = Number(song.start);
+      doc.song = {
+        url: uploaded.url,
+        name: String(song.name || "Song").slice(0, 80),
+        start: Number.isFinite(sStart) ? Math.min(Math.max(sStart, 0), 3600) : 0,
+        length: Number.isFinite(sLen) && sLen > 0 ? Math.min(Math.max(Math.round(sLen), 5), 30) : 0,
+      };
     }
 
     if (location && typeof location.name === "string" && location.name.trim()) {

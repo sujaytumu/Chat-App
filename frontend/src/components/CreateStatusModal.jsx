@@ -4,6 +4,7 @@ import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Musi
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import StatusMusicSheet from "./StatusMusicSheet";
+import StatusSongEditor from "./StatusSongEditor";
 import StatusAudienceSheet, { readAudience, audienceLabel, AUDIENCE_KEY } from "./StatusAudienceSheet";
 import StatusVideoPreview, { MAX_STATUS_VIDEO_SECONDS } from "./StatusVideoPreview";
 import toast from "react-hot-toast";
@@ -148,6 +149,10 @@ const useSongPreview = (song, suspended) => {
     if (!song?.data) return undefined;
     const a = new Audio(song.data);
     a.loop = true;
+    const from = song.start || 0;
+    const to = song.length ? from + song.length : 0;
+    if (from) a.currentTime = from;
+    if (to) a.ontimeupdate = () => { if (a.currentTime >= to || a.currentTime < from - 0.3) a.currentTime = from; };
     a.onplay = () => setPlaying(true);
     a.onpause = () => setPlaying(false);
     audio.current = a;
@@ -157,7 +162,7 @@ const useSongPreview = (song, suspended) => {
       audio.current = null;
       setPlaying(false);
     };
-  }, [song?.data]);
+  }, [song?.data, song?.start, song?.length]);
   useEffect(() => {
     if (suspended) audio.current?.pause();
   }, [suspended]);
@@ -187,6 +192,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [place, setPlace] = useState(null); // { name, lat, lng }
   const [showPlaces, setShowPlaces] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
+  const [editSong, setEditSong] = useState(false); // WhatsApp's "choose the part of the song" screen
   const [audience, setAudience] = useState(readAudience);
   const [showAudience, setShowAudience] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
@@ -195,7 +201,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const audioRef = useRef(null);
   const fileRef = useRef(null);
   const songRef = useRef(null);
-  const songPlay = useSongPreview(song, showMusic);
+  const songPlay = useSongPreview(song, showMusic || editSong);
   useBackToClose(true, onClose);
 
   const take = async (e, as) => {
@@ -234,8 +240,9 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
     if (!file) return;
     if (file.size > MAX_SONG_BYTES) return toast.error("Pick a song under 4 MB");
     try {
-      setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, ""), size: file.size });
+      setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, ""), size: file.size, mime: file.type });
       setShowMusic(false);
+      setEditSong(true);
     } catch {
       toast.error("Couldn't read that song");
     }
@@ -263,7 +270,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         caption: kind === "text" ? "" : caption,
         ...(kind !== "text" && kind !== "image" ? { file: { name: media.name, size: media.size, mime: media.mime, duration: media.duration } } : {}),
         ...(kind === "video" && trim ? { trim } : {}),
-        ...(song ? { song: { data: song.data, name: song.name, size: song.size, mime: song.mime } } : {}),
+        ...(song ? { song: { data: song.data, name: song.name, size: song.size, mime: song.mime, start: song.start, length: song.length } } : {}),
         ...(place ? { location: place } : {}),
         ...(audience.mode !== "all" ? { audience } : {}),
       };
@@ -415,7 +422,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
                 <button onClick={songPlay.toggle} className="size-6 rounded-full bg-[#21C063] text-black flex items-center justify-center shrink-0" aria-label={songPlay.playing ? "Pause preview" : "Play preview"}>
                   {songPlay.playing ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" />}
                 </button>
-                <span className="truncate">{song.name}</span>
+                <button type="button" onClick={() => setEditSong(true)} className="truncate text-left">{song.name}</button>
                 <button onClick={() => setSong(null)} className="size-5 rounded-full flex items-center justify-center text-wa-muted" aria-label="Remove song">
                   <X size={13} />
                 </button>
@@ -444,7 +451,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
                   <button onClick={songPlay.toggle} className="size-8 rounded-full bg-[#21C063] text-black flex items-center justify-center shrink-0" aria-label={songPlay.playing ? "Pause preview" : "Play preview"}>
                     {songPlay.playing ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
                   </button>
-                  <span className="truncate">{song.name}</span>
+                  <button type="button" onClick={() => setEditSong(true)} className="truncate text-left">{song.name}</button>
                   <button onClick={() => setSong(null)} className="size-6 flex items-center justify-center text-white/70" aria-label="Remove song"><X size={16} /></button>
                 </span>
               )}
@@ -575,12 +582,28 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         />
       )}
 
+      {editSong && song && (
+        <StatusSongEditor
+          song={song}
+          onDone={(s) => {
+            setSong(s);
+            setEditSong(false);
+          }}
+          onRemove={() => {
+            setSong(null);
+            setEditSong(false);
+          }}
+          onClose={() => setEditSong(false)}
+        />
+      )}
+
       {showMusic && (
         <StatusMusicSheet
           onClose={() => setShowMusic(false)}
           onPick={(s) => {
             setSong(s);
             setShowMusic(false);
+            setEditSong(true);
           }}
           onFiles={() => songRef.current?.click()}
         />

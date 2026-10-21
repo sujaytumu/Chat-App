@@ -172,7 +172,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           return Math.min(1, Math.max(0, (el.currentTime - st) / len));
         }
         const isMedia = current.type === "video" || current.type === "audio";
-        const total = isMedia ? Math.max(mediaMs, 1000) : DURATION_MS;
+        const total = isMedia ? Math.max(mediaMs, 1000) : current.song?.length ? current.song.length * 1000 : DURATION_MS; // a song's chosen length (15 – 30 s) sets how long a picture / text stays
         const np = p + dt / total;
         if (np >= 1) {
           queueMicrotask(next);
@@ -471,7 +471,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </a>
           </div>
         )}
-        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} muted={songMuted} autoPlay loop preload="auto" onPlaying={() => setSongBlocked(false)} onCanPlay={(e) => { if (!stop && e.currentTarget.paused) e.currentTarget.play().catch((err) => { if (err?.name === "NotAllowedError") setSongBlocked(true); }); }} />}
+        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} muted={songMuted} autoPlay loop preload="auto" onLoadedMetadata={(e) => { if (current.song.start) e.currentTarget.currentTime = current.song.start; }} onTimeUpdate={(e) => { const a = e.currentTarget; const st = current.song.start || 0; if (current.song.length && (a.currentTime >= st + current.song.length || a.currentTime < st - 0.3)) a.currentTime = st; }} onPlaying={() => setSongBlocked(false)} onCanPlay={(e) => { if (!stop && e.currentTarget.paused) e.currentTarget.play().catch((err) => { if (err?.name === "NotAllowedError") setSongBlocked(true); }); }} />}
         {current.song?.url && songBlocked && (
           <button
             onClick={(e) => { e.stopPropagation(); songEl.current?.play?.().then(() => setSongBlocked(false)).catch(() => {}); }}
