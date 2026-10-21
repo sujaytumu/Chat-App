@@ -74,6 +74,7 @@ function toData(payload) {
     title: payload?.title || "Talkies",
     body: payload?.body || "",
     icon: payload?.icon || "",
+    myIcon: payload?.myIcon || "",
     tag: payload?.tag || "",
     isCall: payload?.isCall ? "1" : "0",
     chatId: d.chatId ? String(d.chatId) : "",
