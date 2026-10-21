@@ -145,6 +145,35 @@ const hex = (a) => "#" + a.map((v) => v.toString(16).padStart(2, "0")).join("");
 export const themeBar = (theme) => (theme ? shade(theme.inn, 0.62) : null);
 export const themeBarHex = (theme) => (theme ? hex(themeBar(theme)) : null);
 
+// "Read" ticks must stand out on whatever colour the theme gives my bubbles: WhatsApp blue on a pink or red
+// bubble disappears, so pick the blue (light or deep) with the best contrast against that bubble.
+const lum = (a) => {
+  const [r, g, b] = a.map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const hexToRgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const contrast = (a, b) => {
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+};
+export function seenTickColor(out) {
+  const blues = ["#53BDEB", "#8FE3FF", "#C9F2FF", "#0B7BD6", "#0A55A8", "#003E80"];
+  let best = blues[0];
+  let bestC = 0;
+  for (const c of blues) {
+    const k = contrast(hexToRgb(c), out);
+    if (k >= 3.4) return c; // first one that reads clearly keeps the familiar look
+    if (k > bestC) {
+      bestC = k;
+      best = c;
+    }
+  }
+  return best;
+}
+
 // Inline style for a chat's container. Dark themes switch the chat to the dark palette (so
 // text on the wallpaper stays readable), then the theme re-colours bubbles, header and bars.
 // --ct-out-text is applied per own-bubble in CSS (.chat-themed .bg-wa-out) so the text on a
@@ -164,6 +193,7 @@ export function themeStyle(theme, font) {
     style["--wa-hover"] = rgb(shade(theme.inn, 1.15));
     style["--wa-pop"] = rgb(shade(theme.inn, 0.8));
     style["--ct-out-text"] = rgb(theme.outText);
+    style["--ct-seen"] = seenTickColor(theme.out);
   }
   if (font?.css) style["--chat-font"] = font.css;
   return style;
