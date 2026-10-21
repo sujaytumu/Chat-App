@@ -139,7 +139,7 @@ const ChatHeader = () => {
 
   return (
     <>
-    <div className="chat-header relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5">
+    <div data-chat-header className="chat-header relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5">
       {/* Back to the chat list (phone) */}
       <button onClick={() => setSelectedChat(null)} className={`${iconBtn} lg:hidden shrink-0`} aria-label="Back">
         <WaBack size={24} />
