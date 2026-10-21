@@ -21,6 +21,7 @@ import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
 import Reminder from "../models/reminder.model.js";
 import { summarizeTranscript } from "../lib/chatSummary.js";
+import { sendFcmClearChat } from "../lib/fcm.js";
 import { visibleUserIds, canSee, forgetPair } from "../lib/visibility.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
@@ -49,6 +50,7 @@ export async function markImpliedRead(replier, other, upTo = new Date()) {
       { $set: { seen: true, seenAt: upTo, delivered: true, deliveredAt: upTo } }
     );
     if (!result.modifiedCount) return;
+    sendFcmClearChat(replier, other); // their phone drops the notification for messages they've now replied to
     const room = getReceiverSocketId(other);
     if (!room) return;
     io.to(room).emit("messagesDelivered", { by: String(replier) });
@@ -338,6 +340,7 @@ const sendMessageCore = async (req, res) => {
     const newMessage = new Message({
       senderId,
       receiverId,
+      clientId: typeof req.body.clientId === "string" ? req.body.clientId.slice(0, 64) : undefined,
       vanish,
       expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
       text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
@@ -493,6 +496,7 @@ export const markMessagesAsSeen = async (req, res) => {
       Message.updateMany({ senderId, receiverId: myId, seen: false }, { $set: { seen: true, seenAt: new Date(), delivered: true } }),
       getUserLean(senderId),
     ]);
+    if (result.modifiedCount > 0) sendFcmClearChat(myId, senderId); // read: remove the phone notification
     const receiptsOff = req.user.privacy?.readReceipts === false || sender?.privacy?.readReceipts === false;
     if (result.modifiedCount > 0 && !receiptsOff) {
       const senderSocketId = getReceiverSocketId(senderId);

@@ -1,3 +1,4 @@
+import { sendFcmClearChat } from "./fcm.js";
 import { maskPayload } from "./privateMedia.js";
 import CallLink from "../models/callLink.model.js";
 import { Server } from "socket.io";
@@ -329,7 +330,8 @@ io.on("connection", (socket) => {
         const room = roomFor(sender);
         if (room) io.to(room).emit("messagesSeen", { by: userId });
       }
-      await Message.updateMany({ senderId: sender, receiverId: userId, seen: false }, { $set: { seen: true, seenAt: new Date(), delivered: true } });
+      const r = await Message.updateMany({ senderId: sender, receiverId: userId, seen: false }, { $set: { seen: true, seenAt: new Date(), delivered: true } });
+      if (r.modifiedCount > 0) sendFcmClearChat(userId, sender);
     } catch (e) {
       console.log("Error in markSeen:", e.message);
     }

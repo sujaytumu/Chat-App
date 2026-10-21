@@ -148,6 +148,7 @@ const messageSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    clientId: { type: String, default: undefined }, // the sender's own id for a just-typed message (lets the app match its clock copy)
     pinUntil: { type: Date, default: null }, // pins can expire (8 hours / 24 hours / 7 days)
     deletedForEveryone: {
       type: Boolean,

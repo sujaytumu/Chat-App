@@ -82,6 +82,7 @@ function toData(payload) {
     messageId: d.messageId ? String(d.messageId) : "",
     url: d.url || "/",
     cancel: payload?.cancel ? "1" : "0",
+    clear: payload?.clear ? "1" : "0",
     callId: d.callId ? String(d.callId) : payload?.callId ? String(payload.callId) : "",
   };
   return out;
@@ -152,5 +153,17 @@ export async function sendFcmCancelCall(userId, callerId, callId) {
     await sendFcmToUser(user, { cancel: true, tag: `incoming-call-${callerId}`, isCall: false, data: { callId } });
   } catch (e) {
     console.log("Error in sendFcmCancelCall:", e.message);
+  }
+}
+
+// The messages of one chat were read (on any device): the phone's notification for that chat goes away,
+// so it only ever shows what is still unread.
+export async function sendFcmClearChat(userId, chatId) {
+  try {
+    if (!load()) return;
+    const user = await User.findById(userId).select("fcmTokens").lean();
+    await sendFcmToUser(user, { clear: true, tag: `dm-${chatId}`, isCall: false, data: { chatId: String(chatId) } });
+  } catch (e) {
+    console.log("Error in sendFcmClearChat:", e.message);
   }
 }

@@ -488,7 +488,15 @@ export const useChatStore = create((set, get) => ({
       // Messages still on their way (clock) stay visible; never show the same message twice.
       const seenIds = new Set(base.map((m) => m._id));
       const clientIds = new Set(base.map((m) => m.clientId).filter(Boolean));
-      const inFlight = get().messages.filter((m) => (m.pending || m.failed) && !seenIds.has(m._id) && !clientIds.has(m._id));
+      const me0 = useAuthStore.getState().authUser?._id;
+      const inFlight = get().messages.filter(
+        (m) =>
+          (m.pending || m.failed) &&
+          !seenIds.has(m._id) &&
+          !clientIds.has(m._id) &&
+          // same text from me, sent at about the same time = the real copy is already in the list
+          !base.some((r) => r.senderId === me0 && r.text === m.text && Math.abs(new Date(r.createdAt) - new Date(m.createdAt)) < 120000)
+      );
       const merged = inFlight.length ? [...base, ...inFlight] : base;
       set((state) => ({
         messages: merged,
