@@ -327,13 +327,18 @@ const CallManager = () => {
       }
     };
 
+    // The voice always comes out of the dedicated <audio> element, for voice AND video calls and
+    // whether the call is full-screen or minimized (a video call used to go silent when minimized,
+    // because only the <video> element — gone while minimized — carried the sound). The <video>
+    // element only shows the picture, so the voice is never played twice.
+    if (remoteStream && remoteAudioRef.current) {
+      if (remoteAudioRef.current.srcObject !== remoteStream) remoteAudioRef.current.srcObject = remoteStream;
+      tryPlay(remoteAudioRef.current);
+    }
     if (callType === "video" && remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.muted = true;
       remoteVideoRef.current.srcObject = remoteStream;
       tryPlay(remoteVideoRef.current);
-    }
-    if (callType === "audio" && remoteAudioRef.current && remoteStream) {
-      remoteAudioRef.current.srcObject = remoteStream;
-      tryPlay(remoteAudioRef.current);
     }
   }, [remoteStream, callType, isMinimized, callStatus]);
 
@@ -455,6 +460,16 @@ const CallManager = () => {
   return (
     <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col isolate">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
+      {adding && (
+        <AddParticipantModal
+          excludeIds={[remoteUser?._id]}
+          onClose={() => setAdding(false)}
+          onAdd={(ids) => {
+            setAdding(false);
+            useGroupCallStore.getState().upgradeFromCall(ids);
+          }}
+        />
+      )}
       {(!isVideo || !remoteStream) && <CallBackdrop user={remoteUser} />}
       <AudioRoutePicker />
 
@@ -530,6 +545,7 @@ const CallManager = () => {
             id="call-remote-video"
             ref={remoteVideoRef}
             autoPlay
+            muted
             playsInline
             poster={TRANSPARENT_POSTER}
             style={{ visibility: remoteStream ? "visible" : "hidden" }}
