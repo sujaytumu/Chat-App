@@ -5,12 +5,13 @@ import { OWNER_EMAIL, isOwner, Visibility } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { sendPushToUser } from "../lib/webPush.js";
 
-// After a "no" the person must wait before asking again: 1 hour after the first, 24 hours after the second.
+// After a "no" the person can ask again straight away, 3 times in a row; after every third "no" they wait 1 hour,
+// then get 3 more tries, and so on.
 const HOUR = 60 * 60 * 1000;
 const retryAtFor = (r) => {
   if (!r || r.status !== "declined" || !r.declinedAt) return null;
-  const wait = (r.declines || 1) >= 2 ? 24 * HOUR : HOUR;
-  const at = new Date(r.declinedAt).getTime() + wait;
+  if ((r.declines || 0) % 3 !== 0) return null;
+  const at = new Date(r.declinedAt).getTime() + HOUR;
   return at > Date.now() ? at : null;
 };
 
@@ -39,9 +40,7 @@ export const requestAccess = async (req, res) => {
     if (existing?.status === "pending") return res.json({ status: "pending" });
     const retryAt = retryAtFor(existing);
     if (retryAt) return res.status(429).json({ error: "Please wait a while before asking again", retryAt });
-    // the 24-hour wait is over: start fresh
-    const resetDeclines = existing && (existing.declines || 0) >= 2 && !retryAt;
-    await AccessRequest.findOneAndUpdate({ userId: req.user._id }, { $set: { status: "pending", note, ...(resetDeclines ? { declines: 0 } : {}) } }, { upsert: true });
+    await AccessRequest.findOneAndUpdate({ userId: req.user._id }, { $set: { status: "pending", note } }, { upsert: true });
     const owner = await User.findOne({ email: OWNER_EMAIL }).select("_id").lean();
     if (owner) {
       tell(owner._id, "accessRequest", { userId: String(req.user._id), fullName: req.user.fullName, profilePic: req.user.profilePic || "" });
