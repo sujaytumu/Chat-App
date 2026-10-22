@@ -1,5 +1,6 @@
 import { ChevronUp, Timer, Bell, ShieldCheck } from "lucide-react";
 import { createPortal } from "react-dom";
+import { useEffect } from "react";
 
 // Instagram-style Vanish mode visuals for a 1:1 chat.
 //  - <VanishPullIndicator>: shown while you drag up past the last message. A ring fills with the
@@ -14,40 +15,58 @@ const C = 2 * Math.PI * R;
 // pull is far enough the arrow flips and the circle spins freely — let go and Vanish mode switches.
 export const VanishPullIndicator = ({ px, pull, busy, turningOn }) => {
   const ready = busy || pull >= 1;
+  const p = Math.min(pull, 1);
   const label = busy
     ? `Turning ${turningOn ? "on" : "off"} disappearing messages…`
     : ready
-      ? `Release to turn ${turningOn ? "on" : "off"} disappearing messages`
+      ? `Release to turn ${turningOn ? "on" : "off"}`
       : `Swipe up to turn ${turningOn ? "on" : "off"} disappearing messages`;
-  const scale = busy ? 1 : 0.45 + Math.min(pull, 1) * 0.55;
+  // a short buzz the moment the pull is far enough (like Instagram)
+  useEffect(() => {
+    if (ready && !busy) {
+      try { navigator.vibrate?.(18); } catch { /* not available */ }
+    }
+  }, [ready, busy]);
+  const scale = busy ? 1 : 0.5 + p * 0.5;
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center justify-center gap-2 overflow-hidden"
-      style={{ height: px, opacity: busy ? 1 : Math.min(1, pull * 1.6), transition: busy ? "height 200ms ease" : undefined }}
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center justify-center gap-3 overflow-hidden"
+      style={{
+        height: px,
+        background: `linear-gradient(to top, rgba(0,0,0,${0.35 + p * 0.45}), rgba(0,0,0,${p * 0.12}))`,
+        opacity: busy ? 1 : Math.min(1, pull * 1.8),
+        transition: busy ? "height 200ms ease" : undefined,
+      }}
       aria-live="polite"
     >
-      <div className="relative size-11 flex items-center justify-center" style={{ transform: `scale(${scale})` }}>
-        <svg viewBox="0 0 36 36" className={`absolute inset-0 size-full ${ready ? "animate-spin" : ""}`} style={{ transform: ready ? undefined : "rotate(-90deg)", animationDuration: "0.9s" }}>
-          <circle cx="18" cy="18" r={R} fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2.5" />
+      <div className="relative size-[60px] flex items-center justify-center" style={{ transform: `scale(${scale})` }}>
+        {ready && <span className="absolute inset-0 rounded-full border-2 border-white/60 animate-ping" />}
+        <span className="absolute inset-[5px] rounded-full" style={{ background: ready ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)", transition: "background 200ms" }} />
+        <svg viewBox="0 0 36 36" className={`absolute inset-0 size-full ${busy ? "animate-spin" : ""}`} style={{ transform: busy ? undefined : "rotate(-90deg)", animationDuration: "0.8s" }}>
+          <circle cx="18" cy="18" r={R} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="2" />
           <circle
             cx="18"
             cy="18"
             r={R}
             fill="none"
             stroke="#fff"
-            strokeWidth="2.5"
+            strokeWidth="2.6"
             strokeLinecap="round"
             strokeDasharray={C}
-            strokeDashoffset={ready ? C * 0.25 : C * (1 - Math.min(pull, 1))}
+            strokeDashoffset={busy ? C * 0.7 : C * (1 - p)}
+            style={{ transition: busy ? undefined : "stroke-dashoffset 40ms linear" }}
           />
         </svg>
         <ChevronUp
-          size={20}
+          size={26}
           className="text-white"
-          style={{ transform: `rotate(${ready ? 180 : Math.round(pull * 180)}deg)`, transition: ready ? "transform 220ms ease" : "transform 40ms linear" }}
+          style={{
+            transform: `translateY(${ready ? -2 : (1 - p) * 4}px) rotate(${ready ? 180 : 0}deg)`,
+            transition: "transform 260ms cubic-bezier(.2,1.4,.4,1)",
+          }}
         />
       </div>
-      <span className="text-white/90 text-[12px] leading-none">{label}</span>
+      <span className="text-white text-[12.5px] font-medium leading-none">{label}</span>
     </div>
   );
 };
@@ -66,14 +85,14 @@ export const VanishNotice = ({ message, mine, name, onToggle }) => {
   const on = message.system === "vanish_on";
   const who = mine ? "You" : name || "Someone in the chat";
   return (
-    <div className="flex justify-center px-6 py-3">
-      <p className="max-w-[320px] text-center text-[12.5px] leading-snug text-wa-text/80">
-        {who} turned {on ? "on" : "off"} disappearing messages.
-        {on && mine ? " New messages will disappear after they have been seen and you leave the chat." : ""}{" "}
+    <div className="flex justify-center px-6 py-2.5" title={`${who} turned ${on ? "on" : "off"} disappearing messages`}>
+      <span className="inline-flex items-center gap-2 rounded-full bg-wa-surface/90 px-3.5 py-1.5 text-[12px] text-wa-text/85 shadow-sm">
+        <Timer size={13} className={on ? "text-[#25D366]" : "text-wa-muted"} />
+        Disappearing messages {on ? "on" : "off"}
         <button type="button" onClick={onToggle} className="font-medium text-[#6aa7ff] active:opacity-70">
-          {on ? "Change" : "Turn on"}
+          {on ? "Turn off" : "Turn on"}
         </button>
-      </p>
+      </span>
     </div>
   );
 };
