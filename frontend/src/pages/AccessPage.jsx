@@ -7,6 +7,9 @@ import Avatar from "../components/Avatar";
 
 // Owner only: choose which people can see each other. Everyone else sees only the people allowed here
 // (plus people they already chat with, and the owner).
+const OWNER_EMAIL = "sujaybabutumu@gmail.com";
+const isOwnerUser = (u) => String(u?.email || "").trim().toLowerCase() === OWNER_EMAIL;
+
 const AccessPage = () => {
   const nav = useNavigate();
   const [params] = useSearchParams();
@@ -53,6 +56,7 @@ const AccessPage = () => {
   const pendingForWho = who ? requests.find((r) => r.user._id === who._id) : null;
 
   const toggle = async (other) => {
+    if (isOwnerUser(other)) return toast(`${other.fullName?.split(" ")[0] || "The owner"} is always allowed`, { icon: "✅" });
     const k = key(who._id, other._id);
     const allowed = !pairs.has(k);
     setPairs((p) => {
@@ -74,13 +78,16 @@ const AccessPage = () => {
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return users.filter((u) => u._id !== who?._id && (!needle || u.fullName?.toLowerCase().includes(needle) || u.email?.toLowerCase().includes(needle)));
+    return users
+      .filter((u) => u._id !== who?._id && (!needle || u.fullName?.toLowerCase().includes(needle) || u.email?.toLowerCase().includes(needle)))
+      .sort((a, b) => Number(isOwnerUser(b)) - Number(isOwnerUser(a))); // the owner is always first
   }, [users, q, who]);
   const people = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return users.filter((u) => !needle || u.fullName?.toLowerCase().includes(needle) || u.email?.toLowerCase().includes(needle));
   }, [users, q]);
-  const countFor = (id) => [...pairs].filter((p) => p.split("|").includes(id)).length;
+  const ownerId = users.find(isOwnerUser)?._id;
+  const countFor = (id) => [...pairs].filter((p) => p.split("|").includes(id) && !(ownerId && p.split("|").includes(ownerId))).length + (ownerId && id !== ownerId ? 1 : 0);
 
   if (denied) return <div className="flex-1 flex items-center justify-center text-wa-muted p-8 text-center">Only the owner can open this page.</div>;
 
@@ -132,13 +139,13 @@ const AccessPage = () => {
           ))}
         {who &&
           list.map((u) => {
-            const on = pairs.has(key(who._id, u._id));
+            const on = isOwnerUser(u) || pairs.has(key(who._id, u._id)); // the owner is ticked for everybody
             return (
               <button key={u._id} onClick={() => toggle(u)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-wa-surface/70">
                 <Avatar src={u.profilePic} name={u.fullName} size="size-12" />
                 <span className="min-w-0 flex-1">
                   <span className="block text-[15px] truncate">{u.fullName}</span>
-                  <span className="block text-[12px] text-wa-muted truncate">{u.email}</span>
+                  <span className="block text-[12px] text-wa-muted truncate">{isOwnerUser(u) ? "Owner · always allowed" : u.email}</span>
                 </span>
                 <span className={`size-6 rounded-md border-2 flex items-center justify-center ${on ? "bg-[#21C063] border-[#21C063] text-[#0B141A]" : "border-wa-muted"}`}>{on && <Check size={15} strokeWidth={3.5} />}</span>
               </button>
