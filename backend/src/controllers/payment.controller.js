@@ -7,14 +7,14 @@ import { sendPushToUser } from "../lib/webPush.js";
 import { rememberMessage } from "../lib/recentMessages.js";
 import { getUserLean } from "../lib/authCache.js";
 import { canSee, forgetPair } from "../lib/visibility.js";
-import { createOrder, fetchPayment, signatureValid, razorpayEnabled, razorpayPublicKey, razorpayTestMode } from "../lib/razorpay.js";
+import { createOrder, fetchPayment, signatureValid, razorpayEnabled, razorpayPublicKey, razorpayTestMode, razorpayLiveKeysBlocked } from "../lib/razorpay.js";
 
 const MIN_RUPEES = 1;
 const MAX_RUPEES = 100000;
 const rupees = (paise) => (paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
 export const paymentConfig = (req, res) => {
-  res.json({ enabled: razorpayEnabled(), keyId: razorpayEnabled() ? razorpayPublicKey() : "", test: razorpayTestMode(), min: MIN_RUPEES, max: MAX_RUPEES });
+  res.json({ liveBlocked: razorpayLiveKeysBlocked(), enabled: razorpayEnabled(), keyId: razorpayEnabled() ? razorpayPublicKey() : "", test: razorpayTestMode(), min: MIN_RUPEES, max: MAX_RUPEES });
 };
 
 // Step 1: the payer picks an amount for a person; we ask Razorpay for an order and remember it.
