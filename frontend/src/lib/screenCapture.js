@@ -30,6 +30,7 @@ async function nativeScreenTrack() {
   canvas.height = 960;
   const ctx = canvas.getContext("2d");
   const track = canvas.captureStream(10).getVideoTracks()[0];
+  try { track.contentHint = "detail"; } catch { /* optional */ }
 
   let closed = false;
   let decoding = false;
@@ -38,14 +39,36 @@ async function nativeScreenTrack() {
   const frameHandle = await plugin.addListener("frame", ({ data, width, height }) => {
     if (decoding || closed) return; // never queue up frames — drop and take the next
     decoding = true;
-    const img = new Image();
-    img.onload = () => {
+    const draw = (img) => {
+      if (closed) return;
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
       }
       ctx.drawImage(img, 0, 0, width, height);
+      if (last?.close) last.close();
       last = img;
+    };
+    if (typeof createImageBitmap === "function") {
+      // decoded off the main thread, so the page and the call stay smooth
+      try {
+        const bin = atob(data);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        createImageBitmap(new Blob([bytes], { type: "image/jpeg" }))
+          .then(draw)
+          .catch(() => {})
+          .finally(() => {
+            decoding = false;
+          });
+        return;
+      } catch {
+        /* fall through to the plain decoder */
+      }
+    }
+    const img = new Image();
+    img.onload = () => {
+      draw(img);
       decoding = false;
     };
     img.onerror = () => {

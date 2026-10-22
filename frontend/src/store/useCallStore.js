@@ -218,6 +218,20 @@ const rememberEnded = (id) => {
   for (const [k, t] of endedCallIds) if (now - t > ENDED_CALL_TTL_MS) endedCallIds.delete(k);
 };
 const wasEnded = (id) => !!id && endedCallIds.has(id);
+// Screen content: keep the text sharp and the call smooth (drop frame rate, not sharpness, when the line is slow).
+const tuneScreenSender = (sender) => {
+  try {
+    const p = sender.getParameters();
+    if (!p.encodings?.length) p.encodings = [{}];
+    p.encodings[0].maxBitrate = 1_500_000;
+    p.encodings[0].maxFramerate = 12;
+    p.degradationPreference = "maintain-resolution";
+    sender.setParameters(p).catch(() => {});
+  } catch {
+    /* not supported — defaults are fine */
+  }
+};
+
 // A signal that names a different call than the one on screen is about an old call: ignore it.
 const isOtherCall = (id) => !!id && !!currentCallId && id !== currentCallId;
 
@@ -844,6 +858,7 @@ export const useCallStore = create((set, get) => ({
             // not supported — receiver falls back to the current stream
           }
           await videoSender.replaceTrack(screenTrack);
+          tuneScreenSender(videoSender);
           // A video slot we only ever *received* on (peer shared earlier) is
           // recvonly — replacing its track alone would send nothing.
           if (videoTransceiver && videoTransceiver.direction !== "sendrecv" && videoTransceiver.direction !== "sendonly") {
@@ -852,6 +867,7 @@ export const useCallStore = create((set, get) => ({
         } else {
           // Sharing from a voice call: add a video track (renegotiates)
           videoSender = pc.addTrack(screenTrack, localStream || new MediaStream());
+          tuneScreenSender(videoSender);
         }
 
         // Stop sharing if the user uses the browser's own "Stop sharing" UI
