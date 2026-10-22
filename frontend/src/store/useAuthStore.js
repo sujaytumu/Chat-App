@@ -222,14 +222,32 @@ export const useAuthStore = create((set, get) => ({
     // Force an immediate reconnect attempt as soon as the tab is visible
     // again, instead of waiting on that backoff timer to catch up.
     let lastListSync = 0;
+    let lastChatSync = 0;
+    let lastResume = 0;
+    let hiddenAt = 0;
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") hiddenAt = Date.now();
+    });
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible" || !socket) return;
+      // "visibilitychange" and "focus" fire together when you come back: handle it once.
+      const now = Date.now();
+      if (now - lastResume < 800) return;
+      lastResume = now;
+      const away = hiddenAt ? now - hiddenAt : 0;
       // Back in the app: bring the chat list (latest messages, ticks, unread counts) up to date right away.
-      if (Date.now() - lastListSync > 4000) {
-        lastListSync = Date.now();
+      if (now - lastListSync > 4000) {
+        lastListSync = now;
         useChatStore.getState().getUsers();
         useChatStore.getState().getGroups();
       }
+      // ...and the chat that is open, straight away (don't wait for the connection check below), plus any
+      // message that was still waiting to be sent. Skipped for a quick glance away.
+      if (away > 2500 && now - lastChatSync > 3000) {
+        lastChatSync = now;
+        if (useChatStore.getState().selectedChat) useChatStore.getState().getMessages();
+      }
+      useChatStore.getState().retryFailed?.();
       if (!socket.connected) {
         socket.connect();
         return;
@@ -248,7 +266,7 @@ export const useAuthStore = create((set, get) => ({
           socket.disconnect();
           socket.connect();
         }
-      }, 2500);
+      }, 1500);
     };
     window.addEventListener("online", () => {
       if (socket && !socket.connected) socket.connect();
