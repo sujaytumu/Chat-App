@@ -25,6 +25,7 @@ import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import PollModal from "./PollModal";
 import LocationSheet from "./LocationSheet";
+import PhotoSendPreview from "./PhotoSendPreview";
 import { liveShares } from "../lib/liveShare";
 import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
 import EventModal from "./EventModal";
@@ -864,33 +865,18 @@ const MessageInput = () => {
         </div>
       )}
       {imagePreview && (
-        <div className="mb-2.5 flex items-center gap-2">
-          <div className="relative">
-            <img
-              src={imagePreview}
-              alt="Preview"
-              className="w-20 h-20 object-cover rounded-lg border border-white/10"
-            />
-            <button
-              onClick={clearAttachments}
-              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-wa-field text-wa-text flex items-center justify-center"
-              type="button"
-            >
-              <X className="size-3" />
-            </button>
-          </div>
-          {selectedChat?.type === "direct" && (
-            <button
-              type="button"
-              onClick={() => setViewOnce((v) => !v)}
-              className={`h-9 px-3 rounded-full flex items-center gap-2 text-[13px] ${viewOnce ? "bg-[#25D366] text-wa-bg font-medium" : "bg-wa-field text-wa-text2"}`}
-              aria-pressed={viewOnce}
-            >
-              <span className={`size-5 rounded-full border-2 border-current text-[10px] font-bold flex items-center justify-center`}>1</span>
-              View once
-            </button>
-          )}
-        </div>
+        <PhotoSendPreview
+          src={imagePreview}
+          caption={text}
+          onCaption={setText}
+          canViewOnce={selectedChat?.type === "direct"}
+          viewOnce={viewOnce}
+          onToggleViewOnce={() => setViewOnce((v) => !v)}
+          to={selectedChat?.data?.isSelf ? "Message yourself" : selectedChat?.data?.fullName || selectedChat?.data?.name || ""}
+          sending={isSending}
+          onSend={() => handleSendMessage({ preventDefault() {} })}
+          onClose={clearAttachments}
+        />
       )}
 
       {imageFallback && (
