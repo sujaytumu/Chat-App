@@ -9,7 +9,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import Avatar from "./Avatar";
 import MessageTicks, { GroupMessageTicks } from "./MessageTicks";
-import AccessRequestBanner from "./AccessRequestBanner";
+import { askMorePeople } from "../lib/askMorePeople";
 import { formatChatListTime } from "../lib/utils";
 import {
   Search,
@@ -24,7 +24,7 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -115,6 +115,7 @@ const Sidebar = () => {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const isOwnerUser = String(authUser?.email || "").trim().toLowerCase() === "sujaybabutumu@gmail.com"; // the server enforces this too
   const listRef = useScrollMemory("chats");
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showSelMenu, setShowSelMenu] = useState(false);
@@ -263,7 +264,10 @@ const Sidebar = () => {
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
 
+    // A contact only gets a chat row once there are messages (deleting a chat removes the row; searching still finds the person).
+    const showWithoutChat = (u) => !!q || filter === "online" || !!activeKeys || pinnedSet.has(`d:${u._id}`) || (selectedChat?.type === "direct" && selectedChat.data?._id === u._id);
     const directItems = users
+      .filter((u) => !!u.lastMessage || showWithoutChat(u))
       .filter((u) => (q.startsWith("@") ? (u.username || "").includes(q.slice(1)) : u.fullName.toLowerCase().includes(q) || (!!u.username && u.username.includes(q))))
       .map((u) => ({
         type: "direct",
@@ -335,7 +339,7 @@ const Sidebar = () => {
         return true;
       })
       .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.sortTime - a.sortTime);
-  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, showLocked, lockedSet, activeKeys, selfId, selfLast, authUser?.fullName, authUser?.profilePic, authUser?.about]);
+  }, [users, groups, filter, search, onlineUsers, archivedSet, pinnedSet, mutedSet, unreadMarkedSet, showArchived, showLocked, lockedSet, activeKeys, selfId, selfLast, authUser?.fullName, authUser?.profilePic, authUser?.about, selectedChat?.data?._id]);
 
   // Laptop keyboard shortcuts: Ctrl/Cmd+K or "/" = search, Alt+↑/↓ = previous / next chat.
   const itemsRef = useRef(items);
@@ -608,6 +612,17 @@ const Sidebar = () => {
               >
                 <Megaphone size={18} className="text-wa-icon" /> New broadcast
               </button>
+              {!isOwnerUser && (
+                <button
+                  className={menuItem}
+                  onClick={() => {
+                    setShowMenu(false);
+                    askMorePeople();
+                  }}
+                >
+                  <UserPlus size={18} className="text-wa-icon" /> See more people
+                </button>
+              )}
               <Link to="/profile" className={menuItem} onClick={() => setShowMenu(false)}>
                 <UserRound size={18} className="text-wa-icon" /> Profile
               </Link>
@@ -705,7 +720,6 @@ const Sidebar = () => {
             </button>
           </div>
         )}
-        {!search && filter === "all" && <AccessRequestBanner />}
         {!folderOpen && archivedInfo.count > 0 && !search && filter === "all" && (
           <button
             onClick={() => {
@@ -913,6 +927,11 @@ const Sidebar = () => {
               : activeKeys
               ? "No chats in this list yet. Tap Add / Edit above, or select chats and use ⋮ → Add to list."
               : "Nothing here"}
+            {!isOwnerUser && !showLocked && !showArchived && filter === "all" && (
+              <button onClick={askMorePeople} className="mt-4 mx-auto flex items-center gap-2 h-10 px-5 rounded-full bg-[#25D366] text-[#0B141A] text-[13.5px] font-semibold active:scale-95 transition-transform">
+                <UserPlus size={17} /> {search ? "Can't find them? Ask to see more people" : "Ask to see more people"}
+              </button>
+            )}
           </div>
         )}
       </div>
