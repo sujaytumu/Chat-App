@@ -5,6 +5,15 @@ import { OWNER_EMAIL, isOwner, Visibility } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { sendPushToUser } from "../lib/webPush.js";
 
+// After a "no" the person must wait before asking again: 1 hour after the first, 24 hours after the second.
+const HOUR = 60 * 60 * 1000;
+const retryAtFor = (r) => {
+  if (!r || r.status !== "declined" || !r.declinedAt) return null;
+  const wait = (r.declines || 1) >= 2 ? 24 * HOUR : HOUR;
+  const at = new Date(r.declinedAt).getTime() + wait;
+  return at > Date.now() ? at : null;
+};
+
 const tell = (userId, event, payload) => {
   const sid = getReceiverSocketId(String(userId));
   if (sid) io.to(sid).emit(event, payload);
@@ -13,9 +22,9 @@ const tell = (userId, event, payload) => {
 // Anyone: where does my request stand?
 export const myRequest = async (req, res) => {
   try {
-    const r = await AccessRequest.findOne({ userId: req.user._id }).select("status updatedAt").lean();
+    const r = await AccessRequest.findOne({ userId: req.user._id }).select("status updatedAt declines declinedAt").lean();
     res.set("Cache-Control", "no-store");
-    res.json({ owner: isOwner(req.user), status: r?.status || "none" });
+    res.json({ owner: isOwner(req.user), status: r?.status || "none", retryAt: retryAtFor(r) });
   } catch {
     res.status(500).json({ error: "Internal server error" });
   }
@@ -28,7 +37,11 @@ export const requestAccess = async (req, res) => {
     const note = String(req.body?.note || "").trim().slice(0, 200);
     const existing = await AccessRequest.findOne({ userId: req.user._id });
     if (existing?.status === "pending") return res.json({ status: "pending" });
-    await AccessRequest.findOneAndUpdate({ userId: req.user._id }, { $set: { status: "pending", note } }, { upsert: true });
+    const retryAt = retryAtFor(existing);
+    if (retryAt) return res.status(429).json({ error: "Please wait a while before asking again", retryAt });
+    // the 24-hour wait is over: start fresh
+    const resetDeclines = existing && (existing.declines || 0) >= 2 && !retryAt;
+    await AccessRequest.findOneAndUpdate({ userId: req.user._id }, { $set: { status: "pending", note, ...(resetDeclines ? { declines: 0 } : {}) } }, { upsert: true });
     const owner = await User.findOne({ email: OWNER_EMAIL }).select("_id").lean();
     if (owner) {
       tell(owner._id, "accessRequest", { userId: String(req.user._id), fullName: req.user.fullName, profilePic: req.user.profilePic || "" });
@@ -64,7 +77,10 @@ export const decideRequest = async (req, res) => {
     const userId = req.params.userId;
     const status = req.body?.status === "approved" ? "approved" : req.body?.status === "declined" ? "declined" : null;
     if (!mongoose.isValidObjectId(userId) || !status) return res.status(400).json({ error: "Invalid request" });
-    await AccessRequest.updateOne({ userId }, { $set: { status } });
+    await AccessRequest.updateOne(
+      { userId },
+      status === "declined" ? { $set: { status, declinedAt: new Date() }, $inc: { declines: 1 } } : { $set: { status, declines: 0, declinedAt: null } }
+    );
     // Names of the people this person may now see (the owner is always included, so not listed)
     let names = [];
     if (status === "approved") {
