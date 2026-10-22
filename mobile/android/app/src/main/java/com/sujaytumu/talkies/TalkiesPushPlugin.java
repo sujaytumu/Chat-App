@@ -194,6 +194,19 @@ public class TalkiesPushPlugin extends Plugin {
         call.resolve(res);
     }
 
+    /** Opens this app's system settings page (Permissions: Microphone / Camera). */
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        Context c = getContext();
+        try {
+            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
     @PluginMethod
     public void openCallSettings(PluginCall call) {
         Context c = getContext();

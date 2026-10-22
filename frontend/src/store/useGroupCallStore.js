@@ -5,6 +5,7 @@ import { useAuthStore } from "./useAuthStore";
 import { useCallStore, getIceConfig, markCallHandoff } from "./useCallStore";
 import { startRingtone, stopRingtoneSound, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
 import { tuneAudioSenders } from "../lib/audioTune";
+import { getCallStream } from "../lib/callMedia";
 import { setGroupCallBusy } from "../lib/callBusy";
 
 // Group calls (up to MAX people): every participant connects straight to every
@@ -28,10 +29,11 @@ let screenTrack = null;
 let camOn = false;
 let iceCfg = null;
 let ringTimer = null;
+let ringResumeListening = false;
 let aloneTimer = null;
 let hadOthers = false;
 
-const gum = (constraints) => navigator.mediaDevices.getUserMedia(constraints);
+const gum = (constraints) => getCallStream(constraints);
 
 async function getMedia(callType) {
   if (!navigator.mediaDevices?.getUserMedia) throw new Error("Calls need a secure (https) connection");
@@ -513,6 +515,22 @@ export const useGroupCallStore = create((set, get) => {
       const socket = socketOf();
       if (!socket) return;
       get().unsubscribeFromSocket();
+
+      // A group call that came in while the phone was in the background is only rung by the system
+      // notification; when the app comes back to the front it must ring here too (once, not restarted).
+      if (!ringResumeListening) {
+        ringResumeListening = true;
+        const resume = () => {
+          if (document.visibilityState !== "visible") return;
+          const st = useGroupCallStore.getState();
+          if (!st.incoming || st.status !== "idle") return;
+          primeAudio();
+          startRingtone({ keepIfPlaying: true });
+        };
+        document.addEventListener("visibilitychange", resume);
+        window.addEventListener("focus", resume);
+        window.addEventListener("pageshow", resume);
+      }
 
       socket.on("groupCall:incoming", (inc) => {
         if (get().status !== "idle" || useCallStore.getState().callStatus !== "idle") return; // busy

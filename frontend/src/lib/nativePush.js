@@ -97,6 +97,9 @@ export async function registerNativePush(userId, goHome) {
 
   try {
     await p.requestPermission?.();
+    // Android shows one permission prompt at a time and silently drops a second request made while
+    // the first is on screen — which is how the microphone prompt was being skipped. Wait, then ask.
+    await new Promise((r) => setTimeout(r, 2500));
     // Mic / camera up front so "Answer" never stops at a permission prompt.
     await p.requestCallPermissions?.();
   } catch {
