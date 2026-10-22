@@ -326,41 +326,19 @@ const MessageInput = () => {
     setShowLocSheet(true);
   };
 
-  // one position fix, then hand it to `send`
-  const withPosition = (send) => {
-    setShowLocSheet(false);
-    setIsSharingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          await send(position.coords);
-        } catch {
-          // toast already shown by store
-        } finally {
-          setIsSharingLocation(false);
-        }
-      },
-      () => {
-        toast.error("Couldn't get your location — check location permission");
-        setIsSharingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+  const sendCurrentLocation = ({ lat, lng }) =>
+    sendMessage({ text: `📍 Current location\nhttps://www.google.com/maps?q=${lat},${lng}` });
+
+  const sendPlace = ({ name, lat, lng }) =>
+    sendMessage({ text: `📍 ${String(name).replace(/\s+/g, " ").slice(0, 100)}\nhttps://www.google.com/maps?q=${lat},${lng}` });
+
+  const startLiveLocation = async (minutes, { lat, lng, accuracy }, comment) => {
+    const msg = await sendMessage({ liveLocation: { lat, lng, accuracy, minutes, comment } });
+    if (msg?._id && msg.liveLocation?.expiresAt) {
+      liveShares.add(msg._id, msg.liveLocation.expiresAt);
+      toast.success("Live location started");
+    }
   };
-
-  const sendCurrentLocation = () =>
-    withPosition(({ latitude, longitude }) =>
-      sendMessage({ text: `📍 Current location\nhttps://www.google.com/maps?q=${latitude},${longitude}` })
-    );
-
-  const startLiveLocation = (minutes) =>
-    withPosition(async ({ latitude, longitude, accuracy }) => {
-      const msg = await sendMessage({ liveLocation: { lat: latitude, lng: longitude, accuracy, minutes } });
-      if (msg?._id && msg.liveLocation?.expiresAt) {
-        liveShares.add(msg._id, msg.liveLocation.expiresAt);
-        toast.success("Live location started");
-      }
-    });
 
   const sendVideoNote = ({ data, mimeType, size, duration }) =>
     sendMessage({
@@ -803,6 +781,7 @@ const MessageInput = () => {
         <LocationSheet
           allowLive={!selectedChat?.data?.isSelf}
           onCurrent={sendCurrentLocation}
+          onPlace={sendPlace}
           onLive={startLiveLocation}
           onClose={() => setShowLocSheet(false)}
         />
