@@ -948,13 +948,13 @@ const MessageInput = () => {
           <div className={`relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5 bg-wa-surface rounded-[26px] ${vanishActive ? "border border-dashed border-white/45 lg:border-0" : ""} px-1.5 py-1 min-h-[52px] shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:min-h-0`}>
             <div className="relative order-3 lg:order-2" ref={attachMenuRef}>
               {showAttachMenu && (
-                <div className="absolute bottom-full left-0 mb-2 bg-wa-pop rounded-xl shadow-2xl py-1.5 w-52 z-10 overflow-hidden">
+                <div className="fixed inset-x-3 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 grid grid-cols-3 gap-y-5 rounded-3xl bg-wa-pop p-5 shadow-2xl animate-[m-fade_.14s_ease-out] lg:absolute lg:inset-x-auto lg:bottom-full lg:left-0 lg:mb-2 lg:block lg:w-52 lg:rounded-xl lg:px-0 lg:py-1.5 overflow-hidden">
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
                       <ImageIcon size={16} className="text-white" />
                     </span>
                     Photo &amp; Video
@@ -962,9 +962,9 @@ const MessageInput = () => {
                   <button
                     type="button"
                     onClick={() => documentInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
                       <FileText size={16} className="text-white" />
                     </span>
                     Document
@@ -972,9 +972,9 @@ const MessageInput = () => {
                   <button
                     type="button"
                     onClick={() => audioInputRef.current?.click()}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
                       <Music size={16} className="text-white" />
                     </span>
                     Audio
@@ -985,9 +985,9 @@ const MessageInput = () => {
                       setShowAttachMenu(false);
                       setShowVideoNote(true);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#F15C6D] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#F15C6D] flex items-center justify-center shrink-0">
                       <VideoIcon size={16} className="text-white" />
                     </span>
                     Video message
@@ -996,9 +996,9 @@ const MessageInput = () => {
                     type="button"
                     onClick={handleShareLocation}
                     disabled={isSharingLocation}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0">
                       {isSharingLocation ? (
                         <Loader2 size={16} className="text-white animate-spin" />
                       ) : (
@@ -1013,9 +1013,9 @@ const MessageInput = () => {
                       setShowAttachMenu(false);
                       setShowPoll(true);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#f5a623] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#f5a623] flex items-center justify-center shrink-0">
                       <BarChart3 size={16} className="text-white" />
                     </span>
                     Poll
@@ -1026,9 +1026,9 @@ const MessageInput = () => {
                       setShowAttachMenu(false);
                       setShowEvent(true);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#ef4d7c] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#ef4d7c] flex items-center justify-center shrink-0">
                       <CalendarDays size={16} className="text-white" />
                     </span>
                     Event
@@ -1040,9 +1040,9 @@ const MessageInput = () => {
                         setShowAttachMenu(false);
                         setShowPay(true);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                      className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                     >
-                      <span className="size-8 rounded-full bg-[#25a55f] flex items-center justify-center shrink-0">
+                      <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#25a55f] flex items-center justify-center shrink-0">
                         <IndianRupee size={16} className="text-white" />
                       </span>
                       Payment
@@ -1055,9 +1055,9 @@ const MessageInput = () => {
                       if (canSchedule) setShowSchedule(true);
                       else toast("Type your message first, then pick Send later", { icon: "🕒" });
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#0ea5a4] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#0ea5a4] flex items-center justify-center shrink-0">
                       <CalendarClock size={16} className="text-white" />
                     </span>
                     Send later
@@ -1068,9 +1068,9 @@ const MessageInput = () => {
                       setShowAttachMenu(false);
                       setShowContacts(true);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
                   >
-                    <span className="size-8 rounded-full bg-[#009de2] flex items-center justify-center shrink-0">
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#009de2] flex items-center justify-center shrink-0">
                       <UserRound size={16} className="text-white" />
                     </span>
                     Contact
