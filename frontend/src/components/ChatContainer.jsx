@@ -782,7 +782,7 @@ const ChatContainer = () => {
                       }}
                     />
                   ) : message.liveLocation ? (
-                    <LiveLocationCard message={message} isMe={isMe} onStop={() => stopLiveShare(message._id)} />
+                    <LiveLocationCard message={message} isMe={isMe} sender={sender} onStop={() => stopLiveShare(message._id)} />
                   ) : message.event ? (
                     <EventCard message={message} authUserId={authUser._id} onRsvp={(a) => useChatStore.getState().rsvpEvent(message._id, a)} />
                   ) : message.poll ? (

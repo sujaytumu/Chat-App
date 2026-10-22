@@ -132,6 +132,7 @@ const messageSchema = new mongoose.Schema(
         lat: Number,
         lng: Number,
         accuracy: Number,
+        comment: String,
         startedAt: Date,
         updatedAt: Date,
         expiresAt: Date,

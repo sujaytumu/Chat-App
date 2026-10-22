@@ -18,6 +18,7 @@ export function sanitizeLiveLocation(raw) {
     lat,
     lng,
     accuracy: num(raw.accuracy, 0, 100000) ?? undefined,
+    comment: typeof raw.comment === "string" ? raw.comment.replace(/\s+/g, " ").trim().slice(0, 200) || undefined : undefined,
     startedAt: now,
     updatedAt: now,
     expiresAt: new Date(now.getTime() + minutes * 60_000),

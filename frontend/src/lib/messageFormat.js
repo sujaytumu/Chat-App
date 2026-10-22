@@ -30,11 +30,12 @@ export function emojiFontSize(count) {
   return 22;
 }
 
-const LOCATION_REGEX = /^📍 Current location\nhttps:\/\/www\.google\.com\/maps\?q=(-?\d+\.?\d*),(-?\d+\.?\d*)$/;
+// "📍 Current location" or "📍 <place name>", then the maps link on the next line.
+const LOCATION_REGEX = /^📍 ([^\n]{1,120})\nhttps:\/\/www\.google\.com\/maps\?q=(-?\d+\.?\d*),(-?\d+\.?\d*)$/;
 
 export function parseLocationMessage(text) {
   if (!text) return null;
   const match = text.match(LOCATION_REGEX);
   if (!match) return null;
-  return { lat: match[1], lng: match[2], url: `https://www.google.com/maps?q=${match[1]},${match[2]}` };
+  return { title: match[1], lat: match[2], lng: match[3], url: `https://www.google.com/maps?q=${match[2]},${match[3]}` };
 }
