@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import AccessRequest from "../models/accessRequest.model.js";
 import User from "../models/user.model.js";
-import { OWNER_EMAIL, isOwner } from "../lib/visibility.js";
+import { OWNER_EMAIL, isOwner, Visibility } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { sendPushToUser } from "../lib/webPush.js";
 
@@ -31,13 +31,13 @@ export const requestAccess = async (req, res) => {
     await AccessRequest.findOneAndUpdate({ userId: req.user._id }, { $set: { status: "pending", note } }, { upsert: true });
     const owner = await User.findOne({ email: OWNER_EMAIL }).select("_id").lean();
     if (owner) {
-      tell(owner._id, "accessRequest", { userId: String(req.user._id), fullName: req.user.fullName });
+      tell(owner._id, "accessRequest", { userId: String(req.user._id), fullName: req.user.fullName, profilePic: req.user.profilePic || "" });
       sendPushToUser(owner._id, {
         title: "Access request",
         body: `${req.user.fullName} wants to see more people on Talkies`,
         icon: req.user.profilePic || "/icon-v2-192.png",
         tag: `access-${req.user._id}`,
-        data: { url: "/settings/access" },
+        data: { url: `/settings/access?user=${req.user._id}` },
       });
     }
     res.status(201).json({ status: "pending" });
@@ -65,11 +65,21 @@ export const decideRequest = async (req, res) => {
     const status = req.body?.status === "approved" ? "approved" : req.body?.status === "declined" ? "declined" : null;
     if (!mongoose.isValidObjectId(userId) || !status) return res.status(400).json({ error: "Invalid request" });
     await AccessRequest.updateOne({ userId }, { $set: { status } });
-    tell(userId, "accessDecision", { status });
+    // Names of the people this person may now see (the owner is always included, so not listed)
+    let names = [];
+    if (status === "approved") {
+      const rows = await Visibility.find({ $or: [{ a: userId }, { b: userId }] }).select("a b").lean();
+      const ids = rows.map((r) => (String(r.a) === String(userId) ? r.b : r.a));
+      const people = await User.find({ _id: { $in: ids }, email: { $ne: OWNER_EMAIL }, deleted: { $ne: true } }).select("fullName").lean();
+      names = people.map((p) => p.fullName).filter(Boolean);
+    }
+    const ownerName = String(req.user.fullName || "The owner").split(" ")[0];
+    const summary = names.length ? names.slice(0, 5).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "") : "";
+    tell(userId, "accessDecision", { status, people: names, by: ownerName });
     tell(userId, "visibilityChanged");
     sendPushToUser(userId, {
       title: "Talkies",
-      body: status === "approved" ? "You can now see more people on Talkies" : "Your request to see more people was declined",
+      body: status === "approved" ? (summary ? `${ownerName} approved you to see ${summary}` : `${ownerName} approved your request`) : "Your request to see more people was declined",
       icon: "/icon-v2-192.png",
       tag: "access-decision",
       data: { url: "/" },
