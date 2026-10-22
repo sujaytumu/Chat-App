@@ -23,7 +23,8 @@ const ChatThemeSheet = lazy(() => import("./ChatThemeSheet"));
 const iconBtn =
   "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 transition-colors disabled:opacity-30 disabled:hover:bg-transparent";
 
-const menuItem = "w-full flex items-center gap-3 px-4 py-3 text-[13px] text-wa-text hover:bg-white/5 text-left";
+// WhatsApp phone: text-only list, bigger type; the icons come back on the laptop
+const menuItem = "w-full flex items-center gap-3 px-5 lg:px-4 py-3.5 lg:py-3 text-[16px] lg:text-[13px] text-wa-text hover:bg-white/5 active:bg-white/10 text-left [&>svg]:hidden lg:[&>svg]:block";
 
 import LastSeenLine from "./LastSeenLine";
 import MessageSelectionBar from "./MessageSelectionBar";
@@ -197,7 +198,7 @@ const ChatHeader = () => {
             <WaKebab size={24} />
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-52 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-[232px] lg:w-52 bg-wa-pop rounded-xl lg:rounded-2xl shadow-2xl py-2 z-30 overflow-hidden origin-top-right animate-[menu-pop_.14s_ease-out]">
               {isGroup && (
                 <button
                   className={menuItem}
