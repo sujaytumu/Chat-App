@@ -932,7 +932,7 @@ export const useCallStore = create((set, get) => ({
       if (ringDeferred || !ringing || !isRingtoneActive()) {
         ringDeferred = false;
         ringing = true;
-        startRingtone();
+        startRingtone({ keepIfPlaying: true });
       }
     };
     if (!callListenersAdded) {
@@ -950,7 +950,7 @@ export const useCallStore = create((set, get) => ({
       if (ringing || ringDeferred) {
         ringDeferred = false;
         ringing = true;
-        startRingtone();
+        startRingtone({ keepIfPlaying: true });
       }
     };
     if (!kickListenersAdded) {

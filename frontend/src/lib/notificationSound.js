@@ -303,7 +303,9 @@ async function playMessageTone(id, kind = "message") {
 
 // Incoming-call ringing: sound (built-in tone repeating every 2s, or the
 // person's own file looping) plus vibration. Call stopRingtoneSound() to end.
-export function startRingtone() {
+export function startRingtone({ keepIfPlaying = false } = {}) {
+  // Already ringing: carry on from where the tune is instead of starting it over.
+  if (keepIfPlaying && isRingtoneActive()) return;
   stopRingtoneSound();
   const token = ++ringToken;
   vibrateForCall();
