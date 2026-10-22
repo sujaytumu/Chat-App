@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
 import { acquireCallMedia } from "../lib/callMedia";
-import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -52,6 +52,14 @@ export async function getIceConfig() {
     // fall through to defaults
   }
   return ICE_SERVERS;
+}
+
+// Rings inside the page ONLY when the phone itself is not already ringing (Android app: the system
+// notification rings on the real ringtone volume and keeps going unbroken when the app is opened).
+async function ringHere(get, keepIfPlaying) {
+  if (await isPhoneRinging()) return;
+  if (get().callStatus !== "incoming" || get().isAnswering) return;
+  startRingtone(keepIfPlaying ? { keepIfPlaying: true } : undefined);
 }
 
 // Watches the actual media connection (not just signaling) and gives clear
@@ -622,6 +630,7 @@ export const useCallStore = create((set, get) => ({
     ringing = false;
     ringKicked = false;
     stopRingtoneSound();
+    stopPhoneRing(); // Android app: stop the notification's ring and buzz this instant too
   },
 
   resetCall: () => {
@@ -957,7 +966,7 @@ export const useCallStore = create((set, get) => ({
       if (ringDeferred || !ringing || !isRingtoneActive()) {
         ringDeferred = false;
         ringing = true;
-        startRingtone({ keepIfPlaying: true });
+        ringHere(get, true);
       }
     };
     if (!callListenersAdded) {
@@ -975,7 +984,7 @@ export const useCallStore = create((set, get) => ({
       if (ringing || ringDeferred) {
         ringDeferred = false;
         ringing = true;
-        startRingtone({ keepIfPlaying: true });
+        ringHere(get, true);
       }
     };
     if (!kickListenersAdded) {
@@ -1048,7 +1057,12 @@ export const useCallStore = create((set, get) => ({
         ringDeferred = true;
       } else {
         ringing = true;
-        startRingtone(); // plays the tone chosen in Settings (or their own file) and vibrates
+        if (hasPhoneRing()) {
+          // Give the phone's own ring (push) a moment to start; ring here only if it did not.
+          setTimeout(() => ringHere(get, false), 1500);
+        } else {
+          startRingtone(); // plays the tone chosen in Settings (or their own file) and vibrates
+        }
       }
     });
 

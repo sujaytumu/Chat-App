@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
-import { io } from "../lib/socket.js";
+import { io, deviceRingingFor } from "../lib/socket.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 import { markDirectDelivered } from "./message.controller.js";
 import { fcmEnabled } from "../lib/fcm.js";
@@ -85,6 +85,22 @@ export const deviceDelivered = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (e) {
     console.log("Error in deviceDelivered:", e.message);
+    res.status(500).json({ ok: false });
+  }
+};
+
+// The Android app's push service calls this when an incoming call starts ringing on the phone
+// (even with the app closed). The phone's own push token proves who it is.
+export const deviceRinging = async (req, res) => {
+  try {
+    const { token, callerId, callId } = req.body || {};
+    if (typeof token !== "string" || token.length < 20 || !mongoose.isValidObjectId(callerId)) return res.status(400).json({ ok: false });
+    const user = await User.findOne({ "fcmTokens.token": token }).select("_id").lean();
+    if (!user) return res.status(200).json({ ok: false });
+    const safeCallId = typeof callId === "string" ? callId.replace(/[^A-Za-z0-9-]/g, "").slice(0, 64) : "";
+    res.status(200).json({ ok: deviceRingingFor(user._id, callerId, safeCallId) });
+  } catch (e) {
+    console.log("Error in deviceRinging:", e.message);
     res.status(500).json({ ok: false });
   }
 };

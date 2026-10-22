@@ -549,3 +549,32 @@ export function showDesktopNotification(title, options) {
     // ignore
   }
 }
+
+// ---- The phone's own ring (Android app) -------------------------------------
+// In the Android app an incoming call rings from a system notification, on the phone's real ringtone
+// volume (a web page can only play sound at the quieter media volume). The page asks whether that
+// ring is going, and tells it to stop the moment the call is answered / declined / over.
+const nativePhone = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesPush : null);
+
+export function hasPhoneRing() {
+  return !!nativePhone();
+}
+
+export async function isPhoneRinging() {
+  try {
+    const p = nativePhone();
+    if (!p?.isCallRinging) return false;
+    return !!(await p.isCallRinging())?.ringing;
+  } catch {
+    return false; // older app build without the method: ring in the page as before
+  }
+}
+
+export function stopPhoneRing() {
+  try {
+    const r = nativePhone()?.stopCallRing?.();
+    if (r && typeof r.catch === "function") r.catch(() => {});
+  } catch {
+    // ignore
+  }
+}

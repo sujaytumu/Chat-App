@@ -405,6 +405,13 @@ final class NotificationHelper {
         notifySafe(ctx, id, n);
     }
 
+    /** True while this phone is ringing for a call (the page asks, to avoid ringing a second time itself). */
+    static boolean isAnyRinging() {
+        synchronized (RINGING) {
+            return !RINGING.isEmpty();
+        }
+    }
+
     /**
      * The app came to the front: its own call screen rings from here on, so the notification's ring and
      * vibration must stop (one ring only, never a second tune on top of the first).
