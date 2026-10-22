@@ -71,7 +71,7 @@ const PaymentModal = ({ user, onClose, onDone }) => {
       });
       rzp.on("payment.failed", (resp) => {
         toast.error(resp?.error?.description || "Payment failed");
-        axiosInstance.post("/payments/cancel", { orderId: order.orderId }).catch(() => {});
+        axiosInstance.post("/payments/cancel", { orderId: order.orderId, error: resp?.error }).catch(() => {});
         setBusy(false);
       });
       rzp.open();

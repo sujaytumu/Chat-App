@@ -121,6 +121,13 @@ app.get("/api/health", (req, res) => {
   res.status(200).send("ok");
 });
 
+// Which Razorpay mode is the server in? (no secrets: only "test", "live" or "none")
+app.get("/api/health/payments", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = (process.env.RAZORPAY_KEY_ID || "").trim();
+  res.json({ mode: !id ? "none" : id.startsWith("rzp_test_") ? "test" : "live", secret: !!(process.env.RAZORPAY_KEY_SECRET || "").trim() });
+});
+
 // Is background push set up on the server? (no secrets, just yes/no)
 app.get("/api/health/push", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
