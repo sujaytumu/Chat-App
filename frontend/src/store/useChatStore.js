@@ -1205,7 +1205,7 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
-    // The centred "… turned on disappearing messages" line: shown in the chat and the list, never counted as unread.
+    // The centred "… turned on disappearing messages" line: shown only inside the chat, never in the list or as unread.
     socket.on("systemMessage", (m) => {
       const me = useAuthStore.getState().authUser?._id;
       const peer = m.senderId === me ? m.receiverId : m.senderId;
@@ -1213,7 +1213,7 @@ export const useChatStore = create((set, get) => ({
         const active = st.selectedChat?.type === "direct" && st.selectedChat.data._id === peer;
         return {
           messages: active && !st.messages.some((x) => x._id === m._id) ? [...st.messages, m] : st.messages,
-          users: st.users.map((u) => (u._id === peer ? { ...u, lastMessage: m } : u)),
+          // the chat list keeps showing the last REAL message (and its ticks): this note never replaces it
         };
       });
     });

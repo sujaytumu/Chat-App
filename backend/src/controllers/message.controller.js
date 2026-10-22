@@ -95,6 +95,7 @@ export const getUsersForSidebar = async (req, res) => {
         {
           $match: {
             groupId: null,
+            system: null, // on/off notes never become the chat's "last message"
             deletedFor: { $ne: loggedInUserId },
             $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
           },
