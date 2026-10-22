@@ -24,7 +24,37 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
     public void onNewToken(@NonNull String token) {
         // The web app re-registers the token with the server the next time it opens.
         SharedPreferences p = getSharedPreferences("talkies_push", Context.MODE_PRIVATE);
+        final String oldToken = p.getString("token", "");
         p.edit().putString("token", token).putBoolean("dirty", true).apply();
+        // Tell the server straight away (the old token proves who this phone is), so calls and messages
+        // keep reaching it even if the app is not opened for days.
+        reportTokenChange(oldToken, token);
+    }
+
+    private void reportTokenChange(final String oldToken, final String newToken) {
+        if (oldToken == null || oldToken.isEmpty() || newToken == null || newToken.isEmpty() || oldToken.equals(newToken)) return;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection c = null;
+                try {
+                    c = (HttpURLConnection) new URL("https://chat-app-jjcg.onrender.com/api/push/device-token").openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(30000);
+                    c.setReadTimeout(30000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json");
+                    byte[] body = ("{\"oldToken\":\"" + oldToken + "\",\"newToken\":\"" + newToken + "\"}").getBytes("UTF-8");
+                    OutputStream os = c.getOutputStream();
+                    os.write(body);
+                    os.close();
+                    c.getResponseCode();
+                } catch (Exception ignored) {
+                } finally {
+                    if (c != null) c.disconnect();
+                }
+            }
+        }).start();
     }
 
     @Override
