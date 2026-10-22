@@ -4,7 +4,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -230,6 +230,8 @@ let speakerNoticeShown = false; // the "phone decides the speaker" hint is shown
 let ringing = false; // our own ringtone is (meant to be) playing for an incoming call
 let ringKicked = false; // already re-started once by a tap on the incoming screen
 let ringDeferred = false; // incoming ring held back while a phone's system notification is alerting
+let callListenersAdded = false; // page listeners are added once, never stacked on re-subscribe
+let kickListenersAdded = false;
 let callClaimedAt = 0; // when the current non-idle callStatus was claimed, for stale-state detection
 
 // Tells the other side our current mic/camera state so it can show a
@@ -925,15 +927,20 @@ export const useCallStore = create((set, get) => ({
     const resumeRing = () => {
       if (document.visibilityState !== "visible" || get().callStatus !== "incoming" || get().isAnswering) return;
       primeAudio();
-      if (ringDeferred || !ringing) {
+      // Also restart when we believe it is ringing but the phone paused the sound while the app was
+      // away (leaving the app / switching tabs and coming back used to leave the call silent or wrong).
+      if (ringDeferred || !ringing || !isRingtoneActive()) {
         ringDeferred = false;
         ringing = true;
         startRingtone();
       }
     };
-    document.addEventListener("visibilitychange", resumeRing);
-    window.addEventListener("focus", resumeRing);
-    window.addEventListener("pageshow", resumeRing);
+    if (!callListenersAdded) {
+      callListenersAdded = true;
+      document.addEventListener("visibilitychange", resumeRing);
+      window.addEventListener("focus", resumeRing);
+      window.addEventListener("pageshow", resumeRing);
+    }
     // Browsers only allow sound after a touch: the first tap on the incoming-call screen unlocks audio and
     // restarts the ringtone, so it is never silent.
     const kick = () => {
@@ -946,8 +953,11 @@ export const useCallStore = create((set, get) => ({
         startRingtone();
       }
     };
-    document.addEventListener("pointerdown", kick, true);
-    document.addEventListener("touchstart", kick, true);
+    if (!kickListenersAdded) {
+      kickListenersAdded = true;
+      document.addEventListener("pointerdown", kick, true);
+      document.addEventListener("touchstart", kick, true);
+    }
 
     socket.on("incomingCall", ({ fromUser, offer, callType, callId }) => {
       // This exact call already ended / was declined / answered on this device: the server handed it

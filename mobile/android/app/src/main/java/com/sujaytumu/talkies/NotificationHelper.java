@@ -42,7 +42,7 @@ import java.util.Map;
  * Answer / Decline) and per-chat message notifications.
  */
 final class NotificationHelper {
-    static final String CH_CALLS = "talkies_calls_v2"; // v2: the bundled Talkies ringtone (a channel's sound can't be changed once created)
+    static final String CH_CALLS = "talkies_calls_v3"; // v3: louder bundled Talkies ringtone (a channel's sound can't be changed once created)
     static final String CH_MESSAGES = "talkies_messages_v1";
     static final String CH_MISSED = "talkies_missed_v1";
     static final String SITE = "https://chat-app-jjcg.onrender.com";
