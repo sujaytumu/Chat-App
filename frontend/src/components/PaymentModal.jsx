@@ -42,6 +42,7 @@ const PaymentModal = ({ user, onClose, onDone }) => {
         name: "Talkies",
         description: `Pay ${user.fullName}${note.trim() ? ` · ${note.trim()}` : ""}`,
         prefill: { name: authUser?.fullName || "" },
+        method: { card: true, upi: true, netbanking: true, wallet: false, emi: false, paylater: false }, // test payments: cards, UPI and net banking only
         theme: { color: "#25D366" },
         modal: {
           ondismiss: () => {
@@ -99,7 +100,11 @@ const PaymentModal = ({ user, onClose, onDone }) => {
         </div>
 
         {cfg && !cfg.enabled ? (
-          <p className="rounded-2xl bg-wa-field px-4 py-4 text-[14px] text-wa-muted">Payments aren't switched on yet. The server needs its Razorpay keys.</p>
+          <p className="rounded-2xl bg-wa-field px-4 py-4 text-[14px] text-wa-muted">
+            {cfg.liveBlocked
+              ? "Payments here are test-mode only (play money). The server is using live Razorpay keys, which are refused — put the rzp_test_ key and its secret on the server."
+              : "Payments aren't switched on yet. The server needs its Razorpay test keys."}
+          </p>
         ) : (
           <>
             <div className="flex items-baseline justify-center gap-1 rounded-2xl bg-wa-field py-5">
@@ -128,7 +133,7 @@ const PaymentModal = ({ user, onClose, onDone }) => {
             />
             {cfg?.test && (
               <p className="mt-3 rounded-xl bg-[#E8A33D]/15 text-[#E8A33D] px-3 py-2 text-[12px] leading-snug">
-                Test mode, no real money moves. Use card 4111 1111 1111 1111 (any future date, any CVV) or UPI <b>success@razorpay</b>.
+                Test mode only: no real money moves. Indian test cards: Visa <b>4386 2894 0766 0153</b> or Mastercard <b>5267 3181 8797 5449</b> (any future date, any CVV). Or UPI <b>success@razorpay</b>. On a bank page, tap <b>Success</b>.
               </p>
             )}
             <button onClick={pay} disabled={!valid || busy || !cfg} className="mt-4 w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold flex items-center justify-center gap-2 disabled:opacity-40">

@@ -9,7 +9,9 @@ const API = "https://api.razorpay.com/v1";
 const keyId = () => (process.env.RAZORPAY_KEY_ID || "").trim();
 const keySecret = () => (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
-export const razorpayEnabled = () => !!(keyId() && keySecret());
+// Play money only: live keys (rzp_live_…) are refused, so a real payment can never start from this app.
+export const razorpayLiveKeysBlocked = () => !!keyId() && !keyId().startsWith("rzp_test_");
+export const razorpayEnabled = () => !!(keyId() && keySecret()) && keyId().startsWith("rzp_test_");
 export const razorpayPublicKey = () => keyId();
 export const razorpayTestMode = () => keyId().startsWith("rzp_test_");
 
