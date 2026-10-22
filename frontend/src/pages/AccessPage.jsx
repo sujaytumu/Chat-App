@@ -44,7 +44,7 @@ const AccessPage = () => {
     try {
       await axiosInstance.put(`/admin/requests/${userId}`, { status });
       setRequests((r) => r.filter((x) => x.user._id !== userId));
-      toast.success(status === "approved" ? "They have been told" : "Declined");
+      toast.success(status === "approved" ? "Saved — they have been told who they can see" : "Declined");
       if (status === "approved") {
         setWho(null);
         setQ("");
@@ -152,10 +152,10 @@ const AccessPage = () => {
             );
           })}
       </div>
-      {pendingForWho && (
+      {who && (
         <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-wa-bg via-wa-bg/95 to-transparent">
-          <button onClick={() => decide(who._id, "approved")} className="w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold">
-            Done — let {who.fullName?.split(" ")[0]} in
+          <button onClick={() => decide(who._id, "approved")} className="w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold active:scale-[0.99]">
+            {pendingForWho ? `Enter — let ${who.fullName?.split(" ")[0]} in` : `Enter — save for ${who.fullName?.split(" ")[0]}`}
           </button>
         </div>
       )}

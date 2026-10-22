@@ -17,6 +17,7 @@ import LiveLocationManager from "./components/LiveLocationManager";
 import ProfileLinkHandler, { rememberProfileLink } from "./components/ProfileLinkHandler";
 import ReminderListener from "./components/ReminderListener";
 import BackgroundCallSetup from "./components/BackgroundCallSetup";
+import AccessNotifier from "./components/AccessNotifier";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
 import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -221,6 +222,7 @@ const App = () => {
       {authUser && (
         <ErrorBoundary silent>
           <CallManager />
+          <AccessNotifier />
         </ErrorBoundary>
       )}
       {authUser && (
