@@ -1,4 +1,5 @@
 import { sendFcmClearChat } from "./fcm.js";
+import { canSee } from "./visibility.js";
 import { maskPayload } from "./privateMedia.js";
 import CallLink from "../models/callLink.model.js";
 import { Server } from "socket.io";
@@ -348,7 +349,7 @@ io.on("connection", (socket) => {
   });
   const handleCallUser = async ({ toUserId, offer, callType }, ack) => {
     const fromUser = socket.data.profile; // never trust a client-supplied caller identity
-    let blocked = !canSignal(userId, String(toUserId));
+    let blocked = !canSignal(userId, String(toUserId)) || !(await canSee({ _id: userId }, String(toUserId))); // calls follow the same "who may see whom" rule
     if (!blocked && !isOnline(String(toUserId))) {
       // Offline callee isn't in the cache — one quick lookup before we push-notify them.
       const target = await User.findById(toUserId).select("blockedUsers").lean().catch(() => null);

@@ -43,7 +43,16 @@ const ProfileLinkHandler = () => {
         const known = useChatStore.getState().users.find((u) => String(u._id) === String(person._id));
         useChatStore.getState().setSelectedChat({ type: "direct", data: known || person });
       })
-      .catch(() => toast.error(`No one found with @${name.replace(/^@/, "")}`));
+      .catch((err) => {
+        const handle = name.replace(/^@/, "");
+        if (err.response?.status === 403) {
+          // Not allowed to see them yet: the owner is asked, and decides.
+          axiosInstance.post("/access/request", { note: `wants to see @${handle}` }).catch(() => {});
+          toast(`You need the owner's permission to see @${handle}. A request was sent.`, { icon: "🔒", duration: 6000 });
+          return;
+        }
+        toast.error(`No one found with @${handle}`);
+      });
   }, [me]);
   return null;
 };

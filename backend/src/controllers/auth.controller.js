@@ -482,7 +482,9 @@ export const findByUsername = async (req, res) => {
     const { name, error } = checkName(req.params.username);
     if (error) return res.status(404).json({ message: "No one with that username" });
     const user = await User.findOne({ username: name, deleted: { $ne: true } }).select("fullName profilePic about username").lean();
-    if (!user || !(String(user._id) === String(req.user._id) || (await canSee(req.user, user._id)))) return res.status(404).json({ message: "No one with that username" }); // the owner decides who can see whom
+    if (!user) return res.status(404).json({ message: "No one with that username" });
+    // the owner decides who can see whom: anyone else needs the owner's permission first
+    if (!(String(user._id) === String(req.user._id) || (await canSee(req.user, user._id)))) return res.status(403).json({ message: "You need the owner's permission to see this person. Ask the owner from your chat list." });
     res.status(200).json(user);
   } catch (error) {
     console.log("error in findByUsername:", error.message);
