@@ -2,7 +2,7 @@ import { useSyncExternalStore, useState } from "react";
 import { useCallStore } from "../store/useCallStore";
 
 // Keeps every device on the newest build. When a newer build exists, ONE big popup asks the person to
-// update (never during a call); otherwise the app just runs normally. It installs quietly the next time the app returns to the front.
+// update (never during a call); otherwise the app just runs normally. The Update button stays until the person taps it and the new build is running.
 
 const ENTRY_RE = /assets\/index-[A-Za-z0-9_-]+\.js/;
 const RELOAD_LOG_KEY = "talkies-auto-reloads";
@@ -33,7 +33,22 @@ async function latestEntry() {
 
 const inCall = () => useCallStore.getState().callStatus !== "idle";
 
-let updateReady = false;
+// The "Update" button stays until the app is really running the newer build: the waiting build is remembered
+// on this device, so it survives reloads, the app being closed, and a failed or half-applied update.
+const PENDING_KEY = "talkies-pending-entry";
+const readPending = () => {
+  try { return localStorage.getItem(PENDING_KEY) || ""; } catch { return ""; }
+};
+const writePending = (v) => {
+  try { v ? localStorage.setItem(PENDING_KEY, v) : localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
+};
+let updateReady = (() => {
+  const p = readPending();
+  const mine = typeof document !== "undefined" ? currentEntry() : null;
+  if (p && mine && p !== mine) return true;
+  if (p && mine && p === mine) writePending("");
+  return false;
+})();
 const listeners = new Set();
 const setReady = (v) => {
   if (updateReady === v) return;
@@ -66,8 +81,15 @@ async function check() {
   } catch {
     return; // offline
   }
-  if (!latest || latest === mine) return;
+  if (!latest) return;
+  if (latest === mine) {
+    // really on the newest build now
+    writePending("");
+    setReady(false);
+    return;
+  }
   navigator.serviceWorker?.getRegistration().then((reg) => reg?.update()).catch(() => {});
+  writePending(latest);
   setReady(true);
 }
 
@@ -79,17 +101,7 @@ export function startVersionWatcher() {
       hiddenAt = Date.now();
       return;
     }
-    check().then(() => {
-      // Back after being away for a while and a new version is waiting: install it quietly now.
-      if (updateReady && hiddenAt && Date.now() - hiddenAt > 15000 && !inCall()) {
-        let last = 0;
-        try { last = Number(sessionStorage.getItem("talkies-auto-update") || 0); } catch { /* ignore */ }
-        if (Date.now() - last > 60000) {
-          try { sessionStorage.setItem("talkies-auto-update", String(Date.now())); } catch { /* ignore */ }
-          applyUpdate();
-        }
-      }
-    });
+    check();
   };
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("online", check);
@@ -127,7 +139,12 @@ export async function checkForUpdateNow() {
     const latest = await latestEntry();
     const current = currentEntry();
     if (!latest || !current) return "unknown";
-    if (latest === current) return "latest";
+    if (latest === current) {
+      writePending("");
+      setReady(false);
+      return "latest";
+    }
+    writePending(latest);
     setReady(true);
     return "updating";
   } catch {
