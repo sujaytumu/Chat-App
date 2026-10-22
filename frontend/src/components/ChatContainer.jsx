@@ -280,6 +280,13 @@ const ChatContainer = () => {
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
+  let lastSystemIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].system) {
+      lastSystemIndex = i;
+      break;
+    }
+  }
 
   const membersById = isGroup
     ? Object.fromEntries(data.members.map((m) => [m._id, m]))
@@ -506,6 +513,8 @@ const ChatContainer = () => {
         {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
           if (message.system) {
+            // Only the CURRENT state is shown (one small line); older on/off lines are hidden so the chat stays clean.
+            if (index !== lastSystemIndex) return null;
             return (
               <VanishNotice
                 key={message._id}
