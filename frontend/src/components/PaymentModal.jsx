@@ -12,7 +12,7 @@ import Avatar from "./Avatar";
 const QUICK = [10, 50, 100, 500];
 
 // "Pay": send money to the person in this chat through Razorpay. Test mode uses play money only.
-const PaymentModal = ({ user, onClose }) => {
+const PaymentModal = ({ user, onClose, onDone }) => {
   useBackToClose(true, onClose);
   const authUser = useAuthStore((s) => s.authUser);
   const [cfg, setCfg] = useState(null);
@@ -60,6 +60,7 @@ const PaymentModal = ({ user, onClose }) => {
               }
             }
             toast.success("Payment sent");
+            onDone?.(); // e.g. the Payments screen refreshes its history
             onClose();
           } catch (e) {
             toast.error(e.response?.data?.error || "Couldn't confirm the payment");
