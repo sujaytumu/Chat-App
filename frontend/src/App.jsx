@@ -51,6 +51,7 @@ const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default:
 const AccountPage = more("AccountPage");
 const AccessPage = lazy(() => import("./pages/AccessPage"));
 const StarredPage = more("StarredPage");
+const PaymentsPage = lazy(() => import("./pages/PaymentsPage"));
 const PrivacyPage = more("PrivacyPage");
 const TwoStepPage = more("TwoStepPage");
 const LinkedDevicesPage = more("LinkedDevicesPage");
@@ -329,6 +330,10 @@ const App = () => {
           <Route
             path="/channels"
             element={authUser ? <MainLayout><ChannelsPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/payments"
+            element={authUser ? <MainLayout><PaymentsPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/starred"

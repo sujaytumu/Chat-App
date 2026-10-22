@@ -33,6 +33,7 @@ import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
 import PollCard from "./PollCard";
 import EventCard from "./EventCard";
+import PaymentCard from "./PaymentCard";
 import LiveLocationCard from "./LiveLocationCard";
 import ReminderSheet from "./ReminderSheet";
 import { stopLiveShare } from "./LiveLocationManager";
@@ -534,7 +535,7 @@ const ChatContainer = () => {
           // The first bubble of a run from the same person gets a tail and a
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
-          const hasText = !!message.text && !location && !message.poll && !message.event && !message.liveLocation && !message.contact;
+          const hasText = !!message.text && !location && !message.poll && !message.event && !message.liveLocation && !message.contact && !message.payment;
 
           const menuProps = {
             message,
@@ -767,7 +768,9 @@ const ChatContainer = () => {
                     />
                   )}
                   {message.file && <AttachmentContent file={message.file} incoming={!isMe} onMediaLoaded={handleMediaLoaded} messageId={message._id} transcript={message.transcript?.text} />}
-                  {message.contact ? (
+                  {message.payment ? (
+                    <PaymentCard message={message} isMe={isMe} />
+                  ) : message.contact ? (
                     <ContactCard
                       contact={message.contact}
                       isMe={isMe}

@@ -121,6 +121,11 @@ const messageSchema = new mongoose.Schema(
       },
       default: undefined,
     },
+    // Money sent in the chat (created only by the server after Razorpay confirms the payment).
+    payment: {
+      type: { amount: Number, currency: String, note: String, status: String, paymentId: String, test: Boolean },
+      default: undefined,
+    },
     // Live location: a moving position that the sender updates until it expires or is stopped.
     liveLocation: {
       type: {
