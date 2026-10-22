@@ -194,6 +194,24 @@ public class TalkiesPushPlugin extends Plugin {
         call.resolve(res);
     }
 
+    /** The call was answered / declined / ended inside the app: stop the notification's ring and buzz at once. */
+    @PluginMethod
+    public void stopCallRing(PluginCall call) {
+        try {
+            NotificationHelper.stopAllRinging(getContext());
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    /** Is this phone's own ring (notification) going right now? */
+    @PluginMethod
+    public void isCallRinging(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("ringing", NotificationHelper.isAnyRinging());
+        call.resolve(r);
+    }
+
     /** Opens this app's system settings page (Permissions: Microphone / Camera). */
     @PluginMethod
     public void openAppSettings(PluginCall call) {

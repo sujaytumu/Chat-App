@@ -1042,6 +1042,20 @@ function expireHeldCall(calleeId, entry) {
   activeCalls.delete(key);
 }
 
+// The Android app's push service reports that the phone is RINGING while the app is closed or in
+// the background (no open socket to emit callRingingAck on): the caller's screen moves from
+// "Calling…" to "Ringing…".
+export function deviceRingingFor(calleeId, callerId, callId) {
+  calleeId = String(calleeId);
+  callerId = String(callerId);
+  const held = pendingCalls.get(calleeId);
+  if (!held || String(held.fromUserId) !== callerId) return false; // call over, or not for this phone
+  if (callId && held.callId && String(held.callId) !== String(callId)) return false; // an older call
+  const callerRoom = roomFor(callerId);
+  if (callerRoom) io.to(callerRoom).emit("remoteDeviceRinging", { callId: held.callId });
+  return true;
+}
+
 // "Decline" pressed on an incoming-call notification while the app is closed
 // (so there is no socket to emit rejectCall on). Same effect as rejectCall.
 export function declineCallFor(userId, callerId, callId) {

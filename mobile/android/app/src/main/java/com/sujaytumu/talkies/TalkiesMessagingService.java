@@ -50,17 +50,24 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
         String messageId = nz(d.get("messageId"));
         if (!messageId.isEmpty()) confirmDelivered(messageId);
 
-        // The app is on screen: the page already rings / beeps by itself.
-        if (MainActivity.visible) return;
+        boolean isCall = "1".equals(d.get("isCall"));
+
+        // The app is on screen: the page already beeps for messages by itself. A CALL still rings
+        // from here: the page can only play sound at media volume, this ring uses the phone's real
+        // ringtone volume (and keeps going, unbroken, when the app is opened).
+        if (MainActivity.visible && !isCall) return;
 
         String title = nz(d.get("title"));
         String body = nz(d.get("body"));
         String chatId = nz(d.get("chatId"));
         String chatType = nz(d.get("chatType"));
-        boolean isCall = "1".equals(d.get("isCall"));
 
         if (isCall) {
-            NotificationHelper.showIncomingCall(this, title, body, tag, nz(d.get("callerId")).isEmpty() ? chatId : nz(d.get("callerId")), nz(d.get("icon")), callId);
+            String callerKey = nz(d.get("callerId")).isEmpty() ? chatId : nz(d.get("callerId"));
+            NotificationHelper.showIncomingCall(this, title, body, tag, callerKey, nz(d.get("icon")), callId);
+            // The phone is ringing even though the app may be closed: tell the server so the caller's
+            // screen changes from "Calling…" to "Ringing…".
+            reportRinging(callerKey, callId);
         } else {
             boolean missed = body.toLowerCase().startsWith("missed");
             NotificationHelper.showMessage(this, title, body, tag, chatId, chatType, missed, nz(d.get("icon")), nz(d.get("myIcon")));
@@ -82,6 +89,35 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
                     c.setDoOutput(true);
                     c.setRequestProperty("Content-Type", "application/json");
                     byte[] body = ("{\"token\":\"" + token + "\",\"messageId\":\"" + messageId + "\"}").getBytes("UTF-8");
+                    OutputStream os = c.getOutputStream();
+                    os.write(body);
+                    os.close();
+                    c.getResponseCode();
+                } catch (Exception ignored) {
+                } finally {
+                    if (c != null) c.disconnect();
+                }
+            }
+        }).start();
+    }
+
+    private void reportRinging(final String callerId, final String callId) {
+        final String token = getSharedPreferences("talkies_push", Context.MODE_PRIVATE).getString("token", "");
+        if (token == null || token.isEmpty() || callerId == null || callerId.isEmpty()) return;
+        final String safeCaller = callerId.replaceAll("[^A-Za-z0-9]", "");
+        final String safeCall = callId == null ? "" : callId.replaceAll("[^A-Za-z0-9-]", "");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                HttpURLConnection c = null;
+                try {
+                    c = (HttpURLConnection) new URL("https://chat-app-jjcg.onrender.com/api/push/device-ringing").openConnection();
+                    c.setRequestMethod("POST");
+                    c.setConnectTimeout(8000);
+                    c.setReadTimeout(8000);
+                    c.setDoOutput(true);
+                    c.setRequestProperty("Content-Type", "application/json");
+                    byte[] body = ("{\"token\":\"" + token + "\",\"callerId\":\"" + safeCaller + "\",\"callId\":\"" + safeCall + "\"}").getBytes("UTF-8");
                     OutputStream os = c.getOutputStream();
                     os.write(body);
                     os.close();
