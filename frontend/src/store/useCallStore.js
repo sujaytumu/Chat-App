@@ -401,7 +401,10 @@ export const useCallStore = create((set, get) => ({
       primeAudio();
       startCallingTone();
 
-      pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
+      // Never let a slow / sleeping server hold the call back: use the cached relay list, or fall
+      // back to the built-in one after 1.5 s (the list is fetched in the background at app start).
+      const ice = await Promise.race([getIceConfig(), new Promise((r) => setTimeout(() => r(ICE_SERVERS), 1500))]);
+      pc = new RTCPeerConnection({ ...ice, iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
@@ -485,7 +488,8 @@ export const useCallStore = create((set, get) => ({
       }
       set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now(), isAnswering: false });
 
-      pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
+      const ice = await Promise.race([getIceConfig(), new Promise((r) => setTimeout(() => r(ICE_SERVERS), 1500))]);
+      pc = new RTCPeerConnection({ ...ice, iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 

@@ -89,6 +89,27 @@ export const deviceDelivered = async (req, res) => {
   }
 };
 
+// Android swaps a phone's push token from time to time (even while the app is closed). The app's
+// push service reports the swap here, proven by the OLD token, so calls keep ringing without the app
+// having to be opened first.
+export const rotateFcmToken = async (req, res) => {
+  try {
+    const { oldToken, newToken } = req.body || {};
+    const ok = (t) => typeof t === "string" && t.length >= 20 && t.length <= 4096;
+    if (!ok(oldToken) || !ok(newToken)) return res.status(400).json({ ok: false });
+    if (oldToken === newToken) return res.status(200).json({ ok: true });
+    const user = await User.findOne({ "fcmTokens.token": oldToken }).select("_id").lean();
+    if (!user) return res.status(200).json({ ok: false });
+    await User.updateMany({ "fcmTokens.token": newToken }, { $pull: { fcmTokens: { token: newToken } } });
+    await User.updateOne({ _id: user._id }, { $pull: { fcmTokens: { token: oldToken } } });
+    await User.updateOne({ _id: user._id }, { $push: { fcmTokens: { token: newToken, at: new Date() } } });
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    console.log("Error in rotateFcmToken:", e.message);
+    res.status(500).json({ ok: false });
+  }
+};
+
 // The Android app's push service calls this when an incoming call starts ringing on the phone
 // (even with the app closed). The phone's own push token proves who it is.
 export const deviceRinging = async (req, res) => {

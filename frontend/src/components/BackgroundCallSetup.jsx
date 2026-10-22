@@ -71,8 +71,8 @@ const BackgroundCallSetup = () => {
 
   const close = (done) => {
     try {
-      // "I've turned these on" still re-checks after two weeks; "later" after three days
-      localStorage.setItem(SNOOZE_KEY, String(Date.now() + (done ? 14 : 3) * 24 * 3600 * 1000));
+      // "I've turned these on" still re-checks after a week; "later" after a day
+      localStorage.setItem(SNOOZE_KEY, String(Date.now() + (done ? 7 : 1) * 24 * 3600 * 1000));
     } catch {
       /* ignore */
     }
