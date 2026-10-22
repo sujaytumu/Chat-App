@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Check, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -9,6 +9,8 @@ import Avatar from "../components/Avatar";
 // (plus people they already chat with, and the owner).
 const AccessPage = () => {
   const nav = useNavigate();
+  const [params] = useSearchParams();
+  const [requests, setRequests] = useState([]); // people waiting for the owner's answer
   const [users, setUsers] = useState([]);
   const [pairs, setPairs] = useState(new Set()); // "idA|idB" sorted
   const [loading, setLoading] = useState(true);
@@ -26,7 +28,29 @@ const AccessPage = () => {
       })
       .catch((e) => setDenied(e.response?.status === 403))
       .finally(() => setLoading(false));
+    axiosInstance.get("/admin/requests").then((r) => setRequests(r.data)).catch(() => {});
   }, []);
+
+  // Opened from a request: go straight to that person.
+  useEffect(() => {
+    const id = params.get("user");
+    if (id && users.length && !who) setWho(users.find((u) => u._id === id) || null);
+  }, [users]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const decide = async (userId, status) => {
+    try {
+      await axiosInstance.put(`/admin/requests/${userId}`, { status });
+      setRequests((r) => r.filter((x) => x.user._id !== userId));
+      toast.success(status === "approved" ? "They have been told" : "Declined");
+      if (status === "approved") {
+        setWho(null);
+        setQ("");
+      }
+    } catch {
+      toast.error("Couldn't save that");
+    }
+  };
+  const pendingForWho = who ? requests.find((r) => r.user._id === who._id) : null;
 
   const toggle = async (other) => {
     const k = key(who._id, other._id);
@@ -61,7 +85,7 @@ const AccessPage = () => {
   if (denied) return <div className="flex-1 flex items-center justify-center text-wa-muted p-8 text-center">Only the owner can open this page.</div>;
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-wa-bg text-wa-text">
+    <div className="relative flex-1 min-h-0 flex flex-col bg-wa-bg text-wa-text">
       <div className="flex items-center gap-3 px-3 pt-4 pb-2">
         <button onClick={() => (who ? (setWho(null), setQ("")) : nav(-1))} className="size-10 flex items-center justify-center" aria-label="Back">
           <ArrowLeft size={22} />
@@ -79,6 +103,22 @@ const AccessPage = () => {
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto pb-24">
         {loading && <p className="text-center text-wa-muted text-[13px] pt-10">Loading…</p>}
+        {!who && requests.length > 0 && (
+          <div className="mx-4 mb-3 rounded-2xl bg-wa-surface p-3">
+            <p className="text-[12.5px] font-medium text-[#21C063] mb-2">Waiting for your answer ({requests.length})</p>
+            {requests.map((r) => (
+              <div key={r._id} className="flex items-center gap-3 py-2">
+                <Avatar src={r.user.profilePic} name={r.user.fullName} size="size-10" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14.5px] truncate">{r.user.fullName}</p>
+                  <p className="text-[11.5px] text-wa-muted truncate">wants to see more people</p>
+                </div>
+                <button onClick={() => decide(r.user._id, "declined")} className="h-8 px-3 rounded-full bg-white/10 text-[12.5px]">Decline</button>
+                <button onClick={() => { setWho(users.find((u) => u._id === r.user._id) || null); setQ(""); }} className="h-8 px-3 rounded-full bg-[#25D366] text-[#0B141A] text-[12.5px] font-semibold">Choose</button>
+              </div>
+            ))}
+          </div>
+        )}
         {!who &&
           people.map((u) => (
             <button key={u._id} onClick={() => (setWho(u), setQ(""))} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-wa-surface/70">
@@ -105,6 +145,13 @@ const AccessPage = () => {
             );
           })}
       </div>
+      {pendingForWho && (
+        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-wa-bg via-wa-bg/95 to-transparent">
+          <button onClick={() => decide(who._id, "approved")} className="w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold">
+            Done — let {who.fullName?.split(" ")[0]} in
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -1223,7 +1223,10 @@ export const useChatStore = create((set, get) => ({
       set((st) => ({ messages: st.messages.filter((m) => !gone.has(m._id)) }));
     });
 
-    socket.on("visibilityChanged", () => get().getUsers()); // the owner changed who I can see
+    socket.on("visibilityChanged", () => get().getUsers());
+    // Owner: someone asked to see more people. Person: the owner answered.
+    socket.on("accessRequest", ({ fullName }) => toast(`${fullName || "Someone"} wants to see more people — open Settings → Who can see whom`, { icon: "🔔", duration: 6000 }));
+    socket.on("accessDecision", ({ status }) => toast(status === "approved" ? "You can now see more people" : "Your request was declined", { icon: status === "approved" ? "✅" : "❌" })); // the owner changed who I can see
 
     socket.on("userNote", ({ userId, note }) => {
       set((st) => ({ users: st.users.map((u) => (u._id === userId ? { ...u, note } : u)) }));
@@ -1273,6 +1276,8 @@ export const useChatStore = create((set, get) => ({
       "messagesSeen",
       "messagesDelivered",
       "systemMessage",
+      "accessRequest",
+      "accessDecision",
       "messagePinned",
       "messageUnpinned",
       "messageDeleted",

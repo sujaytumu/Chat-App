@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShieldCheck, Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode, Megaphone, IndianRupee } from "lucide-react";
 import toast from "react-hot-toast";
@@ -7,6 +7,7 @@ import { compressImage } from "../lib/imageUtils";
 import Avatar from "../components/Avatar";
 import UsernameSheet, { profileLink } from "../components/UsernameSheet";
 import { useScrollMemory } from "../lib/useScrollMemory";
+import { axiosInstance } from "../lib/axios";
 
 const iconCls = "text-wa-icon";
 
@@ -52,9 +53,13 @@ const ProfilePage = () => {
   };
 
   const isOwner = String(authUser?.email || "").trim().toLowerCase() === "sujaybabutumu@gmail.com"; // the server enforces this too
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => {
+    if (isOwner) axiosInstance.get("/admin/requests").then((r) => setWaiting(r.data.length)).catch(() => {});
+  }, [isOwner]);
   const rows = [
     { icon: QrCode, title: "Username and QR code", sub: authUser?.username ? `@${authUser.username} · share your profile` : "Pick a username so people can find you", onClick: () => setShowUsername(true) },
-    ...(isOwner ? [{ icon: ShieldCheck, title: "Who can see whom", sub: "Owner controls: allow people to see each other", to: "/settings/access" }] : []),
+    ...(isOwner ? [{ icon: ShieldCheck, title: "Who can see whom", sub: waiting ? `${waiting} request${waiting === 1 ? "" : "s"} waiting for you` : "Owner controls: allow people to see each other", to: "/settings/access" }] : []),
     { icon: IndianRupee, title: "Payments", sub: "Money sent and received in chats", to: "/settings/payments" },
     { icon: Megaphone, title: "Channels", sub: "Follow one-way feeds or start your own", to: "/channels" },
     { icon: KeyRound, title: "Account", sub: "Name, about, password, two-step verification", to: "/settings/account" },

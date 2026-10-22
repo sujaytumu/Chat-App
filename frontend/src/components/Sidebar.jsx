@@ -9,6 +9,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import SidebarSkeleton from "./skeletons/SidebarSkeleton";
 import Avatar from "./Avatar";
 import MessageTicks, { GroupMessageTicks } from "./MessageTicks";
+import AccessRequestBanner from "./AccessRequestBanner";
 import { formatChatListTime } from "../lib/utils";
 import {
   Search,
@@ -704,6 +705,7 @@ const Sidebar = () => {
             </button>
           </div>
         )}
+        {!search && filter === "all" && <AccessRequestBanner />}
         {!folderOpen && archivedInfo.count > 0 && !search && filter === "all" && (
           <button
             onClick={() => {
