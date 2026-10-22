@@ -92,7 +92,7 @@ const AccessPage = () => {
   if (denied) return <div className="flex-1 flex items-center justify-center text-wa-muted p-8 text-center">Only the owner can open this page.</div>;
 
   return (
-    <div className="relative flex-1 min-h-0 flex flex-col bg-wa-bg text-wa-text">
+    <div className="relative flex-1 min-w-0 w-full min-h-0 flex flex-col overflow-x-hidden bg-wa-bg text-wa-text">
       <div className="flex items-center gap-3 px-3 pt-4 pb-2">
         <button onClick={() => (who ? (setWho(null), setQ("")) : nav(-1))} className="size-10 flex items-center justify-center" aria-label="Back">
           <ArrowLeft size={22} />
@@ -108,20 +108,20 @@ const AccessPage = () => {
         <Search size={18} className="text-wa-muted" />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" className="flex-1 bg-transparent text-[14.5px] outline-none placeholder:text-wa-muted" />
       </div>
-      <div className="flex-1 min-h-0 overflow-y-auto pb-24">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pb-[calc(170px+env(safe-area-inset-bottom))] lg:pb-28">
         {loading && <p className="text-center text-wa-muted text-[13px] pt-10">Loading…</p>}
         {!who && requests.length > 0 && (
           <div className="mx-4 mb-3 rounded-2xl bg-wa-surface p-3">
             <p className="text-[12.5px] font-medium text-[#21C063] mb-2">Waiting for your answer ({requests.length})</p>
             {requests.map((r) => (
-              <div key={r._id} className="flex items-center gap-3 py-2">
+              <div key={r._id} className="flex items-center gap-2 py-2 min-w-0">
                 <Avatar src={r.user.profilePic} name={r.user.fullName} size="size-10" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[14.5px] truncate">{r.user.fullName}</p>
                   <p className="text-[11.5px] text-wa-muted truncate">wants to see more people</p>
                 </div>
-                <button onClick={() => decide(r.user._id, "declined")} className="h-8 px-3 rounded-full bg-white/10 text-[12.5px]">Decline</button>
-                <button onClick={() => { setWho(users.find((u) => u._id === r.user._id) || null); setQ(""); }} className="h-8 px-3 rounded-full bg-[#25D366] text-[#0B141A] text-[12.5px] font-semibold">Choose</button>
+                <button onClick={() => decide(r.user._id, "declined")} className="h-8 px-3 shrink-0 rounded-full bg-white/10 text-[12.5px]">Decline</button>
+                <button onClick={() => { setWho(users.find((u) => u._id === r.user._id) || null); setQ(""); }} className="h-8 px-3 shrink-0 rounded-full bg-[#25D366] text-[#0B141A] text-[12.5px] font-semibold">Choose</button>
               </div>
             ))}
           </div>
@@ -134,7 +134,7 @@ const AccessPage = () => {
                 <span className="block text-[15px] truncate">{u.fullName}</span>
                 <span className="block text-[12px] text-wa-muted truncate">{u.email}</span>
               </span>
-              <span className="text-[12px] text-wa-muted">{countFor(u._id)} allowed</span>
+              <span className="text-[12px] text-wa-muted shrink-0">{countFor(u._id)} allowed</span>
             </button>
           ))}
         {who &&
@@ -153,7 +153,7 @@ const AccessPage = () => {
           })}
       </div>
       {who && (
-        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-wa-bg via-wa-bg/95 to-transparent">
+        <div className="absolute inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-0 p-4 pt-8 bg-gradient-to-t from-wa-bg via-wa-bg/95 to-transparent z-20">
           <button onClick={() => decide(who._id, "approved")} className="w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold active:scale-[0.99]">
             {pendingForWho ? `Enter — let ${who.fullName?.split(" ")[0]} in` : `Enter — save for ${who.fullName?.split(" ")[0]}`}
           </button>

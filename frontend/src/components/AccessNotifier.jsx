@@ -1,22 +1,15 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import Avatar from "./Avatar";
-
-const goTo = (path) => {
-  try {
-    window.history.pushState({}, "", path);
-    window.dispatchEvent(new PopStateEvent("popstate")); // the router picks the new address up
-  } catch {
-    window.location.assign(path);
-  }
-};
 
 // Popups for "Who can see whom":
 //  - owner: "<name> is requesting to see more people" — tap it to open that person's page and choose whom they may see
 //  - person: "<owner> approved you to see <names>" (or declined)
 const AccessNotifier = () => {
   const socket = useAuthStore((s) => s.socket);
+  const navigate = useNavigate();
   useEffect(() => {
     if (!socket) return undefined;
     const onRequest = ({ userId, fullName, profilePic }) => {
@@ -26,7 +19,7 @@ const AccessNotifier = () => {
             type="button"
             onClick={() => {
               toast.dismiss(t.id);
-              goTo(`/settings/access?user=${userId}`);
+              navigate(`/settings/access?user=${userId}`);
             }}
             className={`${t.visible ? "animate-enter" : "opacity-0"} w-[min(92vw,380px)] flex items-center gap-3 rounded-2xl bg-wa-pop text-wa-text px-3.5 py-3 shadow-xl text-left border border-white/10 active:scale-[0.98] transition-transform`}
           >
@@ -51,7 +44,7 @@ const AccessNotifier = () => {
       socket.off("accessRequest", onRequest);
       socket.off("accessDecision", onDecision);
     };
-  }, [socket]);
+  }, [socket, navigate]);
   return null;
 };
 
