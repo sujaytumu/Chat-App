@@ -12,6 +12,7 @@ const paymentSchema = new mongoose.Schema(
     paymentId: { type: String, default: "" },
     status: { type: String, enum: ["created", "paid", "failed"], default: "created", index: true },
     test: { type: Boolean, default: true },
+    failure: { type: String, default: "" }, // why Razorpay said no (for finding out what went wrong)
     messageId: { type: mongoose.Schema.Types.ObjectId, ref: "Message" },
     paidAt: { type: Date },
   },

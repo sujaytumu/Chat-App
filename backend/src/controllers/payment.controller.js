@@ -104,7 +104,10 @@ export const verifyPayment = async (req, res) => {
 // The payer closed the window or the payment failed: forget the attempt.
 export const cancelPayment = async (req, res) => {
   try {
-    await Payment.updateOne({ orderId: String(req.body?.orderId || ""), fromUserId: req.user._id, status: "created" }, { $set: { status: "failed" } });
+    const f = req.body?.error || {};
+    const failure = [f.code, f.description, f.reason, f.source, f.step].filter(Boolean).join(" | ").slice(0, 300);
+    if (failure) console.log("Payment failed at Razorpay:", failure);
+    await Payment.updateOne({ orderId: String(req.body?.orderId || ""), fromUserId: req.user._id, status: "created" }, { $set: { status: "failed", ...(failure ? { failure } : {}) } });
     res.json({ ok: true });
   } catch {
     res.json({ ok: true });
