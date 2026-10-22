@@ -49,6 +49,10 @@ public class ScreenShareService extends Service {
     private static final int JPEG_QUALITY = 55;
     private static final long MIN_FRAME_GAP_MS = 120; // ~8 frames per second
 
+    // Reused for every frame: no new big objects per frame, so no garbage-collection stutter.
+    private Bitmap padded;
+    private final ByteArrayOutputStream jpegOut = new ByteArrayOutputStream(96 * 1024);
+
     private MediaProjection projection;
     private VirtualDisplay display;
     private ImageReader reader;
@@ -139,17 +143,24 @@ public class ScreenShareService extends Service {
             ByteBuffer buffer = plane.getBuffer();
             int pixelStride = plane.getPixelStride();
             int rowPadding = plane.getRowStride() - pixelStride * outWidth;
-            Bitmap padded = Bitmap.createBitmap(outWidth + rowPadding / pixelStride, outHeight, Bitmap.Config.ARGB_8888);
+            int paddedWidth = outWidth + rowPadding / pixelStride;
+            if (padded == null || padded.getWidth() != paddedWidth || padded.getHeight() != outHeight) {
+                if (padded != null) padded.recycle();
+                padded = Bitmap.createBitmap(paddedWidth, outHeight, Bitmap.Config.ARGB_8888);
+            }
+            buffer.rewind();
             padded.copyPixelsFromBuffer(buffer);
-            Bitmap frame = Bitmap.createBitmap(padded, 0, 0, outWidth, outHeight);
-            if (frame != padded) padded.recycle();
+            image.close();
+            image = null; // free the capture buffer early so the next frame can arrive
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream(64 * 1024);
-            frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, out);
-            frame.recycle();
+            jpegOut.reset();
+            // compress() only reads the visible part when the bitmap is wider than the picture
+            Bitmap frame = paddedWidth == outWidth ? padded : Bitmap.createBitmap(padded, 0, 0, outWidth, outHeight);
+            frame.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, jpegOut);
+            if (frame != padded) frame.recycle();
 
             Listener l = listener;
-            if (l != null) l.onFrame(Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP), outWidth, outHeight);
+            if (l != null) l.onFrame(Base64.encodeToString(jpegOut.toByteArray(), Base64.NO_WRAP), outWidth, outHeight);
         } catch (Exception ignored) {
             // a bad frame is skipped; the next one will do
         } finally {
