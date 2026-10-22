@@ -1,6 +1,7 @@
 # Render's free plan puts the server to sleep after ~15 minutes without traffic. A sleeping server
-# can't ring anyone, so the first call after a quiet spell is slow or lost. This pings it often
-# enough to keep it awake. (The repo is public, so these runs cost nothing.)
+# can't ring anyone, so the first call after a quiet spell is slow or lost. Every run pings it once a
+# minute for ~5 minutes, and a new run starts every 5 minutes, so there is never a gap (even when
+# GitHub starts a run a little late). The repo is public, so these runs cost nothing.
 name: Keep server awake
 
 on:
@@ -11,14 +12,13 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 7
     steps:
-      - name: Ping the Talkies server
+      - name: Ping the Talkies server every minute
         run: |
-          for i in 1 2 3; do
+          for i in 1 2 3 4 5; do
             code=$(curl -s -o /dev/null -m 60 -w "%{http_code}" https://chat-app-jjcg.onrender.com/api/health || echo 000)
-            echo "attempt $i -> $code"
-            [ "$code" = "200" ] && exit 0
-            sleep 10
+            echo "ping $i -> $code"
+            [ "$i" -lt 5 ] && sleep 55
           done
           exit 0
