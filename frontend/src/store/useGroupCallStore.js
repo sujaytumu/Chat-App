@@ -113,6 +113,16 @@ export const useGroupCallStore = create((set, get) => {
     peers.forEach((rec) => {
       if (rec.videoSender) rec.videoSender.replaceTrack(v).catch(() => {});
       else if (v && localStream) rec.videoSender = rec.pc.addTrack(v, localStream);
+      // Sharing the screen to several people: keep each stream light so nothing stutters.
+      if (rec.videoSender && v && v === screenTrack) {
+        try {
+          const prm = rec.videoSender.getParameters();
+          if (!prm.encodings?.length) prm.encodings = [{}];
+          prm.encodings[0].maxBitrate = 900_000;
+          prm.encodings[0].maxFramerate = 10;
+          rec.videoSender.setParameters(prm).catch(() => {});
+        } catch { /* defaults are fine */ }
+      }
     });
     updateLocalVideo();
     sendMedia();
