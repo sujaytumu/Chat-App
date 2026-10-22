@@ -242,7 +242,7 @@ const readRecent = () => {
 // ---------------------------------------------------------------------------
 // Photo editor like WhatsApp's status editor: crop, draw (4 brushes), text, stickers.
 // Everything stays editable on screen and is flattened into the picture on send.
-const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, onMusic, hasSong, onRotated, onLocation, onModeChange }, ref) {
+const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, onMusic, hasSong, onRotated, onLocation, onModeChange, chat = false }, ref) {
   const stage = useRef(null);
   const imgEl = useRef(null);
   const trashEl = useRef(null);
@@ -267,6 +267,58 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
   // stickers
   const [trayTab, setTrayTab] = useState("stickers");
   const [recent, setRecent] = useState(readRecent);
+
+  // Zoom / pan for looking closely at the photo (pinch with two fingers, scroll wheel, double-tap to reset)
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 });
+  const vp = useRef({ pts: new Map(), d0: 0, z0: 1, last: null });
+  const clampView = (v) => {
+    const el = stage.current;
+    const z = Math.min(6, Math.max(1, v.z));
+    const mx = el ? ((z - 1) * el.offsetWidth) / 2 : 0;
+    const my = el ? ((z - 1) * el.offsetHeight) / 2 : 0;
+    return { z, x: z === 1 ? 0 : Math.min(mx, Math.max(-mx, v.x)), y: z === 1 ? 0 : Math.min(my, Math.max(-my, v.y)) };
+  };
+  const vDown = (e) => {
+    if (mode || e.target.closest?.("button, input, textarea, a")) return;
+    const g = vp.current;
+    g.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    if (g.pts.size === 2) {
+      const [a, b] = [...g.pts.values()];
+      g.d0 = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      g.z0 = view.z;
+    }
+    g.last = { x: e.clientX, y: e.clientY };
+    const now = Date.now();
+    if (g.pts.size === 1) {
+      if (now - (g.tap || 0) < 280) setView((v) => (v.z > 1 ? { z: 1, x: 0, y: 0 } : clampView({ z: 2.5, x: 0, y: 0 })));
+      g.tap = now;
+    }
+  };
+  const vMove = (e) => {
+    const g = vp.current;
+    if (!g.pts.has(e.pointerId)) return;
+    g.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (g.pts.size >= 2) {
+      const [a, b] = [...g.pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+      setView((v) => clampView({ ...v, z: (g.z0 * d) / g.d0 }));
+    } else if (view.z > 1 && g.last) {
+      const dx = e.clientX - g.last.x;
+      const dy = e.clientY - g.last.y;
+      if (Math.abs(dx) + Math.abs(dy) > 2) g.tap = 0;
+      setView((v) => clampView({ ...v, x: v.x + dx, y: v.y + dy }));
+    }
+    g.last = { x: e.clientX, y: e.clientY };
+  };
+  const vUp = (e) => {
+    vp.current.pts.delete(e.pointerId);
+    vp.current.last = null;
+  };
+  const vWheel = (e) => {
+    if (mode) return;
+    setView((v) => clampView({ ...v, z: v.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15) }));
+  };
 
   const drawing = useRef(null);
   const ptrs = useRef(new Map());
@@ -468,6 +520,7 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
   };
   const applyCrop = (dataUrl) => {
     setCropFile(null);
+    setView({ z: 1, x: 0, y: 0 });
     clearAll(); // drawings / stickers were placed on the old framing
     onRotated?.(dataUrl);
   };
@@ -629,15 +682,23 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
   const draftAlign = align === 1 ? "left" : align === 2 ? "right" : "center";
 
   return (
-    <div className="relative flex-1 min-h-0 bg-black flex items-center justify-center overflow-hidden select-none">
-      <div ref={stage} className="relative inline-flex max-w-full max-h-full">
+    <div
+      className="relative flex-1 min-h-0 bg-black flex items-center justify-center overflow-hidden select-none"
+      style={{ touchAction: mode ? undefined : "none" }}
+      onPointerDown={vDown}
+      onPointerMove={vMove}
+      onPointerUp={vUp}
+      onPointerCancel={vUp}
+      onWheel={vWheel}
+    >
+      <div ref={stage} className="relative inline-flex max-w-full max-h-full" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`, transition: vp.current.pts.size ? "none" : "transform .18s ease-out" }}>
         <img
           ref={imgEl}
           src={src}
           alt="Status preview"
           draggable={false}
           className="block max-w-full object-contain"
-          style={{ maxHeight: bigImage ? "calc(100dvh - 200px)" : "calc(100dvh - 440px)" }}
+          style={{ maxHeight: bigImage ? "calc(100dvh - 200px)" : chat ? "calc(100dvh - 250px)" : "calc(100dvh - 440px)" }}
           onLoad={() => setSw(stage.current?.clientWidth || 360)}
         />
 
@@ -689,9 +750,11 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
             <span className="text-[22px] leading-none">✕</span>
           </button>
           <div className="flex-1" />
-          <button onClick={onMusic} aria-label="Add music" className={`${tb} ${hasSong ? "!bg-[#21C063] !text-black" : ""}`}>
-            <Mdi d={D_NOTE} size={22} />
-          </button>
+          {onMusic && (
+            <button onClick={onMusic} aria-label="Add music" className={`${tb} ${hasSong ? "!bg-[#21C063] !text-black" : ""}`}>
+              <Mdi d={D_NOTE} size={22} />
+            </button>
+          )}
           <button onClick={openCrop} aria-label="Crop and rotate" className={tb}>
             <Mdi d={D_CROP_ROTATE} size={24} />
           </button>
@@ -878,7 +941,7 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
                   </button>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2.5 mt-3">
-                  <button
+                  {onLocation && <button
                     onClick={() => {
                       setMode(null);
                       onLocation?.();
@@ -886,11 +949,11 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
                     className="h-[46px] px-4 rounded-xl bg-white text-[#111] text-[18px] flex items-center gap-2"
                   >
                     <MapPin size={22} className="text-[#1FA855]" /> Location
-                  </button>
+                  </button>}
                   <button onClick={() => photoInput.current?.click()} className="h-[46px] px-4 rounded-xl bg-white text-[#111] text-[18px] flex items-center gap-2">
                     <ImageIcon size={22} className="text-[#1FA855]" /> Photo
                   </button>
-                  <button
+                  {onMusic && <button
                     onClick={() => {
                       setMode(null);
                       onMusic?.();
@@ -898,7 +961,7 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
                     className="h-[46px] px-4 rounded-xl bg-white text-[#111] text-[18px] flex items-center gap-2"
                   >
                     <Mdi d={D_NOTE} size={22} className="text-[#1FA855]" /> Music
-                  </button>
+                  </button>}
                 </div>
                 <p className="text-[#8E9AA2] text-[16px] mt-6 mb-3 px-1">Shapes</p>
                 <div className="grid grid-cols-3 gap-3">

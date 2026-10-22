@@ -24,8 +24,8 @@ import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import PollModal from "./PollModal";
+const PhotoSendPreview = lazy(() => import("./PhotoSendPreview"));
 import LocationSheet from "./LocationSheet";
-import PhotoSendPreview from "./PhotoSendPreview";
 import { liveShares } from "../lib/liveShare";
 import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
 import EventModal from "./EventModal";
@@ -526,7 +526,7 @@ const MessageInput = () => {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const handleSendMessage = async (e) => {
+  const handleSendMessage = async (e, editedImage) => {
     e.preventDefault();
     if (editingMessage) {
       const next = text.trim();
@@ -573,7 +573,7 @@ const MessageInput = () => {
         if (tagged.length) payload.mentions = tagged.map((m) => m._id);
       }
       if (imagePreview) {
-        payload.image = imagePreview;
+        payload.image = typeof editedImage === "string" ? editedImage : imagePreview;
         if (viewOnce && selectedChat?.type === "direct") payload.viewOnce = true;
       }
       else if (imageFallback) payload.image = imageFallback.data;
@@ -865,6 +865,7 @@ const MessageInput = () => {
         </div>
       )}
       {imagePreview && (
+        <Suspense fallback={null}>
         <PhotoSendPreview
           src={imagePreview}
           caption={text}
@@ -874,9 +875,11 @@ const MessageInput = () => {
           onToggleViewOnce={() => setViewOnce((v) => !v)}
           to={selectedChat?.data?.isSelf ? "Message yourself" : selectedChat?.data?.fullName || selectedChat?.data?.name || ""}
           sending={isSending}
-          onSend={() => handleSendMessage({ preventDefault() {} })}
+          onSend={(edited) => handleSendMessage({ preventDefault() {} }, edited)}
+          onImageChange={setImagePreview}
           onClose={clearAttachments}
         />
+        </Suspense>
       )}
 
       {imageFallback && (
