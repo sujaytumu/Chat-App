@@ -4,8 +4,8 @@ import Message from "../models/message.model.js";
 import User from "../models/user.model.js";
 import { pairKey } from "../models/directChatSetting.model.js";
 
-// Nobody sees other people in the app unless the OWNER has allowed it. Three things make two people visible to
-// each other: the owner allowed the pair, they already have a chat together, or one of them is the owner.
+// Nobody sees other people in the app unless the OWNER has allowed it. Only two things make two people visible to
+// each other: the owner allowed the pair, or one of them is the owner. (Having chatted before no longer counts.)
 export const OWNER_EMAIL = (process.env.OWNER_EMAIL || "sujaybabutumu@gmail.com").trim().toLowerCase();
 export const isOwner = (user) => String(user?.email || "").trim().toLowerCase() === OWNER_EMAIL;
 
@@ -34,22 +34,15 @@ export async function visibleUserIds(me) {
 async function computeVisible(me) {
   const myId = new mongoose.Types.ObjectId(String(me._id || me));
   if (me.email !== undefined && isOwner(me)) return null;
-  const [pairs, sentTo, gotFrom, owner] = await Promise.all([
-    Visibility.find({ $or: [{ a: myId }, { b: myId }] }).select("a b").lean(),
-    Message.distinct("receiverId", { senderId: myId, groupId: null }),
-    Message.distinct("senderId", { receiverId: myId, groupId: null }),
-    ownerId(),
-  ]);
+  const [pairs, owner] = await Promise.all([Visibility.find({ $or: [{ a: myId }, { b: myId }] }).select("a b").lean(), ownerId()]);
+  if (owner && owner === String(myId)) return null; // the owner sees everybody
   const ids = new Set();
   for (const p of pairs) ids.add(String(String(p.a) === String(myId) ? p.b : p.a));
-  for (const id of [...sentTo, ...gotFrom]) if (id) ids.add(String(id));
   if (owner) ids.add(owner);
   ids.delete(String(myId));
   return ids;
 }
 
-// Quick yes/no for one person (used on every send): a short-lived cache, then a couple of indexed single-row lookups
-// instead of building the whole visible list.
 const seenCache = new Map(); // "me:other" -> expires
 export async function canSee(me, otherId) {
   const myId = String(me._id || me);
@@ -58,12 +51,8 @@ export async function canSee(me, otherId) {
   const ck = `${myId}:${other}`;
   const hit = seenCache.get(ck);
   if (hit && hit > Date.now()) return true;
-  const [owner, existing, allowed] = await Promise.all([
-    ownerId(),
-    Message.exists({ $or: [{ senderId: myId, receiverId: other }, { senderId: other, receiverId: myId }], groupId: null }),
-    Visibility.exists({ key: pairKey(myId, other) }),
-  ]);
-  const ok = other === myId || other === owner || !!existing || !!allowed;
+  const [owner, allowed] = await Promise.all([ownerId(), Visibility.exists({ key: pairKey(myId, other) })]);
+  const ok = other === myId || other === owner || myId === owner || !!allowed;
   if (ok) {
     if (seenCache.size > 5000) seenCache.clear();
     seenCache.set(ck, Date.now() + 10 * 60_000);
