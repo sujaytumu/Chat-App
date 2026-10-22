@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PhoneIncoming, BatteryCharging, Rocket, MonitorSmartphone, Cloud, Smartphone, X } from "lucide-react";
 import { useAuthStore } from "../store/useAuthStore";
 import { axiosInstance } from "../lib/axios";
 import { forceRegisterNativePush } from "../lib/nativePush";
+import { Switch } from "./SettingsShell";
 
 // Android app only. Phones from Samsung, Realme, Redmi, POCO, Xiaomi, Oppo, Vivo and others kill closed apps and hide
 // call screens unless a few switches are on. This sheet shows what is still off and opens
@@ -30,6 +31,15 @@ const BackgroundCallSetup = () => {
   const authUser = useAuthStore((s) => s.authUser);
   const [open, setOpen] = useState(false);
   const [st, setSt] = useState({ notifications: true, fullScreen: true, battery: true, server: true, phone: true });
+  // Autostart can't be read back from the phone, so once the person has switched it on here we trust that.
+  const AUTO_KEY = "talkies-autostart-done";
+  const [autoDone, setAutoDone] = useState(() => {
+    try {
+      return localStorage.getItem(AUTO_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   const check = async () => {
     const p = push();
@@ -94,16 +104,42 @@ const BackgroundCallSetup = () => {
   };
   const allOk = st.notifications && st.fullScreen && st.battery && st.server && st.phone;
 
-  const Row = ({ icon: Icon, title, hint, ok, onClick }) => (
-    <button onClick={onClick} disabled={ok} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-wa-surface text-left disabled:opacity-60">
-      <Icon size={22} className={ok ? "text-[#25D366]" : "text-wa-icon"} />
-      <span className="flex-1 min-w-0">
-        <span className="block text-[14.5px] text-wa-text">{title}</span>
-        <span className="block text-[12px] text-wa-muted">{ok ? "Allowed ✓" : hint}</span>
-      </span>
-      {!ok && <span className="text-[13px] font-medium text-[#00A884]">Allow</span>}
-    </button>
-  );
+  // A row with a WhatsApp-style switch: tap it or swipe it to the right and the matching phone
+  // setting opens; the switch turns on by itself once the phone reports it as allowed.
+  const Row = ({ icon: Icon, title, hint, ok, onClick }) => {
+    const startX = useRef(0);
+    const swiped = useRef(false);
+    return (
+      <button
+        onClick={() => {
+          if (swiped.current) {
+            swiped.current = false;
+            return;
+          }
+          if (!ok) onClick();
+        }}
+        onPointerDown={(e) => {
+          startX.current = e.clientX;
+          swiped.current = false;
+        }}
+        onPointerUp={(e) => {
+          if (!ok && e.clientX - startX.current > 30) {
+            swiped.current = true;
+            onClick();
+          }
+        }}
+        style={{ touchAction: "pan-y" }}
+        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-wa-surface text-left"
+      >
+        <Icon size={22} className={ok ? "text-[#25D366]" : "text-wa-icon"} />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[14.5px] text-wa-text">{title}</span>
+          <span className="block text-[12px] text-wa-muted">{ok ? "Enabled ✓" : hint}</span>
+        </span>
+        <Switch checked={!!ok} />
+      </button>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[200] bg-black/50 flex items-end justify-center" onClick={() => close(false)}>
@@ -115,13 +151,13 @@ const BackgroundCallSetup = () => {
             <X size={22} />
           </button>
         </div>
-        <p className="text-[13px] text-wa-muted mb-4">Your phone may be blocking Talkies in the background. Turn these on once so calls ring on the lock screen.</p>
+        <p className="text-[13px] text-wa-muted mb-4">Your phone may be blocking Talkies in the background. Swipe each switch to the right (or tap it) to enable it. Do this once so calls ring on the lock screen.</p>
         <div className="flex flex-col gap-2.5">
           <Row icon={MonitorSmartphone} title="Notifications & lock-screen calls" hint="Needed to show the call screen" ok={st.notifications && st.fullScreen} onClick={() => push()?.openCallSettings?.()} />
           <Row icon={BatteryCharging} title="No battery restrictions" hint="Choose “Allow” / “No restrictions”" ok={st.battery} onClick={() => call()?.requestBatteryUnrestricted?.()} />
           <Row icon={Cloud} title="Server can ring your phone" hint="Not set up on the server yet — the app owner must add FCM_SERVICE_ACCOUNT" ok={st.server} onClick={() => {}} />
           <Row icon={Smartphone} title="This phone is registered" hint="Tap to sign this phone up for call alerts" ok={st.phone} onClick={async () => { await forceRegisterNativePush(authUser._id); check(); }} />
-          <Row icon={Rocket} title="Autostart / run in background" hint={brandTip()} ok={false} onClick={() => push()?.openAutostartSettings?.()} />
+          <Row icon={Rocket} title="Autostart / run in background" hint={brandTip()} ok={autoDone} onClick={() => { push()?.openAutostartSettings?.(); try { localStorage.setItem(AUTO_KEY, "1"); } catch { /* ignore */ } setAutoDone(true); }} />
         </div>
         <button onClick={() => close(true)} className="mt-4 w-full h-11 rounded-full bg-[#25D366] text-wa-bg text-[14.5px] font-medium">
           {allOk ? "Done" : "I've turned these on"}
