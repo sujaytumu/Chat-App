@@ -4,10 +4,24 @@ import { useAuthStore } from "../store/useAuthStore";
 import { axiosInstance } from "../lib/axios";
 import { forceRegisterNativePush } from "../lib/nativePush";
 
-// Android app only. Phones from Xiaomi / Oppo / Vivo / Samsung kill closed apps and hide
+// Android app only. Phones from Samsung, Realme, Redmi, POCO, Xiaomi, Oppo, Vivo and others kill closed apps and hide
 // call screens unless a few switches are on. This sheet shows what is still off and opens
 // each setting in one tap. It appears once in a while until everything is allowed.
 const SNOOZE_KEY = "talkies-bgcall-snooze";
+
+// Where each phone brand hides the switches that stop it killing a closed app. The model code in the
+// browser string tells us the brand (SM- Samsung, RMX Realme, CPH Oppo, Redmi / POCO / Xiaomi, vivo).
+function brandTip() {
+  const ua = (navigator.userAgent || "").toLowerCase();
+  if (/sm-|samsung/.test(ua)) return "Samsung: Settings → Battery → Background usage limits → Never sleeping apps → add Talkies";
+  if (/rmx|realme/.test(ua)) return "Realme: Settings → Apps → Talkies → Auto-launch ON, Battery usage → Allow background activity";
+  if (/poco/.test(ua)) return "POCO: Security → Autostart → Talkies ON; Apps → Talkies → Battery saver → No restrictions";
+  if (/redmi|xiaomi|mi |miui|hyperos/.test(ua)) return "Redmi/Xiaomi: Security → Autostart → Talkies ON; Apps → Talkies → Battery saver → No restrictions";
+  if (/cph|oppo/.test(ua)) return "Oppo: Settings → Apps → Talkies → Auto-launch ON, Battery → Allow background activity";
+  if (/vivo/.test(ua)) return "Vivo: Settings → Battery → Background power consumption → Talkies → Allow; Autostart ON";
+  if (/oneplus|in20|kb20|le21/.test(ua)) return "OnePlus: Settings → Battery → Battery optimisation → Talkies → Don't optimise; Auto-launch ON";
+  return "Allow Talkies to auto-start and run in the background (Samsung, Realme, Redmi, POCO, Oppo, Vivo, OnePlus: check Battery and Auto-launch)";
+}
 
 const push = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesPush : null);
 const call = () => window.Capacitor?.Plugins?.TalkiesCall;
@@ -107,7 +121,7 @@ const BackgroundCallSetup = () => {
           <Row icon={BatteryCharging} title="No battery restrictions" hint="Choose “Allow” / “No restrictions”" ok={st.battery} onClick={() => call()?.requestBatteryUnrestricted?.()} />
           <Row icon={Cloud} title="Server can ring your phone" hint="Not set up on the server yet — the app owner must add FCM_SERVICE_ACCOUNT" ok={st.server} onClick={() => {}} />
           <Row icon={Smartphone} title="This phone is registered" hint="Tap to sign this phone up for call alerts" ok={st.phone} onClick={async () => { await forceRegisterNativePush(authUser._id); check(); }} />
-          <Row icon={Rocket} title="Autostart / run in background" hint="Xiaomi, Oppo, Vivo: switch Talkies ON" ok={false} onClick={() => push()?.openAutostartSettings?.()} />
+          <Row icon={Rocket} title="Autostart / run in background" hint={brandTip()} ok={false} onClick={() => push()?.openAutostartSettings?.()} />
         </div>
         <button onClick={() => close(true)} className="mt-4 w-full h-11 rounded-full bg-[#25D366] text-wa-bg text-[14.5px] font-medium">
           {allOk ? "Done" : "I've turned these on"}
