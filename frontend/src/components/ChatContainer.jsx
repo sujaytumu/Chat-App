@@ -343,7 +343,8 @@ const ChatContainer = () => {
       return () => clearTimeout(timeout);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, isOtherTyping, selectedChat, data._id]);
+  // Keyed on the newest message, not the whole array: a refresh that only updates ticks / reactions must not scroll or bump the "new messages" count.
+  }, [messages.length, messages[messages.length - 1]?._id, isOtherTyping, selectedChat, data._id]);
 
   // Search result -> scroll to it. If it's older than what's loaded, keep
   // pulling older pages until it appears (bounded), then highlight it.
