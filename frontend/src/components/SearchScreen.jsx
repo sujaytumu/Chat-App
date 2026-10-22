@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { FileText, Link2, Image as ImageIcon, X } from "lucide-react";
+import { FileText, Link2, Image as ImageIcon, X, Users } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -51,6 +51,7 @@ const SearchScreen = ({ onClose }) => {
   const authUser = useAuthStore((s) => s.authUser);
   const [q, setQ] = useState("");
   const [kind, setKind] = useState("");
+  const [contactsOpen, setContactsOpen] = useState(false); // the full contact list, A–Z
   const [from, setFrom] = useState(null);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -153,6 +154,13 @@ const SearchScreen = ({ onClose }) => {
       </div>
 
       <div className="flex gap-2 px-4 pb-1 pt-1 overflow-x-auto no-scrollbar shrink-0">
+        <button
+          onClick={() => setContactsOpen((v) => !v)}
+          className={`h-10 pl-3 pr-4 rounded-full flex items-center gap-2 text-[14px] shrink-0 ${contactsOpen ? "bg-wa-tint text-wa-tinttext" : "bg-wa-surface text-wa-text2"}`}
+        >
+          <Users size={18} />
+          Contacts
+        </button>
         {KINDS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
@@ -168,6 +176,25 @@ const SearchScreen = ({ onClose }) => {
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto pb-6">
+        {contactsOpen && (
+          <>
+            <Heading>Contacts on Talkies</Heading>
+            {[...users]
+              .filter((u) => u._id && (!lc || u.fullName?.toLowerCase().includes(lc)))
+              .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""))
+              .map((u) => (
+                <button key={u._id} onClick={() => open({ type: "direct", data: u })} className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-wa-surface">
+                  <Avatar src={u.profilePic} name={u.fullName} size="size-12" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[16px] text-wa-text truncate">{u.fullName}</p>
+                    {u.about && <p className="text-[13px] text-wa-muted truncate">{u.about}</p>}
+                  </div>
+                </button>
+              ))}
+            {users.filter((u) => u._id && (!lc || u.fullName?.toLowerCase().includes(lc))).length === 0 && <p className="text-center text-wa-muted py-10 text-[14px]">No contacts found</p>}
+          </>
+        )}
+        <div className={contactsOpen ? "hidden" : ""}>
         {chats.length > 0 && (
           <>
             <Heading>Chats</Heading>
@@ -291,6 +318,7 @@ const SearchScreen = ({ onClose }) => {
         {!loading && (term.length >= 2 || kind) && chats.length === 0 && people.length === 0 && shown.length === 0 && (
           <p className="text-center text-wa-muted py-10 text-[14px]">{term ? `No results for “${term}”` : "Nothing here yet"}</p>
         )}
+        </div>
       </div>
     </div>,
     document.body

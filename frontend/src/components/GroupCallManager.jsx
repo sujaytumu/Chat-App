@@ -1,6 +1,6 @@
 import toast from "react-hot-toast";
 import { useEffect, useRef, useState } from "react";
-import { Minimize2, Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Users, Lock } from "lucide-react";
+import { Minimize2, Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, PhoneOff, Phone, SwitchCamera, UserPlus, Users, Lock, ArrowLeft, ArrowRight } from "lucide-react";
 import { isPhoneLike } from "../lib/device";
 import CallReturnBar from "./CallReturnBar";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -128,6 +128,7 @@ const Ctl = ({ on, onClick, label, children, danger }) => (
 
 // "Add participant": who is in the call right now, and who can be rung.
 const ParticipantsSheet = ({ groupId, onClose }) => {
+  useBackToClose(true, onClose);
   const authUser = useAuthStore((s) => s.authUser);
   const group = useChatStore((s) => s.groups.find((g) => g._id === groupId));
   const inCall = useGroupCallStore((s) => s.states[groupId]?.participants) || [];
@@ -173,19 +174,18 @@ const ParticipantsSheet = ({ groupId, onClose }) => {
   );
 
   return (
-    <div className="absolute inset-0 z-10 bg-black/60 flex items-end" onClick={onClose}>
-      <div
-        className="w-full max-h-[78%] bg-wa-panel rounded-t-3xl flex flex-col pb-[env(safe-area-inset-bottom)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-white/20" />
-        <div className="flex items-center px-5 py-3">
-          <h3 className="flex-1 text-[16px] text-wa-text">Add participant</h3>
-          <button onClick={onClose} className="text-[13px] text-[#21C063]">
-            Done
+    <div className="absolute inset-0 z-10 bg-wa-bg flex flex-col">
+      <div className="w-full h-full bg-wa-bg flex flex-col pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-center h-16 px-2 pt-[env(safe-area-inset-top)] box-content bg-gradient-to-b from-[#0e2a1f] to-wa-bg">
+          <button onClick={onClose} className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Back">
+            <ArrowLeft size={24} />
+          </button>
+          <h3 className="flex-1 pl-2 text-[20px] font-medium text-wa-text">Add participant</h3>
+          <button onClick={onClose} className="h-10 px-5 mr-2 rounded-full bg-[#25D366] text-black text-[14.5px] font-semibold flex items-center gap-1.5 active:scale-95 transition-transform">
+            Done <ArrowRight size={18} />
           </button>
         </div>
-        <div className="overflow-y-auto pb-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pb-6">
           <p className="px-5 pt-1 pb-1 text-[11px] text-wa-muted">In this call ({joined.length})</p>
           {joined.map((m) => (
             <Row key={m._id} m={m} right={{ sub: "Joined", node: <span className="size-2.5 rounded-full bg-[#21C063]" /> }} />
