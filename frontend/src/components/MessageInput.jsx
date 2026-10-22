@@ -16,6 +16,7 @@ import {
   Smile,
   Camera,
   CalendarDays,
+  IndianRupee,
   CalendarClock,
 } from "lucide-react";
 import { isDesktopNow } from "./ContextMenu";
@@ -27,6 +28,7 @@ import LocationSheet from "./LocationSheet";
 import { liveShares } from "../lib/liveShare";
 import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
 import EventModal from "./EventModal";
+import PaymentModal from "./PaymentModal";
 import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
 import { createPortal } from "react-dom";
@@ -76,6 +78,7 @@ const MessageInput = () => {
   const [showContacts, setShowContacts] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
+  const [showPay, setShowPay] = useState(false);
   const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
   const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
@@ -789,6 +792,7 @@ const MessageInput = () => {
           }}
         />
       )}
+      {showPay && selectedChat?.type === "direct" && <PaymentModal user={selectedChat.data} onClose={() => setShowPay(false)} />}
       {showEvent && <EventModal onClose={() => setShowEvent(false)} onSend={(event) => sendMessage({ event })} />}
       {showVideoNote && (
         <Suspense fallback={null}>
@@ -1061,6 +1065,21 @@ const MessageInput = () => {
                     </span>
                     Event
                   </button>
+                  {selectedChat?.type === "direct" && !selectedChat.data.isSelf && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAttachMenu(false);
+                        setShowPay(true);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 text-sm text-wa-text2"
+                    >
+                      <span className="size-8 rounded-full bg-[#25a55f] flex items-center justify-center shrink-0">
+                        <IndianRupee size={16} className="text-white" />
+                      </span>
+                      Payment
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
