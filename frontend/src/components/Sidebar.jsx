@@ -23,7 +23,7 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import { IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -612,6 +612,9 @@ const Sidebar = () => {
               </Link>
               <Link to="/settings/devices" className={menuItem} onClick={() => setShowMenu(false)}>
                 <QrCode size={18} className="text-wa-icon" /> Linked devices
+              </Link>
+              <Link to="/settings/payments" className={menuItem} onClick={() => setShowMenu(false)}>
+                <IndianRupee size={18} className="text-wa-icon" /> Payments
               </Link>
               <Link to="/settings" className={menuItem} onClick={() => setShowMenu(false)}>
                 <Settings size={18} className="text-wa-icon" /> Settings
