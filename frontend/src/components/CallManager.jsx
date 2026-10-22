@@ -15,6 +15,7 @@ import AddParticipantModal from "./AddParticipantModal";
 import AudioRoutePicker, { routeLabel } from "./AudioRoutePicker";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import { isPhoneLike } from "../lib/device";
+import { signalCallConnected } from "../lib/notificationSound";
 import { Phone, PhoneEnd, Video, VideoOff, Mic, MicOff, Volume2 } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { TRANSPARENT_POSTER } from "../lib/utils";
@@ -372,6 +373,22 @@ const CallManager = () => {
     if (callStatus === "idle") setIsMinimized(false);
   }, [callStatus]);
 
+  // The call was picked up: stop every ring / ringing buzz, give ONE short buzz and a quick green
+  // blink of the screen, then the call carries on cleanly.
+  const [connectFlash, setConnectFlash] = useState(false);
+  const wasInCall = useRef(false);
+  useEffect(() => {
+    if (callStatus === "in-call" && !wasInCall.current) {
+      wasInCall.current = true;
+      signalCallConnected();
+      setConnectFlash(true);
+      const t = setTimeout(() => setConnectFlash(false), 420);
+      return () => clearTimeout(t);
+    }
+    if (callStatus === "idle") wasInCall.current = false;
+    return undefined;
+  }, [callStatus]);
+
   // "Answer" was tapped on the notification and the call is still on its way to this phone:
   // show that it is connecting (nothing to tap) instead of the home screen.
   if (callStatus === "idle" && autoAnswer && Date.now() < autoAnswer.until) {
@@ -460,6 +477,9 @@ const CallManager = () => {
   return (
     <div className="wa-dark fixed inset-0 z-[200] bg-wa-bg flex flex-col isolate">
       <audio id="call-remote-audio" ref={remoteAudioRef} autoPlay />
+      {connectFlash && (
+        <div className="pointer-events-none fixed inset-0 z-[230]" style={{ background: "rgb(37 211 102 / .38)" }} aria-hidden />
+      )}
       {adding && (
         <AddParticipantModal
           excludeIds={[remoteUser?._id]}

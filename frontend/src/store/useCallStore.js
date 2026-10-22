@@ -4,6 +4,7 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
+import { acquireCallMedia } from "../lib/callMedia";
 import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
@@ -353,12 +354,14 @@ export const useCallStore = create((set, get) => ({
         get().resetCall();
         return;
       }
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: AUDIO_CONSTRAINTS,
-        video: callType === "video",
-      });
-    } catch {
-      toast.error("Could not access camera/microphone");
+      const media = await acquireCallMedia(AUDIO_CONSTRAINTS, callType);
+      stream = media.stream;
+      if (media.videoDropped) {
+        callType = "audio";
+        set({ callType: "audio" });
+      }
+    } catch (err) {
+      toast.error(err?.mediaMessage || "Could not access camera/microphone");
       get().resetCall();
       return;
     }
@@ -442,7 +445,8 @@ export const useCallStore = create((set, get) => ({
 
   acceptCall: async () => {
     const socket = useAuthStore.getState().socket;
-    const { incomingOffer, remoteUser, callType } = get();
+    const { incomingOffer, remoteUser } = get();
+    let callType = get().callType;
     if (!socket || !incomingOffer) return;
 
     get().stopRingtone();
@@ -451,10 +455,12 @@ export const useCallStore = create((set, get) => ({
     set({ isAnswering: true });
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: AUDIO_CONSTRAINTS,
-        video: callType === "video",
-      });
+      const media = await acquireCallMedia(AUDIO_CONSTRAINTS, callType);
+      const stream = media.stream;
+      if (media.videoDropped) {
+        callType = "audio";
+        set({ callType: "audio" });
+      }
       set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now(), isAnswering: false });
 
       pc = new RTCPeerConnection({ ...(await getIceConfig()), iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
@@ -510,8 +516,11 @@ export const useCallStore = create((set, get) => ({
     } catch (err) {
       console.error("acceptCall failed:", err);
       set({ isAnswering: false });
-      toast.error("Couldn't answer the call — check mic/camera permission");
-      get().endCall();
+      toast.error(err?.mediaMessage || "Couldn't answer the call — check mic/camera permission");
+      // Mic/camera blocked before we ever connected: tell the caller it was declined. Any other
+      // failure mid-setup hangs up normally.
+      if (err?.mediaMessage) get().rejectCall();
+      else get().endCall();
     }
   },
 
@@ -1029,6 +1038,7 @@ export const useCallStore = create((set, get) => ({
 
     socket.on("callAnswered", async ({ answer, callId, startedAt }) => {
       if (isOtherCall(callId)) return;
+      stopRingtoneSound(); // the calling / ringing tune ends the moment they pick up, not after setup
       if (!pc) {
         console.warn("Received callAnswered but no active peer connection — call may have already ended");
         return;

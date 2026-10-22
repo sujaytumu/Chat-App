@@ -131,6 +131,17 @@ export function vibrateForCall() {
     // ignore
   }
 }
+// One short buzz when a call connects (after the ringing buzz has been stopped), so the person feels
+// the call has been picked up.
+export function signalCallConnected() {
+  stopRingtoneSound();
+  try {
+    navigator.vibrate?.(0);
+    setTimeout(() => navigator.vibrate?.(160), 60);
+  } catch {
+    // ignore
+  }
+}
 export function stopVibration() {
   try {
     navigator.vibrate?.(0);

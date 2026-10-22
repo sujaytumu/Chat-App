@@ -405,6 +405,20 @@ final class NotificationHelper {
         notifySafe(ctx, id, n);
     }
 
+    /**
+     * The app came to the front: its own call screen rings from here on, so the notification's ring and
+     * vibration must stop (one ring only, never a second tune on top of the first).
+     */
+    static void stopAllRinging(Context ctx) {
+        java.util.List<String> tags;
+        synchronized (RINGING) {
+            tags = new java.util.ArrayList<String>(RINGING.keySet());
+        }
+        for (String t : tags) {
+            cancel(ctx, t);
+        }
+    }
+
     /** Replaces / removes whatever is shown for this tag (stops a ring). */
     static void cancel(Context ctx, String tag) {
         cancel(ctx, tag, "");
