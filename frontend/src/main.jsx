@@ -13,6 +13,7 @@ import { applyAccent } from "./lib/accent";
 import { applyChatColor } from "./lib/chatColor";
 import { consumeLaunchIntentEarly } from "./lib/nativePush";
 
+window.__TALKIES_BUILD__ = typeof __BUILD_ID__ === "undefined" ? "dev" : __BUILD_ID__; // makes each build's main file unique
 applyUiSettings();
 consumeLaunchIntentEarly(); // Android: an "Answer" tapped on the call notification is picked up immediately
 applyAppFont();
