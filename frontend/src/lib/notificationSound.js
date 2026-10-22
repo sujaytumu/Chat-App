@@ -234,9 +234,18 @@ let msgStopTimer = null;
 function playElement(el, url, { loop }) {
   ensureElements();
   el.loop = loop;
+  el.muted = false;
+  el.volume = 1; // full level: the loudness itself comes from the (normalised) tune file
   el.src = url;
   el.currentTime = 0;
   return el.play();
+}
+
+// True while the incoming-call ring is genuinely audible/running. Phones pause <audio> when the app
+// goes to the background, so "I started it earlier" is not proof it is still playing.
+export function isRingtoneActive() {
+  if (ringSoundInterval) return true;
+  return !!ringEl && !ringEl.paused && !ringEl.ended && ringEl.src && !ringEl.src.startsWith("data:audio/wav");
 }
 
 function stopElement(el) {
