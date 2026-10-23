@@ -117,6 +117,26 @@ public class MainActivity extends BridgeActivity {
         });
     }
 
+    /**
+     * Coming back from the payment page (talkies://pay?pay=ok&reason=...): bring the app's own window
+     * to the site's home with the result, where the page shows it and returns to the chat.
+     */
+    private void handlePayReturn(Intent intent) {
+        try {
+            if (intent == null || intent.getData() == null) return;
+            android.net.Uri d = intent.getData();
+            if (!"talkies".equals(d.getScheme()) || !"pay".equals(d.getHost())) return;
+            WebView w = getBridge() != null ? getBridge().getWebView() : null;
+            if (w == null) return;
+            String cur = w.getUrl();
+            android.net.Uri base = android.net.Uri.parse(cur != null && cur.startsWith("http") ? cur : "https://chat-app-jjcg.onrender.com");
+            String origin = base.getScheme() + "://" + base.getAuthority();
+            String q = d.getEncodedQuery();
+            w.loadUrl(origin + "/" + (q != null && !q.isEmpty() ? "?" + q : ""));
+        } catch (Exception ignored) {
+        }
+    }
+
     private void keepPageAliveForCall() {
         if (!callActive || getBridge() == null) return;
         WebView w = getBridge().getWebView();
@@ -145,6 +165,7 @@ public class MainActivity extends BridgeActivity {
         setIntent(intent);
         showOverLockScreenIfCall(intent);
         TalkiesPushPlugin.handleIntent(intent);
+        handlePayReturn(intent);
     }
 
     @Override
@@ -176,6 +197,7 @@ public class MainActivity extends BridgeActivity {
         showOverLockScreenIfCall(getIntent());
         super.onCreate(savedInstanceState);
         TalkiesPushPlugin.handleIntent(getIntent());
+        handlePayReturn(getIntent());
 
         // Make the page render exactly as it does in Chrome: ignore the system
         // font-size scaling, no forced dark mode, no overscroll glow/scrollbars.

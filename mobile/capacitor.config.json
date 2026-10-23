@@ -6,7 +6,12 @@
   "appendUserAgent": "TalkiesApp",
   "server": {
     "url": "https://chat-app-jjcg.onrender.com",
-    "cleartext": false
+    "cleartext": false,
+    "allowNavigation": [
+      "*.razorpay.com",
+      "razorpay.com",
+      "*.onrender.com"
+    ]
   },
   "android": {
     "allowMixedContent": false,
