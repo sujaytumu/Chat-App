@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import toast from "react-hot-toast";
 import { createPortal } from "react-dom";
-import { Loader2, ArrowUpRight, ArrowDownLeft, IndianRupee, Search, X, ShieldCheck } from "lucide-react";
+import { Loader2, ArrowUpRight, ArrowDownLeft, IndianRupee, Search, X, ShieldCheck, Smartphone } from "lucide-react";
+import toast from "react-hot-toast";
 import SettingsShell from "../components/SettingsShell";
 import Avatar from "../components/Avatar";
 import PaymentModal from "../components/PaymentModal";
@@ -52,6 +52,56 @@ const PickContact = ({ users, onPick, onClose }) => {
   );
 };
 
+// Change the mobile number that gets payment text messages (needs the PIN).
+const PhoneSheet = ({ current, pinSet, onClose, onSaved }) => {
+  useBackToClose(true, onClose);
+  const [phone, setPhone] = useState("");
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const ok = /^[6-9]\d{9}$/.test(phone) && /^\d{6}$/.test(pin);
+  const save = async () => {
+    setBusy(true);
+    setErr("");
+    try {
+      const r = await axiosInstance.post("/payments/phone", { phone, pin });
+      toast.success("Number saved");
+      onSaved(r.data?.phone || `+91${phone}`);
+    } catch (e) {
+      const d = e.response?.data;
+      setErr(d?.attemptsLeft != null ? `Wrong PIN · ${d.attemptsLeft} left` : d?.error || "Couldn't save the number");
+    }
+    setBusy(false);
+  };
+  return createPortal(
+    <div className="wa-dark fixed inset-0 z-[150] bg-black/60 flex items-end justify-center" onClick={onClose}>
+      <div className="w-full max-w-md rounded-t-3xl bg-wa-panel text-wa-text p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-[17px] font-semibold">Payment text messages</h3>
+        <p className="text-[13px] text-wa-muted mt-1">{current ? `Texts go to ${current}.` : "Add the number that should get a text when money is sent or received."}</p>
+        {!pinSet ? (
+          <p className="mt-4 rounded-xl bg-wa-field px-4 py-3 text-[13.5px] text-wa-muted">Make your first payment to create your PIN. You can add your number there too.</p>
+        ) : (
+          <>
+            <div className="mt-4 flex items-center gap-2 rounded-xl bg-wa-field px-4 h-12">
+              <span className="text-wa-muted">+91</span>
+              <input value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="tel" placeholder="10-digit mobile number" className="flex-1 bg-transparent outline-none" autoFocus />
+            </div>
+            <input value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} type="password" inputMode="numeric" placeholder="Your 6-digit PIN" className="mt-3 w-full h-12 rounded-xl bg-wa-field px-4 outline-none tracking-[0.3em]" />
+            <p className={`h-5 mt-2 text-[13px] ${err ? "text-[#F15C6D]" : "text-transparent"}`}>{err || "."}</p>
+            <button onClick={save} disabled={!ok || busy} className="mt-2 w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+              {busy && <Loader2 size={18} className="animate-spin" />} Save number
+            </button>
+          </>
+        )}
+        <button onClick={onClose} className="mt-2 w-full h-10 text-[14px] text-wa-muted">
+          Close
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 const PaymentsPage = () => {
   const users = useChatStore((s) => s.users);
   const getUsers = useChatStore((s) => s.getUsers);
@@ -59,6 +109,8 @@ const PaymentsPage = () => {
   const [cfg, setCfg] = useState(null);
   const [picking, setPicking] = useState(false);
   const [payTo, setPayTo] = useState(null);
+  const [pinInfo, setPinInfo] = useState({ set: false, phone: "" });
+  const [phoneSheet, setPhoneSheet] = useState(false);
 
   const load = useCallback(() => {
     axiosInstance.get("/payments").then((r) => setRows(Array.isArray(r.data) ? r.data : [])).catch(() => setRows([]));
@@ -75,7 +127,8 @@ const PaymentsPage = () => {
   }, []);
   useEffect(() => {
     load();
-    axiosInstance.get("/payments/config").then((r) => setCfg(r.data)).catch(() => setCfg({ enabled: false }));
+    axiosInstance.get("/payments/config").then((r) => setCfg(r.data)).catch(() => setCfg({ enabled: true }));
+    axiosInstance.get("/payments/pin").then((r) => setPinInfo(r.data || { set: false, phone: "" })).catch(() => {});
     if (!users.length) getUsers?.();
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -109,18 +162,13 @@ const PaymentsPage = () => {
 
   return (
     <SettingsShell title="Payments" back="/" flush>
-      {/* Test / setup status */}
-      {cfg && !cfg.enabled && (
-        <p className="mx-4 mt-2 rounded-2xl bg-wa-field px-4 py-3 text-[13.5px] text-wa-muted">Payments aren't switched on yet. The server needs its Razorpay keys.</p>
-      )}
-      {cfg?.enabled && cfg.test && (
-        <p className="mx-4 mt-2 rounded-2xl bg-[#E8A33D]/15 text-[#E8A33D] px-4 py-3 text-[12.5px] leading-snug">
-          Test mode: no real money moves. You'll set a 6-digit PIN for payments. Choose <b>Cards</b> and use Mastercard <b>5267 3181 8797 5449</b> (any future date, any CVV).
-        </p>
-      )}
+      {/* Test notice */}
+      <p className="mx-4 mt-2 rounded-2xl bg-[#E8A33D]/15 text-[#E8A33D] px-4 py-3 text-[12.5px] leading-snug">
+        Test payments: play money, no real money moves. Each payment is approved with your 6-digit PIN.
+      </p>
 
       {/* Main actions */}
-      <button onClick={() => setPicking(true)} disabled={cfg && !cfg.enabled} className="w-full flex items-center gap-4 px-5 py-4 text-left active:bg-white/5 disabled:opacity-50">
+      <button onClick={() => setPicking(true)} className="w-full flex items-center gap-4 px-5 py-4 text-left active:bg-white/5">
         <span className="size-12 rounded-full bg-[#25D366] text-[#0B141A] flex items-center justify-center">
           <IndianRupee size={22} />
         </span>
@@ -136,7 +184,7 @@ const PaymentsPage = () => {
           <p className={sectionHead}>People</p>
           <div className="flex gap-4 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
             {people.map((u) => (
-              <button key={u._id} onClick={() => setPayTo(u)} disabled={cfg && !cfg.enabled} className="w-16 shrink-0 flex flex-col items-center gap-1.5 active:opacity-70 disabled:opacity-50">
+              <button key={u._id} onClick={() => setPayTo(u)} className="w-16 shrink-0 flex flex-col items-center gap-1.5 active:opacity-70">
                 <Avatar src={u.profilePic} name={u.fullName || ""} size="size-14" textSize="text-xl" />
                 <span className="text-[12px] text-wa-text truncate w-full text-center">{(u.fullName || "").split(" ")[0]}</span>
               </button>
@@ -188,9 +236,29 @@ const PaymentsPage = () => {
         ))
       )}
 
-      <p className="flex items-center justify-center gap-1.5 text-[12px] text-wa-muted px-8 pt-6 pb-2 text-center">
-        <ShieldCheck size={14} /> Payments are processed securely by Razorpay
+      <button onClick={() => setPhoneSheet(true)} className="w-full flex items-center gap-4 px-5 py-4 mt-3 text-left active:bg-white/5">
+        <span className="size-12 rounded-full bg-wa-field flex items-center justify-center text-wa-icon">
+          <Smartphone size={22} />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-[16px]">Payment text messages</span>
+          <span className="block text-[13px] text-wa-muted truncate">{pinInfo.phone ? `Texts to ${pinInfo.phone}` : "Add your mobile number"}</span>
+        </span>
+      </button>
+      <p className="flex items-center justify-center gap-1.5 text-[12px] text-wa-muted px-8 pt-4 pb-2 text-center">
+        <ShieldCheck size={14} /> Approved with your PIN · test payments
       </p>
+      {phoneSheet && (
+        <PhoneSheet
+          current={pinInfo.phone}
+          pinSet={pinInfo.set}
+          onClose={() => setPhoneSheet(false)}
+          onSaved={(ph) => {
+            setPinInfo((p) => ({ ...p, phone: ph }));
+            setPhoneSheet(false);
+          }}
+        />
+      )}
 
       {picking && (
         <PickContact

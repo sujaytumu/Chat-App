@@ -8,6 +8,7 @@ import { sendPushToUser } from "../lib/webPush.js";
 import { rememberMessage } from "../lib/recentMessages.js";
 import { getUserLean } from "../lib/authCache.js";
 import { canSee, forgetPair } from "../lib/visibility.js";
+import { sendSms, smsEnabled } from "../lib/sms.js";
 import { createOrder, fetchPayment, signatureValid, razorpayEnabled, razorpayPublicKey, razorpayTestMode, razorpayLiveKeysBlocked } from "../lib/razorpay.js";
 
 const PIN_RE = /^\d{6}$/;
@@ -36,20 +37,28 @@ async function checkPin(userId, pin) {
   return { ok: true };
 }
 
+// Indian mobile numbers (10 digits, optional +91 / 0) or any international +number → "+91XXXXXXXXXX".
+function cleanPhone(raw) {
+  const t = String(raw || "").replace(/[\s()-]/g, "");
+  const m = t.match(/^(?:\+?91|0)?([6-9]\d{9})$/);
+  if (m) return `+91${m[1]}`;
+  return /^\+\d{8,15}$/.test(t) ? t : "";
+}
+
 export const pinStatus = async (req, res) => {
   try {
-    const u = await User.findById(req.user._id).select("+payPinHash").lean();
-    res.json({ set: !!u?.payPinHash });
+    const u = await User.findById(req.user._id).select("+payPinHash +payPhone").lean();
+    res.json({ set: !!u?.payPinHash, phone: u?.payPhone || "" });
   } catch {
     res.status(500).json({ error: "Couldn't check your PIN" });
   }
 };
 
-// First time: { pin }. Changing it: { pin, oldPin }.
+// First time: { pin, phone? }. Changing it: { pin, oldPin }.
 export const setPin = async (req, res) => {
   try {
     const me = req.user._id;
-    const { pin, oldPin } = req.body || {};
+    const { pin, oldPin, phone } = req.body || {};
     if (!PIN_RE.test(String(pin || ""))) return res.status(400).json({ error: "The PIN must be 6 digits" });
     if (/^(\d)\1{5}$/.test(pin) || pin === "123456" || pin === "654321") return res.status(400).json({ error: "Choose a PIN that's harder to guess" });
     const u = await User.findById(me).select("+payPinHash").lean();
@@ -58,11 +67,72 @@ export const setPin = async (req, res) => {
       if (!pc.ok) return res.status(pc.status).json(pc);
     }
     const hash = await bcrypt.hash(String(pin), 10);
-    await User.updateOne({ _id: me }, { $set: { payPinHash: hash, payPinFails: 0 }, $unset: { payPinLockedUntil: "" } });
-    res.json({ ok: true });
+    const set = { payPinHash: hash, payPinFails: 0 };
+    if (phone) {
+      const ph = cleanPhone(phone);
+      if (!ph) return res.status(400).json({ error: "Enter a valid mobile number" });
+      set.payPhone = ph;
+    }
+    await User.updateOne({ _id: me }, { $set: set, $unset: { payPinLockedUntil: "" } });
+    res.json({ ok: true, phone: set.payPhone || "" });
   } catch (e) {
     console.log("Error in setPin:", e.message);
     res.status(500).json({ error: "Couldn't save your PIN" });
+  }
+};
+
+// The mobile number that gets payment text messages. Changing it needs the PIN.
+export const setPayPhone = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const ph = cleanPhone(req.body?.phone);
+    if (!ph) return res.status(400).json({ error: "Enter a valid mobile number" });
+    const pc = await checkPin(me, req.body?.pin);
+    if (!pc.ok) return res.status(pc.status).json(pc);
+    await User.updateOne({ _id: me }, { $set: { payPhone: ph } });
+    res.json({ ok: true, phone: ph });
+  } catch {
+    res.status(500).json({ error: "Couldn't save your number" });
+  }
+};
+
+// Send money: amount + PIN. Right PIN → paid straight away; wrong PIN → "Wrong PIN" (5 tries, then a 15-minute lock).
+export const sendPayment = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const { toUserId, note } = req.body || {};
+    const amountRupees = Number(req.body?.amount);
+    if (!mongoose.isValidObjectId(toUserId)) return res.status(400).json({ error: "Pick who to pay" });
+    if (String(toUserId) === String(me)) return res.status(400).json({ error: "You can't pay yourself" });
+    if (!Number.isFinite(amountRupees) || amountRupees < MIN_RUPEES || amountRupees > MAX_RUPEES) {
+      return res.status(400).json({ error: `Enter an amount between ₹${MIN_RUPEES} and ₹${MAX_RUPEES.toLocaleString("en-IN")}` });
+    }
+    const amount = Math.round(amountRupees * 100);
+    const receiver = await getUserLean(toUserId);
+    if (!receiver || !(await canSee(req.user, toUserId))) return res.status(404).json({ error: "Person not found" });
+    if ((req.user.blockedUsers || []).some((b) => String(b) === String(toUserId))) return res.status(403).json({ error: "You blocked this contact" });
+    if (receiver.blockedUsers?.some((b) => String(b) === String(me))) return res.status(403).json({ error: "You can't pay this person" });
+
+    const pc = await checkPin(me, req.body?.pin);
+    if (!pc.ok) return res.status(pc.status).json(pc);
+
+    const ref = `TKP${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+    const pay = await Payment.create({
+      fromUserId: me,
+      toUserId,
+      amount,
+      note: String(note || "").trim().slice(0, 120),
+      orderId: `tkpay_${ref}`,
+      paymentId: ref,
+      status: "paid",
+      paidAt: new Date(),
+      test: true,
+    });
+    const r = await settlePayment(pay, ref);
+    res.status(201).json({ ok: true, message: r.message, paymentId: ref, paidAt: pay.paidAt });
+  } catch (error) {
+    console.log("Error in sendPayment:", error.message);
+    res.status(500).json({ error: "Couldn't complete the payment. Try again." });
   }
 };
 
@@ -71,7 +141,7 @@ const MAX_RUPEES = 100000;
 const rupees = (paise) => (paise / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 
 export const paymentConfig = (req, res) => {
-  res.json({ liveBlocked: razorpayLiveKeysBlocked(), enabled: razorpayEnabled(), keyId: razorpayEnabled() ? razorpayPublicKey() : "", test: razorpayTestMode(), min: MIN_RUPEES, max: MAX_RUPEES });
+  res.json({ enabled: true, test: true, sms: smsEnabled(), razorpay: razorpayEnabled(), min: MIN_RUPEES, max: MAX_RUPEES });
 };
 
 // Step 1: the payer picks an amount for a person; we ask Razorpay for an order and remember it.
@@ -110,25 +180,9 @@ export const createPaymentOrder = async (req, res) => {
 //  - the checkout window's JS callback (/verify, signed-in person), and
 //  - a redirect back to the site (/callback) used inside the Android app, where bank pages can't open in a pop-up.
 // Nothing is trusted until the signature checks out AND Razorpay itself confirms the amount.
-async function finalizePayment({ orderId, paymentId, signature, payerId }) {
-  const pay = await Payment.findOne({ orderId: String(orderId || ""), ...(payerId ? { fromUserId: payerId } : {}) });
-  if (!pay) return { status: 404, error: "Payment not found" };
-  if (pay.status === "paid") {
-    const message = pay.messageId ? await Message.findById(pay.messageId) : null;
-    return { status: 200, message };
-  }
-  if (!signatureValid(orderId, paymentId, signature)) {
-    pay.status = "failed";
-    await pay.save();
-    return { status: 400, error: "Payment couldn't be verified" };
-  }
-  const info = await fetchPayment(paymentId);
-  if (info.order_id !== pay.orderId || Number(info.amount) !== pay.amount || !["captured", "authorized"].includes(info.status)) {
-    pay.status = "failed";
-    await pay.save();
-    return { status: 400, error: "Payment wasn't completed" };
-  }
-
+// Marks a payment as paid and tells everyone: a payment card in the chat, a push notification, and
+// text messages ("₹X sent to …" to the payer, "₹X received from …" to the receiver) when numbers are on file.
+async function settlePayment(pay, paymentId) {
   const me = pay.fromUserId;
   const payer = await User.findById(me).select("fullName profilePic").lean();
   pay.status = "paid";
@@ -157,7 +211,42 @@ async function finalizePayment({ orderId, paymentId, signature, payerId }) {
     tag: `dm-${me}`,
     data: { url: "/", chatType: "direct", chatId: String(me), messageId: String(message._id) },
   }, {}, `d:${me}`);
+  notifyBySms(pay, paymentId).catch(() => {});
   return { status: 201, message };
+}
+
+const inr = (paise) => `Rs ${rupees(paise)}`;
+const stamp = (d) => new Date(d).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+
+async function notifyBySms(pay, paymentId) {
+  const people = await User.find({ _id: { $in: [pay.fromUserId, pay.toUserId] } }).select("fullName +payPhone").lean();
+  const payer = people.find((u) => String(u._id) === String(pay.fromUserId));
+  const payee = people.find((u) => String(u._id) === String(pay.toUserId));
+  const tail = `${stamp(pay.paidAt || Date.now())}. Ref ${paymentId}.${pay.test ? " Test payment, no real money." : ""}`;
+  if (payer?.payPhone) await sendSms(payer.payPhone, `Talkies Pay: ${inr(pay.amount)} sent to ${payee?.fullName || "a contact"} on ${tail}`);
+  if (payee?.payPhone) await sendSms(payee.payPhone, `Talkies Pay: ${inr(pay.amount)} received from ${payer?.fullName || "a contact"} on ${tail}`);
+}
+
+async function finalizePayment({ orderId, paymentId, signature, payerId }) {
+  const pay = await Payment.findOne({ orderId: String(orderId || ""), ...(payerId ? { fromUserId: payerId } : {}) });
+  if (!pay) return { status: 404, error: "Payment not found" };
+  if (pay.status === "paid") {
+    const message = pay.messageId ? await Message.findById(pay.messageId) : null;
+    return { status: 200, message };
+  }
+  if (!signatureValid(orderId, paymentId, signature)) {
+    pay.status = "failed";
+    await pay.save();
+    return { status: 400, error: "Payment couldn't be verified" };
+  }
+  const info = await fetchPayment(paymentId);
+  if (info.order_id !== pay.orderId || Number(info.amount) !== pay.amount || !["captured", "authorized"].includes(info.status)) {
+    pay.status = "failed";
+    await pay.save();
+    return { status: 400, error: "Payment wasn't completed" };
+  }
+
+  return settlePayment(pay, paymentId);
 }
 
 export const verifyPayment = async (req, res) => {
