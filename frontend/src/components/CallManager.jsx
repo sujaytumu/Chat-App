@@ -461,6 +461,8 @@ const CallManager = () => {
 
   // ---- Outgoing / active call ----
   const isVideo = callType === "video";
+  // While someone shares their screen the picture needs every pixel it can get: slim header, one row of buttons.
+  const compact = isVideo && remoteScreenSharing;
   // With a profile photo the whole screen is their photo (like WhatsApp): no small circle photo,
   // and the name + "Ringing…"/timer live together at the top.
   const hasPhoto = !!remoteUser?.profilePic;
@@ -509,7 +511,7 @@ const CallManager = () => {
       )}
 
       {/* Top bar: minimize / name + encrypted / add participant */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2 relative z-10">
+      <div className={`shrink-0 flex items-center justify-between relative z-10 ${compact ? "px-3 pt-[calc(6px+env(safe-area-inset-top))] pb-1" : "px-4 pt-4 pb-2"}`}>
         <button
           onClick={() => setIsMinimized(true)}
           className="size-11 rounded-full flex items-center justify-center bg-black/30 text-white"
@@ -521,9 +523,13 @@ const CallManager = () => {
             {remoteUser?.fullName}
           </h3>
           {hasPhoto && <p className="text-[15px] text-white/90 mt-0.5 tabular-nums drop-shadow">{statusText}</p>}
-          <p className="text-xs text-white/60 flex items-center justify-center gap-1 mt-0.5">
-            <Lock size={10} /> End-to-end encrypted
-          </p>
+          {compact ? (
+            <p className="text-[13px] text-white/80 tabular-nums">{statusText}</p>
+          ) : (
+            <p className="text-xs text-white/60 flex items-center justify-center gap-1 mt-0.5">
+              <Lock size={10} /> End-to-end encrypted
+            </p>
+          )}
           {isScreenSharing && (
             <p className="text-xs text-[#00A884] flex items-center justify-center gap-1 mt-0.5">
               <UploadCloud size={11} /> You&apos;re sharing your screen
@@ -560,7 +566,7 @@ const CallManager = () => {
       </div>
 
       {isVideo ? (
-        <div className={`relative flex-1 ${remoteStream ? "bg-black" : ""}`}>
+        <div className={`relative flex-1 min-h-0 overflow-hidden ${remoteStream ? "bg-black" : ""}`}>
           <video
             id="call-remote-video"
             ref={remoteVideoRef}
@@ -570,7 +576,7 @@ const CallManager = () => {
             poster={TRANSPARENT_POSTER}
             style={{ visibility: remoteStream ? "visible" : "hidden" }}
             // A shared screen must not be cropped like a camera feed is.
-            className={`w-full h-full ${remoteScreenSharing ? "object-contain bg-black" : "object-cover"}`}
+            className={`absolute inset-0 w-full h-full ${remoteScreenSharing ? "object-contain bg-black" : "object-cover"}`}
           />
           {remoteScreenSharing && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5">
@@ -617,8 +623,8 @@ const CallManager = () => {
       {/* Bottom control panel — 2x3 grid matching WhatsApp:
           Speaker / Video / Mute
           More    / Share / End */}
-      <div className="relative bg-black/50 rounded-t-3xl px-6 pt-6 pb-8">
-        <div className="grid grid-cols-3 gap-x-6 gap-y-5 max-w-xs mx-auto">
+      <div className={`relative shrink-0 bg-black/50 rounded-t-3xl px-4 ${compact ? "pt-3 pb-[calc(12px+env(safe-area-inset-bottom))]" : "px-6 pt-6 pb-[calc(32px+env(safe-area-inset-bottom))]"}`}>
+        <div className={compact ? "grid grid-cols-6 gap-x-1 max-w-md mx-auto [&>div>button]:!size-12 [&>div>span]:hidden" : "grid grid-cols-3 gap-x-6 gap-y-5 max-w-xs mx-auto"}>
           <div className="flex flex-col items-center gap-1.5">
             <button onClick={toggleSpeakerOutput} className={callBtn(isSpeakerOn)}>
               <Volume2 size={24} />

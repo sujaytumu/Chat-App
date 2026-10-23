@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
 import Payment from "../models/payment.model.js";
 import Message from "../models/message.model.js";
 import User from "../models/user.model.js";
@@ -8,6 +9,62 @@ import { rememberMessage } from "../lib/recentMessages.js";
 import { getUserLean } from "../lib/authCache.js";
 import { canSee, forgetPair } from "../lib/visibility.js";
 import { createOrder, fetchPayment, signatureValid, razorpayEnabled, razorpayPublicKey, razorpayTestMode, razorpayLiveKeysBlocked } from "../lib/razorpay.js";
+
+const PIN_RE = /^\d{6}$/;
+const PIN_MAX_TRIES = 5;
+const PIN_LOCK_MS = 15 * 60 * 1000;
+
+// Checks the person's 6-digit payment PIN. Five wrong tries lock payments for 15 minutes.
+async function checkPin(userId, pin) {
+  const u = await User.findById(userId).select("+payPinHash +payPinFails +payPinLockedUntil").lean();
+  if (!u?.payPinHash) return { ok: false, status: 428, error: "Create your payment PIN first", needsPin: true };
+  if (u.payPinLockedUntil && new Date(u.payPinLockedUntil) > new Date()) {
+    const mins = Math.max(1, Math.ceil((new Date(u.payPinLockedUntil) - Date.now()) / 60000));
+    return { ok: false, status: 429, error: `Too many wrong PINs. Try again in ${mins} min.`, locked: true };
+  }
+  const good = PIN_RE.test(String(pin || "")) && (await bcrypt.compare(String(pin), u.payPinHash));
+  if (!good) {
+    const fails = (u.payPinFails || 0) + 1;
+    if (fails >= PIN_MAX_TRIES) {
+      await User.updateOne({ _id: userId }, { $set: { payPinFails: 0, payPinLockedUntil: new Date(Date.now() + PIN_LOCK_MS) } });
+      return { ok: false, status: 429, error: "Too many wrong PINs. Try again in 15 min.", locked: true };
+    }
+    await User.updateOne({ _id: userId }, { $set: { payPinFails: fails } });
+    return { ok: false, status: 401, error: "Wrong PIN", attemptsLeft: PIN_MAX_TRIES - fails };
+  }
+  if (u.payPinFails || u.payPinLockedUntil) await User.updateOne({ _id: userId }, { $set: { payPinFails: 0 }, $unset: { payPinLockedUntil: "" } });
+  return { ok: true };
+}
+
+export const pinStatus = async (req, res) => {
+  try {
+    const u = await User.findById(req.user._id).select("+payPinHash").lean();
+    res.json({ set: !!u?.payPinHash });
+  } catch {
+    res.status(500).json({ error: "Couldn't check your PIN" });
+  }
+};
+
+// First time: { pin }. Changing it: { pin, oldPin }.
+export const setPin = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const { pin, oldPin } = req.body || {};
+    if (!PIN_RE.test(String(pin || ""))) return res.status(400).json({ error: "The PIN must be 6 digits" });
+    if (/^(\d)\1{5}$/.test(pin) || pin === "123456" || pin === "654321") return res.status(400).json({ error: "Choose a PIN that's harder to guess" });
+    const u = await User.findById(me).select("+payPinHash").lean();
+    if (u?.payPinHash) {
+      const pc = await checkPin(me, oldPin);
+      if (!pc.ok) return res.status(pc.status).json(pc);
+    }
+    const hash = await bcrypt.hash(String(pin), 10);
+    await User.updateOne({ _id: me }, { $set: { payPinHash: hash, payPinFails: 0 }, $unset: { payPinLockedUntil: "" } });
+    res.json({ ok: true });
+  } catch (e) {
+    console.log("Error in setPin:", e.message);
+    res.status(500).json({ error: "Couldn't save your PIN" });
+  }
+};
 
 const MIN_RUPEES = 1;
 const MAX_RUPEES = 100000;
@@ -34,6 +91,10 @@ export const createPaymentOrder = async (req, res) => {
     if (!receiver || !(await canSee(req.user, toUserId))) return res.status(404).json({ error: "Person not found" });
     if ((req.user.blockedUsers || []).some((b) => String(b) === String(toUserId))) return res.status(403).json({ error: "You blocked this contact" });
     if (receiver.blockedUsers?.some((b) => String(b) === String(me))) return res.status(403).json({ error: "You can't pay this person" });
+
+    // Every payment is authorised with the person's own 6-digit PIN, like a UPI PIN.
+    const pc = await checkPin(me, req.body?.pin);
+    if (!pc.ok) return res.status(pc.status).json(pc);
 
     const cleanNote = String(note || "").trim().slice(0, 120);
     const order = await createOrder({ amount, receipt: `tk_${Date.now().toString(36)}`, notes: { from: String(me), to: String(toUserId) } });
