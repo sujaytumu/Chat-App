@@ -85,8 +85,9 @@ async function canAccessStatusMedia(me, url) {
   for (const st of statuses) {
     if (String(st.userId) === me || (st.expiresAt > new Date() && audienceAllows(st.audience, st.userId, me))) return true;
   }
-  const hls = await Highlight.find({ $or: [{ "items.song.url": url }, { "items.content": url }] }).select("userId items").limit(10).lean();
+  const hls = await Highlight.find({ $or: [{ "items.song.url": url }, { "items.content": url }] }).select("userId audience items").limit(10).lean();
   for (const h of hls) {
+    if (!audienceAllows(h.audience, h.userId, me)) continue; // the whole highlight is kept from this person
     for (const it of h.items || []) {
       if ((it.song?.url === url || it.content === url) && audienceAllows(it.audience, h.userId, me)) return true;
     }

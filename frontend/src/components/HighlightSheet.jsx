@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Check, Loader2, Trash2, Bookmark } from "lucide-react";
+import { X, Check, Loader2, Trash2, Bookmark, Lock, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { UpdateThumb } from "./HighlightsRow";
+import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { HL_GRADIENT, HL_ACCENT, HL_ACCENT_SOFT, HL_ACCENT_TEXT, HL_SHADOW } from "../lib/highlightTheme";
 
 const monthLabel = (iso) => new Date(iso).toLocaleDateString([], { month: "long", year: "numeric" });
@@ -21,6 +22,13 @@ const HighlightSheet = ({ statuses, highlights, preselect = null, editing = null
   const [picked, setPicked] = useState(() => new Set(preselect ? [preselect] : []));
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Who can see this highlight (everyone / everyone except… / only…). New ones start private-by-choice: the person decides.
+  const [audience, setAudience] = useState(() => {
+    const a = editing?.audience;
+    return a?.mode ? { mode: a.mode, users: a.users || [] } : { mode: "all", users: [] };
+  });
+  const [audienceDirty, setAudienceDirty] = useState(false);
+  const [showAudience, setShowAudience] = useState(false);
 
   // the archive: every status I've posted, loaded a page at a time
   const [archive, setArchive] = useState(() => [...statuses].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
@@ -78,19 +86,20 @@ const HighlightSheet = ({ statuses, highlights, preselect = null, editing = null
 
   const chosen = available.filter((s) => picked.has(s._id)).map((s) => s._id);
   const renamed = !!editing && title.trim() && title.trim() !== editing.title;
-  const canSave = !busy && (target === "new" ? chosen.length > 0 : chosen.length > 0 || renamed);
+  const canSave = !busy && (target === "new" ? chosen.length > 0 : chosen.length > 0 || renamed || (!!editing && audienceDirty));
 
   const save = async () => {
     if (!canSave) return;
     setBusy(true);
     try {
       if (target === "new") {
-        await axiosInstance.post("/highlights", { title: title.trim() || "Highlights", statusIds: chosen });
+        await axiosInstance.post("/highlights", { title: title.trim() || "Highlights", statusIds: chosen, audience });
         toast.success("Highlight created");
       } else {
         await axiosInstance.put(`/highlights/${target}`, {
           ...(renamed ? { title: title.trim() } : {}),
           ...(chosen.length ? { addStatusIds: chosen } : {}),
+          ...(audienceDirty && editing ? { audience } : {}),
         });
         toast.success(editing ? "Highlight updated" : "Added to highlight");
       }
@@ -167,6 +176,21 @@ const HighlightSheet = ({ statuses, highlights, preselect = null, editing = null
             />
           )}
 
+          {(target === "new" || editing) && (
+            <button
+              type="button"
+              onClick={() => setShowAudience(true)}
+              className="w-full flex items-center gap-3 rounded-xl bg-wa-field px-4 py-3 mb-4 text-left active:opacity-80"
+            >
+              <Lock size={18} style={{ color: HL_ACCENT }} />
+              <span className="flex-1 min-w-0">
+                <span className="block text-[14px] text-wa-text">Who can see this highlight</span>
+                <span className="block text-[12.5px] text-wa-muted">{audience.mode === "all" ? "All my contacts" : audienceLabel(audience)}</span>
+              </span>
+              <ChevronRight size={18} className="text-wa-muted" />
+            </button>
+          )}
+
           {groups.length === 0 && !loading && (
             <p className="text-[13px] text-wa-muted py-8 text-center">
               {editing || target !== "new" ? "Everything you have posted is already in this highlight." : "You haven't posted any status yet. Post one, then save it here."}
@@ -232,6 +256,20 @@ const HighlightSheet = ({ statuses, highlights, preselect = null, editing = null
           </button>
         </div>
       </div>
+      {showAudience && (
+        <div className="fixed inset-0 z-[190] wa-dark" onClick={(e) => e.stopPropagation()}>
+          <StatusAudienceSheet
+            noun="highlight"
+            value={audience}
+            onClose={() => setShowAudience(false)}
+            onSave={(a) => {
+              setAudience({ mode: a.mode, users: a.users || [] });
+              setAudienceDirty(true);
+              setShowAudience(false);
+            }}
+          />
+        </div>
+      )}
     </div>,
     document.body
   );
