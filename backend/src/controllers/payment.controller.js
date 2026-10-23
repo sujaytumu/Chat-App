@@ -115,7 +115,23 @@ export const verifyPayment = async (req, res) => {
 // Razorpay sends the person's browser back here (a form POST) when checkout runs in redirect mode (the Android app).
 // The signature is the proof, so no sign-in is needed; then the person is sent back into the app.
 export const paymentCallback = async (req, res) => {
-  const back = (q) => res.redirect(303, `/settings/payments?${new URLSearchParams(q).toString()}`);
+  const inApp = /TalkiesApp/i.test(req.get("user-agent") || "");
+  const back = (q) => {
+    const qs = new URLSearchParams(q).toString();
+    // Inside the Talkies app's own window: just go back into the app.
+    if (inApp) return res.redirect(303, `/?${qs}`);
+    // Opened in a normal browser (older app versions send people there): hand them back to the Talkies app.
+    const deep = `talkies://pay?${qs}`;
+    const ok = q.pay === "ok";
+    res.set("Cache-Control", "no-store").type("html").send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Talkies</title>
+<style>body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0b141a;color:#e9edef;font-family:system-ui,sans-serif;text-align:center;padding:24px}
+h1{font-size:24px;margin:16px 0 6px}p{color:#8696a0;margin:0 0 28px;max-width:320px}.i{font-size:56px}
+a.b{display:block;background:#25d366;color:#0b141a;font-weight:700;text-decoration:none;padding:15px 34px;border-radius:30px;font-size:17px}a.s{margin-top:18px;color:#8696a0;font-size:14px}</style></head>
+<body><div class="i">${ok ? "✅" : "⚠️"}</div><h1>${ok ? "Payment sent" : "Payment not completed"}</h1>
+<p>${ok ? "Your test payment went through." : String(q.reason || "Payment could not be completed").replace(/[<>&"]/g, "")}</p>
+<a class="b" href="${deep}">Back to Talkies</a><a class="s" href="/?${qs}">Continue in the browser</a>
+<script>setTimeout(function(){location.href=${JSON.stringify(deep)}},400)</script></body></html>`);
+  };
   try {
     const b = req.body || {};
     if (b.razorpay_payment_id && b.razorpay_signature) {

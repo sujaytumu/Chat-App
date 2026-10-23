@@ -34,6 +34,7 @@ const PaymentModal = ({ user, onClose, onDone }) => {
     try {
       const [Razorpay, res] = await Promise.all([loadRazorpay(), axiosInstance.post("/payments/order", { toUserId: user._id, amount: value, note })]);
       order = res.data;
+      try { localStorage.setItem("talkies-pay-return", String(user._id)); } catch { /* optional */ }
       const inApp = !!window.Capacitor?.isNativePlatform?.() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
       const rzp = new Razorpay({
         key: order.keyId,
@@ -51,7 +52,7 @@ const PaymentModal = ({ user, onClose, onDone }) => {
         // Inside the Android app (and phone browsers) bank / OTP pages can't open in a pop-up and show a blank page,
         // so there the whole screen goes to Razorpay and comes back to the app when finished.
         ...(inApp
-          ? { redirect: true, callback_url: `${window.location.origin}/api/payments/callback`, cancel_url: `${window.location.origin}/settings/payments?pay=cancelled` }
+          ? { redirect: true, callback_url: `${window.location.origin}/api/payments/callback`, cancel_url: `${window.location.origin}/?pay=cancelled` }
           : {}),
         modal: {
           ondismiss: () => {

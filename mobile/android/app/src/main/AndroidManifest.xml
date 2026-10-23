@@ -23,6 +23,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- talkies://pay?pay=ok : the payment page in the browser hands the person back to the app -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="talkies" android:host="pay" />
+            </intent-filter>
+
         </activity>
 
         <!-- Firebase push: rings for calls and shows messages even when the app is closed -->
