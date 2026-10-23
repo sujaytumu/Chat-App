@@ -102,7 +102,7 @@ final class CallRinger {
         try {
             Vibrator v = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
             if (v == null || !v.hasVibrator()) return;
-            long[] pattern = {0, 900, 600, 900, 600};
+            long[] pattern = NotificationHelper.RING_VIBRATION;
             if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createWaveform(pattern, 0));
             else v.vibrate(pattern, 0);
         } catch (Exception ignored) {

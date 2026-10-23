@@ -15,6 +15,7 @@ import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.Rect;
 import android.media.AudioAttributes;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -42,7 +43,7 @@ import java.util.Map;
  * Answer / Decline) and per-chat message notifications.
  */
 final class NotificationHelper {
-    static final String CH_CALLS = "talkies_calls_v3"; // v3: louder bundled Talkies ringtone (a channel's sound can't be changed once created)
+    static final String CH_CALLS = "talkies_calls_v4"; // v4: the phone's own ringtone (double ring) // v3: louder bundled Talkies ringtone (a channel's sound can't be changed once created)
     static final String CH_MESSAGES = "talkies_messages_v1";
     static final String CH_MISSED = "talkies_missed_v1";
     static final String SITE = "https://chat-app-jjcg.onrender.com";
@@ -111,10 +112,10 @@ final class NotificationHelper {
                 Uri custom = customToneUri(ctx);
                 calls.setSound(custom != null ? custom : Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring), ring);
             } else {
-                calls.setSound(Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring), ring);
+                calls.setSound(phoneRingtone(ctx), ring);
             }
             calls.enableVibration(true);
-            calls.setVibrationPattern(new long[]{0, 900, 600, 900, 600, 900, 600, 900});
+            calls.setVibrationPattern(RING_VIBRATION);
             calls.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             calls.setBypassDnd(false);
             nm.createNotificationChannel(calls);
@@ -173,6 +174,20 @@ final class NotificationHelper {
         }
     }
 
+    /** The phone's own normal ringtone (what a real call plays); the bundled tune only if the phone has none. */
+    static Uri phoneRingtone(Context ctx) {
+        try {
+            Uri u = RingtoneManager.getActualDefaultRingtoneUri(ctx, RingtoneManager.TYPE_RINGTONE);
+            if (u == null) u = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            if (u != null) return u;
+        } catch (Exception ignored) {
+        }
+        return Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring);
+    }
+
+    /** Double ring: ring-ring, pause, repeated until the call is answered / declined / cancelled. */
+    static final long[] RING_VIBRATION = {0, 500, 250, 500, 1800};
+
     private static volatile Context appCtx;
 
     static Context appContext() {
@@ -187,7 +202,7 @@ final class NotificationHelper {
             Uri u = customToneUri(ctx);
             if (u != null) return u;
         }
-        return Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring);
+        return phoneRingtone(ctx);
     }
 
     /**
