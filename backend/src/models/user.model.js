@@ -104,6 +104,7 @@ const userSchema = new mongoose.Schema(
       select: false, // private: never returned with user lists / profiles
     },
     // Talkies Pay PIN (6 digits, stored only as a bcrypt hash) that authorises every payment
+    payPhone: { type: String, select: false }, // mobile number that gets payment text messages
     payPinHash: { type: String, select: false },
     payPinFails: { type: Number, default: 0, select: false },
     payPinLockedUntil: { type: Date, select: false },
