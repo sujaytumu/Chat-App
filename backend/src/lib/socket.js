@@ -622,7 +622,11 @@ io.on("connection", (socket) => {
     // Hang-up for a call that is not the current one (late / repeated): ignore it.
     if (isStaleSignal(userId, toUserId, callId)) return;
     const id = cur?.callId || callId;
-    const wasRingingForCallee = !!cur && !cur.answered && cur.callerId === userId;
+    const heldForCallee = pendingCalls.get(toUserId);
+    const wasRingingForCallee =
+      (!!cur && !cur.answered && cur.callerId === userId) ||
+      (!!heldForCallee && String(heldForCallee.fromUserId) === userId) ||
+      (!cur && !!callId); // the server forgot the call (restart): still stop the phone ringing
     clearHeldCall(toUserId, userId);
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {

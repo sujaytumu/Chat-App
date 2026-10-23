@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
-import { io, deviceRingingFor } from "../lib/socket.js";
+import { io, deviceRingingFor, declineCallFor } from "../lib/socket.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 import { markDirectDelivered } from "./message.controller.js";
 import { fcmEnabled } from "../lib/fcm.js";
@@ -135,5 +135,23 @@ export const pushStatus = async (req, res) => {
   } catch (e) {
     console.log("Error in pushStatus:", e.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// "Decline" tapped on the incoming-call screen / notification of the Android app while it is closed.
+// Works without a login cookie (the WebView cookie can be missing or expired): the phone's own push
+// token proves who it is, so the caller always stops "Calling…".
+export const deviceDecline = async (req, res) => {
+  try {
+    const { token, callerId, callId } = req.body || {};
+    if (typeof token !== "string" || token.length < 20 || !mongoose.isValidObjectId(callerId)) return res.status(400).json({ ok: false });
+    const user = await User.findOne({ "fcmTokens.token": token }).select("_id").lean();
+    if (!user) return res.status(200).json({ ok: false });
+    const safeCallId = typeof callId === "string" ? callId.replace(/[^A-Za-z0-9-]/g, "").slice(0, 64) : "";
+    declineCallFor(String(user._id), String(callerId), safeCallId || undefined);
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    console.log("Error in deviceDecline:", e.message);
+    res.status(500).json({ ok: false });
   }
 };

@@ -34,7 +34,7 @@ public class CallActionReceiver extends BroadcastReceiver {
             // "comes back" when the app is opened. Try up to 3 times if the first request fails.
             try {
                 for (int attempt = 0; attempt < 3; attempt++) {
-                    if (sendDecline(callerId, callId)) break;
+                    if (sendDeviceDecline(context, callerId, callId) || sendDecline(callerId, callId)) break;
                     try {
                         Thread.sleep(1200);
                     } catch (InterruptedException ignored) {
@@ -45,6 +45,33 @@ public class CallActionReceiver extends BroadcastReceiver {
                 pending.finish();
             }
         }).start();
+    }
+
+    /** Decline proven by this phone's push token: works with no login cookie, even long after the app was used. */
+    private static boolean sendDeviceDecline(Context ctx, String callerId, String callId) {
+        HttpURLConnection c = null;
+        try {
+            String token = ctx.getSharedPreferences("talkies_push", Context.MODE_PRIVATE).getString("token", "");
+            if (token == null || token.isEmpty()) return false;
+            c = (HttpURLConnection) new URL(NotificationHelper.SITE + "/api/push/device-decline").openConnection();
+            c.setRequestMethod("POST");
+            c.setConnectTimeout(5000);
+            c.setReadTimeout(5000);
+            c.setDoOutput(true);
+            c.setRequestProperty("Content-Type", "application/json");
+            String safeCaller = callerId.replaceAll("[^A-Za-z0-9]", "");
+            String safeCall = callId == null ? "" : callId.replaceAll("[^A-Za-z0-9-]", "");
+            byte[] body = ("{\"token\":\"" + token + "\",\"callerId\":\"" + safeCaller + "\",\"callId\":\"" + safeCall + "\"}").getBytes(StandardCharsets.UTF_8);
+            try (OutputStream os = c.getOutputStream()) {
+                os.write(body);
+            }
+            int code = c.getResponseCode();
+            return code >= 200 && code < 300;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (c != null) c.disconnect();
+        }
     }
 
     private static boolean sendDecline(String callerId, String callId) {

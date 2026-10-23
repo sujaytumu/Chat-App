@@ -139,22 +139,31 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                HttpURLConnection c = null;
-                try {
-                    c = (HttpURLConnection) new URL("https://chat-app-jjcg.onrender.com/api/push/device-ringing").openConnection();
-                    c.setRequestMethod("POST");
-                    c.setConnectTimeout(8000);
-                    c.setReadTimeout(8000);
-                    c.setDoOutput(true);
-                    c.setRequestProperty("Content-Type", "application/json");
-                    byte[] body = ("{\"token\":\"" + token + "\",\"callerId\":\"" + safeCaller + "\",\"callId\":\"" + safeCall + "\"}").getBytes("UTF-8");
-                    OutputStream os = c.getOutputStream();
-                    os.write(body);
-                    os.close();
-                    c.getResponseCode();
-                } catch (Exception ignored) {
-                } finally {
-                    if (c != null) c.disconnect();
+                // The caller's screen says "Calling…" until this arrives: retry, the server may be waking up.
+                for (int attempt = 0; attempt < 4; attempt++) {
+                    HttpURLConnection c = null;
+                    try {
+                        c = (HttpURLConnection) new URL("https://chat-app-jjcg.onrender.com/api/push/device-ringing").openConnection();
+                        c.setRequestMethod("POST");
+                        c.setConnectTimeout(6000);
+                        c.setReadTimeout(6000);
+                        c.setDoOutput(true);
+                        c.setRequestProperty("Content-Type", "application/json");
+                        byte[] body = ("{\"token\":\"" + token + "\",\"callerId\":\"" + safeCaller + "\",\"callId\":\"" + safeCall + "\"}").getBytes("UTF-8");
+                        OutputStream os = c.getOutputStream();
+                        os.write(body);
+                        os.close();
+                        int code = c.getResponseCode();
+                        if (code >= 200 && code < 300) return;
+                    } catch (Exception ignored) {
+                    } finally {
+                        if (c != null) c.disconnect();
+                    }
+                    try {
+                        Thread.sleep(1500L * (attempt + 1));
+                    } catch (InterruptedException e) {
+                        return;
+                    }
                 }
             }
         }).start();

@@ -131,7 +131,14 @@ export async function sendFcmToUser(user, payload) {
     await Promise.all(
       user.fcmTokens.map(async ({ token }) => {
         try {
-          const r = await sendOne(token, payload, isCall);
+          let r = await sendOne(token, payload, isCall).catch((e) => "error:" + e.message);
+          // A ring that fails to leave the server is a call that never rings: retry quickly (token
+          // refresh, a cold network, a 5xx from Google) while it is still worth ringing.
+          for (let attempt = 1; attempt <= 3 && isCall && r !== "ok" && !["UNREGISTERED", "INVALID_ARGUMENT", "NOT_FOUND"].includes(r); attempt++) {
+            cached = { token: null, exp: 0 };
+            await new Promise((ok) => setTimeout(ok, 400 * attempt));
+            r = await sendOne(token, payload, isCall).catch((e) => "error:" + e.message);
+          }
           if (r === "UNREGISTERED" || r === "INVALID_ARGUMENT" || r === "NOT_FOUND") dead.push(token);
           else if (r !== "ok") console.log("FCM send:", r);
         } catch (e) {

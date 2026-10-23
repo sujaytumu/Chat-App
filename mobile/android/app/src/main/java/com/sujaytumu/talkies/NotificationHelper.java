@@ -372,6 +372,55 @@ final class NotificationHelper {
 
     /** Full-screen incoming call (caller photo, ringtone, Answer / Decline). */
     static void showIncomingCall(Context ctx, String name, String body, String tag, String callerId, String photoUrl, String callId) {
+        try {
+            showIncomingCallFull(ctx, name, body, tag, callerId, photoUrl, callId);
+        } catch (Throwable t) {
+            // Whatever went wrong while building the fancy call card (photo, CallStyle, an OEM quirk ...),
+            // the phone must STILL ring: plain high-priority notification + the app's own ringer.
+            try {
+                showIncomingCallPlain(ctx, name, body, tag, callerId, callId);
+            } catch (Throwable ignored) {
+            }
+            try {
+                CallRinger.start(ctx, tag);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private static void showIncomingCallPlain(Context ctx, String name, String body, String tag, String callerId, String callId) {
+        if (wasCancelled(callId)) return;
+        appCtx = ctx.getApplicationContext();
+        synchronized (RINGING) {
+            RINGING.put(tag == null ? "" : tag, callId == null ? "" : callId);
+        }
+        ensureChannels(ctx);
+        int id = idFor(tag);
+        Intent screen = new Intent(ctx, IncomingCallActivity.class);
+        screen.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_NO_USER_ACTION);
+        screen.putExtra(IncomingCallActivity.EXTRA_NAME, name);
+        screen.putExtra(IncomingCallActivity.EXTRA_BODY, body);
+        screen.putExtra(IncomingCallActivity.EXTRA_TAG, tag);
+        screen.putExtra(IncomingCallActivity.EXTRA_CALLER, callerId);
+        screen.putExtra(IncomingCallActivity.EXTRA_CALL_ID, callId == null ? "" : callId);
+        screen.putExtra(IncomingCallActivity.EXTRA_STARTED, System.currentTimeMillis());
+        screen.setData(Uri.parse("talkies://call/" + id));
+        PendingIntent fullScreen = PendingIntent.getActivity(ctx, id + 3, screen, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, callChannelId(ctx))
+                .setSmallIcon(R.drawable.ic_stat_talkies)
+                .setContentTitle(name)
+                .setContentText(body)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setOngoing(true)
+                .setTimeoutAfter(CALL_RING_MS)
+                .setContentIntent(fullScreen)
+                .setFullScreenIntent(fullScreen, true);
+        notifySafe(ctx, id, b.build());
+    }
+
+    private static void showIncomingCallFull(Context ctx, String name, String body, String tag, String callerId, String photoUrl, String callId) {
         // This call was already cancelled / ended before its ring reached the phone (it was offline,
         // then came back): stay silent, exactly like a real call that was hung up.
         if (wasCancelled(callId)) return;
