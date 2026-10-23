@@ -164,6 +164,17 @@ export const cancelPayment = async (req, res) => {
   }
 };
 
+// Where does one of my payments stand? (The app asks this when you come back from a bank page opened elsewhere.)
+export const paymentStatus = async (req, res) => {
+  try {
+    const p = await Payment.findOne({ orderId: String(req.params.orderId || ""), fromUserId: req.user._id }).select("status").lean();
+    res.set("Cache-Control", "no-store");
+    res.json({ status: p?.status || "none" });
+  } catch {
+    res.json({ status: "none" });
+  }
+};
+
 // Everything I sent or received that went through.
 export const paymentHistory = async (req, res) => {
   try {

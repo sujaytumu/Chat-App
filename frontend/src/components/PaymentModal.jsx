@@ -79,6 +79,38 @@ const PaymentModal = ({ user, onClose, onDone }) => {
           }
         },
       });
+      // Redirect mode: the payment page may open outside the app. When the person switches back to Talkies (or every few
+      // seconds), ask the server how it went and carry on right here: no need for the browser's "back" button.
+      if (inApp) {
+        let done = false;
+        const check = async () => {
+          if (done) return;
+          try {
+            const { data } = await axiosInstance.get(`/payments/status/${order.orderId}`);
+            if (data.status === "paid") {
+              done = true;
+              cleanup();
+              try { rzp.close(); } catch { /* already closed */ }
+              toast.success("Payment sent ✅", { duration: 5000 });
+              onDone?.();
+              onClose();
+            } else if (data.status === "failed") {
+              done = true;
+              cleanup();
+              toast.error("Payment could not be completed");
+              setBusy(false);
+            }
+          } catch { /* try again */ }
+        };
+        const onVis = () => document.visibilityState === "visible" && check();
+        const timer = setInterval(check, 3000);
+        document.addEventListener("visibilitychange", onVis);
+        var cleanup = () => {
+          clearInterval(timer);
+          document.removeEventListener("visibilitychange", onVis);
+        };
+        setTimeout(() => !done && cleanup(), 15 * 60 * 1000);
+      }
       rzp.on("payment.failed", (resp) => {
         toast.error(resp?.error?.description || "Payment failed");
         axiosInstance.post("/payments/cancel", { orderId: order.orderId, error: resp?.error }).catch(() => {});
