@@ -41,8 +41,11 @@ const PaymentModal = ({ user, onClose, onDone }) => {
         currency: order.currency,
         name: "Talkies",
         description: `Pay ${user.fullName}${note.trim() ? ` · ${note.trim()}` : ""}`,
-        prefill: { name: authUser?.fullName || "" },
-        method: { card: true, upi: true, netbanking: true, wallet: false, emi: false, paylater: false }, // test payments: cards, UPI and net banking only
+        // No phone / saved bank is passed in: Razorpay's test mode only accepts its TEST card and bank pages, so a real
+        // saved account (or a real UPI app) would always fail with "Payment could not be completed".
+        prefill: { name: authUser?.fullName || "", contact: "", email: "" },
+        remember_customer: false,
+        method: { card: true, upi: false, netbanking: true, wallet: false, emi: false, paylater: false }, // test payments: test card or the test bank page
         theme: { color: "#25D366" },
         modal: {
           ondismiss: () => {
@@ -133,7 +136,8 @@ const PaymentModal = ({ user, onClose, onDone }) => {
             />
             {cfg?.test && (
               <p className="mt-3 rounded-xl bg-[#E8A33D]/15 text-[#E8A33D] px-3 py-2 text-[12px] leading-snug">
-                Test mode only: no real money moves. Indian test cards: Visa <b>4386 2894 0766 0153</b> or Mastercard <b>5267 3181 8797 5449</b> (any future date, any CVV). Or UPI <b>success@razorpay</b>. On a bank page, tap <b>Success</b>.
+                Test mode only: no real money moves, and your real card, UPI or bank will NOT work. Choose <b>Cards</b> and use Mastercard <b>5267 3181 8797 5449</b> (any future date, any CVV, any name). On the bank/OTP page tap <b>Success</b>.
+                <button type="button" onClick={() => { try { navigator.clipboard?.writeText("5267318187975449"); toast.success("Test card number copied"); } catch { /* ignore */ } }} className="ml-1 underline font-medium">Copy card number</button>
               </p>
             )}
             <button onClick={pay} disabled={!valid || busy || !cfg} className="mt-4 w-full h-12 rounded-full bg-[#25D366] text-[#0B141A] font-semibold flex items-center justify-center gap-2 disabled:opacity-40">
