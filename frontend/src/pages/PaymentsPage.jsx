@@ -115,7 +115,7 @@ const PaymentsPage = () => {
       )}
       {cfg?.enabled && cfg.test && (
         <p className="mx-4 mt-2 rounded-2xl bg-[#E8A33D]/15 text-[#E8A33D] px-4 py-3 text-[12.5px] leading-snug">
-          Test mode: no real money moves. Use card 4111 1111 1111 1111 (any future date, any CVV) or UPI <b>success@razorpay</b>.
+          Test mode: no real money moves. You'll set a 6-digit PIN for payments. Choose <b>Cards</b> and use Mastercard <b>5267 3181 8797 5449</b> (any future date, any CVV).
         </p>
       )}
 

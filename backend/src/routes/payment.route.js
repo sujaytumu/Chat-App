@@ -1,6 +1,6 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
-import { paymentConfig, createPaymentOrder, verifyPayment, paymentCallback, paymentStatus, cancelPayment, paymentHistory } from "../controllers/payment.controller.js";
+import { paymentConfig, createPaymentOrder, verifyPayment, paymentCallback, paymentStatus, cancelPayment, paymentHistory, pinStatus, setPin } from "../controllers/payment.controller.js";
 
 const router = express.Router();
 
@@ -8,6 +8,8 @@ const router = express.Router();
 router.post("/callback", express.urlencoded({ extended: true, limit: "50kb" }), paymentCallback);
 router.get("/config", protectRoute, paymentConfig);
 router.get("/", protectRoute, paymentHistory);
+router.get("/pin", protectRoute, pinStatus);
+router.post("/pin", protectRoute, setPin);
 router.post("/order", protectRoute, createPaymentOrder);
 router.get("/status/:orderId", protectRoute, paymentStatus);
 router.post("/verify", protectRoute, verifyPayment);
