@@ -24,6 +24,7 @@ public class CallActionReceiver extends BroadcastReceiver {
             NotificationManagerCompat.from(context).cancel(notifId);
         } catch (Exception ignored) {
         }
+        CallRinger.stop();
         IncomingCallActivity.dismiss(null); // close the full-screen call screen if it is open
         if (callerId == null || callerId.isEmpty()) return;
 

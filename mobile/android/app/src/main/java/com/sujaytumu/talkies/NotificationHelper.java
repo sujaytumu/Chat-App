@@ -173,6 +173,43 @@ final class NotificationHelper {
         }
     }
 
+    private static volatile Context appCtx;
+
+    static Context appContext() {
+        return appCtx;
+    }
+
+    /** The tone the app rings itself with (fallback ringer); null when the person chose silent. */
+    static Uri ringToneUri(Context ctx) {
+        String mode = toneMode(ctx);
+        if ("silent".equals(mode)) return null;
+        if ("custom".equals(mode)) {
+            Uri u = customToneUri(ctx);
+            if (u != null) return u;
+        }
+        return Uri.parse("android.resource://" + ctx.getPackageName() + "/" + R.raw.talkies_ring);
+    }
+
+    /**
+     * Will the system itself ring for the call notification? False when the call channel was muted or
+     * downgraded (by the user, the battery manager, an OEM ...) or its sound is gone.
+     */
+    private static boolean systemWillRing(Context ctx) {
+        try {
+            if ("silent".equals(toneMode(ctx))) return true; // nothing to ring, by choice
+            if (Build.VERSION.SDK_INT < 26) return true;
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return false;
+            NotificationChannel ch = nm.getNotificationChannel(callChannelId(ctx));
+            if (ch == null) return false;
+            if (ch.getImportance() < NotificationManager.IMPORTANCE_HIGH) return false;
+            if (ch.getSound() == null) return false;
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /** Id of the notification channel that carries the currently chosen call tone. */
     static String callChannelId(Context ctx) {
         String mode = toneMode(ctx);
@@ -338,11 +375,18 @@ final class NotificationHelper {
         // This call was already cancelled / ended before its ring reached the phone (it was offline,
         // then came back): stay silent, exactly like a real call that was hung up.
         if (wasCancelled(callId)) return;
+        appCtx = ctx.getApplicationContext();
         synchronized (RINGING) {
             RINGING.put(tag == null ? "" : tag, callId == null ? "" : callId);
         }
         ensureChannels(ctx);
         int id = idFor(tag);
+        // A left-over notification with the same id (earlier call, missed-call card ...) would turn this
+        // new call into a quiet in-place update with no sound. Remove it first so it always alerts.
+        try {
+            NotificationManagerCompat.from(ctx).cancel(id);
+        } catch (Exception ignored) {
+        }
         // Ring FIRST: downloading the photo here used to delay the ring by up to ~12 s on a slow
         // network (FCM only gives the service ~10 s). The call screen loads the photo by itself.
         Bitmap photo = cachedPhoto(ctx, callerId);
@@ -403,6 +447,30 @@ final class NotificationHelper {
         Notification n = b.build();
         n.flags |= Notification.FLAG_INSISTENT; // keep ringing until answered / declined / cancelled
         notifySafe(ctx, id, n);
+
+        // Safety net: if the system won't ring this notification, the app rings itself.
+        boolean sysRing = systemWillRing(ctx);
+        if (!sysRing) {
+            CallRinger.start(ctx, tag);
+        } else {
+            // Double check shortly after: the post may have been swallowed (rate limit / cooldown).
+            final Context c2 = ctx.getApplicationContext();
+            final String t2 = tag == null ? "" : tag;
+            final int id2 = id;
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    boolean stillRinging;
+                    synchronized (RINGING) {
+                        stillRinging = RINGING.containsKey(t2);
+                    }
+                    if (stillRinging && !callNotificationShown(c2, id2)) {
+                        // call is live but its notification is gone / was never shown: ring ourselves
+                        CallRinger.start(c2, t2);
+                    }
+                }
+            }, 1200);
+        }
     }
 
     /** True while this phone is ringing for a call (the page asks, to avoid ringing a second time itself). */
@@ -444,6 +512,7 @@ final class NotificationHelper {
         synchronized (RINGING) {
             RINGING.remove(key);
         }
+        CallRinger.stopFor(key);
         // A cancel names a specific call. If what is on screen under this tag is no longer that ringing
         // call (e.g. the "Missed call" notification already replaced it), leave it alone.
         if (callId != null && !callId.isEmpty() && !callNotificationShown(ctx, idFor(tag))) return;
@@ -480,6 +549,7 @@ final class NotificationHelper {
             synchronized (RINGING) {
                 RINGING.remove(tag == null ? "" : tag);
             }
+            CallRinger.stopFor(tag);
             IncomingCallActivity.dismiss(tag);
         }
         ensureChannels(ctx);
