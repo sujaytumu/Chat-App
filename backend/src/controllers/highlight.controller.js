@@ -17,6 +17,15 @@ const canSee = (item, viewerId) => {
   return a.mode === "only" ? listed : !listed;
 };
 
+// The highlight's own audience, from the client: { mode, users } -> clean value (or null if it isn't one)
+const cleanAudience = (a, myId) => {
+  if (!a || !["all", "except", "only"].includes(a.mode)) return null;
+  if (a.mode === "all") return { mode: "all", users: [] };
+  const users = [...new Set((Array.isArray(a.users) ? a.users : []).map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(myId)).slice(0, 1000);
+  if (a.mode === "only" && !users.length) return null;
+  return { mode: a.mode, users };
+};
+
 const cleanTitle = (t) => (typeof t === "string" ? t.trim().slice(0, MAX_TITLE) : "");
 
 const toItem = (s) => ({
@@ -44,8 +53,9 @@ const ids = (arr) => [...new Set((Array.isArray(arr) ? arr : []).map(String))].f
 // `createdAt` mirrors the original post time so the status viewer can show it unchanged.
 const present = (h, viewerId) => {
   const mine = String(h.userId?._id || h.userId) === String(viewerId);
+  const blocked = !mine && !canSee(h, viewerId); // the owner kept this whole highlight from this person
   const items = h.items
-    .filter((it) => mine || canSee(it, viewerId))
+    .filter((it) => mine || (!blocked && canSee(it, viewerId)))
     .map((it) => {
       const o = it.toObject ? it.toObject() : { ...it };
       o.createdAt = o.postedAt;
@@ -59,7 +69,15 @@ const present = (h, viewerId) => {
       }
       return o;
     });
-  return { _id: h._id, title: h.title, cover: h.cover || "", updatedAt: h.updatedAt, user: h.userId?._id ? h.userId : undefined, items };
+  return {
+    _id: h._id,
+    title: h.title,
+    cover: h.cover || "",
+    updatedAt: h.updatedAt,
+    user: h.userId?._id ? h.userId : undefined,
+    items,
+    ...(mine ? { audience: { mode: h.audience?.mode || "all", users: (h.audience?.users || []).map(String) } } : {}),
+  };
 };
 
 // Highlights of one person
@@ -117,7 +135,8 @@ export const createHighlight = async (req, res) => {
     }
     const found = await Status.find({ _id: { $in: statusIds }, userId: myId }).sort({ createdAt: 1 });
     if (!found.length) return res.status(404).json({ error: "Those statuses are no longer available" });
-    const h = await Highlight.create({ userId: myId, title, items: found.map(toItem) });
+    const audience = cleanAudience(req.body?.audience, myId);
+    const h = await Highlight.create({ userId: myId, title, items: found.map(toItem), ...(audience ? { audience } : {}) });
     res.status(201).json(present(h, myId));
   } catch (error) {
     console.log("Error in createHighlight controller:", error.message);
@@ -134,6 +153,11 @@ export const updateHighlight = async (req, res) => {
     if (!h) return res.status(404).json({ error: "Highlight not found" });
 
     const { title, cover, addStatusIds, removeItemIds } = req.body || {};
+    if (req.body?.audience !== undefined) {
+      const audience = cleanAudience(req.body.audience, myId);
+      if (!audience) return res.status(400).json({ error: "Pick at least one person to share with" });
+      h.audience = audience;
+    }
     if (title !== undefined) {
       const t = cleanTitle(title);
       if (!t) return res.status(400).json({ error: "Give the highlight a name" });
@@ -187,10 +211,10 @@ export const deleteHighlight = async (req, res) => {
 const findItem = async (req) => {
   const { id, itemId } = req.params;
   if (!mongoose.isValidObjectId(id) || !mongoose.isValidObjectId(itemId)) return null;
-  const h = await Highlight.findById(id).select("userId items._id items.audience");
+  const h = await Highlight.findById(id).select("userId audience items._id items.audience");
   const item = h?.items.id(itemId);
   if (!h || !item) return null;
-  if (String(h.userId) !== String(req.user._id) && !canSee(item, req.user._id)) return null;
+  if (String(h.userId) !== String(req.user._id) && (!canSee(h, req.user._id) || !canSee(item, req.user._id))) return null;
   return { h, item };
 };
 

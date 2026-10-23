@@ -32,6 +32,11 @@ const highlightSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true, maxlength: 20 },
     // Optional chosen cover picture (URL). Without it the app uses the first picture / colour.
     cover: { type: String, default: "" },
+    // Who can see this whole highlight (on top of each update's own audience): everyone, everyone except…, only…
+    audience: {
+      mode: { type: String, enum: ["all", "except", "only"], default: "all" },
+      users: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    },
     items: { type: [itemSchema], default: [] },
   },
   { timestamps: true }

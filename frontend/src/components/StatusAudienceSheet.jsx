@@ -34,7 +34,7 @@ const Radio = ({ on }) => (
   </span>
 );
 
-const StatusAudienceSheet = ({ value, onClose, onSave }) => {
+const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
   useBackToClose(true, onClose);
   const users = useChatStore((s) => s.users);
   const [mode, setMode] = useState(value.mode);
@@ -73,7 +73,7 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
     return (
       <div className="absolute inset-0 z-[70] bg-[#0B141A] flex flex-col text-white">
         <div className="px-4 pt-4 pb-2">
-          <p className="text-[18px]">{mode === "except" ? "Hide status from…" : mode === "close" ? "Close friends" : "Share status with…"}</p>
+          <p className="text-[18px]">{mode === "except" ? `Hide ${noun} from…` : mode === "close" ? "Close friends" : `Share ${noun} with…`}</p>
           <p className="text-[12.5px] text-[#8E9AA2]">{picked.size} selected</p>
         </div>
         <div className="mx-3.5 mb-2 flex items-center gap-3 h-[42px] rounded-full bg-[#171C20] px-4">
@@ -122,8 +122,8 @@ const StatusAudienceSheet = ({ value, onClose, onSave }) => {
   return (
     <div className="absolute inset-0 z-[70] flex flex-col justify-end bg-black/60" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="rounded-t-[22px] bg-[#1D1F1F] text-white pb-[calc(12px+env(safe-area-inset-bottom))]">
-        <p className="px-5 pt-5 pb-1 text-[18px]">Status privacy</p>
-        <p className="px-5 pb-2 text-[12.5px] text-[#8E9AA2]">Who can see my status updates</p>
+        <p className="px-5 pt-5 pb-1 text-[18px]">{noun === "status" ? "Status privacy" : "Highlight privacy"}</p>
+        <p className="px-5 pb-2 text-[12.5px] text-[#8E9AA2]">{noun === "status" ? "Who can see my status updates" : "Who can see this highlight"}</p>
         {rows.map(([m, label]) => (
           <button key={m} onClick={() => choose(m)} className="w-full flex items-center gap-4 px-5 py-3.5 text-left active:bg-white/5">
             <Radio on={m === "close" ? !!value.close : m === "only" ? value.mode === "only" && !value.close : value.mode === m} />
