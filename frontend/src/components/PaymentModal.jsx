@@ -34,6 +34,7 @@ const PaymentModal = ({ user, onClose, onDone }) => {
     try {
       const [Razorpay, res] = await Promise.all([loadRazorpay(), axiosInstance.post("/payments/order", { toUserId: user._id, amount: value, note })]);
       order = res.data;
+      const inApp = !!window.Capacitor?.isNativePlatform?.() || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
       const rzp = new Razorpay({
         key: order.keyId,
         order_id: order.orderId,
@@ -47,6 +48,11 @@ const PaymentModal = ({ user, onClose, onDone }) => {
         remember_customer: false,
         method: { card: true, upi: false, netbanking: true, wallet: false, emi: false, paylater: false }, // test payments: test card or the test bank page
         theme: { color: "#25D366" },
+        // Inside the Android app (and phone browsers) bank / OTP pages can't open in a pop-up and show a blank page,
+        // so there the whole screen goes to Razorpay and comes back to the app when finished.
+        ...(inApp
+          ? { redirect: true, callback_url: `${window.location.origin}/api/payments/callback`, cancel_url: `${window.location.origin}/settings/payments?pay=cancelled` }
+          : {}),
         modal: {
           ondismiss: () => {
             axiosInstance.post("/payments/cancel", { orderId: order.orderId }).catch(() => {});

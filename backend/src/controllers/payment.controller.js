@@ -45,59 +45,93 @@ export const createPaymentOrder = async (req, res) => {
   }
 };
 
-// Step 2: after the Razorpay window closes successfully the browser hands back three values.
+// Checks a finished payment and records it. Used by both ways Razorpay can hand a result back:
+//  - the checkout window's JS callback (/verify, signed-in person), and
+//  - a redirect back to the site (/callback) used inside the Android app, where bank pages can't open in a pop-up.
 // Nothing is trusted until the signature checks out AND Razorpay itself confirms the amount.
+async function finalizePayment({ orderId, paymentId, signature, payerId }) {
+  const pay = await Payment.findOne({ orderId: String(orderId || ""), ...(payerId ? { fromUserId: payerId } : {}) });
+  if (!pay) return { status: 404, error: "Payment not found" };
+  if (pay.status === "paid") {
+    const message = pay.messageId ? await Message.findById(pay.messageId) : null;
+    return { status: 200, message };
+  }
+  if (!signatureValid(orderId, paymentId, signature)) {
+    pay.status = "failed";
+    await pay.save();
+    return { status: 400, error: "Payment couldn't be verified" };
+  }
+  const info = await fetchPayment(paymentId);
+  if (info.order_id !== pay.orderId || Number(info.amount) !== pay.amount || !["captured", "authorized"].includes(info.status)) {
+    pay.status = "failed";
+    await pay.save();
+    return { status: 400, error: "Payment wasn't completed" };
+  }
+
+  const me = pay.fromUserId;
+  const payer = await User.findById(me).select("fullName profilePic").lean();
+  pay.status = "paid";
+  pay.paymentId = paymentId;
+  pay.paidAt = new Date();
+  const message = new Message({
+    senderId: me,
+    receiverId: pay.toUserId,
+    text: `💸 Paid ₹${rupees(pay.amount)}`,
+    payment: { amount: pay.amount, currency: pay.currency, note: pay.note, status: "paid", paymentId, test: pay.test },
+  });
+  await message.save();
+  pay.messageId = message._id;
+  await pay.save();
+
+  forgetPair(me, pay.toUserId);
+  rememberMessage(message);
+  for (const uid of [String(pay.toUserId), String(me)]) {
+    const socketId = getReceiverSocketId(uid);
+    if (socketId) io.to(socketId).emit("newMessage", message);
+  }
+  sendPushToUser(pay.toUserId, {
+    title: payer?.fullName || "Talkies",
+    body: `💸 Sent you ₹${rupees(pay.amount)}${pay.test ? " (test)" : ""}`,
+    icon: payer?.profilePic || "/icon-v2-192.png",
+    tag: `dm-${me}`,
+    data: { url: "/", chatType: "direct", chatId: String(me), messageId: String(message._id) },
+  }, {}, `d:${me}`);
+  return { status: 201, message };
+}
+
 export const verifyPayment = async (req, res) => {
   try {
     if (!razorpayEnabled()) return res.status(503).json({ error: "Payments aren't set up on the server yet" });
-    const me = req.user._id;
     const { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature } = req.body || {};
-    const pay = await Payment.findOne({ orderId: String(orderId || ""), fromUserId: me });
-    if (!pay) return res.status(404).json({ error: "Payment not found" });
-    if (pay.status === "paid") {
-      const message = pay.messageId ? await Message.findById(pay.messageId) : null;
-      return res.json({ ok: true, message });
-    }
-    if (!signatureValid(orderId, paymentId, signature)) {
-      pay.status = "failed";
-      await pay.save();
-      return res.status(400).json({ error: "Payment couldn't be verified" });
-    }
-    const info = await fetchPayment(paymentId);
-    if (info.order_id !== pay.orderId || Number(info.amount) !== pay.amount || !["captured", "authorized"].includes(info.status)) {
-      pay.status = "failed";
-      await pay.save();
-      return res.status(400).json({ error: "Payment wasn't completed" });
-    }
-
-    pay.status = "paid";
-    pay.paymentId = paymentId;
-    pay.paidAt = new Date();
-    const message = new Message({
-      senderId: me,
-      receiverId: pay.toUserId,
-      text: `💸 Paid ₹${rupees(pay.amount)}`,
-      payment: { amount: pay.amount, currency: pay.currency, note: pay.note, status: "paid", paymentId, test: pay.test },
-    });
-    await message.save();
-    pay.messageId = message._id;
-    await pay.save();
-
-    forgetPair(me, pay.toUserId);
-    rememberMessage(message);
-    const socketId = getReceiverSocketId(String(pay.toUserId));
-    if (socketId) io.to(socketId).emit("newMessage", message);
-    sendPushToUser(pay.toUserId, {
-      title: req.user.fullName,
-      body: `💸 Sent you ₹${rupees(pay.amount)}${pay.test ? " (test)" : ""}`,
-      icon: req.user.profilePic || "/icon-v2-192.png",
-      tag: `dm-${me}`,
-      data: { url: "/", chatType: "direct", chatId: String(me), messageId: String(message._id) },
-    }, {}, `d:${me}`);
-    res.status(201).json({ ok: true, message });
+    const r = await finalizePayment({ orderId, paymentId, signature, payerId: req.user._id });
+    if (r.error) return res.status(r.status).json({ error: r.error });
+    res.status(r.status).json({ ok: true, message: r.message });
   } catch (error) {
     console.log("Error in verifyPayment:", error.message);
     res.status(500).json({ error: "Couldn't confirm the payment" });
+  }
+};
+
+// Razorpay sends the person's browser back here (a form POST) when checkout runs in redirect mode (the Android app).
+// The signature is the proof, so no sign-in is needed; then the person is sent back into the app.
+export const paymentCallback = async (req, res) => {
+  const back = (q) => res.redirect(303, `/settings/payments?${new URLSearchParams(q).toString()}`);
+  try {
+    const b = req.body || {};
+    if (b.razorpay_payment_id && b.razorpay_signature) {
+      const r = await finalizePayment({ orderId: b.razorpay_order_id, paymentId: b.razorpay_payment_id, signature: b.razorpay_signature });
+      return r.error ? back({ pay: "failed", reason: r.error }) : back({ pay: "ok" });
+    }
+    // a failed / cancelled payment: Razorpay sends error[...] fields
+    const err = b.error || {};
+    const desc = String(err.description || b["error[description]"] || "Payment could not be completed").slice(0, 200);
+    const orderId = String(err?.metadata?.order_id || b["error[metadata][order_id]"] || b.order_id || "");
+    console.log("Payment failed at Razorpay (redirect):", [err.code || b["error[code]"], desc, err.reason || b["error[reason]"], err.source || b["error[source]"], err.step || b["error[step]"]].filter(Boolean).join(" | ").slice(0, 300));
+    if (orderId) await Payment.updateOne({ orderId, status: "created" }, { $set: { status: "failed", failure: desc } });
+    return back({ pay: "failed", reason: desc });
+  } catch (error) {
+    console.log("Error in paymentCallback:", error.message);
+    return back({ pay: "failed", reason: "Couldn't confirm the payment" });
   }
 };
 

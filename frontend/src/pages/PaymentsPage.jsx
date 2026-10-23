@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import toast from "react-hot-toast";
 import { createPortal } from "react-dom";
 import { Loader2, ArrowUpRight, ArrowDownLeft, IndianRupee, Search, X, ShieldCheck } from "lucide-react";
 import SettingsShell from "../components/SettingsShell";
@@ -61,6 +62,16 @@ const PaymentsPage = () => {
 
   const load = useCallback(() => {
     axiosInstance.get("/payments").then((r) => setRows(Array.isArray(r.data) ? r.data : [])).catch(() => setRows([]));
+  }, []);
+  // Back from Razorpay's full-screen checkout (the Android app): say how it went, then tidy the address
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const r = q.get("pay");
+    if (!r) return;
+    if (r === "ok") toast.success("Payment sent ✅", { duration: 5000 });
+    else if (r === "cancelled") toast("Payment cancelled");
+    else toast.error(q.get("reason") || "Payment could not be completed", { duration: 7000 });
+    window.history.replaceState({}, "", window.location.pathname);
   }, []);
   useEffect(() => {
     load();
