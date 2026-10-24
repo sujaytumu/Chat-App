@@ -39,3 +39,14 @@ export function parseLocationMessage(text) {
   if (!match) return null;
   return { title: match[1], lat: match[2], lng: match[3], url: `https://www.google.com/maps?q=${match[2]},${match[3]}` };
 }
+
+// A reel sent into a chat: "🎬 Reel by <name>" then its link on the next line.
+const REEL_REGEX = /^🎬 Reel by ([^\n]{1,80})\n\S*\/reels\?r=([a-f0-9]{24})$/;
+
+export function parseReelMessage(text) {
+  if (!text) return null;
+  const m = text.match(REEL_REGEX);
+  return m ? { by: m[1], id: m[2] } : null;
+}
+
+export const reelMessageText = (reel) => `🎬 Reel by ${(reel.user?.fullName || "Talkies").replace(/\n/g, " ").slice(0, 80)}\n${window.location.origin}/reels?r=${reel._id}`;

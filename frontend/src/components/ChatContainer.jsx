@@ -15,7 +15,8 @@ import MessageContextMenu from "./MessageContextMenu";
 import PinDurationSheet from "./PinDurationSheet";
 import { isPinned } from "../lib/pin";
 import { isDesktopNow } from "./ContextMenu";
-import { emojiOnlyCount, emojiFontSize, parseLocationMessage } from "../lib/messageFormat";
+import { emojiOnlyCount, emojiFontSize, parseLocationMessage, parseReelMessage } from "../lib/messageFormat";
+import ReelCard from "./ReelCard";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
@@ -527,9 +528,10 @@ const ChatContainer = () => {
           }
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
           const location = message.text ? parseLocationMessage(message.text) : null;
+          const reelShare = !location && message.text ? parseReelMessage(message.text) : null;
           // emoji-only text stays in the normal bubble (like WhatsApp), just a bit larger
           const emojiPx =
-            !message.image && !message.file && !location && !message.replyTo && !message.mentions?.length
+            !message.image && !message.file && !location && !reelShare && !message.replyTo && !message.mentions?.length
               ? emojiFontSize(emojiOnlyCount(message.text))
               : null;
           const replyFromMe = message.replyTo?.senderId === authUser._id;
@@ -798,6 +800,8 @@ const ChatContainer = () => {
                     <PollCard message={message} authUserId={authUser._id} onVote={(ids) => votePoll(message._id, ids)} />
                   ) : location ? (
                     <LocationCard location={location} />
+                  ) : reelShare ? (
+                    <ReelCard reel={reelShare} />
                   ) : (
                     message.text && (
                       <>

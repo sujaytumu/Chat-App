@@ -6,6 +6,7 @@ import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import { useAuthStore } from "../store/useAuthStore";
 import StatusComments from "../components/StatusComments";
+import SendReelModal from "../components/SendReelModal";
 
 // Reels: short vertical videos from people you can see — swipe up for the next one, double-tap to like,
 // comments, share, and your own post button. Same privacy rule as chats ("who can see whom").
@@ -213,6 +214,7 @@ const ReelsPage = () => {
   const [muted, setMuted] = useState(false);
   const [commentsFor, setCommentsFor] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [sendFor, setSendFor] = useState(null);
   const box = useRef(null);
   const loadingMore = useRef(false);
 
@@ -278,19 +280,6 @@ const ReelsPage = () => {
     }
   };
 
-  const share = async (reel) => {
-    const link = `${window.location.origin}/reels?r=${reel._id}`;
-    try {
-      if (navigator.share) await navigator.share({ title: `${reel.user?.fullName} on Talkies`, text: reel.caption || "Watch this reel", url: link });
-      else {
-        await navigator.clipboard.writeText(link);
-        toast.success("Reel link copied");
-      }
-    } catch {
-      /* cancelled */
-    }
-  };
-
   const remove = async (reel) => {
     if (!window.confirm("Delete this reel?")) return;
     try {
@@ -326,7 +315,7 @@ const ReelsPage = () => {
       ) : (
         <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
           {reels.map((r) => (
-            <ReelItem key={r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={setCommentsFor} onShare={share} onDelete={remove} />
+            <ReelItem key={r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={setCommentsFor} onShare={setSendFor} onDelete={remove} />
           ))}
         </div>
       )}
@@ -338,6 +327,7 @@ const ReelsPage = () => {
           onTotal={(n) => setReels((l) => l.map((r) => (r._id === commentsFor._id ? { ...r, comments: n } : r)))}
         />
       )}
+      {sendFor && <SendReelModal reel={sendFor} onClose={() => setSendFor(null)} />}
       {creating && (
         <NewReel
           onClose={() => setCreating(false)}
