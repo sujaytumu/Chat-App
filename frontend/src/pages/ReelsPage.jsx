@@ -39,13 +39,15 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   </button>
 );
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost }) => {
+const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
   const [burst, setBurst] = useState(0);
   const [progress, setProgress] = useState(0);
   const [more, setMore] = useState(false);
+  const [scrub, setScrub] = useState(false);
+  const bar = useRef(null);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
 
@@ -85,12 +87,47 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
     const v = e.currentTarget;
     const start = reel.trim?.start || 0;
     const end = reel.trim?.end || v.duration || 0;
-    if (reel.trim && v.currentTime >= end) {
-      v.currentTime = start;
-      if (songEl.current) songEl.current.currentTime = reel.song?.start || 0;
+    if (reel.trim && v.currentTime >= end - 0.05 && !scrub) {
+      finished();
+      return;
     }
     setProgress(end > start ? Math.min(1, Math.max(0, (v.currentTime - start) / (end - start))) : 0);
   };
+
+  // Played to the end: go to the next reel by itself (the last one starts over).
+  const finished = () => {
+    const v = video.current;
+    if (!v || !active) return;
+    if (onNext && onNext(reel._id)) return;
+    v.currentTime = reel.trim?.start || 0;
+    if (songEl.current) songEl.current.currentTime = reel.song?.start || 0;
+    v.play().catch(() => {});
+  };
+
+  // Drag the bar to jump to any moment.
+  const seekTo = (clientX) => {
+    const v = video.current;
+    const r = bar.current?.getBoundingClientRect();
+    if (!v || !r) return;
+    const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
+    const start = reel.trim?.start || 0;
+    const end = reel.trim?.end || v.duration || 0;
+    if (!(end > start)) return;
+    const t = start + f * (end - start);
+    v.currentTime = Math.min(t, Math.max(start, end - 0.1));
+    if (songEl.current && reel.song) songEl.current.currentTime = (reel.song.start || 0) + (t - start);
+    setProgress(f);
+  };
+  const scrubDown = (e) => {
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setScrub(true);
+    seekTo(e.clientX);
+  };
+  const scrubMove = (e) => {
+    if (scrub) seekTo(e.clientX);
+  };
+  const scrubUp = () => setScrub(false);
 
   const tap = () => {
     const now = Date.now();
@@ -123,10 +160,10 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         ref={video}
         src={reel.videoUrl}
         poster={reel.poster}
-        loop
         playsInline
         preload={active ? "auto" : "metadata"}
         onTimeUpdate={onTime}
+        onEnded={finished}
         onLoadedMetadata={(e) => { if (reel.trim?.start) e.currentTarget.currentTime = reel.trim.start; }}
         style={{ filter: filterCss(reel.filter) }}
         className="absolute inset-0 w-full h-full object-contain"
@@ -183,8 +220,18 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
           </p>
         )}
       </div>
-      <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25 z-10">
-        <div className="h-full bg-white" style={{ width: `${progress * 100}%` }} />
+      <div
+        className="absolute inset-x-0 bottom-0 h-7 z-20 flex items-end touch-none"
+        onPointerDown={scrubDown}
+        onPointerMove={scrubMove}
+        onPointerUp={scrubUp}
+        onPointerCancel={scrubUp}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div ref={bar} className={`relative w-full bg-white/25 transition-[height] ${scrub ? "h-[7px]" : "h-[3px]"}`}>
+          <div className="h-full bg-white" style={{ width: `${progress * 100}%` }} />
+          {scrub && <span className="absolute top-1/2 size-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow" style={{ left: `${progress * 100}%` }} />}
+        </div>
       </div>
     </section>
   );
@@ -438,6 +485,16 @@ const ReelsPage = () => {
     if (i >= reels.length - 3 && reels.length) load(false);
   }, [activeId, reels, more, load, tab]);
 
+  // Called when a reel finishes: slide to the next one. Returns false on the last reel so it can replay.
+  const goNext = useCallback((id) => {
+    const root = box.current;
+    const cur = root?.querySelector(`[data-reel="${id}"]`);
+    const next = cur?.nextElementSibling;
+    if (!next || !next.hasAttribute("data-reel")) return false;
+    next.scrollIntoView({ behavior: "smooth", block: "start" });
+    return true;
+  }, []);
+
   const patch = (id, fn) => setReels((l) => l.map((r) => (r._id === id ? { ...r, ...fn(r) } : r)));
 
   // A Discover clip becomes a real reel the first time you interact with it (like / comment / save / send / repost).
@@ -606,7 +663,7 @@ const ReelsPage = () => {
         ) : (
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
             {reels.map((r) => (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} />
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} />
             ))}
           </div>
         )}
