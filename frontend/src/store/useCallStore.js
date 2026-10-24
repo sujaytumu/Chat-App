@@ -251,6 +251,8 @@ let cameraTrack = null; // kept so screen share can revert back to it
 let initialNegotiationDone = false; // guards against onnegotiationneeded firing during initial setup
 let speakerNoticeShown = false; // the "phone decides the speaker" hint is shown once per page load
 let ringing = false; // our own ringtone is (meant to be) playing for an incoming call
+let netBackHandler = null;
+let netOnlineAdded = false;
 let ringKicked = false; // already re-started once by a tap on the incoming screen
 let ringDeferred = false; // incoming ring held back while a phone's system notification is alerting
 let callListenersAdded = false; // page listeners are added once, never stacked on re-subscribe
@@ -1177,6 +1179,32 @@ export const useCallStore = create((set, get) => ({
       toast.error(reason || "Call failed");
       get().resetCall();
     });
+
+    // Internet came back (or the socket reconnected) while a call is ringing / calling: the call must
+    // never be left silent or stuck on "Calling…".
+    const afterNetBack = () => {
+      const st = get();
+      if (st.callStatus === "incoming" && !st.isAnswering) {
+        primeAudio();
+        ringDeferred = false;
+        ringing = true;
+        ringHere(get, true); // rings now, unless it already is (keepIfPlaying)
+        if (st.remoteUser?._id) socket.emit("callRingingAck", { toUserId: st.remoteUser._id, callId: currentCallId });
+      } else if (st.callStatus === "calling" && st.remoteUser?._id) {
+        primeAudio();
+        if (st.isRemoteRinging) startRingback();
+        else startCallingTone();
+        // ask the server if this call is still alive; if it was dropped while we were offline, stop calling
+        socket.emit("checkCall", { toUserId: st.remoteUser._id, callId: currentCallId });
+      }
+    };
+    socket.off("connect", netBackHandler);
+    netBackHandler = afterNetBack;
+    socket.on("connect", afterNetBack);
+    if (!netOnlineAdded) {
+      netOnlineAdded = true;
+      window.addEventListener("online", () => setTimeout(() => netBackHandler?.(), 800));
+    }
   },
 
   unsubscribeFromCallSocket: () => {
