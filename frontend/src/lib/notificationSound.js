@@ -48,18 +48,20 @@ function unlockElements() {
   elementsUnlocked = true;
   [ringEl, msgEl].forEach((el) => {
     const prev = { src: el.src, loop: el.loop };
+    const tok = ringToken;
     el.muted = true;
     el.loop = false;
     el.src = SILENT_WAV;
     el.play()
       .then(() => {
-        el.pause();
+        if (tok === ringToken && !(el === ringEl && ringSoundActive)) el.pause();
       })
       .catch(() => {
         elementsUnlocked = false; // try again on the next gesture
       })
       .finally(() => {
         el.muted = false;
+        if (tok !== ringToken || (el === ringEl && ringSoundActive)) return; // a call started ringing meanwhile: leave it alone
         el.loop = prev.loop;
         if (prev.src && !prev.src.startsWith("data:audio/wav")) el.src = prev.src;
         if (el === ringEl) setTimeout(warmRingtone, 50);
@@ -139,6 +141,15 @@ export function signalCallConnected() {
   try {
     navigator.vibrate?.(0);
     setTimeout(() => navigator.vibrate?.(160), 60);
+  } catch {
+    // ignore
+  }
+}
+// Two short buzzes when a call ends, so you can feel it is over without looking.
+export function vibrateCallEnded() {
+  try {
+    navigator.vibrate?.(0);
+    setTimeout(() => navigator.vibrate?.([110, 70, 110]), 40);
   } catch {
     // ignore
   }
@@ -237,6 +248,7 @@ const MESSAGE_PRESETS = {
 
 // ---- Playback --------------------------------------------------------------
 
+let ringSoundActive = false; // the incoming ring (file) has been started and not stopped
 let ringToken = 0; // invalidates an in-flight start if the ring is stopped first
 let ringVibrateInterval = null;
 let ringSoundInterval = null;
@@ -352,9 +364,16 @@ export function startRingtone({ keepIfPlaying = false } = {}) {
   const toneId = getCallTone();
   if (toneId === "talkies") {
     ensureElements();
-    playElement(ringEl, TALKIES_RING_URL, { loop: true }).catch(() => {
-      if (token === ringToken) startPreset("classic"); // blocked / not loadable: still ring
-    });
+    ringSoundActive = true;
+    const fallback = () => {
+      if (token === ringToken && !ringSoundInterval) startPreset("classic"); // blocked / not loadable: still ring
+    };
+    playElement(ringEl, TALKIES_RING_URL, { loop: true }).catch(fallback);
+    // play() can also just hang (slow file, stalled load) without failing: if nothing is actually
+    // playing after a moment, ring with the built-in tone so a call is never silent.
+    setTimeout(() => {
+      if (token === ringToken && (ringEl.paused || ringEl.currentTime === 0)) fallback();
+    }, 900);
     return;
   }
   if (toneId !== "custom") {
@@ -434,6 +453,7 @@ export function stopRingtoneSound() {
   clearInterval(ringSoundInterval);
   ringVibrateInterval = null;
   ringSoundInterval = null;
+  ringSoundActive = false;
   stopElement(ringEl);
   stopVibration();
 }
