@@ -14,6 +14,7 @@ const reelSchema = new mongoose.Schema(
     song: { url: String, name: String, start: { type: Number, default: 0 } },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     views: { type: Number, default: 0 },
+    saves: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

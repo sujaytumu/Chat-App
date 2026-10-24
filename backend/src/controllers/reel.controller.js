@@ -1,6 +1,9 @@
 import mongoose from "mongoose";
 import Reel from "../models/reel.model.js";
 import StatusComment from "../models/statusComment.model.js";
+import Status from "../models/status.model.js";
+import Follow from "../models/follow.model.js";
+import SavedReel from "../models/savedReel.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
 import { MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
@@ -28,6 +31,7 @@ const shape = (r, meId, commentCounts) => ({
   views: r.views || 0,
   comments: commentCounts?.get(String(r._id)) || 0,
   mine: String(r.userId?._id || r.userId) === String(meId),
+  saves: r.saves || 0,
 });
 
 const withCounts = async (rows, meId) => {
@@ -42,22 +46,197 @@ const withCounts = async (rows, meId) => {
   return rows.filter((r) => r.userId).map((r) => shape(r, meId, counts));
 };
 
-// Reels from me + everyone I may see, newest first. ?before=<ISO date> pages further back.
+// ---- "Discover": popular vertical videos that appear on their own (needs PEXELS_API_KEY, free at pexels.com/api) ----
+const discoverCache = new Map(); // page -> { at, items }
+const discoverOn = () => !!process.env.PEXELS_API_KEY;
+async function discoverPage(page) {
+  const hit = discoverCache.get(page);
+  if (hit && Date.now() - hit.at < 30 * 60_000) return hit.items;
+  try {
+    const r = await fetch(`https://api.pexels.com/videos/popular?per_page=15&page=${page}&min_duration=5&max_duration=45`, {
+      headers: { Authorization: process.env.PEXELS_API_KEY },
+    });
+    if (!r.ok) throw new Error(`pexels ${r.status}`);
+    const j = await r.json();
+    const items = (j.videos || [])
+      .filter((v) => v.height > v.width)
+      .map((v) => {
+        const files = (v.video_files || []).filter((f) => f.file_type === "video/mp4" && f.height > f.width).sort((x, y) => Math.abs(x.width - 720) - Math.abs(y.width - 720));
+        const f = files[0];
+        if (!f) return null;
+        return {
+          _id: `px-${v.id}`,
+          source: "discover",
+          videoUrl: f.link,
+          poster: v.image || "",
+          caption: "",
+          duration: v.duration || 0,
+          filter: "none",
+          trim: null,
+          song: null,
+          createdAt: new Date().toISOString(),
+          user: { _id: `px-u-${v.user?.id || v.id}`, fullName: v.user?.name || "Talkies Discover", profilePic: "" },
+          likeCount: 0,
+          liked: false,
+          views: 0,
+          comments: 0,
+          saves: 0,
+          mine: false,
+          following: false,
+          saved: false,
+        };
+      })
+      .filter(Boolean);
+    if (discoverCache.size > 40) discoverCache.clear();
+    discoverCache.set(page, { at: Date.now(), items });
+    return items;
+  } catch (e) {
+    console.log("Discover reels:", e.message);
+    return [];
+  }
+}
+
+const audienceAllows = (a, viewerId) => {
+  if (!a || !a.mode || a.mode === "all") return true;
+  const listed = (a.users || []).some((u) => String(u) === String(viewerId));
+  return a.mode === "only" ? listed : !listed;
+};
+
+// The Reels feed: reels people posted + their video statuses (they appear on their own, nobody has to
+// upload twice) + "Discover" clips. tab=friends shows only people I follow.
+// ?before=<ISO date of the last local item> pages further back, ?px=<discover page>.
 export const getReelFeed = async (req, res) => {
   try {
     const me = req.user;
+    const myId = String(me._id);
+    const friendsTab = req.query.tab === "friends";
     const ids = await visibleUserIds(me);
-    const q = ids === null ? {} : { userId: { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] } };
+    const follows = new Set((await Follow.find({ follower: me._id }).select("following").lean()).map((f) => String(f.following)));
+    const blocked = new Set((me.blockedUsers || []).map(String));
+
+    let allowed = ids === null ? null : new Set([myId, ...[...ids].map(String)]);
+    if (friendsTab) {
+      const f = [...follows].filter((id) => !allowed || allowed.has(id));
+      allowed = new Set(f);
+    }
+    const userQ = allowed === null ? {} : { userId: { $in: [...allowed].map((i) => new mongoose.Types.ObjectId(i)) } };
     const before = req.query.before ? new Date(String(req.query.before)) : null;
-    if (before && !Number.isNaN(before.getTime())) q.createdAt = { $lt: before };
-    const blocked = (me.blockedUsers || []).map(String);
-    const rows = await Reel.find(q).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean();
-    const more = rows.length > PAGE;
-    const page = rows.slice(0, PAGE).filter((r) => !blocked.includes(String(r.userId?._id)));
+    const dateQ = before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {};
+
+    const [reelRows, statusRows, saved] = await Promise.all([
+      Reel.find({ ...userQ, ...dateQ }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
+      Status.find({ ...userQ, ...dateQ, type: "video", expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
+      SavedReel.find({ userId: me._id }).select("key").lean(),
+    ]);
+    const savedKeys = new Set(saved.map((s) => s.key));
+    const statusIds = statusRows.map((s) => s._id);
+    const counts = new Map();
+    if (statusIds.length) {
+      const agg = await StatusComment.aggregate([{ $match: { targetId: { $in: statusIds } } }, { $group: { _id: "$targetId", n: { $sum: 1 } } }]);
+      for (const a of agg) counts.set(String(a._id), a.n);
+    }
+    const reelItems = (await withCounts(reelRows, me._id)).map((r) => ({ ...r, source: "reel", following: follows.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`) }));
+    const statusItems = statusRows
+      .filter((s) => s.userId && (String(s.userId._id) === myId || audienceAllows(s.audience, myId)))
+      .map((s) => ({
+        _id: s._id,
+        source: "status",
+        videoUrl: s.content,
+        poster: "",
+        caption: s.caption || "",
+        duration: 0,
+        filter: "none",
+        trim: s.trim?.end > 0 ? { start: s.trim.start || 0, end: s.trim.end } : null,
+        song: s.song?.url ? { url: s.song.url, name: s.song.name, start: s.song.start || 0 } : null,
+        createdAt: s.createdAt,
+        user: { _id: s.userId._id, fullName: s.userId.fullName, profilePic: s.userId.profilePic },
+        likeCount: (s.likes || []).length,
+        liked: (s.likes || []).some((l) => String(l.user) === myId),
+        views: (s.views || []).length,
+        comments: counts.get(String(s._id)) || 0,
+        saves: 0,
+        mine: String(s.userId._id) === myId,
+        following: follows.has(String(s.userId._id)),
+        saved: false,
+      }));
+    const merged = [...reelItems, ...statusItems].filter((x) => x.user && !blocked.has(String(x.user._id))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const localMore = merged.length > PAGE || reelRows.length > PAGE || statusRows.length > PAGE;
+    const page = merged.slice(0, PAGE);
+
+    // Discover clips are woven in (every 3rd place) on the For-you tab, so the feed never runs dry.
+    let px = Math.max(1, Math.min(parseInt(req.query.px, 10) || 1, 30));
+    let out = page;
+    let more = localMore;
+    if (!friendsTab && discoverOn()) {
+      const found = (await discoverPage(px)).slice(0, 4);
+      px += 1;
+      out = [];
+      let d = 0;
+      page.forEach((it, i) => {
+        out.push(it);
+        if ((i + 1) % 3 === 0 && found[d]) out.push({ ...found[d++], saved: savedKeys.has(`px:${found[d - 1]._id}`) });
+      });
+      while (d < found.length && out.length < PAGE + found.length) out.push({ ...found[d++] });
+      more = px <= 30;
+    }
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ reels: await withCounts(page, me._id), more });
+    res.status(200).json({ reels: out, more, px, localMore, next: page.length ? page[page.length - 1].createdAt : null });
   } catch (error) {
     console.log("Error in getReelFeed:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const toggleFollow = async (req, res) => {
+  try {
+    const target = req.params.userId;
+    if (!mongoose.isValidObjectId(target) || String(target) === String(req.user._id)) return res.status(400).json({ error: "Invalid" });
+    if (!(await canSee(req.user, target))) return res.status(404).json({ error: "Not found" });
+    const want = req.body?.follow !== false;
+    if (want) await Follow.updateOne({ follower: req.user._id, following: target }, { $setOnInsert: { follower: req.user._id, following: target } }, { upsert: true });
+    else await Follow.deleteOne({ follower: req.user._id, following: target });
+    res.status(200).json({ following: want });
+  } catch (error) {
+    console.log("Error in toggleFollow:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Bookmark / un-bookmark a reel (or a Discover clip, sent as a snapshot).
+export const toggleSave = async (req, res) => {
+  try {
+    const { key, snapshot, saved } = req.body || {};
+    if (typeof key !== "string" || !/^(reel:[a-f0-9]{24}|px:px-\d+)$/.test(key)) return res.status(400).json({ error: "Invalid" });
+    if (saved === false) {
+      await SavedReel.deleteOne({ userId: req.user._id, key });
+      if (key.startsWith("reel:")) await Reel.updateOne({ _id: key.slice(5), saves: { $gt: 0 } }, { $inc: { saves: -1 } });
+      return res.status(200).json({ saved: false });
+    }
+    let snap = snapshot;
+    if (key.startsWith("reel:")) {
+      const r = await Reel.findById(key.slice(5)).populate("userId", "fullName profilePic").lean();
+      if (!r || !(await canSee(req.user, r.userId?._id))) return res.status(404).json({ error: "Not found" });
+      snap = (await withCounts([r], req.user._id))[0];
+    } else {
+      snap = { ...snapshot, source: "discover" };
+      if (typeof snap.videoUrl !== "string" || !/^https:\/\//.test(snap.videoUrl)) return res.status(400).json({ error: "Invalid" });
+    }
+    const r = await SavedReel.updateOne({ userId: req.user._id, key }, { $setOnInsert: { userId: req.user._id, key, snapshot: snap } }, { upsert: true });
+    if (r.upsertedCount && key.startsWith("reel:")) await Reel.updateOne({ _id: key.slice(5) }, { $inc: { saves: 1 } });
+    res.status(200).json({ saved: true });
+  } catch (error) {
+    console.log("Error in toggleSave:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const getSaved = async (req, res) => {
+  try {
+    const rows = await SavedReel.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(100).lean();
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: rows.map((r) => ({ ...r.snapshot, saved: true, liked: false })), more: false });
+  } catch (error) {
+    console.log("Error in getSaved:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

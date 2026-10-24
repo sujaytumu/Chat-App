@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music } from "lucide-react";
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -32,19 +32,20 @@ const MAX_TOTAL_MB = 12; // video + song together (they travel in one request)
 const MAX_SECONDS = 60;
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
-const Rail = ({ icon: Icon, label, onClick, active, fill }) => (
-  <button onClick={onClick} className="flex flex-col items-center gap-1 text-white drop-shadow active:scale-90 transition-transform">
-    <Icon size={30} className={active ? "text-[#ff3040]" : ""} fill={fill ? "currentColor" : "none"} strokeWidth={1.8} />
-    {label !== undefined && <span className="text-[12px] font-medium tabular-nums">{label}</span>}
+const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
+  <button onClick={onClick} className="flex flex-col items-center gap-1 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.6)] active:scale-90 transition-transform">
+    <Icon size={size} className={active ? "text-[#ff3040]" : ""} fill={fill ? "currentColor" : "none"} strokeWidth={1.7} />
+    {label !== undefined && <span className="text-[13px] font-semibold tabular-nums leading-none">{label}</span>}
   </button>
 );
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onDelete }) => {
+const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
   const [burst, setBurst] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [more, setMore] = useState(false);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
 
@@ -65,7 +66,8 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         setMuted(true);
         v.play().catch(() => {});
       });
-      axiosInstance.put(`/reels/${reel._id}/view`).catch(() => {});
+      if (reel.source === "reel" || !reel.source) axiosInstance.put(`/reels/${reel._id}/view`).catch(() => {});
+      else if (reel.source === "status") axiosInstance.put(`/status/${reel._id}/view`).catch(() => {});
     } else {
       v.pause();
       songEl.current?.pause();
@@ -143,26 +145,39 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
           <Heart size={110} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />
         </div>
       )}
-      <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/75 to-transparent pointer-events-none" />
 
-      <div className="absolute right-3 bottom-24 flex flex-col items-center gap-5 z-10">
-        <Rail icon={Heart} label={count(reel.likeCount)} active={reel.liked} fill={reel.liked} onClick={() => onLike(reel, !reel.liked)} />
-        <Rail icon={MessageCircle} label={count(reel.comments)} onClick={() => onComments(reel)} />
-        <Rail icon={Send} onClick={() => onShare(reel)} />
-        <Rail icon={muted ? VolumeX : Volume2} onClick={() => setMuted(!muted)} />
-        {reel.mine && <Rail icon={Trash2} onClick={() => onDelete(reel)} />}
+      <div className="absolute right-3 bottom-8 flex flex-col items-center gap-[22px] z-10">
+        <Rail icon={Heart} size={32} label={count(reel.likeCount)} active={reel.liked} fill={reel.liked} onClick={() => onLike(reel, !reel.liked)} />
+        <Rail icon={MessageCircle} size={31} label={count(reel.comments)} onClick={() => onComments(reel)} />
+        <Rail icon={Send} size={29} label={count(reel.views)} onClick={() => onShare(reel)} />
+        {reel.source !== "status" && <Rail icon={Bookmark} size={29} label={count(reel.saves)} fill={reel.saved} onClick={() => onSave(reel)} />}
+        <Rail icon={AlignJustify} size={26} onClick={() => onMenu(reel)} />
       </div>
 
-      <div className="absolute left-4 right-20 bottom-[calc(28px+env(safe-area-inset-bottom))] text-white z-10 pointer-events-none">
+      <div className="absolute left-4 right-[72px] bottom-6 text-white z-10">
         <div className="flex items-center gap-2.5">
-          <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-9 rounded-full object-cover border border-white/40" />
-          <span className="font-semibold text-[15px] drop-shadow truncate">{reel.user?.fullName}</span>
+          <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-10 rounded-full object-cover border border-white/30 bg-neutral-800" />
+          <span className="font-semibold text-[15.5px] drop-shadow truncate max-w-[40vw]">{reel.user?.fullName}</span>
+          {!reel.mine && reel.source !== "discover" && (
+            <button
+              onClick={() => onFollow(reel)}
+              className={`ml-1 px-3.5 py-1 rounded-lg border text-[14px] font-semibold ${reel.following ? "border-white/40 text-white/80" : "border-white text-white"}`}
+            >
+              {reel.following ? "Following" : "Follow"}
+            </button>
+          )}
         </div>
-        {reel.caption && <p className="mt-2 text-[14px] leading-snug drop-shadow line-clamp-3 whitespace-pre-wrap break-words">{reel.caption}</p>}
-        {reel.song?.url && (
-          <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-white/90"><SongBars playing={active && !paused && !muted} /> <span className="truncate">{reel.song.name || "Original audio"}</span></p>
+        {reel.song?.url ? (
+          <p className="mt-2 flex items-center gap-1.5 text-[13px] text-white/95"><Music size={13} /> <span className="truncate">{reel.song.name || "Original audio"}</span></p>
+        ) : (
+          <p className="mt-2 flex items-center gap-1.5 text-[13px] text-white/80"><Music size={13} /> <span className="truncate">Original audio · {reel.user?.fullName}</span></p>
         )}
-        <p className="mt-1 text-[12px] text-white/70">{count(reel.views)} views</p>
+        {reel.caption && (
+          <p onClick={() => setMore((m) => !m)} className={`mt-1.5 text-[14.5px] leading-snug drop-shadow whitespace-pre-wrap break-words ${more ? "max-h-40 overflow-y-auto" : "line-clamp-1"}`}>
+            {reel.caption}
+          </p>
+        )}
       </div>
       <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25 z-10">
         <div className="h-full bg-white" style={{ width: `${progress * 100}%` }} />
@@ -331,6 +346,7 @@ const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const me = useAuthStore((s) => s.authUser);
+  const [tab, setTab] = useState("foryou"); // foryou | friends | saved
   const [reels, setReels] = useState([]);
   const [more, setMore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -339,41 +355,61 @@ const ReelsPage = () => {
   const [commentsFor, setCommentsFor] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sendFor, setSendFor] = useState(null);
+  const [menuFor, setMenuFor] = useState(null);
+  const [pickTab, setPickTab] = useState(false);
   const box = useRef(null);
   const loadingMore = useRef(false);
+  const cursor = useRef({ before: null, px: 1 });
+  const gen = useRef(0);
 
-  const load = useCallback(async (before) => {
-    if (loadingMore.current) return;
+  const load = useCallback(async (reset) => {
+    if (loadingMore.current && !reset) return;
     loadingMore.current = true;
+    const my = ++gen.current;
     try {
-      const { data } = await axiosInstance.get("/reels", { params: before ? { before } : {} });
+      const params = { tab };
+      if (!reset) {
+        if (cursor.current.before) params.before = cursor.current.before;
+        params.px = cursor.current.px;
+      }
+      const { data } = tab === "saved" ? await axiosInstance.get("/reels/saved") : await axiosInstance.get("/reels", { params });
+      if (my !== gen.current) return;
+      if (data.next) cursor.current.before = data.next;
+      if (data.px) cursor.current.px = data.px;
       setReels((cur) => {
-        const seen = new Set(cur.map((r) => r._id));
-        return [...cur, ...data.reels.filter((r) => !seen.has(r._id))];
+        const base = reset ? cur.filter((r) => r._pinned) : cur;
+        const seen = new Set(base.map((r) => r._id));
+        return [...base, ...data.reels.filter((r) => !seen.has(r._id))];
       });
       setMore(!!data.more);
     } catch {
-      if (!before) toast.error("Couldn't load reels");
+      toast.error("Couldn't load reels");
     } finally {
       loadingMore.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [tab]);
 
+  // (re)load whenever the tab changes; a shared reel link is shown first
   useEffect(() => {
+    cursor.current = { before: null, px: 1 };
+    setLoading(true);
+    setReels([]);
+    setActiveId(null);
+    box.current?.scrollTo({ top: 0 });
     (async () => {
-      const wanted = params.get("r");
+      const wanted = tab === "foryou" ? params.get("r") : null;
       if (wanted) {
         try {
           const { data } = await axiosInstance.get(`/reels/${wanted}`);
-          setReels([data]);
+          setReels([{ ...data, source: "reel", _pinned: true }]);
         } catch {
           toast.error("This reel isn't available");
         }
       }
-      load();
+      load(true);
     })();
-  }, [load, params]);
+  }, [tab, params, load]);
 
   // the reel filling the screen is the one that plays
   useEffect(() => {
@@ -390,18 +426,56 @@ const ReelsPage = () => {
   }, [reels.length]);
 
   useEffect(() => {
-    if (!activeId || !more) return;
+    if (!activeId || !more || tab === "saved") return;
     const i = reels.findIndex((r) => r._id === activeId);
-    if (i >= reels.length - 3 && reels.length) load(reels[reels.length - 1].createdAt);
-  }, [activeId, reels, more, load]);
+    if (i >= reels.length - 3 && reels.length) load(false);
+  }, [activeId, reels, more, load, tab]);
+
+  const patch = (id, fn) => setReels((l) => l.map((r) => (r._id === id ? { ...r, ...fn(r) } : r)));
 
   const like = async (reel, liked) => {
-    setReels((l) => l.map((r) => (r._id === reel._id ? { ...r, liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) } : r)));
-    try {
-      await axiosInstance.put(`/reels/${reel._id}/like`, { liked });
-    } catch {
-      setReels((l) => l.map((r) => (r._id === reel._id ? { ...r, liked: !liked, likeCount: Math.max(0, r.likeCount + (liked ? -1 : 1)) } : r)));
+    if (reel.source === "discover") {
+      patch(reel._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
+      return;
     }
+    patch(reel._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
+    try {
+      await axiosInstance.put(reel.source === "status" ? `/status/${reel._id}/like` : `/reels/${reel._id}/like`, { liked });
+    } catch (err) {
+      patch(reel._id, (r) => ({ liked: !liked, likeCount: Math.max(0, r.likeCount + (liked ? -1 : 1)) }));
+      if (err.response?.data?.error) toast.error(err.response.data.error);
+    }
+  };
+
+  const follow = async (reel) => {
+    const want = !reel.following;
+    const uid = reel.user?._id;
+    setReels((l) => l.map((r) => (String(r.user?._id) === String(uid) ? { ...r, following: want } : r)));
+    try {
+      await axiosInstance.put(`/reels/follow/${uid}`, { follow: want });
+      if (want) toast.success(`Following ${reel.user?.fullName}`);
+    } catch {
+      setReels((l) => l.map((r) => (String(r.user?._id) === String(uid) ? { ...r, following: !want } : r)));
+    }
+  };
+
+  const save = async (reel) => {
+    const want = !reel.saved;
+    const key = reel.source === "discover" ? `px:${reel._id}` : `reel:${reel._id}`;
+    patch(reel._id, (r) => ({ saved: want, saves: Math.max(0, (r.saves || 0) + (want ? 1 : -1)) }));
+    try {
+      await axiosInstance.put("/reels/save", { key, saved: want, snapshot: want && reel.source === "discover" ? reel : undefined });
+      toast(want ? "Saved" : "Removed from saved", { icon: want ? "🔖" : "✖️" });
+      if (!want && tab === "saved") setReels((l) => l.filter((r) => r._id !== reel._id));
+    } catch {
+      patch(reel._id, (r) => ({ saved: !want, saves: Math.max(0, (r.saves || 0) + (want ? -1 : 1)) }));
+      toast.error("Couldn't save");
+    }
+  };
+
+  const shareReel = (reel) => {
+    if (reel.source !== "reel" && reel.source) return toast("Only posted reels can be sent in chat", { icon: "🎬" });
+    setSendFor(reel);
   };
 
   const remove = async (reel) => {
@@ -414,50 +488,113 @@ const ReelsPage = () => {
     }
   };
 
+  const copyLink = async (reel) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/reels?r=${reel._id}`);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Couldn't copy");
+    }
+  };
+
+  const tabBtn = (id, label) => (
+    <button onClick={() => setTab(id)} className={`text-[21px] font-bold drop-shadow ${tab === id ? "text-white" : "text-white/55"}`}>
+      {label}
+    </button>
+  );
+
   return (
     <div className="fixed inset-0 z-[60] bg-black">
       <style>{"@keyframes reelHeart{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:0}}"}</style>
-      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-3 pt-[calc(10px+env(safe-area-inset-top))] pointer-events-none">
-        <button onClick={() => navigate("/")} className="pointer-events-auto size-10 rounded-full bg-black/35 text-white flex items-center justify-center" aria-label="Back">
-          <ArrowLeft size={22} />
+      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(14px+env(safe-area-inset-top))] pointer-events-none">
+        <button onClick={() => setCreating(true)} className="pointer-events-auto text-white drop-shadow" aria-label="New reel">
+          <Plus size={34} strokeWidth={1.8} />
         </button>
-        <h2 className="text-white text-[18px] font-semibold drop-shadow">Reels</h2>
-        <button onClick={() => setCreating(true)} className="pointer-events-auto size-10 rounded-full bg-black/35 text-white flex items-center justify-center" aria-label="New reel">
-          <Plus size={24} />
-        </button>
+        <div className="pointer-events-auto flex items-center gap-5 relative">
+          <div className="flex items-center gap-1">
+            {tabBtn(tab === "saved" ? "saved" : "foryou", tab === "saved" ? "Saved" : "Reels")}
+            <button onClick={() => setPickTab((v) => !v)} className="text-white drop-shadow" aria-label="Choose feed"><ChevronDown size={20} /></button>
+          </div>
+          {tabBtn("friends", "Friends")}
+          {pickTab && (
+            <div className="absolute top-9 left-0 w-40 rounded-xl bg-neutral-900/95 shadow-2xl py-1 text-white text-[15px]">
+              {[["foryou", "For you"], ["saved", "Saved"]].map(([id, label]) => (
+                <button key={id} onClick={() => { setTab(id); setPickTab(false); }} className="w-full flex items-center justify-between px-4 py-2.5 active:bg-white/10">
+                  {label} {tab === id && <Check size={16} className="text-[#25D366]" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <span className="size-8" aria-hidden />
       </div>
 
-      {loading && !reels.length ? (
-        <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
-      ) : !reels.length ? (
-        <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
-          <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
-          <p className="text-lg font-semibold">No reels yet</p>
-          <p className="text-white/60 text-[14px]">Post the first one — people who can see you will watch it here.</p>
-          <button onClick={() => setCreating(true)} className="px-6 py-3 rounded-full bg-[#25D366] text-black font-semibold">Create reel</button>
-        </div>
-      ) : (
-        <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
-          {reels.map((r) => (
-            <ReelItem key={r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={setCommentsFor} onShare={setSendFor} onDelete={remove} />
-          ))}
-        </div>
-      )}
+      <div className="absolute inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom))]">
+        {loading && !reels.length ? (
+          <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
+        ) : !reels.length ? (
+          <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
+            <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
+            <p className="text-lg font-semibold">{tab === "friends" ? "No reels from people you follow" : tab === "saved" ? "Nothing saved yet" : "No reels yet"}</p>
+            <p className="text-white/60 text-[14px]">
+              {tab === "friends" ? "Tap Follow on a reel and their new reels and video updates show up here." : tab === "saved" ? "Tap the bookmark on a reel to keep it here." : "Video updates from people you can see appear here by themselves. Post the first reel, too."}
+            </p>
+            {tab === "foryou" && <button onClick={() => setCreating(true)} className="px-6 py-3 rounded-full bg-[#25D366] text-black font-semibold">Create reel</button>}
+          </div>
+        ) : (
+          <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
+            {reels.map((r) => (
+              <ReelItem key={r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={(x) => (x.source === "discover" ? toast("Comments are off on discover clips", { icon: "💬" }) : setCommentsFor(x))} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} />
+            ))}
+          </div>
+        )}
 
-      {commentsFor && (
-        <StatusComments
-          targetId={commentsFor._id}
-          onClose={() => setCommentsFor(null)}
-          onTotal={(n) => setReels((l) => l.map((r) => (r._id === commentsFor._id ? { ...r, comments: n } : r)))}
-        />
-      )}
-      {sendFor && <SendReelModal reel={sendFor} onClose={() => setSendFor(null)} />}
+        {commentsFor && (
+          <StatusComments
+            targetId={commentsFor._id}
+            onClose={() => setCommentsFor(null)}
+            onTotal={(n) => setReels((l) => l.map((r) => (r._id === commentsFor._id ? { ...r, comments: n } : r)))}
+          />
+        )}
+        {sendFor && <SendReelModal reel={sendFor} onClose={() => setSendFor(null)} />}
+        {menuFor && (
+          <div className="absolute inset-0 z-50 bg-black/60 flex items-end" onClick={() => setMenuFor(null)}>
+            <div className="w-full bg-neutral-900 rounded-t-3xl pb-4 text-white wa-pop-in" onClick={(e) => e.stopPropagation()}>
+              <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-white/25" />
+              {[
+                { icon: muted ? VolumeX : Volume2, label: muted ? "Turn sound on" : "Mute sound", run: () => setMuted(!muted) },
+                ...(menuFor.source !== "status" ? [{ icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) }] : []),
+                ...(menuFor.source === "reel" || !menuFor.source ? [{ icon: Link2, label: "Copy link", run: () => copyLink(menuFor) }] : []),
+                { icon: Bookmark, label: "Saved reels", run: () => setTab("saved") },
+                ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Delete reel", run: () => remove(menuFor), danger: true }] : []),
+              ].map((it) => (
+                <button key={it.label} onClick={() => { setMenuFor(null); it.run(); }} className={`w-full flex items-center gap-4 px-6 py-3.5 text-[16px] active:bg-white/10 ${it.danger ? "text-red-400" : ""}`}>
+                  <it.icon size={22} /> {it.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom bar like Instagram: Home · Reels · Updates · Calls · You */}
+      <nav className="absolute bottom-0 inset-x-0 h-[calc(56px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-black flex items-center justify-around z-30">
+        <button onClick={() => navigate("/")} className="flex-1 flex justify-center text-white" aria-label="Chats"><House size={28} strokeWidth={1.8} /></button>
+        <span className="flex-1 flex justify-center"><span className="px-5 py-2 rounded-full bg-white/15 text-white"><Film size={26} fill="currentColor" strokeWidth={1.5} /></span></span>
+        <button onClick={() => navigate("/status")} className="flex-1 flex justify-center text-white" aria-label="Updates"><CircleDashed size={28} strokeWidth={1.8} /></button>
+        <button onClick={() => navigate("/calls")} className="flex-1 flex justify-center text-white" aria-label="Calls"><Phone size={26} strokeWidth={1.8} /></button>
+        <button onClick={() => navigate("/profile")} className="flex-1 flex justify-center" aria-label="You">
+          <img src={optimizeImage(me?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover" />
+        </button>
+      </nav>
+
       {creating && (
         <NewReel
           onClose={() => setCreating(false)}
           onPosted={(r) => {
             setCreating(false);
-            setReels((l) => [r, ...l]);
+            setTab("foryou");
+            setReels((l) => [{ ...r, source: "reel" }, ...l]);
             setActiveId(r._id);
             box.current?.scrollTo({ top: 0 });
           }}
