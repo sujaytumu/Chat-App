@@ -264,6 +264,32 @@ const gridBtnOn = `${gridBtnBase} call-btn-on bg-[#FFFFFF] text-[#0B141A]`;
 const gridBtn = gridBtnOff;
 const callBtn = (active) => (active ? gridBtnOn : gridBtnOff);
 
+// soft expanding rings behind the avatar while the call is placed
+const Ripples = () => (
+  <>
+    {[0, 1, 2].map((n) => (
+      <span
+        key={n}
+        className="absolute inset-0 rounded-full bg-[#00A884]/40"
+        style={{ animation: "callRipple 2.4s ease-out infinite", animationDelay: `${n * 0.8}s` }}
+      />
+    ))}
+  </>
+);
+
+// "Calling" / "Ringing" with three softly pulsing dots, like WhatsApp
+const PulseDots = ({ word }) => (
+  <span className="inline-flex items-baseline">
+    {word}
+    {[0, 1, 2].map((n) => (
+      <span key={n} className="inline-block" style={{ animation: "callDot 1.4s infinite", animationDelay: `${n * 0.22}s` }}>
+        .
+      </span>
+    ))}
+    <style>{"@keyframes callDot{0%,60%,100%{opacity:.25}30%{opacity:1}}@keyframes callRipple{0%{transform:scale(1);opacity:.45}100%{transform:scale(1.9);opacity:0}}"}</style>
+  </span>
+);
+
 const CallManager = () => {
   const {
     callStatus,
@@ -469,9 +495,7 @@ const CallManager = () => {
   const canFlip = isVideo && isPhoneLike() && !isVideoOff && !isScreenSharing;
   const statusText =
     callStatus === "calling"
-      ? isRemoteRinging
-        ? "Ringing…"
-        : "Calling…"
+      ? <PulseDots word={isRemoteRinging ? "Ringing" : "Calling"} />
       : isReconnecting
         ? "Reconnecting…"
         : callDuration || (isVideo ? "Video call" : "Voice call");
@@ -586,9 +610,7 @@ const CallManager = () => {
           {!remoteStream && !hasPhoto && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-white drop-shadow">
               <div className="relative mb-4">
-                {callStatus === "calling" && (
-                  <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
-                )}
+                {callStatus === "calling" && <Ripples />}
                 <CallAvatar user={remoteUser} />
               </div>
               <p className="text-lg font-medium">{remoteUser?.fullName}</p>
@@ -610,9 +632,7 @@ const CallManager = () => {
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center text-white">
           <div className="relative mb-4">
-            {callStatus === "calling" && (
-              <span className="absolute inset-0 rounded-full bg-[#00A884]/30 animate-ping" />
-            )}
+            {callStatus === "calling" && <Ripples />}
             <CallAvatar user={remoteUser} />
           </div>
           <h3 className="text-xl font-semibold">{remoteUser?.fullName}</h3>
