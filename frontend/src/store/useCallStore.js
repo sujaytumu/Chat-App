@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
 import { acquireCallMedia } from "../lib/callMedia";
-import { startRingtone, stopRingtoneSound, warmRingtone, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, warmRingtone, vibrateCallEnded, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -641,6 +641,7 @@ export const useCallStore = create((set, get) => ({
   },
 
   resetCall: () => {
+    const hadCall = get().callStatus !== "idle";
     // Tell the server roughly how much data this call used (best-effort, never blocks the hang-up).
     try {
       const st = get();
@@ -655,6 +656,7 @@ export const useCallStore = create((set, get) => ({
     rememberEnded(currentCallId);
     currentCallId = null;
     get().stopRingtone();
+    if (hadCall) vibrateCallEnded();
     voiceOriginShare = false;
     if (pc) {
       pc.close();
