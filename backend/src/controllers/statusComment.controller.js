@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import Status from "../models/status.model.js";
 import Highlight from "../models/highlight.model.js";
 import StatusComment from "../models/statusComment.model.js";
+import Reel from "../models/reel.model.js";
+import { canSee } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { sendPushToUser } from "../lib/webPush.js";
 
@@ -20,6 +22,8 @@ const resolveTarget = async (targetId, viewerId) => {
     const own = String(st.userId) === String(viewerId);
     return own || canSeeAudience(st.audience, viewerId) ? { ownerId: String(st.userId) } : null;
   }
+  const reel = await Reel.findById(targetId).select("userId").lean();
+  if (reel) return (await canSee({ _id: viewerId }, reel.userId)) ? { ownerId: String(reel.userId) } : null;
   const h = await Highlight.findOne({ "items._id": targetId }).select("userId items._id items.audience").lean();
   const item = h?.items?.find((i) => String(i._id) === String(targetId));
   if (!h || !item) return null;
