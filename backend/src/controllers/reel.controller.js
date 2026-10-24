@@ -4,6 +4,8 @@ import StatusComment from "../models/statusComment.model.js";
 import Status from "../models/status.model.js";
 import Follow from "../models/follow.model.js";
 import SavedReel from "../models/savedReel.model.js";
+import Repost from "../models/repost.model.js";
+import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
 import { MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
@@ -25,13 +27,15 @@ const shape = (r, meId, commentCounts) => ({
   trim: r.trim?.end > 0 ? { start: r.trim.start || 0, end: r.trim.end } : null,
   song: r.song?.url ? { url: r.song.url, name: r.song.name, start: r.song.start || 0 } : null,
   createdAt: r.createdAt,
-  user: r.userId?._id ? { _id: r.userId._id, fullName: r.userId.fullName, profilePic: r.userId.profilePic } : null,
+  user: r.userId?._id ? { _id: r.userId._id, fullName: r.userId.fullName, profilePic: r.userId.profilePic } : r.externalId ? { _id: `ext-${r._id}`, fullName: r.externalAuthor || "Talkies Discover", profilePic: "" } : null,
+  external: !!r.externalId,
   likeCount: (r.likes || []).length,
   liked: (r.likes || []).some((l) => String(l) === String(meId)),
   views: r.views || 0,
   comments: commentCounts?.get(String(r._id)) || 0,
   mine: String(r.userId?._id || r.userId) === String(meId),
   saves: r.saves || 0,
+  reposts: r.reposts || 0,
 });
 
 const withCounts = async (rows, meId) => {
@@ -43,7 +47,7 @@ const withCounts = async (rows, meId) => {
     ]);
     for (const a of agg) counts.set(String(a._id), a.n);
   }
-  return rows.filter((r) => r.userId).map((r) => shape(r, meId, counts));
+  return rows.filter((r) => r.userId || r.externalId).map((r) => shape(r, meId, counts));
 };
 
 // ---- "Discover": popular vertical videos that appear on their own (needs PEXELS_API_KEY, free at pexels.com/api) ----
@@ -129,13 +133,33 @@ export const getReelFeed = async (req, res) => {
       SavedReel.find({ userId: me._id }).select("key").lean(),
     ]);
     const savedKeys = new Set(saved.map((s) => s.key));
+    const mineReposted = new Set((await Repost.find({ userId: me._id }).select("reelId").lean()).map((x) => String(x.reelId)));
     const statusIds = statusRows.map((s) => s._id);
     const counts = new Map();
     if (statusIds.length) {
       const agg = await StatusComment.aggregate([{ $match: { targetId: { $in: statusIds } } }, { $group: { _id: "$targetId", n: { $sum: 1 } } }]);
       for (const a of agg) counts.set(String(a._id), a.n);
     }
-    const reelItems = (await withCounts(reelRows, me._id)).map((r) => ({ ...r, source: "reel", following: follows.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`) }));
+    const reelItems = (await withCounts(reelRows, me._id)).map((r) => ({ ...r, source: "reel", following: follows.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`), reposted: mineReposted.has(String(r._id)) }));
+    // reposts by people I may see: the original reel appears with "X reposted" at the time of the repost
+    const repostRows = await Repost.find({ ...(allowed === null ? {} : { userId: { $in: [...allowed].filter((i) => i !== myId).map((i) => new mongoose.Types.ObjectId(i)) } }), ...dateQ })
+      .sort({ createdAt: -1 })
+      .limit(PAGE + 1)
+      .populate("userId", "fullName profilePic")
+      .populate({ path: "reelId", populate: { path: "userId", select: "fullName profilePic" } })
+      .lean();
+    const repostItems = [];
+    const repostReels = repostRows.filter((x) => x.reelId && x.userId && (x.reelId.userId ? true : !!x.reelId.externalId));
+    const shapedRe = await withCounts(repostReels.map((x) => x.reelId), me._id);
+    const byId = new Map(shapedRe.map((r) => [String(r._id), r]));
+    for (const x of repostReels) {
+      const base = byId.get(String(x.reelId._id));
+      if (!base) continue;
+      if (x.reelId.userId && allowed && !allowed.has(String(x.reelId.userId._id || x.reelId.userId)) && String(x.reelId.userId._id || x.reelId.userId) !== myId) {
+        if (!(await canSee(me, x.reelId.userId._id || x.reelId.userId))) continue;
+      }
+      repostItems.push({ ...base, source: "reel", createdAt: x.createdAt, repostedBy: { _id: x.userId._id, fullName: x.userId.fullName }, following: follows.has(String(base.user?._id)), saved: savedKeys.has(`reel:${base._id}`), reposted: mineReposted.has(String(base._id)) });
+    }
     const statusItems = statusRows
       .filter((s) => s.userId && (String(s.userId._id) === myId || audienceAllows(s.audience, myId)))
       .map((s) => ({
@@ -159,8 +183,12 @@ export const getReelFeed = async (req, res) => {
         following: follows.has(String(s.userId._id)),
         saved: false,
       }));
-    const merged = [...reelItems, ...statusItems].filter((x) => x.user && !blocked.has(String(x.user._id))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const localMore = merged.length > PAGE || reelRows.length > PAGE || statusRows.length > PAGE;
+    const seenIds = new Set();
+    const merged = [...reelItems, ...repostItems, ...statusItems]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .filter((x) => (seenIds.has(String(x._id)) ? false : (seenIds.add(String(x._id)), true)))
+      .filter((x) => x.user && !blocked.has(String(x.user._id))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const localMore = merged.length > PAGE || reelRows.length > PAGE || statusRows.length > PAGE || repostRows.length > PAGE;
     const page = merged.slice(0, PAGE);
 
     // Discover clips are woven in (every 3rd place) on the For-you tab, so the feed never runs dry.
@@ -206,7 +234,7 @@ export const toggleFollow = async (req, res) => {
 export const toggleSave = async (req, res) => {
   try {
     const { key, snapshot, saved } = req.body || {};
-    if (typeof key !== "string" || !/^(reel:[a-f0-9]{24}|px:px-\d+)$/.test(key)) return res.status(400).json({ error: "Invalid" });
+    if (typeof key !== "string" || !/^(reel:[a-f0-9]{24}|px:px-\d+|status:[a-f0-9]{24})$/.test(key)) return res.status(400).json({ error: "Invalid" });
     if (saved === false) {
       await SavedReel.deleteOne({ userId: req.user._id, key });
       if (key.startsWith("reel:")) await Reel.updateOne({ _id: key.slice(5), saves: { $gt: 0 } }, { $inc: { saves: -1 } });
@@ -215,8 +243,13 @@ export const toggleSave = async (req, res) => {
     let snap = snapshot;
     if (key.startsWith("reel:")) {
       const r = await Reel.findById(key.slice(5)).populate("userId", "fullName profilePic").lean();
-      if (!r || !(await canSee(req.user, r.userId?._id))) return res.status(404).json({ error: "Not found" });
+      if (!r || (r.userId && !(await canSee(req.user, r.userId._id)))) return res.status(404).json({ error: "Not found" });
       snap = (await withCounts([r], req.user._id))[0];
+    } else if (key.startsWith("status:")) {
+      const st = await Status.findOne({ _id: key.slice(7), type: "video", expiresAt: { $gt: new Date() } }).populate("userId", "fullName profilePic").lean();
+      if (!st || !st.userId || (String(st.userId._id) !== String(req.user._id) && !audienceAllows(st.audience, req.user._id) )) return res.status(404).json({ error: "Not found" });
+      if (String(st.userId._id) !== String(req.user._id) && !(await canSee(req.user, st.userId._id))) return res.status(404).json({ error: "Not found" });
+      snap = { _id: st._id, source: "status", videoUrl: st.content, poster: "", caption: st.caption || "", filter: "none", trim: st.trim?.end > 0 ? { start: st.trim.start || 0, end: st.trim.end } : null, song: st.song?.url ? { url: st.song.url, name: st.song.name, start: st.song.start || 0 } : null, createdAt: st.createdAt, user: { _id: st.userId._id, fullName: st.userId.fullName, profilePic: st.userId.profilePic }, likeCount: 0, liked: false, views: 0, comments: 0, saves: 0, reposts: 0, mine: false, following: false };
     } else {
       snap = { ...snapshot, source: "discover" };
       if (typeof snap.videoUrl !== "string" || !/^https:\/\//.test(snap.videoUrl)) return res.status(400).json({ error: "Invalid" });
@@ -245,7 +278,7 @@ export const getReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const r = await Reel.findById(req.params.id).populate("userId", "fullName profilePic").lean();
-    if (!r || !(await canSee(req.user, r.userId?._id))) return res.status(404).json({ error: "This reel isn't available" });
+    if (!r || (r.userId && !(await canSee(req.user, r.userId._id)))) return res.status(404).json({ error: "This reel isn't available" });
     res.status(200).json((await withCounts([r], req.user._id))[0]);
   } catch (error) {
     console.log("Error in getReel:", error.message);
@@ -303,11 +336,11 @@ export const likeReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const r = await Reel.findById(req.params.id).select("userId likes").lean();
-    if (!r || !(await canSee(req.user, r.userId))) return res.status(404).json({ error: "Not found" });
+    if (!r || (r.userId && !(await canSee(req.user, r.userId)))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.liked !== false;
     const already = (r.likes || []).some((l) => String(l) === String(req.user._id));
     const upd = await Reel.findByIdAndUpdate(req.params.id, want ? { $addToSet: { likes: req.user._id } } : { $pull: { likes: req.user._id } }, { new: true }).select("likes");
-    if (want && !already && String(r.userId) !== String(req.user._id)) {
+    if (want && !already && r.userId && String(r.userId) !== String(req.user._id)) {
       sendPushToUser(r.userId, {
         title: "Talkies",
         body: `❤️ ${req.user.fullName} liked your reel`,
@@ -341,6 +374,92 @@ export const deleteReel = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.log("Error in deleteReel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// A Discover clip becomes a real reel the first time someone interacts with it, so likes, comments,
+// saves, sends and reposts all work the same as on any other reel.
+export const importDiscover = async (req, res) => {
+  try {
+    const c = req.body?.clip || {};
+    const id = String(c._id || "");
+    if (!/^px-\d+$/.test(id) || typeof c.videoUrl !== "string" || !/^https:\/\//.test(c.videoUrl)) return res.status(400).json({ error: "Invalid clip" });
+    const reel = await Reel.findOneAndUpdate(
+      { externalId: id },
+      {
+        $setOnInsert: {
+          externalId: id,
+          videoUrl: c.videoUrl,
+          poster: typeof c.poster === "string" && /^https:\/\//.test(c.poster) ? c.poster : "",
+          duration: Number(c.duration) || 0,
+          externalAuthor: String(c.user?.fullName || "Talkies Discover").slice(0, 60),
+        },
+      },
+      { upsert: true, new: true }
+    ).lean();
+    res.status(200).json((await withCounts([reel], req.user._id))[0]);
+  } catch (error) {
+    console.log("Error in importDiscover:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// A public video status becomes a reel of its owner (needed to send it in chat / repost it): the video is
+// copied once to a public address, so it also keeps working after the 24-hour status is gone.
+export const importStatus = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const existing = await Reel.findOne({ fromStatus: req.params.id }).populate("userId", "fullName profilePic").lean();
+    const st = await Status.findOne({ _id: req.params.id, type: "video", expiresAt: { $gt: new Date() } }).populate("userId", "fullName profilePic").lean();
+    if (!st || !st.userId) {
+      if (existing) return res.status(200).json((await withCounts([existing], req.user._id))[0]);
+      return res.status(404).json({ error: "That update is gone" });
+    }
+    const mine = String(st.userId._id) === String(req.user._id);
+    if (!mine && (!audienceAllows(st.audience, req.user._id) || !(await canSee(req.user, st.userId._id)))) return res.status(404).json({ error: "Not available" });
+    if (st.audience?.mode && st.audience.mode !== "all") return res.status(403).json({ error: "This update is private, so it can't be shared" });
+    if (existing) return res.status(200).json((await withCounts([existing], req.user._id))[0]);
+    const up = await cloudinary.uploader.upload(deliveryUrl(st.content), { folder: "chat-app/reels", resource_type: "video" });
+    const reel = await Reel.create({
+      userId: st.userId._id,
+      fromStatus: st._id,
+      videoUrl: up.secure_url,
+      poster: up.secure_url.replace(/\.[a-z0-9]+$/i, ".jpg"),
+      caption: st.caption || "",
+      duration: up.duration || 0,
+      trim: st.trim?.end > 0 ? { start: st.trim.start || 0, end: st.trim.end } : { start: 0, end: 0 },
+    });
+    await reel.populate("userId", "fullName profilePic");
+    res.status(200).json((await withCounts([reel.toObject()], req.user._id))[0]);
+  } catch (error) {
+    console.log("Error in importStatus:", error.message);
+    res.status(500).json({ error: "Couldn't share that update" });
+  }
+};
+
+export const repostReel = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const r = await Reel.findById(req.params.id).select("userId").lean();
+    if (!r || (r.userId && !(await canSee(req.user, r.userId)))) return res.status(404).json({ error: "Not found" });
+    const want = req.body?.reposted !== false;
+    if (want) {
+      const u = await Repost.updateOne({ userId: req.user._id, reelId: r._id }, { $setOnInsert: { userId: req.user._id, reelId: r._id } }, { upsert: true });
+      if (u.upsertedCount) {
+        await Reel.updateOne({ _id: r._id }, { $inc: { reposts: 1 } });
+        if (r.userId && String(r.userId) !== String(req.user._id)) {
+          sendPushToUser(r.userId, { title: "Talkies", body: `🔁 ${req.user.fullName} reposted your reel`, icon: req.user.profilePic || "/icon-v2-192.png", tag: `reel-repost-${r._id}`, data: { url: `/reels?r=${r._id}` } }).catch(() => {});
+        }
+      }
+    } else {
+      const d = await Repost.deleteOne({ userId: req.user._id, reelId: r._id });
+      if (d.deletedCount) await Reel.updateOne({ _id: r._id, reposts: { $gt: 0 } }, { $inc: { reposts: -1 } });
+    }
+    const fresh = await Reel.findById(r._id).select("reposts").lean();
+    res.status(200).json({ reposted: want, reposts: fresh?.reposts || 0 });
+  } catch (error) {
+    console.log("Error in repostReel:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check } from "lucide-react";
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -39,7 +39,7 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   </button>
 );
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu }) => {
+const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -150,16 +150,20 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       <div className="absolute right-3 bottom-8 flex flex-col items-center gap-[22px] z-10">
         <Rail icon={Heart} size={32} label={count(reel.likeCount)} active={reel.liked} fill={reel.liked} onClick={() => onLike(reel, !reel.liked)} />
         <Rail icon={MessageCircle} size={31} label={count(reel.comments)} onClick={() => onComments(reel)} />
+        <Rail icon={Repeat2} size={31} label={count(reel.reposts)} active={reel.reposted} onClick={() => onRepost(reel)} />
         <Rail icon={Send} size={29} label={count(reel.views)} onClick={() => onShare(reel)} />
-        {reel.source !== "status" && <Rail icon={Bookmark} size={29} label={count(reel.saves)} fill={reel.saved} onClick={() => onSave(reel)} />}
+        <Rail icon={Bookmark} size={29} label={count(reel.saves)} fill={reel.saved} onClick={() => onSave(reel)} />
         <Rail icon={AlignJustify} size={26} onClick={() => onMenu(reel)} />
       </div>
 
       <div className="absolute left-4 right-[72px] bottom-6 text-white z-10">
+        {reel.repostedBy && (
+          <p className="mb-1.5 flex items-center gap-1.5 text-[12.5px] text-white/85"><Repeat2 size={14} /> {reel.repostedBy.fullName} reposted</p>
+        )}
         <div className="flex items-center gap-2.5">
           <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-10 rounded-full object-cover border border-white/30 bg-neutral-800" />
           <span className="font-semibold text-[15.5px] drop-shadow truncate max-w-[40vw]">{reel.user?.fullName}</span>
-          {!reel.mine && reel.source !== "discover" && (
+          {!reel.mine && !reel.external && reel.source !== "discover" && (
             <button
               onClick={() => onFollow(reel)}
               className={`ml-1 px-3.5 py-1 rounded-lg border text-[14px] font-semibold ${reel.following ? "border-white/40 text-white/80" : "border-white text-white"}`}
@@ -433,11 +437,24 @@ const ReelsPage = () => {
 
   const patch = (id, fn) => setReels((l) => l.map((r) => (r._id === id ? { ...r, ...fn(r) } : r)));
 
-  const like = async (reel, liked) => {
-    if (reel.source === "discover") {
-      patch(reel._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
-      return;
+  // A Discover clip becomes a real reel the first time you interact with it (like / comment / save / send / repost).
+  const materialize = async (reel) => {
+    if (reel.source !== "discover") return reel;
+    try {
+      const { data } = await axiosInstance.post("/reels/import", { clip: reel });
+      const real = { ...data, source: "reel", following: false, _key: reel._key || reel._id };
+      setReels((l) => l.map((r) => (r._id === reel._id ? real : r)));
+      setActiveId((cur) => (cur === reel._id ? real._id : cur));
+      return real;
+    } catch {
+      toast.error("Couldn't open that clip");
+      return null;
     }
+  };
+
+  const like = async (item, liked) => {
+    const reel = await materialize(item);
+    if (!reel) return;
     patch(reel._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
     try {
       await axiosInstance.put(reel.source === "status" ? `/status/${reel._id}/like` : `/reels/${reel._id}/like`, { liked });
@@ -459,23 +476,59 @@ const ReelsPage = () => {
     }
   };
 
-  const save = async (reel) => {
+  const save = async (item) => {
+    const reel = await materialize(item);
+    if (!reel) return;
     const want = !reel.saved;
-    const key = reel.source === "discover" ? `px:${reel._id}` : `reel:${reel._id}`;
+    const key = reel.source === "status" ? `status:${reel._id}` : `reel:${reel._id}`;
     patch(reel._id, (r) => ({ saved: want, saves: Math.max(0, (r.saves || 0) + (want ? 1 : -1)) }));
     try {
-      await axiosInstance.put("/reels/save", { key, saved: want, snapshot: want && reel.source === "discover" ? reel : undefined });
+      await axiosInstance.put("/reels/save", { key, saved: want });
       toast(want ? "Saved" : "Removed from saved", { icon: want ? "🔖" : "✖️" });
       if (!want && tab === "saved") setReels((l) => l.filter((r) => r._id !== reel._id));
-    } catch {
+    } catch (err) {
       patch(reel._id, (r) => ({ saved: !want, saves: Math.max(0, (r.saves || 0) + (want ? -1 : 1)) }));
-      toast.error("Couldn't save");
+      toast.error(err.response?.data?.error || "Couldn't save");
     }
   };
 
-  const shareReel = (reel) => {
-    if (reel.source !== "reel" && reel.source) return toast("Only posted reels can be sent in chat", { icon: "🎬" });
-    setSendFor(reel);
+  // a video status needs a public copy (only when it is for everyone) before it can be sent or reposted
+  const asReel = async (item) => {
+    let reel = await materialize(item);
+    if (!reel) return null;
+    if (reel.source === "status") {
+      const oldId = reel._id;
+      try {
+        const { data } = await axiosInstance.post(`/reels/import-status/${oldId}`);
+        reel = { ...data, source: "reel", following: reel.following, _key: reel._key || oldId };
+        setReels((l) => l.map((r) => (r._id === oldId ? reel : r)));
+        setActiveId((cur) => (cur === oldId ? reel._id : cur));
+      } catch (err) {
+        toast.error(err.response?.data?.error || "Couldn't share that update");
+        return null;
+      }
+    }
+    return reel;
+  };
+
+  const shareReel = async (item) => {
+    const reel = await asReel(item);
+    if (reel) setSendFor(reel);
+  };
+
+  const repost = async (item) => {
+    const reel = await asReel(item);
+    if (!reel) return;
+    if (reel.mine) return toast("That's your own reel", { icon: "🎬" });
+    const want = !reel.reposted;
+    patch(reel._id, (r) => ({ reposted: want, reposts: Math.max(0, (r.reposts || 0) + (want ? 1 : -1)) }));
+    try {
+      await axiosInstance.put(`/reels/${reel._id}/repost`, { reposted: want });
+      toast(want ? "Reposted — people who can see you will get it" : "Repost removed", { icon: "🔁" });
+    } catch (err) {
+      patch(reel._id, (r) => ({ reposted: !want, reposts: Math.max(0, (r.reposts || 0) + (want ? -1 : 1)) }));
+      toast.error(err.response?.data?.error || "Couldn't repost");
+    }
   };
 
   const remove = async (reel) => {
@@ -544,7 +597,7 @@ const ReelsPage = () => {
         ) : (
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
             {reels.map((r) => (
-              <ReelItem key={r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={(x) => (x.source === "discover" ? toast("Comments are off on discover clips", { icon: "💬" }) : setCommentsFor(x))} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} />
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} />
             ))}
           </div>
         )}
@@ -563,8 +616,8 @@ const ReelsPage = () => {
               <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-white/25" />
               {[
                 { icon: muted ? VolumeX : Volume2, label: muted ? "Turn sound on" : "Mute sound", run: () => setMuted(!muted) },
-                ...(menuFor.source !== "status" ? [{ icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) }] : []),
-                ...(menuFor.source === "reel" || !menuFor.source ? [{ icon: Link2, label: "Copy link", run: () => copyLink(menuFor) }] : []),
+                { icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) },
+                { icon: Link2, label: "Copy link", run: async () => { const r = await asReel(menuFor); if (r) copyLink(r); } },
                 { icon: Bookmark, label: "Saved reels", run: () => setTab("saved") },
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Delete reel", run: () => remove(menuFor), danger: true }] : []),
               ].map((it) => (

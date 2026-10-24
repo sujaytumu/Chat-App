@@ -23,7 +23,10 @@ const resolveTarget = async (targetId, viewerId) => {
     return own || canSeeAudience(st.audience, viewerId) ? { ownerId: String(st.userId) } : null;
   }
   const reel = await Reel.findById(targetId).select("userId").lean();
-  if (reel) return (await canSee({ _id: viewerId }, reel.userId)) ? { ownerId: String(reel.userId) } : null;
+  if (reel) {
+    if (!reel.userId) return { ownerId: null }; // an imported Discover clip: open to everyone
+    return (await canSee({ _id: viewerId }, reel.userId)) ? { ownerId: String(reel.userId) } : null;
+  }
   const h = await Highlight.findOne({ "items._id": targetId }).select("userId items._id items.audience").lean();
   const item = h?.items?.find((i) => String(i._id) === String(targetId));
   if (!h || !item) return null;
@@ -81,7 +84,7 @@ export const addComment = async (req, res) => {
       parentAuthor = String(p.userId);
     }
 
-    const c = await StatusComment.create({ targetId, ownerId: target.ownerId, userId: req.user._id, parentId, text });
+    const c = await StatusComment.create({ targetId, ownerId: target.ownerId || req.user._id, userId: req.user._id, parentId, text });
     const out = shape({ ...c.toObject(), userId: { _id: req.user._id, fullName: req.user.fullName, profilePic: req.user.profilePic } }, req.user._id);
 
     // Tell the owner (and whoever was replied to) right away
