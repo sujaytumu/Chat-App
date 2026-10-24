@@ -91,8 +91,8 @@ const MainNav = () => {
             {({ isActive }) => (
               <>
                 <span
-                  className={`relative h-8 w-16 rounded-full flex items-center justify-center transition-colors ${
-                    isActive ? "bg-wa-tint text-wa-tinttext" : "text-wa-text2 active:bg-white/5"
+                  className={`relative h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+                    isActive ? "w-16 bg-wa-tint text-wa-tinttext" : "w-12 text-wa-text2 active:bg-white/5"
                   }`}
                 >
                   <Icon size={26} filled={isActive} />
