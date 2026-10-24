@@ -40,7 +40,7 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   </button>
 );
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext }) => {
+const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -48,6 +48,9 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
   const [progress, setProgress] = useState(0);
   const [more, setMore] = useState(false);
   const [scrub, setScrub] = useState(false);
+  const [fast, setFast] = useState(false); // holding the screen = 2x speed
+  const holdTimer = useRef(null);
+  const heldRef = useRef(false);
   const bar = useRef(null);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
@@ -130,7 +133,30 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
   };
   const scrubUp = () => setScrub(false);
 
+  const setRate = (r) => {
+    if (video.current) video.current.playbackRate = r;
+    if (songEl.current) songEl.current.playbackRate = r;
+  };
+  const holdStart = () => {
+    heldRef.current = false;
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      heldRef.current = true;
+      setRate(2);
+      setFast(true);
+    }, 350);
+  };
+  const holdEnd = () => {
+    clearTimeout(holdTimer.current);
+    if (heldRef.current) {
+      setRate(1);
+      setFast(false);
+      setTimeout(() => (heldRef.current = false), 60); // swallow the click that follows a hold
+    }
+  };
+
   const tap = () => {
+    if (heldRef.current) return;
     const now = Date.now();
     if (now - lastTap.current < 280) {
       clearTimeout(tapTimer.current);
@@ -162,7 +188,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         src={reel.videoUrl}
         poster={reel.poster}
         playsInline
-        preload={active ? "auto" : "metadata"}
+        preload={active || near ? "auto" : "metadata"}
         onTimeUpdate={onTime}
         onEnded={finished}
         onLoadedMetadata={(e) => { if (reel.trim?.start) e.currentTarget.currentTime = reel.trim.start; }}
@@ -170,7 +196,12 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         className="absolute inset-0 w-full h-full object-contain"
       />
       {reel.song?.url && <audio ref={songEl} src={reel.song.url} loop preload={active ? "auto" : "none"} />}
-      <div className="absolute inset-0" onClick={tap} />
+      <div className="absolute inset-0 touch-pan-y select-none" onClick={tap} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()} />
+      {fast && (
+        <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-10">
+          <span className="px-3 py-1 rounded-full bg-black/55 text-white text-[13px] font-semibold">2× speed</span>
+        </div>
+      )}
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="size-20 rounded-full bg-black/40 flex items-center justify-center text-white">
@@ -496,6 +527,8 @@ const ReelsPage = () => {
     return true;
   }, []);
 
+  const activeIdx = Math.max(0, reels.findIndex((r) => r._id === (activeId || reels[0]?._id)));
+
   const patch = (id, fn) => setReels((l) => l.map((r) => (r._id === id ? { ...r, ...fn(r) } : r)));
 
   // A Discover clip becomes a real reel the first time you interact with it (like / comment / save / send / repost).
@@ -663,8 +696,8 @@ const ReelsPage = () => {
           </div>
         ) : (
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
-            {reels.map((r) => (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} />
+            {reels.map((r, idx) => (
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} />
             ))}
           </div>
         )}

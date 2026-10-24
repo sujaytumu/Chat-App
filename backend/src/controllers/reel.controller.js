@@ -274,6 +274,22 @@ export const getSaved = async (req, res) => {
   }
 };
 
+// A person's own reels for their profile grid (only if I'm allowed to see them).
+export const getUserReels = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!mongoose.isValidObjectId(userId)) return res.status(404).json({ error: "Not found" });
+    if (String(userId) !== String(req.user._id) && !(await canSee(req.user, userId))) return res.status(200).json({ reels: [] });
+    const rows = await Reel.find({ userId }).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
+    const shaped = await withCounts(rows, req.user._id);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: shaped.map((r) => ({ _id: r._id, videoUrl: r.videoUrl, poster: r.poster, views: r.views, likeCount: r.likeCount, duration: r.duration, createdAt: r.createdAt })) });
+  } catch (error) {
+    console.log("Error in getUserReels:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const getReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
