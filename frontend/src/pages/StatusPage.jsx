@@ -9,7 +9,6 @@ import StatusViewer from "../components/StatusViewer";
 import HighlightsRow from "../components/HighlightsRow";
 import HighlightSheet from "../components/HighlightSheet";
 import PlaylistsCard from "../components/PlaylistsCard";
-import NotesRow from "../components/NotesRow";
 import { HL_GRADIENT } from "../lib/highlightTheme";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import toast from "react-hot-toast";
@@ -159,43 +158,66 @@ const StatusPage = () => {
           </div>
         ) : (
           <>
-            <button
-              onClick={() =>
-                feed.myStatuses.length > 0
-                  ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
-                  : setShowCreate("image")
-              }
-              className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 active:bg-wa-surface"
-            >
-              <div className="relative">
-                <img
-                  src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                  alt="My status"
-                  className={`size-14 rounded-full object-cover ${
-                    feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""
-                  }`}
-                />
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowCreate("image");
-                  }}
-                  className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#00A884] border-2 border-wa-bg flex items-center justify-center text-white"
-                >
-                  <Plus size={14} strokeWidth={3} />
-                </span>
-              </div>
-              <div className="text-left min-w-0">
-                <p className="text-[14.5px] text-wa-text">My status</p>
-                <p className="text-[12px] text-wa-muted">
-                  {feed.myStatuses.length > 0
-                    ? statusTime(feed.myStatuses[feed.myStatuses.length - 1].createdAt)
-                    : "Tap to add status update"}
-                </p>
-              </div>
-            </button>
+            {/* One slim row you swipe sideways (like WhatsApp's status bar): my status first, then everyone else's */}
+            <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pt-1 pb-3 border-b border-white/5">
+              <button
+                onClick={() =>
+                  feed.myStatuses.length > 0
+                    ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
+                    : setShowCreate("image")
+                }
+                className="shrink-0 w-[68px] flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
+              >
+                <div className="relative">
+                  <img
+                    src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
+                    alt="My status"
+                    className={`size-[60px] rounded-full object-cover ${feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""}`}
+                  />
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowCreate("image");
+                    }}
+                    className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#00A884] border-2 border-wa-bg flex items-center justify-center text-white"
+                  >
+                    <Plus size={14} strokeWidth={3} />
+                  </span>
+                </div>
+                <span className="text-[12px] text-wa-text truncate w-full text-center">My status</span>
+              </button>
 
-            <NotesRow />
+              {[
+                ...feed.others.filter((o) => o.hasUnseen && !isMuted(o.user._id)).map((o) => ({ ...o, tone: "new" })),
+                ...feed.others.filter((o) => !o.hasUnseen && !isMuted(o.user._id)).map((o) => ({ ...o, tone: "seen" })),
+                ...feed.others.filter((o) => isMuted(o.user._id)).map((o) => ({ ...o, tone: "muted" })),
+              ].map(({ user, statuses, hasUnseen, tone }) => (
+                <button
+                  key={user._id}
+                  onClick={() => {
+                    if (rowLongPressed.current) return; // the long-press already opened the options
+                    setViewing({ user, statuses, isOwn: false });
+                  }}
+                  onPointerDown={() => startRowPress({ user, statuses })}
+                  onPointerUp={endRowPress}
+                  onPointerLeave={endRowPress}
+                  onPointerCancel={endRowPress}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setRowSheet({ user, statuses });
+                  }}
+                  className={`shrink-0 w-[68px] flex flex-col items-center gap-1.5 select-none active:scale-95 transition-transform ${tone === "muted" ? "opacity-60" : ""}`}
+                >
+                  <img
+                    src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
+                    alt={user.fullName}
+                    className={`size-[60px] rounded-full object-cover ring-2 ${hasUnseen && tone !== "muted" ? "ring-[#00A884]" : "ring-wa-muted/40"} ring-offset-2 ring-offset-wa-bg`}
+                    draggable={false}
+                  />
+                  <span className={`text-[12px] truncate w-full text-center ${tone === "new" ? "text-wa-text font-medium" : "text-wa-muted"}`}>{(user.fullName || "").split(" ")[0]}</span>
+                </button>
+              ))}
+            </div>
 
             {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
             <div className="mt-3 pb-1 border-t border-white/5 pt-3">
@@ -226,51 +248,6 @@ const StatusPage = () => {
             </div>
 
             <PlaylistsCard />
-
-            {[
-              ["Recent updates", feed.others.filter((o) => o.hasUnseen && !isMuted(o.user._id))],
-              ["Viewed updates", feed.others.filter((o) => !o.hasUnseen && !isMuted(o.user._id))],
-              ["Muted updates", feed.others.filter((o) => isMuted(o.user._id))],
-            ].map(
-              ([title, list]) =>
-                list.length > 0 && (
-                  <div key={title}>
-                    <p className="px-4 pt-4 pb-1 text-[12px] font-medium text-wa-muted">{title}</p>
-                    {list.map(({ user, statuses, hasUnseen }) => (
-                      <div key={user._id} className={`flex items-center hover:bg-white/5 ${title === "Muted updates" ? "opacity-70" : ""}`}>
-                        <button
-                          onClick={() => {
-                            if (rowLongPressed.current) return; // the long-press already opened the options
-                            setViewing({ user, statuses, isOwn: false });
-                          }}
-                          onPointerDown={() => startRowPress({ user, statuses })}
-                          onPointerUp={endRowPress}
-                          onPointerLeave={endRowPress}
-                          onPointerCancel={endRowPress}
-                          onContextMenu={(e) => {
-                            e.preventDefault();
-                            setRowSheet({ user, statuses });
-                          }}
-                          className="flex-1 min-w-0 flex items-center gap-4 px-4 py-3 active:bg-wa-surface select-none"
-                        >
-                          <img
-                            src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                            alt={user.fullName}
-                            className={`size-14 rounded-full object-cover ring-2 ${
-                              hasUnseen && title !== "Muted updates" ? "ring-[#00A884]" : "ring-wa-muted/40"
-                            } ring-offset-2 ring-offset-wa-bg`}
-                            draggable={false}
-                          />
-                          <div className="text-left min-w-0">
-                            <p className="text-[14.5px] text-wa-text truncate">{user.fullName}</p>
-                            <p className="text-[12px] text-wa-muted">{statusTime(statuses[statuses.length - 1].createdAt)}</p>
-                          </div>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )
-            )}
 
             {feed.others.length === 0 && feed.myStatuses.length === 0 && (
               <p className="text-center text-wa-muted py-10 text-sm">No status updates yet</p>

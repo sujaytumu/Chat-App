@@ -371,6 +371,7 @@ export const useCallStore = create((set, get) => ({
     // valid and must not carry on creating a connection / ringing the callee.
     const isStale = () => get().callStatus !== "calling" || callClaimedAt !== claimedAt;
 
+    const icePromise = getIceConfig(); // fetched while the microphone starts, not after it
     let stream;
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -405,7 +406,7 @@ export const useCallStore = create((set, get) => ({
 
       // Never let a slow / sleeping server hold the call back: use the cached relay list, or fall
       // back to the built-in one after 1.5 s (the list is fetched in the background at app start).
-      const ice = await Promise.race([getIceConfig(), new Promise((r) => setTimeout(() => r(ICE_SERVERS), 1500))]);
+      const ice = await Promise.race([icePromise, new Promise((r) => setTimeout(() => r(ICE_SERVERS), 1500))]);
       pc = new RTCPeerConnection({ ...ice, iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
       attachConnectionWatchdog(pc, get);
       stream.getTracks().forEach((track) => pc.addTrack(track, stream));
