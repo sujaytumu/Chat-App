@@ -517,6 +517,15 @@ io.on("connection", (socket) => {
 
   // The app came back to the front (or the network returned): hand over any call that is
   // still ringing for this user. The client ignores a call it is already showing.
+  // The caller's phone lost its internet while "Calling…" and is back: if the server no longer has
+  // this call (it was dropped while they were away), tell them, so they never sit on "Calling…" forever.
+  socket.on("checkCall", ({ toUserId, callId } = {}) => {
+    const cur = activeCalls.get(pairKey(userId, String(toUserId)));
+    if (!cur || (callId && cur.callId !== callId)) {
+      socket.emit("callFailed", { reason: "Call ended", callId });
+    }
+  });
+
   socket.on("syncCalls", () => {
     const pending = pendingCalls.get(userId);
     if (!pending) return;
