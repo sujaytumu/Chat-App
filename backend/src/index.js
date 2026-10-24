@@ -19,6 +19,7 @@ import callRoutes from "./routes/call.route.js";
 import statusRoutes from "./routes/status.route.js";
 import highlightRoutes from "./routes/highlight.route.js";
 import statusCommentRoutes from "./routes/statusComment.route.js";
+import reelRoutes from "./routes/reel.route.js";
 import scheduledRoutes from "./routes/scheduled.route.js";
 import broadcastRoutes from "./routes/broadcast.route.js";
 import mediaRoutes from "./routes/media.route.js";
@@ -112,6 +113,7 @@ app.use("/api/calls", callRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/highlights", highlightRoutes);
 app.use("/api/status-comments", statusCommentRoutes);
+app.use("/api/reels", reelRoutes);
 app.use("/api/scheduled", scheduledRoutes);
 app.use("/api/broadcasts", broadcastRoutes);
 
