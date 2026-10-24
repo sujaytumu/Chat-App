@@ -361,6 +361,7 @@ const ReelsPage = () => {
   const [sendFor, setSendFor] = useState(null);
   const [menuFor, setMenuFor] = useState(null);
   const [pickTab, setPickTab] = useState(false);
+  const [failed, setFailed] = useState(false);
   const box = useRef(null);
   const loadingMore = useRef(false);
   const cursor = useRef({ before: null, px: 1 });
@@ -376,7 +377,7 @@ const ReelsPage = () => {
         if (cursor.current.before) params.before = cursor.current.before;
         params.px = cursor.current.px;
       }
-      const { data } = tab === "saved" ? await axiosInstance.get("/reels/saved") : await axiosInstance.get("/reels", { params });
+      const { data } = tab === "saved" ? await axiosInstance.get("/reels/saved", { timeout: 20000 }) : await axiosInstance.get("/reels", { params, timeout: 20000 });
       if (my !== gen.current) return;
       if (data.next) cursor.current.before = data.next;
       if (data.px) cursor.current.px = data.px;
@@ -386,8 +387,10 @@ const ReelsPage = () => {
         return [...base, ...data.reels.filter((r) => !seen.has(r._id))];
       });
       setMore(!!data.more);
+      setFailed(false);
     } catch {
-      toast.error("Couldn't load reels");
+      // the server may be waking up / updating: say so, and let the person retry (never a spinner forever)
+      if (my === gen.current) setFailed(true);
     } finally {
       loadingMore.current = false;
       setLoading(false);
@@ -585,6 +588,12 @@ const ReelsPage = () => {
       <div className="absolute inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom))]">
         {loading && !reels.length ? (
           <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
+        ) : !reels.length && failed ? (
+          <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
+            <p className="text-lg font-semibold">Couldn&apos;t load reels</p>
+            <p className="text-white/60 text-[14px]">The server may be starting up. Check your internet and try again.</p>
+            <button onClick={() => { setLoading(true); setFailed(false); load(true); }} className="px-6 py-3 rounded-full bg-[#25D366] text-black font-semibold">Try again</button>
+          </div>
         ) : !reels.length ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
             <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
