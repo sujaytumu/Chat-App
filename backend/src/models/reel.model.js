@@ -9,6 +9,9 @@ const reelSchema = new mongoose.Schema(
     poster: { type: String, default: "" },
     caption: { type: String, default: "", maxlength: 300 },
     duration: { type: Number, default: 0 },
+    filter: { type: String, default: "none" },
+    trim: { start: { type: Number, default: 0 }, end: { type: Number, default: 0 } }, // end 0 = whole video
+    song: { url: String, name: String, start: { type: Number, default: 0 } },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     views: { type: Number, default: 0 },
   },

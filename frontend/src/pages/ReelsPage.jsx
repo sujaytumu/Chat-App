@@ -1,17 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play } from "lucide-react";
+import { ArrowLeft, Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import { useAuthStore } from "../store/useAuthStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
+import StatusMusicSheet from "../components/StatusMusicSheet";
+import { SongBars } from "../components/StatusSong";
+import { readFileAsBase64 } from "../lib/fileUtils";
 
 // Reels: short vertical videos from people you can see — swipe up for the next one, double-tap to like,
 // comments, share, and your own post button. Same privacy rule as chats ("who can see whom").
 
+// Looks: pure CSS filters applied while playing, so the original video is never re-encoded.
+export const FILTERS = [
+  { id: "none", name: "Original", css: "none" },
+  { id: "warm", name: "Warm", css: "sepia(.25) saturate(1.3) hue-rotate(-10deg) brightness(1.05)" },
+  { id: "cool", name: "Cool", css: "saturate(1.1) hue-rotate(15deg) brightness(1.03) contrast(1.05)" },
+  { id: "mono", name: "Mono", css: "grayscale(1) contrast(1.1)" },
+  { id: "vivid", name: "Vivid", css: "saturate(1.7) contrast(1.1)" },
+  { id: "fade", name: "Fade", css: "contrast(.85) brightness(1.1) saturate(.8)" },
+  { id: "vintage", name: "Vintage", css: "sepia(.55) contrast(.95) brightness(1.05) saturate(.9)" },
+  { id: "dream", name: "Dream", css: "brightness(1.1) saturate(1.25) contrast(.92) blur(.4px)" },
+];
+const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css || "none";
+
 const MAX_MB = 10;
+const MAX_TOTAL_MB = 12; // video + song together (they travel in one request)
 const MAX_SECONDS = 60;
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
@@ -24,6 +41,7 @@ const Rail = ({ icon: Icon, label, onClick, active, fill }) => (
 
 const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onDelete }) => {
   const video = useRef(null);
+  const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
   const [burst, setBurst] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -35,8 +53,12 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
     if (!v) return;
     if (active) {
       setPaused(false);
-      v.currentTime = 0;
+      v.currentTime = reel.trim?.start || 0;
       v.muted = muted;
+      if (songEl.current) {
+        songEl.current.currentTime = reel.song?.start || 0;
+        songEl.current.play().catch(() => {});
+      }
       v.play().catch(() => {
         // sound blocked until a tap: start muted so it still plays
         v.muted = true;
@@ -46,13 +68,27 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       axiosInstance.put(`/reels/${reel._id}/view`).catch(() => {});
     } else {
       v.pause();
+      songEl.current?.pause();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, reel._id]);
 
   useEffect(() => {
     if (video.current) video.current.muted = muted;
+    if (songEl.current) songEl.current.muted = muted;
   }, [muted]);
+
+  // the trimmed part loops (the file itself is whole)
+  const onTime = (e) => {
+    const v = e.currentTarget;
+    const start = reel.trim?.start || 0;
+    const end = reel.trim?.end || v.duration || 0;
+    if (reel.trim && v.currentTime >= end) {
+      v.currentTime = start;
+      if (songEl.current) songEl.current.currentTime = reel.song?.start || 0;
+    }
+    setProgress(end > start ? Math.min(1, Math.max(0, (v.currentTime - start) / (end - start))) : 0);
+  };
 
   const tap = () => {
     const now = Date.now();
@@ -69,9 +105,11 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       if (!v) return;
       if (v.paused) {
         v.play().catch(() => {});
+        songEl.current?.play().catch(() => {});
         setPaused(false);
       } else {
         v.pause();
+        songEl.current?.pause();
         setPaused(true);
       }
     }, 280);
@@ -86,9 +124,12 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         loop
         playsInline
         preload={active ? "auto" : "metadata"}
-        onTimeUpdate={(e) => setProgress(e.currentTarget.duration ? e.currentTarget.currentTime / e.currentTarget.duration : 0)}
+        onTimeUpdate={onTime}
+        onLoadedMetadata={(e) => { if (reel.trim?.start) e.currentTarget.currentTime = reel.trim.start; }}
+        style={{ filter: filterCss(reel.filter) }}
         className="absolute inset-0 w-full h-full object-contain"
       />
+      {reel.song?.url && <audio ref={songEl} src={reel.song.url} loop preload={active ? "auto" : "none"} />}
       <div className="absolute inset-0" onClick={tap} />
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -118,6 +159,9 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
           <span className="font-semibold text-[15px] drop-shadow truncate">{reel.user?.fullName}</span>
         </div>
         {reel.caption && <p className="mt-2 text-[14px] leading-snug drop-shadow line-clamp-3 whitespace-pre-wrap break-words">{reel.caption}</p>}
+        {reel.song?.url && (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-white/90"><SongBars playing={active && !paused && !muted} /> <span className="truncate">{reel.song.name || "Original audio"}</span></p>
+        )}
         <p className="mt-1 text-[12px] text-white/70">{count(reel.views)} views</p>
       </div>
       <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25 z-10">
@@ -134,7 +178,16 @@ const NewReel = ({ onClose, onPosted }) => {
   const [caption, setCaption] = useState("");
   const [pct, setPct] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState("none");
+  const [range, setRange] = useState([0, 0]); // trim start / end in seconds (end 0 = untouched)
+  const [song, setSong] = useState(null); // { data, name, size, mime }
+  const [showMusic, setShowMusic] = useState(false);
   const pick = useRef(null);
+  const prev = useRef(null);
+  const songInput = useRef(null);
+  const trimmed = duration > 0 && (range[0] > 0.05 || (range[1] > 0 && range[1] < duration - 0.05));
+  const effEnd = range[1] > 0 ? range[1] : duration;
+  const effLen = Math.max(0, effEnd - range[0]);
 
   useEffect(() => () => url && URL.revokeObjectURL(url), [url]);
 
@@ -143,12 +196,14 @@ const NewReel = ({ onClose, onPosted }) => {
     if (!f.type.startsWith("video/")) return toast.error("Pick a video");
     if (f.size > MAX_MB * 1024 * 1024) return toast.error(`Keep the video under ${MAX_MB} MB`);
     setFile(f);
+    setRange([0, 0]);
     setUrl(URL.createObjectURL(f));
   };
 
   const post = async () => {
     if (!file || busy) return;
-    if (duration > MAX_SECONDS + 0.5) return toast.error(`Reels can be at most ${MAX_SECONDS} seconds`);
+    if ((trimmed ? effLen : duration) > MAX_SECONDS + 0.5) return toast.error(`Reels can be at most ${MAX_SECONDS} seconds — trim it shorter`);
+    if (song && (file.size + song.size) / 1048576 > MAX_TOTAL_MB) return toast.error("Video + song are too big together — pick a shorter video or another song");
     setBusy(true);
     try {
       const data = await new Promise((ok, bad) => {
@@ -157,7 +212,7 @@ const NewReel = ({ onClose, onPosted }) => {
         r.onerror = bad;
         r.readAsDataURL(file);
       });
-      const res = await axiosInstance.post("/reels", { video: data, caption, duration }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+      const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}) }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
       toast.success("Reel posted");
       onPosted(res.data);
     } catch (err) {
@@ -177,7 +232,22 @@ const NewReel = ({ onClose, onPosted }) => {
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center p-3">
         {url ? (
-          <video src={url} controls playsInline muted loop onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)} className="max-h-full max-w-full rounded-xl" />
+          <video
+            ref={prev}
+            src={url}
+            playsInline
+            muted
+            loop
+            autoPlay
+            onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())}
+            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onTimeUpdate={(e) => {
+              const v = e.currentTarget;
+              if (v.currentTime >= effEnd - 0.05 || v.currentTime < range[0] - 0.3) v.currentTime = range[0];
+            }}
+            style={{ filter: filterCss(filter) }}
+            className="max-h-full max-w-full rounded-xl"
+          />
         ) : (
           <button onClick={() => pick.current?.click()} className="flex flex-col items-center gap-3 text-white/80">
             <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
@@ -190,6 +260,36 @@ const NewReel = ({ onClose, onPosted }) => {
         {busy && (
           <div className="h-1.5 rounded-full bg-white/20 overflow-hidden"><div className="h-full bg-[#25D366] transition-all" style={{ width: `${pct}%` }} /></div>
         )}
+        {file && !busy && (
+          <>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {FILTERS.map((f) => (
+                <button key={f.id} onClick={() => setFilter(f.id)} className="shrink-0 flex flex-col items-center gap-1">
+                  <span className={`block size-14 rounded-xl overflow-hidden border-2 ${filter === f.id ? "border-[#25D366]" : "border-transparent"}`}>
+                    <video src={url} muted playsInline preload="metadata" style={{ filter: f.css }} className="size-full object-cover pointer-events-none" />
+                  </span>
+                  <span className={`text-[11px] ${filter === f.id ? "text-[#25D366]" : "text-white/70"}`}>{f.name}</span>
+                </button>
+              ))}
+            </div>
+            {duration > 1 && (
+              <div className="rounded-xl bg-white/10 px-3 py-2">
+                <div className="flex justify-between text-[12px] text-white/70 mb-1">
+                  <span>Trim</span>
+                  <span className="tabular-nums">{range[0].toFixed(1)}s – {effEnd.toFixed(1)}s ({effLen.toFixed(1)}s)</span>
+                </div>
+                <input type="range" min={0} max={duration} step={0.1} value={range[0]} onChange={(e) => setRange(([, b]) => [Math.min(+e.target.value, (b || duration) - 0.5), b])} className="w-full accent-[#25D366]" aria-label="Start" />
+                <input type="range" min={0} max={duration} step={0.1} value={effEnd} onChange={(e) => setRange(([a]) => [a, Math.max(+e.target.value, a + 0.5)])} className="w-full accent-[#25D366]" aria-label="End" />
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowMusic(true)} className="flex-1 flex items-center gap-2 rounded-full bg-white/10 px-4 py-2.5 text-[14px]">
+                <Music size={17} className={song ? "text-[#25D366]" : ""} /> <span className="truncate">{song ? song.name : "Add music"}</span>
+              </button>
+              {song && <button onClick={() => setSong(null)} className="size-10 rounded-full bg-white/10 flex items-center justify-center" aria-label="Remove music"><X size={16} /></button>}
+            </div>
+          </>
+        )}
         <input
           value={caption}
           onChange={(e) => setCaption(e.target.value.slice(0, 300))}
@@ -199,6 +299,30 @@ const NewReel = ({ onClose, onPosted }) => {
         />
         {file && !busy && <button onClick={() => pick.current?.click()} className="text-sm text-white/70 underline">Choose another video</button>}
       </div>
+      <input
+        ref={songInput}
+        type="file"
+        accept="audio/*"
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          if (file.size > 4 * 1024 * 1024) return toast.error("Pick a song under 4 MB");
+          setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, ""), size: file.size, mime: file.type });
+          setShowMusic(false);
+        }}
+      />
+      {showMusic && (
+        <StatusMusicSheet
+          onClose={() => setShowMusic(false)}
+          onPick={(sg) => {
+            setSong(sg);
+            setShowMusic(false);
+          }}
+          onFiles={() => songInput.current?.click()}
+        />
+      )}
     </div>
   );
 };

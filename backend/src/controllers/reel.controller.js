@@ -4,6 +4,10 @@ import StatusComment from "../models/statusComment.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
 import { MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
+import { sendPushToUser } from "../lib/webPush.js";
+
+const FILTERS = ["none", "warm", "cool", "mono", "vivid", "fade", "vintage", "dream"];
+const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 
 const MAX_SECONDS = 60;
 const PAGE = 8;
@@ -14,6 +18,9 @@ const shape = (r, meId, commentCounts) => ({
   poster: r.poster,
   caption: r.caption,
   duration: r.duration,
+  filter: r.filter || "none",
+  trim: r.trim?.end > 0 ? { start: r.trim.start || 0, end: r.trim.end } : null,
+  song: r.song?.url ? { url: r.song.url, name: r.song.name, start: r.song.start || 0 } : null,
   createdAt: r.createdAt,
   user: r.userId?._id ? { _id: r.userId._id, fullName: r.userId.fullName, profilePic: r.userId.profilePic } : null,
   likeCount: (r.likes || []).length,
@@ -69,7 +76,7 @@ export const getReel = async (req, res) => {
 
 export const createReel = async (req, res) => {
   try {
-    const { video, caption, duration } = req.body || {};
+    const { video, caption, duration, filter, trim, song } = req.body || {};
     const secs = Number(duration) || 0;
     if (typeof video !== "string" || !video.startsWith("data:video/")) return res.status(400).json({ error: "Pick a video" });
     if (video.length > MAX_BASE64_LENGTH) return res.status(413).json({ error: "That video is too large (max about 10 MB)" });
@@ -79,12 +86,31 @@ export const createReel = async (req, res) => {
       cloudinary.uploader.destroy(up.public_id, { resource_type: "video" }).catch(() => {});
       return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
     }
+    // optional extras: a look, a trimmed part, a song
+    const cleanFilter = FILTERS.includes(filter) ? filter : "none";
+    let cleanTrim = { start: 0, end: 0 };
+    const tStart = Number(trim?.start);
+    const tEnd = Number(trim?.end);
+    const total = up.duration || secs || 0;
+    if (Number.isFinite(tStart) && Number.isFinite(tEnd) && tStart >= 0 && tEnd > tStart + 0.5 && (!total || tEnd <= total + 0.5)) {
+      cleanTrim = { start: Math.round(tStart * 10) / 10, end: Math.round(tEnd * 10) / 10 };
+    }
+    let cleanSong;
+    if (song?.data && typeof song.data === "string" && song.data.startsWith("data:audio/")) {
+      if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
+      const sUp = await cloudinary.uploader.upload(song.data, { folder: "chat-app/reel-music", resource_type: "video" });
+      const sStart = Number(song.start);
+      cleanSong = { url: sUp.secure_url, name: String(song.name || "Song").slice(0, 80), start: Number.isFinite(sStart) ? Math.min(Math.max(sStart, 0), 3600) : 0 };
+    }
     const reel = await Reel.create({
+      filter: cleanFilter,
+      trim: cleanTrim,
+      ...(cleanSong ? { song: cleanSong } : {}),
       userId: req.user._id,
       videoUrl: up.secure_url,
       poster: up.secure_url.replace(/\.[a-z0-9]+$/i, ".jpg"), // Cloudinary makes a still of the first frame
       caption: typeof caption === "string" ? caption.trim().slice(0, 300) : "",
-      duration: Math.round((up.duration || secs) * 10) / 10,
+      duration: Math.round((cleanTrim.end > 0 ? cleanTrim.end - cleanTrim.start : up.duration || secs) * 10) / 10,
     });
     await reel.populate("userId", "fullName profilePic");
     res.status(201).json((await withCounts([reel.toObject()], req.user._id))[0]);
@@ -100,7 +126,17 @@ export const likeReel = async (req, res) => {
     const r = await Reel.findById(req.params.id).select("userId likes").lean();
     if (!r || !(await canSee(req.user, r.userId))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.liked !== false;
+    const already = (r.likes || []).some((l) => String(l) === String(req.user._id));
     const upd = await Reel.findByIdAndUpdate(req.params.id, want ? { $addToSet: { likes: req.user._id } } : { $pull: { likes: req.user._id } }, { new: true }).select("likes");
+    if (want && !already && String(r.userId) !== String(req.user._id)) {
+      sendPushToUser(r.userId, {
+        title: "Talkies",
+        body: `❤️ ${req.user.fullName} liked your reel`,
+        icon: req.user.profilePic || "/icon-v2-192.png",
+        tag: `reel-like-${req.params.id}`,
+        data: { url: `/reels?r=${req.params.id}` },
+      }).catch(() => {});
+    }
     res.status(200).json({ liked: want, likeCount: upd.likes.length });
   } catch (error) {
     console.log("Error in likeReel:", error.message);
