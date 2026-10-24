@@ -385,9 +385,13 @@ let backTimer = null;
 let backStopTimer = null;
 let backToken = 0;
 
-const TAP = { freq: 425, dur: 0.6, gain: 0.35, type: "sine" };
-const CALLING_STEPS = [{ ...TAP, dur: 0.8, start: 0 }]; // ONE clear beep ...
-const RINGING_STEPS = [{ ...TAP, dur: 0.45, start: 0 }, { ...TAP, dur: 0.45, start: 0.65 }]; // ... TWO beeps once their phone rings
+// Soft two-note ringback like a real phone / WhatsApp: 440 Hz + 480 Hz together, gentle fade in and out.
+const duo = (start, dur) => [
+  { freq: 440, dur, gain: 0.2, type: "sine", start },
+  { freq: 480, dur, gain: 0.2, type: "sine", start },
+];
+const CALLING_STEPS = [...duo(0, 1.1)]; // ONE soft "tuuu" while connecting
+const RINGING_STEPS = [...duo(0, 0.45), ...duo(0.65, 0.45)]; // "tu-tu" once their phone rings
 const BUSY_STEPS = [
   { freq: 480, dur: 0.9, gain: 0.12, type: "sine", start: 0 },
   { freq: 620, dur: 0.9, gain: 0.08, type: "sine", start: 0 },
@@ -411,8 +415,8 @@ function startPattern(steps, periodMs, maxMs) {
 }
 
 // no time limit: both repeat until they pick up, decline, or the caller hangs up
-export function startCallingTone() { startPattern(CALLING_STEPS, 2500); }
-export function startRingback() { startPattern(RINGING_STEPS, 3000); }
+export function startCallingTone() { startPattern(CALLING_STEPS, 3000); }
+export function startRingback() { startPattern(RINGING_STEPS, 3200); }
 export function startBusyTone() { startPattern(BUSY_STEPS, 1500, 4300); }
 
 export function stopRingback() {
