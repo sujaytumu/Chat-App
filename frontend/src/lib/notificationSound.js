@@ -62,6 +62,7 @@ function unlockElements() {
         el.muted = false;
         el.loop = prev.loop;
         if (prev.src && !prev.src.startsWith("data:audio/wav")) el.src = prev.src;
+        if (el === ringEl) setTimeout(warmRingtone, 50);
       });
   });
 }
@@ -247,9 +248,28 @@ function playElement(el, url, { loop }) {
   el.loop = loop;
   el.muted = false;
   el.volume = 1; // full level: the loudness itself comes from the (normalised) tune file
-  el.src = url;
-  el.currentTime = 0;
+  // Already loaded (warmed up in advance)? Don't reload it — that is what made the ring start late.
+  const abs = new URL(url, window.location.href).href;
+  if (el.src !== abs) el.src = url;
+  else if (el.readyState >= 2) el.currentTime = 0;
   return el.play();
+}
+
+// Load the call ringtone into its <audio> now, while nothing is ringing, so the ring starts the instant a call comes.
+export function warmRingtone() {
+  try {
+    if (typeof Audio === "undefined" || getCallTone() !== "talkies" || !isCallRingtoneEnabled()) return;
+    ensureElements();
+    if (!ringEl.paused) return;
+    const abs = new URL(TALKIES_RING_URL, window.location.href).href;
+    if (ringEl.src !== abs) {
+      ringEl.src = TALKIES_RING_URL;
+      ringEl.loop = true;
+      ringEl.load();
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 // True while the incoming-call ring is genuinely audible/running. Phones pause <audio> when the app
