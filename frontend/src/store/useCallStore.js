@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
 import { acquireCallMedia } from "../lib/callMedia";
-import { startRingtone, stopRingtoneSound, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing } from "../lib/notificationSound";
+import { startRingtone, stopRingtoneSound, warmRingtone, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -953,6 +953,8 @@ export const useCallStore = create((set, get) => ({
     set({ callSubscribed: true });
     syncClock(socket);
     getIceConfig(); // warm the cache so answering/placing a call isn't delayed
+    warmRingtone(); // the ringtone is loaded before any call arrives
+    window.addEventListener("pointerdown", () => warmRingtone(), { once: true, capture: true });
 
     // Coming back to the app (tapping the call notification, unlocking, switching back) while a call is
     // still ringing: play the same ringtone right away, whether it was held back or got blocked.

@@ -38,6 +38,22 @@ const ago = (iso) => {
 
 // highlight: when set, this plays a saved highlight. It works like a live status: viewers can reply and heart it, the owner sees views and hearts.
 // onAddToHighlight(status): my own live status -> "save to highlights". onEditHighlight(highlight): rename / manage.
+// Songs already being downloaded in the background, so the music starts the instant a status opens.
+const warmedSongs = new Map();
+const warmSong = (url) => {
+  if (!url || warmedSongs.has(url) || typeof Audio === "undefined") return;
+  try {
+    const a = new Audio();
+    a.preload = "auto";
+    a.src = url;
+    a.load();
+    warmedSongs.set(url, a);
+    if (warmedSongs.size > 12) warmedSongs.delete(warmedSongs.keys().next().value);
+  } catch {
+    /* ignore */
+  }
+};
+
 const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = null, onAddToHighlight, onEditHighlight, hold = false }) => {
   const [list, setList] = useState(initial);
   const [index, setIndex] = useState(0);
@@ -68,6 +84,11 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const [sendingReply, setSendingReply] = useState(false);
   const [heartPop, setHeartPop] = useState(0); // bumps to replay the little pop animation
   useBackToClose(true, onClose);
+
+  // Start downloading every song in this viewer up front (current first), so no status waits for its music.
+  useEffect(() => {
+    list.slice(index).concat(list.slice(0, index)).forEach((st) => warmSong(st.song?.url));
+  }, [list, index]);
 
   // My own update: new views and hearts show up live (like WhatsApp / Instagram) instead of only after a reload.
   useEffect(() => {
