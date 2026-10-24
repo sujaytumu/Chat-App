@@ -590,7 +590,7 @@ const ReelsPage = () => {
             <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
             <p className="text-lg font-semibold">{tab === "friends" ? "No reels from people you follow" : tab === "saved" ? "Nothing saved yet" : "No reels yet"}</p>
             <p className="text-white/60 text-[14px]">
-              {tab === "friends" ? "Tap Follow on a reel and their new reels and video updates show up here." : tab === "saved" ? "Tap the bookmark on a reel to keep it here." : "Video updates from people you can see appear here by themselves. Post the first reel, too."}
+              {tab === "friends" ? "Tap Follow on a reel and their new reels show up here." : tab === "saved" ? "Tap the bookmark on a reel to keep it here." : "Reels from people you can see appear here. Post the first one!"}
             </p>
             {tab === "foryou" && <button onClick={() => setCreating(true)} className="px-6 py-3 rounded-full bg-[#25D366] text-black font-semibold">Create reel</button>}
           </div>
@@ -633,8 +633,8 @@ const ReelsPage = () => {
       {/* Bottom bar like Instagram: Home · Reels · Updates · Calls · You */}
       <nav className="absolute bottom-0 inset-x-0 h-[calc(56px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-black flex items-center justify-around z-30">
         <button onClick={() => navigate("/")} className="flex-1 flex justify-center text-white" aria-label="Chats"><House size={28} strokeWidth={1.8} /></button>
-        <span className="flex-1 flex justify-center"><span className="px-5 py-2 rounded-full bg-white/15 text-white"><Film size={26} fill="currentColor" strokeWidth={1.5} /></span></span>
         <button onClick={() => navigate("/status")} className="flex-1 flex justify-center text-white" aria-label="Updates"><CircleDashed size={28} strokeWidth={1.8} /></button>
+        <span className="flex-1 flex justify-center"><span className="px-5 py-2 rounded-full bg-white/15 text-white"><Film size={26} fill="currentColor" strokeWidth={1.5} /></span></span>
         <button onClick={() => navigate("/calls")} className="flex-1 flex justify-center text-white" aria-label="Calls"><Phone size={26} strokeWidth={1.8} /></button>
         <button onClick={() => navigate("/profile")} className="flex-1 flex justify-center" aria-label="You">
           <img src={optimizeImage(me?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover" />

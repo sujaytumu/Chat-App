@@ -129,7 +129,7 @@ export const getReelFeed = async (req, res) => {
 
     const [reelRows, statusRows, saved] = await Promise.all([
       Reel.find({ ...userQ, ...dateQ }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
-      Status.find({ ...userQ, ...dateQ, type: "video", expiresAt: { $gt: new Date() } }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
+      Promise.resolve([]), // video statuses are NOT shown as reels
       SavedReel.find({ userId: me._id }).select("key").lean(),
     ]);
     const savedKeys = new Set(saved.map((s) => s.key));
