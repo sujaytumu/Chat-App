@@ -385,9 +385,9 @@ let backTimer = null;
 let backStopTimer = null;
 let backToken = 0;
 
-const TAP = { freq: 440, dur: 0.38, gain: 0.12, type: "sine" };
-const CALLING_STEPS = [{ ...TAP, start: 0 }];
-const RINGING_STEPS = [{ ...TAP, start: 0 }, { ...TAP, start: 0.55 }];
+const TAP = { freq: 425, dur: 0.6, gain: 0.35, type: "sine" };
+const CALLING_STEPS = [{ ...TAP, dur: 0.8, start: 0 }]; // ONE clear beep ...
+const RINGING_STEPS = [{ ...TAP, dur: 0.45, start: 0 }, { ...TAP, dur: 0.45, start: 0.65 }]; // ... TWO beeps once their phone rings
 const BUSY_STEPS = [
   { freq: 480, dur: 0.9, gain: 0.12, type: "sine", start: 0 },
   { freq: 620, dur: 0.9, gain: 0.08, type: "sine", start: 0 },
@@ -410,8 +410,9 @@ function startPattern(steps, periodMs, maxMs) {
   if (maxMs) backStopTimer = setTimeout(() => { if (token === backToken) stopRingback(); }, maxMs);
 }
 
-export function startCallingTone() { startPattern(CALLING_STEPS, 3000); }
-export function startRingback() { startPattern(RINGING_STEPS, 3500); }
+// no time limit: both repeat until they pick up, decline, or the caller hangs up
+export function startCallingTone() { startPattern(CALLING_STEPS, 2500); }
+export function startRingback() { startPattern(RINGING_STEPS, 3000); }
 export function startBusyTone() { startPattern(BUSY_STEPS, 1500, 4300); }
 
 export function stopRingback() {
