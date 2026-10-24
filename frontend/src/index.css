@@ -30,7 +30,7 @@
 .wa-dark {
   --wa-bg: 11 20 26;
   --wa-panel: 17 27 33;
-  --wa-surface: 31 44 52;
+  --wa-surface: 32 44 51;
   --wa-pop: 35 49 56;
   --wa-field: 42 57 66;
   --wa-hover: 38 51 60;
@@ -39,8 +39,8 @@
   --wa-icon: 174 186 193;
   --wa-text2: 209 215 219;
   --wa-muted2: 102 119 129;
-  --wa-out: 20 77 55;
-  --wa-tint: 16 54 41;
+  --wa-out: 0 92 75;
+  --wa-tint: 3 76 57;
   --wa-tinttext: 217 253 211;
   --wa-wallpaper: #0B141A;
   --wa-doodle: #FFFFFF;
@@ -323,3 +323,31 @@ html.reduce-motion .sel-pop{animation:none}
 .pay-ring { animation: pay-ring 1s ease-out .2s both; }
 @keyframes pin-shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-9px); } 40%,80% { transform: translateX(9px); } }
 .pin-shake { animation: pin-shake .38s ease-in-out; }
+
+
+/* ---- App-wide polish: crisper text, instant press feedback, smooth theme / hover changes ---- */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+button, [role="button"], a {
+  transition: background-color .15s ease, color .15s ease, scale .12s ease, opacity .15s ease;
+}
+button:active:not(:disabled), [role="button"]:active {
+  scale: .97; /* the separate 'scale' property never fights Tailwind's translate / rotate */
+}
+/* round, soft focus ring for keyboard users only */
+:focus-visible {
+  outline: 2px solid #25D366;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+:focus:not(:focus-visible) { outline: none; }
+/* sheets and popups slide in softly */
+@keyframes waPopIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.wa-pop-in { animation: waPopIn .18s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
