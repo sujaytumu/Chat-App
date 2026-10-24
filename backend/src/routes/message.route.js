@@ -1,0 +1,97 @@
+import express from "express";
+import { lockStatus, setLockPin, verifyLockPin, setChatLocked, resetChatLock } from "../controllers/chatlock.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
+import {
+  getMessages,
+  prefetchMessages,
+  getUsersForSidebar,
+  sendMessage,
+  markMessagesAsSeen,
+  togglePinMessage,
+  deleteMessage,
+  toggleStarMessage,
+  getStarredMessages,
+  setChatArchived,
+  ackDelivered,
+  transcribeMessage,
+  setChatPinned,
+  setChatMuted,
+  setChatLists,
+  updatePrivacy,
+  setUserBlocked,
+  getStorageUsage,
+  exportChats,
+  deleteChatForMe,
+  searchMessages,
+  firstMessageFrom,
+  reactToMessage,
+  editMessage,
+  votePoll,
+  openViewOnce,
+  setChatMarkedUnread,
+  getChatMedia,
+  getDirectDisappearing,
+  linkPreview,
+  setDirectDisappearing,
+  setNote,
+  rsvpEvent,
+  updateLiveLocation,
+  createReminder,
+  listReminders,
+  deleteReminder,
+  summarizeChat,
+  setDirectVanish,
+  clearVanish,
+} from "../controllers/message.controller.js";
+
+const router = express.Router();
+
+router.get("/users", protectRoute, getUsersForSidebar);
+router.put("/note", protectRoute, setNote);
+router.put("/event/:id/rsvp", protectRoute, rsvpEvent);
+router.post("/summary", protectRoute, summarizeChat);
+router.post("/reminders", protectRoute, createReminder);
+router.get("/reminders", protectRoute, listReminders);
+router.delete("/reminders/:id", protectRoute, deleteReminder);
+router.put("/live-location/:id", protectRoute, updateLiveLocation);
+router.put("/live-location/:id/stop", protectRoute, updateLiveLocation);
+router.put("/vanish/:id", protectRoute, setDirectVanish);
+router.post("/vanish/clear/:id", protectRoute, clearVanish);
+router.get("/starred/all", protectRoute, getStarredMessages);
+router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
+router.get("/search/all", protectRoute, searchMessages);
+router.get("/search/date", protectRoute, firstMessageFrom);
+router.put("/react/:id", protectRoute, reactToMessage);
+router.put("/edit/:id", protectRoute, editMessage);
+router.post("/transcribe/:id", protectRoute, transcribeMessage);
+router.put("/poll/:id/vote", protectRoute, votePoll);
+router.post("/view-once/:id", protectRoute, openViewOnce);
+router.get("/disappearing/:id", protectRoute, getDirectDisappearing);
+router.put("/disappearing/:id", protectRoute, setDirectDisappearing);
+router.get("/link-preview", protectRoute, linkPreview);
+router.get("/storage-usage", protectRoute, getStorageUsage);
+router.get("/export", protectRoute, exportChats);
+router.get("/prefetch", protectRoute, prefetchMessages);
+router.get("/:id", protectRoute, getMessages);
+
+router.post("/send/:id", protectRoute, sendMessage);
+router.put("/archive", protectRoute, setChatArchived);
+router.get("/lock/status", protectRoute, lockStatus);
+router.post("/lock/pin", protectRoute, setLockPin);
+router.post("/lock/verify", protectRoute, verifyLockPin);
+router.put("/lock", protectRoute, setChatLocked);
+router.post("/lock/reset", protectRoute, resetChatLock);
+router.post("/ack-delivered", protectRoute, ackDelivered);
+router.put("/pin-chat", protectRoute, setChatPinned);
+router.put("/mute-chat", protectRoute, setChatMuted);
+router.put("/mark-unread", protectRoute, setChatMarkedUnread);
+router.put("/chat-lists", protectRoute, setChatLists);
+router.put("/privacy", protectRoute, updatePrivacy);
+router.put("/block-user", protectRoute, setUserBlocked);
+router.delete("/chat/:chatType/:chatId", protectRoute, deleteChatForMe);
+router.put("/seen/:id", protectRoute, markMessagesAsSeen);
+router.put("/pin/:id", protectRoute, togglePinMessage);
+router.put("/star/:id", protectRoute, toggleStarMessage);
+router.delete("/:id", protectRoute, deleteMessage);
+
+export default router;

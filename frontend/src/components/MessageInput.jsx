@@ -1,0 +1,1246 @@
+import { useRef, useState, useEffect, lazy, Suspense } from "react";
+import { useChatStore } from "../store/useChatStore";
+import {
+  Paperclip,
+  X,
+  Loader2,
+  Image as ImageIcon,
+  FileText,
+  Music,
+  Video as VideoIcon,
+  Mic,
+  Trash2,
+  MapPin,
+  BarChart3,
+  UserRound,
+  Smile,
+  Camera,
+  CalendarDays,
+  IndianRupee,
+  CalendarClock,
+} from "lucide-react";
+import { isDesktopNow } from "./ContextMenu";
+import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
+import toast from "react-hot-toast";
+import Avatar from "./Avatar";
+import PollModal from "./PollModal";
+const PhotoSendPreview = lazy(() => import("./PhotoSendPreview"));
+import LocationSheet from "./LocationSheet";
+import { liveShares } from "../lib/liveShare";
+import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
+import EventModal from "./EventModal";
+import PaymentModal from "./PaymentModal";
+import ContactPicker from "./ContactPicker";
+import { useAuthStore } from "../store/useAuthStore";
+import { createPortal } from "react-dom";
+import { compressImage } from "../lib/imageUtils";
+import { getEnterSends } from "../lib/uiSettings";
+import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
+
+import { useDraftStore, draftKey } from "../store/useDraftStore";
+import ScheduleSheet, { fmtWhen } from "./ScheduleSheet";
+import { axiosInstance } from "../lib/axios";
+
+const EmojiStickerPicker = lazy(() => import("./EmojiStickerPicker"));
+const VideoNoteRecorder = lazy(() => import("./VideoNoteRecorder"));
+
+const MessageInput = () => {
+  const [text, setText] = useState("");
+  const [imagePreview, setImagePreview] = useState(null);
+  const [imageFallback, setImageFallback] = useState(null); // { data, name } — image we can't locally preview (e.g. HEIC) but can still send
+  const [filePreview, setFilePreview] = useState(null); // { data, name, mimeType, size, kind }
+  const [isProcessingAttachment, setIsProcessingAttachment] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isSharingLocation, setIsSharingLocation] = useState(false);
+  const [showLocSheet, setShowLocSheet] = useState(false);
+  const [dismissedQuick, setDismissedQuick] = useState(null);
+  const [showVideoNote, setShowVideoNote] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingStreamRef = useRef(null);
+  const recordingIntervalRef = useRef(null);
+  const discardRecordingRef = useRef(false);
+  const holdRef = useRef(null); // press-and-hold gesture on the mic (phones): { x, y, t, locked, done }
+  const pendingStopRef = useRef(null); // released before the microphone was ready: "send" | "discard"
+  const suppressClickRef = useRef(false);
+  const [holding, setHolding] = useState(false); // finger is down on the mic (not locked yet)
+
+  const photoInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
+  const documentInputRef = useRef(null);
+  const audioInputRef = useRef(null);
+  const textareaRef = useRef(null);
+  const authUser = useAuthStore((st) => st.authUser);
+  const [showContacts, setShowContacts] = useState(false);
+  const [showPoll, setShowPoll] = useState(false);
+  const [showEvent, setShowEvent] = useState(false);
+  const [showPay, setShowPay] = useState(false);
+  const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
+  const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
+  const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
+  const attachMenuRef = useRef(null);
+  const messages = useChatStore((st) => st.messages);
+  const vanishActive = useChatStore((s) => (s.selectedChat?.type === "direct" ? !!s.directVanish[s.selectedChat.data._id] : false));
+  const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore();
+
+  const typingTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target)) {
+        setShowAttachMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const resizeTextarea = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
+    }
+  };
+
+  const clearAttachments = () => {
+    setImagePreview(null);
+    setImageFallback(null);
+    setFilePreview(null);
+    setViewOnce(false);
+    [photoInputRef, cameraInputRef, documentInputRef, audioInputRef].forEach((ref) => {
+      if (ref.current) ref.current.value = "";
+    });
+  };
+
+  // "Photo & Video" input: images get compressed, videos are read as-is.
+  // Some phones (notably iPhones by default) save photos as HEIC, which most
+  // non-Safari browsers can't decode via <img>/canvas — compression fails
+  // there. Rather than blocking the send, fall back to uploading the raw
+  // file: Cloudinary transcodes HEIC server-side reliably even though the
+  // browser can't preview it locally.
+  const handlePhotoOrVideoChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setShowAttachMenu(false);
+    clearAttachments();
+
+    const looksLikeVideo =
+      file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|avi|3gp)$/i.test(file.name);
+    const looksLikeImage =
+      file.type.startsWith("image/") ||
+      (!file.type && /\.(heic|heif|jpg|jpeg|png|gif|webp|bmp)$/i.test(file.name));
+
+    if (looksLikeImage) {
+      setIsProcessingAttachment(true);
+      try {
+        const compressed = await compressImage(file);
+        setImagePreview(compressed);
+      } catch {
+        // Fallback: send the original file untouched
+        try {
+          if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+            toast.error(`Image must be under ${MAX_FILE_SIZE_MB}MB`);
+          } else {
+            const data = await readFileAsBase64(file);
+            setImageFallback({ data, name: file.name });
+          }
+        } catch {
+          toast.error("Could not read that image");
+        }
+      } finally {
+        setIsProcessingAttachment(false);
+      }
+      return;
+    }
+
+    if (looksLikeVideo) {
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(`Video must be under ${MAX_FILE_SIZE_MB}MB`);
+        return;
+      }
+      setIsProcessingAttachment(true);
+      try {
+        const data = await readFileAsBase64(file);
+        setFilePreview({ data, name: file.name, mimeType: file.type, size: file.size, kind: "video" });
+      } catch {
+        toast.error("Could not read that video");
+      } finally {
+        setIsProcessingAttachment(false);
+      }
+      return;
+    }
+
+    toast.error("Please select a photo or video");
+  };
+
+  const handleDocumentChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setShowAttachMenu(false);
+    clearAttachments();
+
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(`File must be under ${MAX_FILE_SIZE_MB}MB`);
+      return;
+    }
+    setIsProcessingAttachment(true);
+    try {
+      const data = await readFileAsBase64(file);
+      setFilePreview({ data, name: file.name, mimeType: file.type, size: file.size, kind: "document" });
+    } catch {
+      toast.error("Could not read that file");
+    } finally {
+      setIsProcessingAttachment(false);
+    }
+  };
+
+  const handleAudioChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setShowAttachMenu(false);
+    clearAttachments();
+
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      toast.error(`Audio must be under ${MAX_FILE_SIZE_MB}MB`);
+      return;
+    }
+    setIsProcessingAttachment(true);
+    try {
+      const data = await readFileAsBase64(file);
+      setFilePreview({ data, name: file.name, mimeType: file.type, size: file.size, kind: "audio" });
+    } catch {
+      toast.error("Could not read that audio file");
+    } finally {
+      setIsProcessingAttachment(false);
+    }
+  };
+
+  // Long-press Send (or right-click it) to schedule the message for later.
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const schedTimer = useRef(null);
+  const schedFired = useRef(false);
+  const canSchedule = !!text.trim() && !(imagePreview || imageFallback || filePreview) && !editingMessage;
+  const sendPressStart = () => {
+    schedFired.current = false;
+    clearTimeout(schedTimer.current);
+    if (!canSchedule) return;
+    schedTimer.current = setTimeout(() => {
+      schedFired.current = true;
+      navigator.vibrate?.(15);
+      setShowSchedule(true);
+    }, 550);
+  };
+  const sendPressEnd = () => clearTimeout(schedTimer.current);
+  const doSchedule = async (date) => {
+    if (!selectedChat) return;
+    setScheduling(true);
+    try {
+      await axiosInstance.post("/scheduled", {
+        chatType: selectedChat.type,
+        chatId: selectedChat.data._id,
+        text: text.trim(),
+        sendAt: date.toISOString(),
+      });
+      toast.success(`Scheduled for ${fmtWhen(date)}`);
+      setText("");
+      setMentionIds([]);
+      setMentionQuery(null);
+      setShowSchedule(false);
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Couldn't schedule the message");
+    } finally {
+      setScheduling(false);
+    }
+  };
+
+  // Paste a picture / drop a file straight into the chat (laptops).
+  const ingestFile = (file) => {
+    if (!file) return;
+    const fake = { target: { files: [file] } };
+    const isMedia = file.type.startsWith("image/") || file.type.startsWith("video/");
+    if (isMedia) handlePhotoOrVideoChange(fake);
+    else if (file.type.startsWith("audio/")) handleAudioChange(fake);
+    else handleDocumentChange(fake);
+  };
+  const ingestRef = useRef(null);
+  ingestRef.current = ingestFile;
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
+    const enter = (e) => {
+      if (!hasFiles(e)) return;
+      depth += 1;
+      setDragging(true);
+    };
+    const over = (e) => hasFiles(e) && e.preventDefault();
+    const leave = (e) => {
+      if (!hasFiles(e)) return;
+      depth = Math.max(0, depth - 1);
+      if (!depth) setDragging(false);
+    };
+    const drop = (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      depth = 0;
+      setDragging(false);
+      ingestRef.current?.(e.dataTransfer.files[0]);
+    };
+    window.addEventListener("dragenter", enter);
+    window.addEventListener("dragover", over);
+    window.addEventListener("dragleave", leave);
+    window.addEventListener("drop", drop);
+    return () => {
+      window.removeEventListener("dragenter", enter);
+      window.removeEventListener("dragover", over);
+      window.removeEventListener("dragleave", leave);
+      window.removeEventListener("drop", drop);
+    };
+  }, []);
+  const handlePaste = (e) => {
+    const file = Array.from(e.clipboardData?.files || [])[0];
+    if (file) {
+      e.preventDefault();
+      ingestFile(file);
+    }
+  };
+
+  const handleTyping = () => {
+    emitTyping();
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => emitStopTyping(), 1500);
+  };
+
+  const handleShareLocation = () => {
+    setShowAttachMenu(false);
+    if (!navigator.geolocation) {
+      toast.error("Location isn't available in this browser");
+      return;
+    }
+    setShowLocSheet(true);
+  };
+
+  const sendCurrentLocation = ({ lat, lng }) =>
+    sendMessage({ text: `📍 Current location\nhttps://www.google.com/maps?q=${lat},${lng}` });
+
+  const sendPlace = ({ name, lat, lng }) =>
+    sendMessage({ text: `📍 ${String(name).replace(/\s+/g, " ").slice(0, 100)}\nhttps://www.google.com/maps?q=${lat},${lng}` });
+
+  const startLiveLocation = async (minutes, { lat, lng, accuracy }, comment) => {
+    const msg = await sendMessage({ liveLocation: { lat, lng, accuracy, minutes, comment } });
+    if (msg?._id && msg.liveLocation?.expiresAt) {
+      liveShares.add(msg._id, msg.liveLocation.expiresAt);
+      toast.success("Live location started");
+    }
+  };
+
+  const sendVideoNote = ({ data, mimeType, size, duration }) =>
+    sendMessage({
+      text: "",
+      file: { data, name: `Video message.${mimeType.includes("mp4") ? "mp4" : "webm"}`, mimeType, size, duration, videoNote: true },
+    });
+
+  const handleEmojiSelect = (emoji) => {
+    setText((prev) => prev + emoji);
+    textareaRef.current?.focus();
+  };
+
+  const handleStickerSelect = async (sticker) => {
+    setShowEmojiPicker(false);
+    try {
+      await sendMessage({ text: sticker });
+    } catch {
+      // toast already shown by store
+    }
+  };
+
+  // WhatsApp-style: press and HOLD the mic to record, release to send, slide left to cancel, slide up to lock.
+  const finishHold = (how) => {
+    const h = holdRef.current;
+    holdRef.current = null;
+    setHolding(false);
+    suppressClickRef.current = true;
+    setTimeout(() => (suppressClickRef.current = false), 80);
+    if (!h || h.done) return;
+    h.done = true;
+    const mr = mediaRecorderRef.current;
+    const live = mr && mr.state !== "inactive";
+    if (how === "lock") return;
+    const tooShort = Date.now() - h.t < 500;
+    if (how === "cancel" || tooShort) {
+      if (tooShort && how !== "cancel") toast("Hold the mic to record, release to send", { id: "hold-hint" });
+      if (live) stopRecording(true);
+      else pendingStopRef.current = "discard";
+    } else if (live) stopRecording(false);
+    else pendingStopRef.current = "send";
+  };
+  const micDown = (e) => {
+    if (e.pointerType === "mouse" || isRecording || isSending) return; // laptop: click to start / click to send
+    holdRef.current = { x: e.clientX, y: e.clientY, t: Date.now(), locked: false, done: false };
+    pendingStopRef.current = null;
+    setHolding(true);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    startRecording();
+  };
+  const micMove = (e) => {
+    const h = holdRef.current;
+    if (!h || h.done || h.locked) return;
+    if (h.x - e.clientX > 90) finishHold("cancel");
+    else if (h.y - e.clientY > 80) {
+      h.locked = true;
+      setHolding(false);
+      if (navigator.vibrate) navigator.vibrate(15);
+      finishHold("lock");
+    }
+  };
+  const micUp = () => {
+    const h = holdRef.current;
+    if (h && !h.done) finishHold("send");
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      audioChunksRef.current = [];
+      discardRecordingRef.current = false;
+
+      // Loudness profile for the waveform shown on the voice note (sampled while recording)
+      const peaks = [];
+      let analyserTimer = null;
+      let audioCtx = null;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new Ctx();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const buf = new Uint8Array(analyser.fftSize);
+        analyserTimer = setInterval(() => {
+          analyser.getByteTimeDomainData(buf);
+          let max = 0;
+          for (let i = 0; i < buf.length; i++) max = Math.max(max, Math.abs(buf[i] - 128));
+          peaks.push(max / 128); // 0..1
+        }, 100);
+      } catch {
+        // no analyser available — the player falls back to a generic waveform
+      }
+      const startedAt = Date.now();
+
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        clearInterval(recordingIntervalRef.current);
+        clearInterval(analyserTimer);
+        audioCtx?.close().catch(() => {});
+        const duration = (Date.now() - startedAt) / 1000;
+        // squash the samples into 40 bars, scaled so the loudest bar is full height
+        const BARS = 40;
+        let waveform;
+        if (peaks.length >= 8) {
+          const per = peaks.length / BARS;
+          const raw = Array.from({ length: BARS }, (_, i) => {
+            const slice = peaks.slice(Math.floor(i * per), Math.max(Math.floor(i * per) + 1, Math.floor((i + 1) * per)));
+            return Math.max(...slice);
+          });
+          const top = Math.max(...raw, 0.05);
+          waveform = raw.map((v) => Math.round(Math.max(0.08, v / top) * 100));
+        }
+
+        if (discardRecordingRef.current || audioChunksRef.current.length === 0) {
+          setIsRecording(false);
+          setRecordingSeconds(0);
+          return;
+        }
+
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || "audio/webm" });
+        setIsSending(true);
+        try {
+          const data = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error("Failed to read recording"));
+            reader.readAsDataURL(blob);
+          });
+          await sendMessage({
+            text: "",
+            file: { data, name: `Voice message.webm`, mimeType: blob.type, size: blob.size, duration, waveform },
+          });
+        } catch {
+          toast.error("Could not send voice message");
+        } finally {
+          setIsSending(false);
+          setIsRecording(false);
+          setRecordingSeconds(0);
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      if (pendingStopRef.current) {
+        const how = pendingStopRef.current;
+        pendingStopRef.current = null;
+        setTimeout(() => stopRecording(how === "discard"), 0);
+      }
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingSeconds((s) => s + 1);
+      }, 1000);
+    } catch {
+      toast.error("Microphone access is needed to record a voice message");
+    }
+  };
+
+  const stopRecording = (discard = false) => {
+    discardRecordingRef.current = discard;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      clearInterval(recordingIntervalRef.current);
+      recordingStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  const formatDuration = (secs) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const handleSendMessage = async (e, editedImage) => {
+    e.preventDefault();
+    if (editingMessage) {
+      const next = text.trim();
+      if (!next) return;
+      setIsSending(true);
+      try {
+        await editMessage(editingMessage._id, next);
+        setText("");
+        if (textareaRef.current) textareaRef.current.style.height = "40px";
+      } catch (err) {
+        toast.error(err?.response?.data?.error || "Couldn't edit message");
+      } finally {
+        setIsSending(false);
+      }
+      return;
+    }
+    if ((!text.trim() && !imagePreview && !imageFallback && !filePreview) || isSending) return;
+
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    emitStopTyping();
+
+    // Plain text: clear the box and let the message appear right away; the send
+    // finishes in the background (and the text comes back if it fails).
+    if (text.trim() && !imagePreview && !imageFallback && !filePreview) {
+      const sentText = text;
+      const payload = { text: text.trim() };
+      if (isGroupChat) {
+        const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
+        if (tagged.length) payload.mentions = tagged.map((m) => m._id);
+      }
+      setMentionIds([]);
+      setMentionQuery(null);
+      setText("");
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+      sendMessage(payload).catch(() => setText((cur) => cur || sentText));
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const payload = { text: text.trim() };
+      if (isGroupChat) {
+        const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
+        if (tagged.length) payload.mentions = tagged.map((m) => m._id);
+      }
+      if (imagePreview) {
+        payload.image = typeof editedImage === "string" ? editedImage : imagePreview;
+        if (viewOnce && selectedChat?.type === "direct") payload.viewOnce = true;
+      }
+      else if (imageFallback) payload.image = imageFallback.data;
+      if (filePreview) {
+        payload.file = {
+          data: filePreview.data,
+          name: filePreview.name,
+          mimeType: filePreview.mimeType,
+          size: filePreview.size,
+        };
+      }
+      await sendMessage(payload);
+
+      setMentionIds([]);
+      setMentionQuery(null);
+      setText("");
+      clearAttachments();
+      if (textareaRef.current) textareaRef.current.style.height = "40px";
+    } catch {
+      // toast already shown by store
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const isGroupChat = selectedChat?.type === "group";
+  const mentionCandidates = isGroupChat && mentionQuery !== null
+    ? (selectedChat.data.members || [])
+        .filter((m) => m._id !== authUser?._id && m.fullName?.toLowerCase().includes(mentionQuery.toLowerCase()))
+        .slice(0, 6)
+    : [];
+  const pickMention = (m) => {
+    const el = textareaRef.current;
+    const pos = el?.selectionStart ?? text.length;
+    const before = text.slice(0, pos).replace(/@[^\s@]*$/, `@${m.fullName} `);
+    setText(before + text.slice(pos));
+    setMentionIds((ids) => [...new Set([...ids, m._id])]);
+    setMentionQuery(null);
+    setTimeout(() => el?.focus(), 0);
+  };
+
+  const handleChange = (e) => {
+    if (isGroupChat) {
+      const v = e.target.value;
+      const m = v.slice(0, e.target.selectionStart ?? v.length).match(/(?:^|\s)@([^\s@]*)$/);
+      setMentionQuery(m ? m[1] : null);
+    }
+    setText(e.target.value);
+    resizeTextarea();
+    handleTyping();
+  };
+
+  const [hasSel, setHasSel] = useState(false);
+  const checkSel = () => {
+    const t = textareaRef.current;
+    setHasSel(!!t && t.selectionEnd > t.selectionStart);
+  };
+  const wrapSelection = (mark) => {
+    const t = textareaRef.current;
+    if (!t || t.selectionEnd <= t.selectionStart) return;
+    const { selectionStart: a, selectionEnd: b } = t;
+    const sel = text.slice(a, b);
+    const next = text.slice(0, a) + mark + sel + mark + text.slice(b);
+    setText(next);
+    setHasSel(false);
+    requestAnimationFrame(() => {
+      t.focus();
+      t.setSelectionRange(a + mark.length, b + mark.length);
+    });
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && ["b", "i"].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+      wrapSelection(e.key.toLowerCase() === "b" ? "*" : "_");
+      return;
+    }
+    const enterSends = getEnterSends();
+    if (e.key === "Enter" && !e.shiftKey && (enterSends || e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (text.trim() || imagePreview || imageFallback || filePreview) {
+        handleSendMessage(e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      emitStopTyping();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat]);
+
+  // Tell the other person while a voice note is being recorded.
+  useEffect(() => {
+    if (!isRecording) return;
+    const st = useChatStore.getState();
+    st.emitRecording(true);
+    const again = setInterval(() => useChatStore.getState().emitRecording(true), 5000);
+    return () => {
+      clearInterval(again);
+      st.emitRecording(false);
+    };
+  }, [isRecording, selectedChat?.data?._id]);
+
+  // Drafts: what you typed and didn't send is kept per chat, and comes back when you return.
+  // Saving a draft on EVERY keystroke re-rendered the chat list and rewrote
+  // localStorage each time (typing lag). Now it's saved ~0.4 s after you pause.
+  const draftPending = useRef(null);
+  const flushDraft = () => {
+    const p = draftPending.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    draftPending.current = null;
+    useDraftStore.getState().setDraft(p.key, p.text);
+  };
+  useEffect(() => flushDraft, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    flushDraft(); // finish saving the chat we're leaving
+    const key = draftKey(selectedChat);
+    if (!key || useChatStore.getState().editingMessage) return;
+    setText(useDraftStore.getState().drafts[key] || "");
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.style.height = "40px";
+        el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+      }
+    }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat?.type, selectedChat?.data?._id]);
+  useEffect(() => {
+    if (editingMessage) return;
+    const key = draftKey(selectedChat);
+    if (!key) return;
+    if (!text.trim()) {
+      // cleared / sent: update the list right away
+      if (draftPending.current) {
+        clearTimeout(draftPending.current.timer);
+        draftPending.current = null;
+      }
+      useDraftStore.getState().setDraft(key, text);
+      return;
+    }
+    if (draftPending.current) clearTimeout(draftPending.current.timer);
+    const pending = { key, text, timer: null };
+    pending.timer = setTimeout(() => {
+      if (draftPending.current === pending) draftPending.current = null;
+      useDraftStore.getState().setDraft(key, text);
+    }, 400);
+    draftPending.current = pending;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text]);
+
+  // Edit mode: the message text goes back into the box; send saves the change.
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.text || "");
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [editingMessage]);
+  useEffect(() => {
+    // leaving the chat cancels an edit
+    clearEditingMessage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChat]);
+
+  const hasAttachment = imagePreview || imageFallback || filePreview;
+
+  return (
+<div data-chat-composer className="px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3 lg:px-4 lg:py-2.5 lg:bg-wa-surface w-full lg:[&>*]:w-full">
+      {dragging &&
+        createPortal(
+          <div className="fixed inset-0 z-[120] bg-black/60 flex items-center justify-center pointer-events-none" style={{ animation: "m-fade .15s ease-out" }}>
+            <div className="rounded-3xl border-2 border-dashed border-[#25D366] bg-wa-panel/90 px-10 py-8 text-center text-wa-text">
+              <p className="text-[18px] font-medium">Drop to send</p>
+              <p className="text-[12.5px] text-wa-muted mt-1">Photos, videos and files</p>
+            </div>
+          </div>,
+          document.body
+        )}
+      {showSchedule && <ScheduleSheet text={text.trim()} busy={scheduling} onPick={doSchedule} onClose={() => setShowSchedule(false)} />}
+      {showContacts && (
+        <ContactPicker
+          onClose={() => setShowContacts(false)}
+          onPick={async (u) => {
+            setShowContacts(false);
+            try {
+              await sendMessage({ contactUserId: u._id });
+            } catch {
+              /* toast shown by store */
+            }
+          }}
+        />
+      )}
+      {showPay && selectedChat?.type === "direct" && <PaymentModal user={selectedChat.data} onClose={() => setShowPay(false)} />}
+      {showEvent && <EventModal onClose={() => setShowEvent(false)} onSend={(event) => sendMessage({ event })} />}
+      {showVideoNote && (
+        <Suspense fallback={null}>
+          <VideoNoteRecorder onSend={sendVideoNote} onClose={() => setShowVideoNote(false)} />
+        </Suspense>
+      )}
+      {showLocSheet && (
+        <LocationSheet
+          allowLive={!selectedChat?.data?.isSelf}
+          onCurrent={sendCurrentLocation}
+          onPlace={sendPlace}
+          onLive={startLiveLocation}
+          onClose={() => setShowLocSheet(false)}
+        />
+      )}
+      {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
+      {mentionCandidates.length > 0 && (
+        <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
+          {mentionCandidates.map((m) => (
+            <button
+              key={m._id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pickMention(m)}
+              className="w-full flex items-center gap-3 px-3 py-2 text-left active:bg-wa-hover hover:bg-wa-hover"
+            >
+              <Avatar src={m.profilePic} name={m.fullName} size="size-8" textSize="text-sm" />
+              <span className="text-[14px] text-wa-text truncate">{m.fullName}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {editingMessage && (
+        <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
+          <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
+            <p className="text-xs font-medium text-[#00A884]">Edit message</p>
+            <p className="text-xs text-wa-muted truncate">{editingMessage.text}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              clearEditingMessage();
+              setText("");
+            }}
+            className="text-wa-muted hover:text-wa-text shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {(() => {
+        const last = messages[messages.length - 1];
+        if (!last || !getQuickReplies() || text.trim() || replyingTo || editingMessage || isRecording) return null;
+        if (dismissedQuick === last._id || String(last.senderId) === String(authUser?._id)) return null;
+        if (!last.text || last.image || last.file || last.poll || last.event || last.liveLocation || last.contact || last.deletedForEveryone) return null;
+        if (Date.now() - new Date(last.createdAt).getTime() > 30 * 60 * 1000) return null;
+        const options = suggestReplies(last.text);
+        if (!options.length) return null;
+        return (
+          <div className="flex items-center gap-2 px-3 pt-2 overflow-x-auto no-scrollbar">
+            {options.map((o) => (
+              <button
+                key={o}
+                type="button"
+                onClick={() => {
+                  setDismissedQuick(last._id);
+                  sendMessage({ text: o });
+                }}
+                className="shrink-0 h-9 px-4 rounded-full bg-wa-field text-wa-text text-[13.5px] active:scale-95 transition-transform"
+              >
+                {o}
+              </button>
+            ))}
+            <button type="button" aria-label="Hide suggestions" onClick={() => setDismissedQuick(last._id)} className="shrink-0 size-8 flex items-center justify-center text-wa-muted">
+              <X size={16} />
+            </button>
+          </div>
+        );
+      })()}
+      {replyingTo && (
+        <div className="mb-2 flex items-center gap-2 bg-wa-field rounded-lg pl-3 pr-2 py-2">
+          <div className="flex-1 min-w-0 border-l-2 border-[#00A884] pl-2">
+            <p className="text-xs font-medium text-[#00A884]">Replying to</p>
+            <p className="text-xs text-wa-muted truncate">
+              {replyingTo.image ? "📷 Photo" : replyingTo.file ? `📎 ${replyingTo.file.name}` : replyingTo.text}
+            </p>
+          </div>
+          <button onClick={clearReplyingTo} className="text-wa-muted hover:text-wa-text shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+      )}
+      {imagePreview && (
+        <Suspense fallback={null}>
+        <PhotoSendPreview
+          src={imagePreview}
+          caption={text}
+          onCaption={setText}
+          canViewOnce={selectedChat?.type === "direct"}
+          viewOnce={viewOnce}
+          onToggleViewOnce={() => setViewOnce((v) => !v)}
+          to={selectedChat?.data?.isSelf ? "Message yourself" : selectedChat?.data?.fullName || selectedChat?.data?.name || ""}
+          sending={isSending}
+          onSend={(edited) => handleSendMessage({ preventDefault() {} }, edited)}
+          onImageChange={setImagePreview}
+          onClose={clearAttachments}
+        />
+        </Suspense>
+      )}
+
+      {imageFallback && (
+        <div className="mb-2.5 flex items-center gap-2 bg-wa-field rounded-lg p-2 pr-3 max-w-xs shadow-sm">
+          <div className="size-10 rounded-md bg-white/10 flex items-center justify-center shrink-0">
+            <ImageIcon size={18} className="text-[#00A884]" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate text-wa-text">{imageFallback.name}</p>
+            <p className="text-xs text-wa-muted">Photo · preview unavailable, will still send</p>
+          </div>
+          <button
+            onClick={clearAttachments}
+            type="button"
+            className="size-6 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {filePreview && (
+        <div className="mb-2.5 flex items-center gap-2 bg-wa-field rounded-lg p-2 pr-3 max-w-xs shadow-sm">
+          <div className="size-10 rounded-md bg-white/10 flex items-center justify-center shrink-0">
+            {filePreview.kind === "video" && <VideoIcon size={18} className="text-[#00A884]" />}
+            {filePreview.kind === "audio" && <Music size={18} className="text-[#00A884]" />}
+            {filePreview.kind === "document" && <FileText size={18} className="text-[#00A884]" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate text-wa-text">{filePreview.name}</p>
+            <p className="text-xs text-wa-muted">{formatFileSize(filePreview.size)}</p>
+          </div>
+          <button
+            onClick={clearAttachments}
+            type="button"
+            className="size-6 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      <form
+        onSubmit={handleSendMessage}
+        className={`flex items-end gap-2 ${isRecording ? "" : "lg:gap-2 lg:items-center"}`}
+      >
+        {isRecording ? (
+          <div className="flex-1 flex items-center gap-3 bg-wa-surface rounded-full px-4 py-2 min-h-[48px]">
+            <button
+              type="button"
+              onClick={() => stopRecording(true)}
+              className="text-wa-muted hover:text-red-400 transition-colors shrink-0"
+              title="Cancel recording"
+            >
+              <Trash2 size={19} />
+            </button>
+            <span className="size-2.5 rounded-full bg-red-500 animate-pulse shrink-0" />
+            <span className="text-wa-text2 text-sm tabular-nums">{formatDuration(recordingSeconds)}</span>
+            {holding ? (
+              <span className="text-wa-muted text-xs ml-auto">‹ Slide to cancel · ↑ Lock</span>
+            ) : (
+              <span className="text-wa-muted text-xs ml-auto hidden sm:inline">Recording voice message…</span>
+            )}
+          </div>
+        ) : (
+          <div className={`relative flex-1 min-w-0 flex items-end lg:items-center gap-0.5 lg:gap-1.5 bg-wa-surface rounded-[26px] ${vanishActive ? "border border-dashed border-white/45 lg:border-0" : ""} px-1.5 py-1 min-h-[52px] shadow-sm lg:bg-transparent lg:rounded-none lg:shadow-none lg:p-0 lg:min-h-0`}>
+            <div className="relative order-3 lg:order-2" ref={attachMenuRef}>
+              {showAttachMenu && (
+                <div className="fixed inset-x-3 bottom-[calc(76px+env(safe-area-inset-bottom))] z-30 grid grid-cols-3 gap-y-5 rounded-3xl bg-wa-pop p-5 shadow-2xl animate-[m-fade_.14s_ease-out] lg:absolute lg:inset-x-auto lg:bottom-full lg:left-0 lg:mb-2 lg:block lg:w-52 lg:rounded-xl lg:px-0 lg:py-1.5 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#bf59cf] flex items-center justify-center shrink-0">
+                      <ImageIcon size={16} className="text-white" />
+                    </span>
+                    Photo &amp; Video
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => documentInputRef.current?.click()}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#7f66ff] flex items-center justify-center shrink-0">
+                      <FileText size={16} className="text-white" />
+                    </span>
+                    Document
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => audioInputRef.current?.click()}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#ff8f4d] flex items-center justify-center shrink-0">
+                      <Music size={16} className="text-white" />
+                    </span>
+                    Audio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowVideoNote(true);
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#F15C6D] flex items-center justify-center shrink-0">
+                      <VideoIcon size={16} className="text-white" />
+                    </span>
+                    Video message
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareLocation}
+                    disabled={isSharingLocation}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#22c55e] flex items-center justify-center shrink-0">
+                      {isSharingLocation ? (
+                        <Loader2 size={16} className="text-white animate-spin" />
+                      ) : (
+                        <MapPin size={16} className="text-white" />
+                      )}
+                    </span>
+                    Location
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowPoll(true);
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#f5a623] flex items-center justify-center shrink-0">
+                      <BarChart3 size={16} className="text-white" />
+                    </span>
+                    Poll
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowEvent(true);
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#ef4d7c] flex items-center justify-center shrink-0">
+                      <CalendarDays size={16} className="text-white" />
+                    </span>
+                    Event
+                  </button>
+                  {selectedChat?.type === "direct" && !selectedChat.data.isSelf && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAttachMenu(false);
+                        setShowPay(true);
+                      }}
+                      className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                    >
+                      <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#25a55f] flex items-center justify-center shrink-0">
+                        <IndianRupee size={16} className="text-white" />
+                      </span>
+                      Payment
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      if (canSchedule) setShowSchedule(true);
+                      else toast("Type your message first, then pick Send later", { icon: "🕒" });
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#0ea5a4] flex items-center justify-center shrink-0">
+                      <CalendarClock size={16} className="text-white" />
+                    </span>
+                    Send later
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowContacts(true);
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#009de2] flex items-center justify-center shrink-0">
+                      <UserRound size={16} className="text-white" />
+                    </span>
+                    Contact
+                  </button>
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                ref={photoInputRef}
+                onChange={handlePhotoOrVideoChange}
+              />
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                ref={cameraInputRef}
+                onChange={handlePhotoOrVideoChange}
+              />
+              <input type="file" className="hidden" ref={documentInputRef} onChange={handleDocumentChange} />
+              <input
+                type="file"
+                accept="audio/*"
+                className="hidden"
+                ref={audioInputRef}
+                onChange={handleAudioChange}
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowAttachMenu((s) => !s)}
+                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                disabled={isProcessingAttachment}
+                aria-label="Attach"
+              >
+                {isProcessingAttachment ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <Paperclip size={22} className="rotate-45" />
+                )}
+              </button>
+            </div>
+
+            <div className="relative order-1 lg:order-1">
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((s) => !s)}
+                className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                aria-label="Emoji and stickers"
+              >
+                <Smile size={24} />
+              </button>
+              {showEmojiPicker && (
+                <Suspense fallback={null}>
+                  <EmojiStickerPicker
+                    onEmojiSelect={handleEmojiSelect}
+                    onStickerSelect={handleStickerSelect}
+                    onClose={() => setShowEmojiPicker(false)}
+                  />
+                </Suspense>
+              )}
+            </div>
+
+            {hasSel && (
+              <div className="absolute left-12 -top-11 z-30 flex items-center gap-0.5 rounded-full bg-wa-panel shadow-lg ring-1 ring-black/10 px-1.5 py-1 fmt-pop">
+                {[["B", "*", "font-bold"], ["I", "_", "italic"], ["S", "~", "line-through"], ["M", "`", "font-mono"]].map(([l, m, c]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => wrapSelection(m)}
+                    className={`size-8 rounded-full text-[14px] text-wa-text hover:bg-white/10 active:bg-white/15 ${c}`}
+                    aria-label={`Format ${l}`}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
+            )}
+            <textarea
+              ref={textareaRef}
+              rows={1}
+              value={text}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onSelect={checkSel}
+              onBlur={() => setTimeout(() => setHasSel(false), 150)}
+              placeholder={vanishActive ? "Disappearing messages…" : isDesktopNow() ? "Type a message" : "Message"}
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+              className="wa-input-field flex-1 min-w-0 resize-none bg-transparent px-1.5 py-2 text-[13.5px] leading-[22px] max-h-32 min-h-[40px] text-wa-text placeholder:text-wa-muted focus:outline-none order-2 text-[16px] lg:text-[14.5px] lg:order-3 lg:rounded-lg lg:px-3.5 lg:py-[9px] lg:min-h-[42px] lg:text-[14.5px]"
+              style={{ overflow: "hidden" }}
+            />
+
+            {!text.trim() && !hasAttachment && (
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="lg:hidden order-4 size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
+                disabled={isProcessingAttachment}
+                aria-label="Take a photo"
+                title="Camera"
+              >
+                <Camera size={22} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {!isRecording && (text.trim() || hasAttachment) ? (
+          <button
+            type="submit"
+            className="size-[52px] lg:size-10 mb-0 rounded-full flex items-center justify-center bg-[#21C063] hover:bg-[#1daa56] active:scale-95 text-[#0B141A] shrink-0 transition-all shadow-md lg:shadow-none lg:order-4 lg:!bg-transparent lg:!bg-none lg:!shadow-none lg:hover:!bg-white/10 lg:!text-[#00A884]"
+            disabled={isSending}
+            onPointerDown={sendPressStart}
+            onPointerUp={sendPressEnd}
+            onPointerLeave={sendPressEnd}
+            onPointerCancel={sendPressEnd}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (canSchedule) setShowSchedule(true);
+            }}
+            onClickCapture={(e) => {
+              if (schedFired.current) {
+                schedFired.current = false;
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
+            title="Send (hold to schedule)"
+            aria-label="Send"
+          >
+            {isSending ? <Loader2 size={20} className="animate-spin" /> : <WhatsAppSendIcon size={20} className="ml-0.5" />}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (suppressClickRef.current) return;
+              if (isRecording) stopRecording(false);
+              else startRecording();
+            }}
+            onPointerDown={micDown}
+            onPointerMove={micMove}
+            onPointerUp={micUp}
+            onPointerCancel={() => finishHold("cancel")}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ touchAction: "none", WebkitTouchCallout: "none", userSelect: "none" }}
+            className={`${holding ? "scale-125" : ""} size-[52px] lg:size-10 lg:order-4 rounded-full flex items-center justify-center active:scale-95 shrink-0 transition-all ${isRecording ? "bg-[#00A884] hover:bg-[#02906f] text-white" : "bg-[#21C063] text-[#0B141A] shadow-md lg:shadow-none lg:bg-transparent lg:text-wa-muted lg:hover:bg-white/10"}`}
+            disabled={isSending && !isRecording}
+            aria-label={isRecording ? "Send voice message" : "Record voice message"}
+            title={isRecording ? "Send voice message" : "Record voice message"}
+          >
+            {isSending ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : isRecording ? (
+              <WhatsAppSendIcon size={20} className="ml-0.5" />
+            ) : (
+              <Mic size={23} />
+            )}
+          </button>
+        )}
+      </form>
+    </div>
+  );
+};
+
+export default MessageInput;

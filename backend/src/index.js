@@ -1,0 +1,175 @@
+import express from "express";
+import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
+import cors from "cors";
+import compression from "compression";
+import helmet from "helmet";
+import { fcmEnabled } from "./lib/fcm.js";
+import rateLimit from "express-rate-limit";
+import path from "path";
+
+import { connectDB } from "./lib/db.js";
+import { wipeChatMediaOnce } from "./lib/wipeChatMedia.js";
+
+import authRoutes from "./routes/auth.route.js";
+import messageRoutes from "./routes/message.route.js";
+import groupRoutes from "./routes/group.route.js";
+import pushRoutes from "./routes/push.route.js";
+import callRoutes from "./routes/call.route.js";
+import statusRoutes from "./routes/status.route.js";
+import highlightRoutes from "./routes/highlight.route.js";
+import statusCommentRoutes from "./routes/statusComment.route.js";
+import reelRoutes from "./routes/reel.route.js";
+import scheduledRoutes from "./routes/scheduled.route.js";
+import broadcastRoutes from "./routes/broadcast.route.js";
+import mediaRoutes from "./routes/media.route.js";
+import channelRoutes from "./routes/channel.route.js";
+import playlistRoutes from "./routes/playlist.route.js";
+import paymentRoutes from "./routes/payment.route.js";
+import adminRoutes from "./routes/admin.route.js";
+import accessRoutes from "./routes/access.route.js";
+import { maskJsonMiddleware } from "./lib/privateMedia.js";
+import { startScheduler } from "./lib/scheduler.js";
+import { app, server } from "./lib/socket.js";
+import { configureWebPush } from "./lib/webPush.js";
+
+dotenv.config();
+
+// One stray error in a socket handler must never take the whole server (and every chat/call) down.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught exception:", err);
+});
+configureWebPush();
+
+const PORT = process.env.PORT || 5001;
+const __dirname = path.resolve();
+
+const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim());
+
+// Behind a host's proxy (Render/Railway/…) req.ip must be the real client for rate limiting
+app.set("trust proxy", 1);
+// Standard security headers (nosniff, HSTS, frame protection, referrer policy…).
+// CSP is left to the page itself — the app loads fonts/images/CDN media.
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false }));
+app.use(compression()); // gzip API responses for faster loads on slow connections
+app.use(express.json({ limit: "18mb" })); // fits base64 image/video/document/audio payloads
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+
+// Brute-force protection: failed logins / signups are limited per IP, and the
+// whole API gets a generous ceiling so one client can't hammer the server.
+const json429 = (message) => (req, res) => res.status(429).json({ message });
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  skipSuccessfulRequests: true,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: json429("Too many attempts. Try again in a few minutes."),
+});
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 600,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: json429("Too many requests. Slow down a little."),
+});
+app.use("/api", apiLimiter);
+const lockLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 15,
+  skipSuccessfulRequests: true,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: json429("Too many PIN attempts. Try again in a few minutes."),
+});
+app.use("/api/messages/lock", lockLimiter);
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/signup", authLimiter);
+app.use("/api/auth/change-password", authLimiter);
+
+app.use("/api/media", mediaRoutes); // private chat files (checks you are in the chat, then redirects)
+app.use("/api", maskJsonMiddleware); // from here on, chat file addresses never leave the server as-is
+app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
+app.use("/api/groups", groupRoutes);
+app.use("/api/playlists", playlistRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/channels", channelRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/access", accessRoutes);
+app.use("/api/push", pushRoutes);
+app.use("/api/calls", callRoutes);
+app.use("/api/status", statusRoutes);
+app.use("/api/highlights", highlightRoutes);
+app.use("/api/status-comments", statusCommentRoutes);
+app.use("/api/reels", reelRoutes);
+app.use("/api/scheduled", scheduledRoutes);
+app.use("/api/broadcasts", broadcastRoutes);
+
+// Tiny wake-up / keep-alive endpoint (no database, no auth).
+app.get("/api/health", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).send("ok");
+});
+
+// Which Razorpay mode is the server in? (no secrets: only "test", "live" or "none")
+app.get("/api/health/payments", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  const id = (process.env.RAZORPAY_KEY_ID || "").trim();
+  res.json({ mode: !id ? "none" : id.startsWith("rzp_test_") ? "test" : "live", secret: !!(process.env.RAZORPAY_KEY_SECRET || "").trim() });
+});
+
+// Is background push set up on the server? (no secrets, just yes/no)
+app.get("/api/health/push", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.json({
+    webPush: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+    androidPush: fcmEnabled(),
+    privateTurn: !!(process.env.TURN_URLS && process.env.TURN_USERNAME && process.env.TURN_CREDENTIAL),
+  });
+});
+
+if (process.env.NODE_ENV === "production") {
+  app.use(
+    express.static(path.join(__dirname, "../frontend/dist"), {
+      maxAge: "1d",
+      index: false,
+      setHeaders(res, filePath) {
+        const name = path.basename(filePath);
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+          // vite output filenames are content-hashed, safe to cache hard
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (name === "sw.js" || name === "manifest.json" || name.endsWith(".html")) {
+          // Not content-hashed: must always be revalidated, otherwise phones and
+          // installed home-screen apps keep running an old build (and an old
+          // service worker) for as long as the cache lifetime.
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    })
+  );
+
+  app.get("*", (req, res) => {
+    res.setHeader("Cache-Control", "no-cache");
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
+  });
+}
+
+server.listen(PORT, () => {
+  console.log("server is running on PORT:" + PORT);
+  connectDB().then(() => {
+    startScheduler();
+    wipeChatMediaOnce().catch((e) => console.log("wipe error:", e.message)); // one-time, owner-approved clean-up
+  });
+});

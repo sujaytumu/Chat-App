@@ -1,0 +1,288 @@
+import { visibleUserIds } from "../lib/visibility.js";
+import mongoose from "mongoose";
+import Status from "../models/status.model.js";
+import cloudinary from "../lib/cloudinary.js";
+import { uploadFileAttachment } from "../lib/uploadFile.js";
+import { io, getReceiverSocketId } from "../lib/socket.js";
+import { sendPushToUser } from "../lib/webPush.js";
+
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+const MAX_MEDIA_BASE64 = 13 * 1024 * 1024;
+const MAX_SONG_BASE64 = 6 * 1024 * 1024;
+const MAX_VIDEO_SECONDS = 90;
+
+// Can `viewerId` see this status? The owner always can; otherwise the audience the owner picked decides.
+const canSee = (s, viewerId) => {
+  const a = s.audience;
+  if (!a || !a.mode || a.mode === "all") return true;
+  const listed = (a.users || []).some((u) => String(u) === String(viewerId));
+  return a.mode === "only" ? listed : !listed;
+};
+
+export const createStatus = async (req, res) => {
+  try {
+    const { type, content, backgroundColor, caption, file, song, location, font, trim, audience } = req.body;
+    const myId = req.user._id;
+
+    if (!["text", "image", "video", "audio", "file"].includes(type) || !content) {
+      return res.status(400).json({ error: "Status needs a type and content" });
+    }
+    if (type !== "text" && typeof content === "string" && content.length > MAX_MEDIA_BASE64) {
+      return res.status(413).json({ error: "That file is too large for a status" });
+    }
+
+    const doc = {
+      userId: myId,
+      type,
+      backgroundColor: backgroundColor || "#00A884",
+      font: Number.isInteger(font) && font >= 0 && font <= 4 ? font : 0,
+      caption: typeof caption === "string" ? caption.trim().slice(0, 700) : "",
+      expiresAt: new Date(Date.now() + TWENTY_FOUR_HOURS_MS),
+    };
+
+    if (type === "text") {
+      doc.content = String(content).slice(0, 700);
+    } else if (type === "image") {
+      const uploadResponse = await cloudinary.uploader.upload(content, { folder: "chat-app/status", resource_type: "image" });
+      doc.content = uploadResponse.secure_url;
+    } else {
+      const mime = type === "video" ? "video/mp4" : type === "audio" ? "audio/mpeg" : "application/octet-stream";
+      const uploaded = await uploadFileAttachment({
+        data: content,
+        name: file?.name,
+        mimeType: file?.mime || mime,
+        size: file?.size,
+        duration: file?.duration,
+      });
+      doc.content = uploaded.url;
+      doc.file = { name: uploaded.name, size: uploaded.size, mime: file?.mime || mime };
+    }
+
+    if (type === "video" && trim) {
+      const start = Number(trim.start);
+      const end = Number(trim.end);
+      if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end - start <= MAX_VIDEO_SECONDS + 0.5) {
+        doc.trim = { start, end };
+      } else {
+        return res.status(400).json({ error: "Status videos can be at most 90 seconds" });
+      }
+    }
+
+    if (song?.data) {
+      if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
+      const songMime = typeof song.mime === "string" && song.mime.startsWith("audio/") ? song.mime : "audio/mpeg";
+      const uploaded = await uploadFileAttachment({ data: song.data, name: song.name, mimeType: songMime, size: song.size });
+      const sLen = Number(song.length);
+      const sStart = Number(song.start);
+      doc.song = {
+        url: uploaded.url,
+        name: String(song.name || "Song").slice(0, 80),
+        start: Number.isFinite(sStart) ? Math.min(Math.max(sStart, 0), 3600) : 0,
+        length: Number.isFinite(sLen) && sLen > 0 ? Math.min(Math.max(Math.round(sLen), 5), 30) : 0,
+      };
+    }
+
+    if (location && typeof location.name === "string" && location.name.trim()) {
+      const lat = Number(location.lat);
+      const lng = Number(location.lng);
+      doc.location = {
+        name: location.name.trim().slice(0, 100),
+        ...(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : {}),
+      };
+    }
+
+    if (audience && ["except", "only"].includes(audience.mode) && Array.isArray(audience.users)) {
+      const ids = [...new Set(audience.users.map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(myId)).slice(0, 1000);
+      if (audience.mode === "only" && !ids.length) return res.status(400).json({ error: "Pick at least one person to share with" });
+      doc.audience = { mode: audience.mode, users: ids };
+      if (audience.mode === "only" && audience.close === true) doc.closeFriends = true;
+    }
+
+    const status = await Status.create(doc);
+    res.status(201).json(status);
+  } catch (error) {
+    console.log("Error in createStatus controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Grouped by user: everyone (besides me) who currently has at least one
+// active (non-expired — the TTL index handles actual deletion) status.
+export const getStatusFeed = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    res.set("Cache-Control", "no-store");
+
+    const visible = await visibleUserIds(req.user);
+    const statuses = await Status.find({ expiresAt: { $gt: new Date() }, ...(visible ? { userId: { $in: [...visible, String(myId)] } } : {}) })
+      .populate("userId", "fullName profilePic")
+      .sort({ createdAt: 1 });
+
+    const byUser = new Map();
+    for (const s of statuses) {
+      if (!s.userId) continue; // owner account was deleted
+      const uid = s.userId._id.toString();
+      if (uid !== myId.toString() && !canSee(s, myId)) continue; // the owner left me out of this one
+      if (!byUser.has(uid)) byUser.set(uid, { user: s.userId, statuses: [] });
+      byUser.get(uid).statuses.push(s);
+    }
+
+    const myDocs = byUser.get(myId.toString())?.statuses || [];
+    byUser.delete(myId.toString());
+    // Only the owner sees who viewed their status.
+    await Status.populate(myDocs, [
+      { path: "views.user", select: "fullName profilePic" },
+      { path: "likes.user", select: "fullName profilePic" },
+    ]);
+    const myStatuses = myDocs.map((d) => d.toObject());
+
+    const others = Array.from(byUser.values()).map((entry) => ({
+      user: entry.user,
+      hasUnseen: entry.statuses.some((s) => !s.viewedBy.some((v) => v.equals(myId))),
+      statuses: entry.statuses.map((s) => {
+        const o = s.toObject();
+        o.seen = s.viewedBy.some((v) => v.equals(myId));
+        o.liked = (s.likes || []).some((l) => l.user.equals(myId)); // only my own heart
+        delete o.viewedBy;
+        delete o.views;
+        delete o.likes;
+        delete o.audience; // nobody else learns who was left out
+        return o;
+      }),
+    }));
+
+    res.status(200).json({ myStatuses, others });
+  } catch (error) {
+    console.log("Error in getStatusFeed controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// My own history: every status I have posted, newest first (including ones that are no longer live).
+// Paged with `before` (ISO date of the last item received) so a long history stays fast.
+export const getStatusArchive = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 100);
+    const q = { userId: req.user._id };
+    const before = req.query.before ? new Date(String(req.query.before)) : null;
+    if (before && !Number.isNaN(before.getTime())) q.createdAt = { $lt: before };
+    const rows = await Status.find(q)
+      .select("-views -viewedBy -likes -audience.users")
+      .sort({ createdAt: -1 })
+      .limit(limit + 1)
+      .lean();
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+    res.status(200).json({ items, hasMore, next: items.length ? items[items.length - 1].createdAt : null });
+  } catch (error) {
+    console.log("Error in getStatusArchive controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const markStatusViewed = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+
+    const viewResult = await Status.updateOne(
+      {
+        _id: id,
+        userId: { $ne: myId },
+        viewedBy: { $ne: myId },
+        $or: [
+          { "audience.mode": { $in: [null, "all"] } },
+          { "audience.mode": "except", "audience.users": { $ne: myId } },
+          { "audience.mode": "only", "audience.users": myId },
+        ],
+      },
+      { $push: { viewedBy: myId, views: { user: myId, at: new Date() } } }
+    );
+
+    // Tell the owner right away, so their view count moves while they are looking at it.
+    if (viewResult.modifiedCount > 0) {
+      try {
+        const st = await Status.findById(id).select("userId").lean();
+        const socketId = st && getReceiverSocketId(String(st.userId));
+        if (socketId) {
+          io.to(socketId).emit("statusViewed", {
+            statusId: id,
+            user: { _id: String(myId), fullName: req.user.fullName, profilePic: req.user.profilePic },
+            at: new Date().toISOString(),
+          });
+        }
+      } catch {
+        /* the count still shows on the next load */
+      }
+    }
+
+    res.status(200).json({ message: "Marked as viewed" });
+  } catch (error) {
+    console.log("Error in markStatusViewed controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const deleteStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+
+    const status = await Status.findById(id);
+    if (!status) return res.status(404).json({ error: "Status not found" });
+    if (!status.userId.equals(myId)) {
+      return res.status(403).json({ error: "You can only delete your own status" });
+    }
+
+    await Status.findByIdAndDelete(id);
+    res.status(200).json({ message: "Status deleted" });
+  } catch (error) {
+    console.log("Error in deleteStatus controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Heart / un-heart someone else's status. The owner is told when it's liked.
+export const likeStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = req.user._id;
+    const liked = req.body?.liked !== false;
+
+    const status = await Status.findOne({ _id: id, expiresAt: { $gt: new Date() } }).select("userId audience");
+    if (!status || (!status.userId.equals(myId) && !canSee(status, myId))) return res.status(404).json({ error: "Status not found" });
+    if (status.userId.equals(myId)) return res.status(400).json({ error: "You can't like your own status" });
+
+    if (liked) {
+      const result = await Status.updateOne(
+        { _id: id, "likes.user": { $ne: myId } },
+        { $push: { likes: { user: myId, at: new Date() } } }
+      );
+      if (result.modifiedCount > 0) {
+        const ownerId = status.userId.toString();
+        const socketId = getReceiverSocketId(ownerId);
+        if (socketId) {
+          io.to(socketId).emit("statusLiked", {
+            statusId: id,
+            user: { _id: myId.toString(), fullName: req.user.fullName, profilePic: req.user.profilePic },
+          });
+        }
+        sendPushToUser(ownerId, {
+          title: "Talkies",
+          body: `❤️ ${req.user.fullName} liked your status`,
+          icon: req.user.profilePic || "/icon-v2-192.png",
+          tag: `status-like-${id}`,
+          data: { url: "/status" },
+        });
+      }
+    } else {
+      await Status.updateOne({ _id: id }, { $pull: { likes: { user: myId } } });
+    }
+    res.status(200).json({ liked });
+  } catch (error) {
+    console.log("Error in likeStatus controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

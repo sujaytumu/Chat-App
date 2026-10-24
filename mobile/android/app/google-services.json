@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "867298290229",
+    "project_id": "talkies-ff1a2",
+    "storage_bucket": "talkies-ff1a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:867298290229:android:7af574732ccd157de4df7c",
+        "android_client_info": {
+          "package_name": "com.sujaytumu.talkies"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvYAH4ncy0VT-wO8hC2RIgePp9MxGEKqI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

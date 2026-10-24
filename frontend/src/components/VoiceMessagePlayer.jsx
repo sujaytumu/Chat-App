@@ -1,0 +1,232 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Play, Pause, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
+import { axiosInstance } from "../lib/axios";
+
+// Only one voice note plays at a time (like WhatsApp): starting one pauses the other.
+let currentlyPlaying = null;
+
+const BARS = 40;
+const SPEEDS = [1, 1.5, 2];
+
+const fmt = (secs) => {
+  const s = Math.max(0, Math.round(secs || 0));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+// Stable pseudo-waveform for notes recorded before waveforms were stored
+const fallbackBars = (seed) => {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return Array.from({ length: BARS }, () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h ^= h >>> 13;
+    return 25 + (Math.abs(h) % 70);
+  });
+};
+
+const VoiceMessagePlayer = ({ file, onError, autoNext, messageId, transcript }) => {
+  const [text, setText] = useState(transcript || "");
+  const [open, setOpen] = useState(!!transcript);
+  const [busy, setBusy] = useState(false);
+  const transcribe = async (e) => {
+    e.stopPropagation();
+    if (text) return setOpen((o) => !o);
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.post(`/messages/transcribe/${messageId}`);
+      if (data.empty || !data.text) toast("No speech found in this voice message");
+      else {
+        setText(data.text);
+        setOpen(true);
+      }
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.error === "not_configured"
+          ? "Transcripts aren't switched on yet — add a GROQ_API_KEY on the server"
+          : err?.response?.data?.error || "Couldn't transcribe this voice message"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  const audioRef = useRef(null);
+  const barsRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const [duration, setDuration] = useState(file.duration || 0);
+  const [rate, setRate] = useState(1);
+
+  const bars = useMemo(
+    () => (file.waveform?.length >= 8 ? file.waveform : fallbackBars(file.url || "")),
+    [file.waveform, file.url]
+  );
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    return () => {
+      audio?.pause();
+      if (currentlyPlaying === audio) currentlyPlaying = null;
+    };
+  }, []);
+
+  // Like WhatsApp: when one incoming voice note ends, the next incoming one starts by itself.
+  useEffect(() => {
+    const audio = audioRef.current;
+    const go = () => {
+      if (audio && audio.paused) toggleRef.current?.();
+    };
+    audio?.addEventListener("voice-autoplay", go);
+    return () => audio?.removeEventListener("voice-autoplay", go);
+  }, []);
+  const toggleRef = useRef(null);
+
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) {
+      if (currentlyPlaying && currentlyPlaying !== audio) currentlyPlaying.pause();
+      currentlyPlaying = audio;
+      audio.playbackRate = rate;
+      audio.play().catch(() => onError?.());
+    } else {
+      audio.pause();
+    }
+  };
+
+  toggleRef.current = toggle;
+
+  const playNext = () => {
+    const all = Array.from(document.querySelectorAll("audio[data-voice-incoming]"));
+    const next = all[all.indexOf(audioRef.current) + 1];
+    if (!next) return;
+    next.closest("[data-voice-row]")?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    next.dispatchEvent(new Event("voice-autoplay"));
+  };
+
+  const cycleSpeed = (e) => {
+    e.stopPropagation();
+    const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length];
+    setRate(next);
+    if (audioRef.current) audioRef.current.playbackRate = next;
+  };
+
+  const seekTo = (clientX) => {
+    const el = barsRef.current;
+    const audio = audioRef.current;
+    if (!el || !audio || !duration) return;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    audio.currentTime = ratio * duration;
+    setCurrent(audio.currentTime);
+  };
+
+  const onPointerDown = (e) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    seekTo(e.clientX);
+  };
+  const onPointerMove = (e) => {
+    if (e.buttons === 1) seekTo(e.clientX);
+  };
+
+  // Browser-recorded webm often reports an infinite length. Jumping to the end
+  // once makes the browser work out the real value.
+  const onLoadedMetadata = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.duration === Infinity || Number.isNaN(audio.duration)) {
+      if (!file.duration) {
+        const fix = () => {
+          audio.removeEventListener("timeupdate", fix);
+          setDuration(audio.duration);
+          audio.currentTime = 0;
+        };
+        audio.addEventListener("timeupdate", fix);
+        audio.currentTime = 1e101;
+      }
+    } else if (!file.duration) {
+      setDuration(audio.duration);
+    }
+  };
+
+  const progress = duration ? Math.min(1, current / duration) : 0;
+  const shown = playing || current > 0 ? current : duration;
+
+  return (
+    <div className="mb-1 min-w-[230px] max-w-[270px]">
+    <div data-voice-row="1" className="flex items-center gap-2.5 min-w-[230px] max-w-[270px] select-none">
+      <button
+        type="button"
+        onClick={toggle}
+        className="size-10 rounded-full bg-white/15 hover:bg-white/25 active:bg-white/30 flex items-center justify-center shrink-0 transition-colors"
+        aria-label={playing ? "Pause voice message" : "Play voice message"}
+      >
+        {playing ? <Pause size={19} fill="currentColor" /> : <Play size={19} fill="currentColor" className="ml-0.5" />}
+      </button>
+
+      <div className="flex-1 min-w-0">
+        <div
+          ref={barsRef}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          className="flex items-center gap-[2px] h-7 cursor-pointer touch-none"
+        >
+          {bars.map((h, i) => (
+            <span
+              key={i}
+              className={`flex-1 rounded-full transition-colors ${
+                i / bars.length < progress ? "bg-white" : "bg-white/35"
+              }`}
+              style={{ height: `${Math.max(12, h)}%` }}
+            />
+          ))}
+        </div>
+        <div className="flex items-center justify-between text-[9.4px] opacity-80 tabular-nums mt-0.5">
+          <span>{fmt(shown)}</span>
+          {(playing || rate !== 1) && (
+            <button type="button" onClick={cycleSpeed} className="px-1.5 rounded-full bg-white/20 font-medium">
+              {rate}x
+            </button>
+          )}
+        </div>
+      </div>
+
+      <audio
+        ref={audioRef}
+        src={file.url}
+        preload="metadata"
+        data-voice-incoming={autoNext ? "1" : undefined}
+        onLoadedMetadata={onLoadedMetadata}
+        onTimeUpdate={(e) => setCurrent(e.currentTarget.currentTime)}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => {
+          setPlaying(false);
+          setCurrent(0);
+          if (currentlyPlaying === audioRef.current) currentlyPlaying = null;
+          if (autoNext) playNext();
+        }}
+        onError={onError}
+      />
+    </div>
+      {messageId && (
+        <div className="mt-1">
+          <button type="button" onClick={transcribe} disabled={busy} className="text-[11.5px] font-medium opacity-90 underline-offset-2 hover:underline flex items-center gap-1">
+            {busy ? (
+              <>
+                <Loader2 size={12} className="animate-spin" /> Transcribing…
+              </>
+            ) : text ? (
+              open ? "Hide transcript" : "Show transcript"
+            ) : (
+              "Transcribe"
+            )}
+          </button>
+          {open && text && <p className="mt-1 text-[13.5px] leading-snug whitespace-pre-wrap break-words">{text}</p>}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VoiceMessagePlayer;

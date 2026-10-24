@@ -1,0 +1,353 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Colour themes -------------------------------------------------------
+   The app is bright (white, WhatsApp-style) by default. Dark themes add the
+   `wa-dark` class to <html>; call screens carry `wa-dark` themselves so they
+   stay dark in either mode. Components use bg-wa-bg, text-wa-text, ... */
+:root {
+  --wa-bg: 255 255 255;
+  --wa-panel: 255 255 255;
+  --wa-surface: 240 242 245;
+  --wa-pop: 255 255 255;
+  --wa-field: 233 237 239;
+  --wa-hover: 226 230 233;
+  --wa-text: 17 27 33;
+  --wa-muted: 102 119 129;
+  --wa-icon: 84 101 111;
+  --wa-text2: 59 74 84;
+  --wa-muted2: 134 150 160;
+  --wa-out: 217 253 211;
+  --wa-tint: 217 253 211;
+  --wa-tinttext: 10 107 61;
+  --wa-wallpaper: #EFEAE2;
+  --wa-doodle: #000000;
+  --wa-doodle-opacity: 0.06;
+  --wa-scroll: #C5CDD2;
+  --wa-scroll-hover: #AEB8BE;
+}
+.wa-dark {
+  --wa-bg: 11 20 26;
+  --wa-panel: 17 27 33;
+  --wa-surface: 32 44 51;
+  --wa-pop: 35 49 56;
+  --wa-field: 42 57 66;
+  --wa-hover: 38 51 60;
+  --wa-text: 233 237 239;
+  --wa-muted: 134 150 160;
+  --wa-icon: 174 186 193;
+  --wa-text2: 209 215 219;
+  --wa-muted2: 102 119 129;
+  --wa-out: 0 92 75;
+  --wa-tint: 3 76 57;
+  --wa-tinttext: 217 253 211;
+  --wa-wallpaper: #0B141A;
+  --wa-doodle: #FFFFFF;
+  --wa-doodle-opacity: 0.055;
+  --wa-scroll: #374248;
+  --wa-scroll-hover: #4A575F;
+}
+
+/* White see-through overlays were designed for dark screens; in the bright
+   theme they become dark see-through overlays (outside the always-dark call
+   screens). */
+
+html:not(.wa-dark) .bg-white\/10 { background-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .bg-white\/15 { background-color: rgb(0 0 0 / 0.15); }
+html:not(.wa-dark) .bg-white\/20 { background-color: rgb(0 0 0 / 0.2); }
+html:not(.wa-dark) .bg-white\/30 { background-color: rgb(0 0 0 / 0.3); }
+html:not(.wa-dark) .bg-white\/35 { background-color: rgb(0 0 0 / 0.35); }
+html:not(.wa-dark) .bg-white\/5 { background-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .border-white\/10 { border-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .border-white\/20 { border-color: rgb(0 0 0 / 0.2); }
+html:not(.wa-dark) .border-white\/5 { border-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .active\:bg-white\/10:active { background-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .active\:bg-white\/15:active { background-color: rgb(0 0 0 / 0.15); }
+html:not(.wa-dark) .active\:bg-white\/30:active { background-color: rgb(0 0 0 / 0.3); }
+html:not(.wa-dark) .active\:bg-white\/5:active { background-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .hover\:bg-white\/10:hover { background-color: rgb(0 0 0 / 0.1); }
+html:not(.wa-dark) .hover\:bg-white\/15:hover { background-color: rgb(0 0 0 / 0.15); }
+html:not(.wa-dark) .hover\:bg-white\/25:hover { background-color: rgb(0 0 0 / 0.25); }
+html:not(.wa-dark) .hover\:bg-white\/5:hover { background-color: rgb(0 0 0 / 0.05); }
+html:not(.wa-dark) .hover\:bg-white\/90:hover { background-color: rgb(0 0 0 / 0.9); }
+html:not(.wa-dark) .lg\:border-white\/5 { border-color: rgb(0 0 0 / 0.05); }
+.wa-dark .bg-white\/10 { background-color: rgb(255 255 255 / 0.1); }
+.wa-dark .bg-white\/15 { background-color: rgb(255 255 255 / 0.15); }
+.wa-dark .bg-white\/20 { background-color: rgb(255 255 255 / 0.2); }
+.wa-dark .bg-white\/30 { background-color: rgb(255 255 255 / 0.3); }
+.wa-dark .bg-white\/35 { background-color: rgb(255 255 255 / 0.35); }
+.wa-dark .bg-white\/5 { background-color: rgb(255 255 255 / 0.05); }
+.wa-dark .border-white\/10 { border-color: rgb(255 255 255 / 0.1); }
+.wa-dark .border-white\/20 { border-color: rgb(255 255 255 / 0.2); }
+.wa-dark .border-white\/5 { border-color: rgb(255 255 255 / 0.05); }
+.wa-dark .active\:bg-white\/10:active { background-color: rgb(255 255 255 / 0.1); }
+.wa-dark .active\:bg-white\/15:active { background-color: rgb(255 255 255 / 0.15); }
+.wa-dark .active\:bg-white\/30:active { background-color: rgb(255 255 255 / 0.3); }
+.wa-dark .active\:bg-white\/5:active { background-color: rgb(255 255 255 / 0.05); }
+.wa-dark .hover\:bg-white\/10:hover { background-color: rgb(255 255 255 / 0.1); }
+.wa-dark .hover\:bg-white\/15:hover { background-color: rgb(255 255 255 / 0.15); }
+.wa-dark .hover\:bg-white\/25:hover { background-color: rgb(255 255 255 / 0.25); }
+.wa-dark .hover\:bg-white\/5:hover { background-color: rgb(255 255 255 / 0.05); }
+.wa-dark .hover\:bg-white\/90:hover { background-color: rgb(255 255 255 / 0.9); }
+.wa-dark .lg\:border-white\/5 { border-color: rgb(255 255 255 / 0.05); }
+
+/* Phones: no 300ms tap delay, no grey tap flash, no rubber-banding the page. */
+body { font-size: 13.6px; }
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, [role="button"], input, select, textarea, label, summary {
+  touch-action: manipulation;
+}
+html,
+body,
+#root {
+  background-color: rgb(var(--wa-bg));
+}
+/* While the chat shell is mounted the document itself never scrolls — only the
+   message list / chat list do. Prevents the header scrolling out of view. */
+html.app-locked,
+html.app-locked body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+body {
+  overscroll-behavior-y: none;
+  font-family: "Segoe UI", "Helvetica Neue", Helvetica, "Lucida Grande", Arial, Ubuntu, Cantarell,
+    "Fira Sans", sans-serif;
+}
+
+/* Hide scrollbars on horizontally scrolling chip rows (still scrollable). */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Dark chat wallpaper: a faint tiled doodle pattern over the base colour. */
+.chat-wallpaper {
+  background-color: var(--wa-wallpaper);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260' viewBox='0 0 260 260' fill='none' stroke='%23ffffff' stroke-opacity='0.055' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='30' cy='32' r='9'/%3E%3Cpolygon points='122,16 126,26 137,27 129,34 131,45 122,39 113,45 115,34 107,27 118,26' transform='rotate(12 122 30)'/%3E%3Cpath d='M208 52c-12-9-18-17-12-24 5-6 12-3 12 3 0-6 7-9 12-3 6 7 0 15-12 24z'/%3E%3Crect x='38' y='100' width='26' height='22' rx='6' transform='rotate(-14 51 111)'/%3E%3Cpath d='M112 116q8-14 16 0t16 0t16 0'/%3E%3Cpath d='M190 98h34a8 8 0 0 1 8 8v16a8 8 0 0 1-8 8h-20l-10 9v-9h-4a8 8 0 0 1-8-8v-16a8 8 0 0 1 8-8z'/%3E%3Cpath d='M30 186v18M21 195h18'/%3E%3Cpath d='M118 178a16 16 0 1 0 14 24a13 13 0 0 1-14-24z'/%3E%3Cpath d='M186 214l12-20l12 20z' transform='rotate(8 198 205)'/%3E%3Cpath d='M236 170v26a7 7 0 1 1-4-6v-18l14-4v18' transform='scale(.9) translate(26 14)'/%3E%3Ccircle cx='84' cy='60' r='2'/%3E%3Ccircle cx='160' cy='150' r='2'/%3E%3Ccircle cx='70' cy='236' r='2'/%3E%3Ccircle cx='232' cy='88' r='2'/%3E%3Cpath d='M150 232c6-10 14-10 20 0'/%3E%3C/svg%3E");
+  background-size: 260px 260px;
+}
+
+/* Message bubble "tails" — only drawn on the first bubble of a run. */
+.bubble-tail-out::before,
+.bubble-tail-in::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 9px;
+  height: 14px;
+  background: inherit;
+}
+.bubble-tail-out::before {
+  right: -8px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.bubble-tail-in::before {
+  left: -8px;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
+
+/* Thin, dark scrollbars (like WhatsApp Web) instead of the bright default. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--wa-scroll) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--wa-scroll);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--wa-scroll-hover);
+}
+
+/* Selected text uses the WhatsApp green instead of the browser blue. */
+::selection {
+  background: rgba(37, 211, 102, 0.35);
+}
+
+/* Accessibility / appearance switches (Settings → Accessibility, Appearance) */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+html.no-wallpaper .chat-wallpaper {
+  background-image: none;
+}
+
+/* Tab swipe: the new tab slides in from the side you swiped towards. */
+@keyframes tab-in-right { from { transform: translateX(28%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes tab-in-left { from { transform: translateX(-28%); opacity: 0.2; } to { transform: none; opacity: 1; } }
+.tab-slide-from-right { animation: tab-in-right 0.22s ease-out; }
+.tab-slide-from-left { animation: tab-in-left 0.22s ease-out; }
+
+/* ---- Premium auth screens ------------------------------------------------ */
+.auth-hero { background: radial-gradient(120% 120% at 20% 0%, #0f3d36 0%, #08201d 45%, #050f0e 100%); }
+.auth-orb { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: .55; animation: auth-float 14s ease-in-out infinite; }
+.auth-orb-a { width: 380px; height: 380px; background: #25d366; top: -90px; left: -80px; }
+.auth-orb-b { width: 320px; height: 320px; background: #14b8a6; bottom: -80px; right: -60px; animation-delay: -5s; }
+.auth-orb-c { width: 220px; height: 220px; background: #6366f1; top: 45%; left: 55%; opacity: .35; animation-delay: -9s; }
+.auth-grid { position: absolute; inset: 0; opacity: .08; background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 44px 44px; mask-image: radial-gradient(circle at center, #000 30%, transparent 75%); }
+.auth-bubble { opacity: 0; transform: translateY(14px); animation: auth-rise .7s cubic-bezier(.2,.8,.2,1) forwards; }
+@keyframes auth-rise { to { opacity: 1; transform: none; } }
+@keyframes auth-float { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(30px,-24px) scale(1.08); } }
+.auth-form .input { border-radius: .85rem; transition: box-shadow .2s, border-color .2s; }
+.auth-form .input:focus { box-shadow: 0 0 0 4px rgb(37 211 102 / .18); border-color: #25d366; outline: none; }
+.auth-form .btn-primary { border-radius: .85rem; border: 0; background: linear-gradient(135deg, #25d366, #128c7e); color: #fff; box-shadow: 0 10px 24px -10px rgb(18 140 126 / .7); transition: transform .15s, box-shadow .2s; }
+.auth-form .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px rgb(18 140 126 / .8); }
+.auth-logo { background: linear-gradient(135deg, #25d366, #128c7e); box-shadow: 0 12px 30px -10px rgb(18 140 126 / .7); }
+@media (prefers-reduced-motion: reduce) { .auth-orb, .auth-bubble { animation: none; opacity: 1; transform: none; } }
+
+/* ---- Motion polish: everything eases in instead of just appearing ---------
+   Uses the individual `scale` / `translate` properties so it never clashes
+   with Tailwind's own transforms (e.g. -translate-x-1/2). */
+@keyframes m-pop { from { opacity: 0; scale: .92; } to { opacity: 1; scale: 1; } }
+@keyframes m-sheet { from { opacity: .6; translate: 0 28%; } to { opacity: 1; translate: 0 0; } }
+@keyframes m-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes menu-pop { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: scale(1); } }
+@keyframes m-bubble { from { opacity: 0; translate: 0 10px; scale: .96; } to { opacity: 1; translate: 0 0; scale: 1; } }
+
+/* dropdown menus */
+.absolute.bg-wa-pop.shadow-2xl, .absolute.bg-wa-pop.shadow-xl, .absolute.bg-wa-pop.shadow-lg {
+  animation: m-pop .16s cubic-bezier(.2, .9, .3, 1.15);
+  transform-origin: top right;
+}
+/* centred dialogs */
+.fixed .rounded-2xl.bg-wa-pop, .fixed .rounded-3xl.bg-wa-pop, .fixed .rounded-\[28px\].bg-wa-pop {
+  animation: m-pop .2s cubic-bezier(.2, .9, .3, 1.1);
+}
+/* bottom sheets */
+.rounded-t-3xl { animation: m-sheet .28s cubic-bezier(.2, .8, .2, 1); }
+/* dimmed backdrops */
+.fixed.inset-0[class*="bg-black/"] { animation: m-fade .18s ease-out; }
+/* new chat bubbles */
+.msg-in { animation: m-bubble .24s cubic-bezier(.2, .8, .2, 1); }
+/* tactile icon buttons */
+button[class*="size-"], .btn { transition: scale .12s ease, background-color .15s ease, opacity .15s ease; }
+button[class*="size-"]:not(:disabled):active, .btn:not(:disabled):active { scale: .92; }
+/* chat / contact rows glide on hover and press */
+.chat-row { transition: background-color .15s ease; }
+
+/* Long-press to select a message (touch screens): no text-selection / callout popup fighting it. */
+.msg-row { -webkit-touch-callout: none; }
+@media (pointer: coarse) { .msg-row { -webkit-user-select: none; user-select: none; } }
+
+@keyframes heartpop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+/* ---- Chat colour (Settings → Appearance) ---- */
+[data-chat-color="ocean"] { --wa-out: 205 232 255; --wa-tint: 205 232 255; --wa-tinttext: 12 74 140; }
+.wa-dark[data-chat-color="ocean"], .wa-dark [data-chat-color="ocean"] { --wa-out: 18 62 105; --wa-tint: 14 45 78; --wa-tinttext: 205 232 255; }
+[data-chat-color="violet"] { --wa-out: 228 217 255; --wa-tint: 228 217 255; --wa-tinttext: 76 29 149; }
+.wa-dark[data-chat-color="violet"], .wa-dark [data-chat-color="violet"] { --wa-out: 61 38 110; --wa-tint: 44 28 80; --wa-tinttext: 228 217 255; }
+[data-chat-color="rose"] { --wa-out: 255 217 228; --wa-tint: 255 217 228; --wa-tinttext: 157 23 77; }
+.wa-dark[data-chat-color="rose"], .wa-dark [data-chat-color="rose"] { --wa-out: 110 34 62; --wa-tint: 80 26 46; --wa-tinttext: 255 217 228; }
+[data-chat-color="sunset"] { --wa-out: 255 229 204; --wa-tint: 255 229 204; --wa-tinttext: 154 52 18; }
+.wa-dark[data-chat-color="sunset"], .wa-dark [data-chat-color="sunset"] { --wa-out: 112 56 20; --wa-tint: 82 42 16; --wa-tinttext: 255 229 204; }
+[data-chat-color="teal"] { --wa-out: 204 244 240; --wa-tint: 204 244 240; --wa-tinttext: 17 94 89; }
+.wa-dark[data-chat-color="teal"], .wa-dark [data-chat-color="teal"] { --wa-out: 16 84 80; --wa-tint: 14 62 59; --wa-tinttext: 204 244 240; }
+[data-chat-color="graphite"] { --wa-out: 226 229 233; --wa-tint: 226 229 233; --wa-tinttext: 31 41 55; }
+.wa-dark[data-chat-color="graphite"], .wa-dark [data-chat-color="graphite"] { --wa-out: 55 65 81; --wa-tint: 38 46 58; --wa-tinttext: 226 229 233; }
+
+/* double-tap ❤️ on a message */
+@keyframes m-heart {
+  0% { opacity: 0; scale: .3; translate: -50% -40%; }
+  25% { opacity: 1; scale: 1.25; translate: -50% -50%; }
+  60% { opacity: 1; scale: 1; translate: -50% -60%; }
+  100% { opacity: 0; scale: 1; translate: -50% -140%; }
+}
+
+/* Message text size (Settings → Chats → Font size) */
+html[data-font="small"] .msg-text { font-size: 12px; line-height: 19px; }
+html[data-font="large"] .msg-text { font-size: 15.5px; line-height: 23px; }
+html[data-font="huge"] .msg-text { font-size: 18px; line-height: 26px; }
+@media (min-width: 1024px) {
+  html[data-font="small"] .msg-text { font-size: 14px; line-height: 21px; }
+  html[data-font="large"] .msg-text { font-size: 17.5px; line-height: 26px; }
+  html[data-font="huge"] .msg-text { font-size: 20px; line-height: 29px; }
+}
+[data-chat-color="green"] { --wa-out: 217 253 211; --wa-tint: 217 253 211; --wa-tinttext: 10 107 61; }
+.wa-dark[data-chat-color="green"], .wa-dark [data-chat-color="green"] { --wa-out: 20 77 55; --wa-tint: 16 54 41; --wa-tinttext: 217 253 211; }
+
+@keyframes fmtpop{from{opacity:0;translate:0 6px;scale:.92}to{opacity:1;translate:0 0;scale:1}}
+.fmt-pop{animation:fmtpop .14s ease-out}
+html.reduce-motion .fmt-pop{animation:none}
+
+@keyframes selpop{from{opacity:0;translate:0 -8px;scale:.9}to{opacity:1;translate:0 0;scale:1}}
+.sel-pop{animation:selpop .16s ease-out}
+html.reduce-motion .sel-pop{animation:none}
+
+/* Call controls that turn on (speaker, mute, camera, share): a clean white circle that blinks once, like WhatsApp. */
+@keyframes call-on-blink {
+  0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.75); transform: scale(0.92); }
+  60% { box-shadow: 0 0 0 14px rgba(255,255,255,0); transform: scale(1.06); }
+  100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); transform: scale(1); }
+}
+.call-btn-on { animation: call-on-blink 0.5s ease-out; }
+
+/* WhatsApp-style "now playing" bars next to a status song */
+@keyframes eqbar {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.eq-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+.eq-bars > i { display: block; width: 3px; height: 100%; border-radius: 1.5px; background: currentColor; transform-origin: bottom; animation: eqbar 0.9s ease-in-out infinite; }
+.eq-bars > i:nth-child(2) { animation-delay: -0.35s; animation-duration: 0.75s; }
+.eq-bars > i:nth-child(3) { animation-delay: -0.6s; animation-duration: 1.05s; }
+.eq-bars.paused > i { animation-play-state: paused; transform: scaleY(0.4); }
+
+/* Payment result: the tick / cross pops in, the ring pulses once */
+@keyframes pay-pop { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes pay-ring { 0% { transform: scale(.8); opacity: .55; } 100% { transform: scale(1.6); opacity: 0; } }
+.pay-pop { animation: pay-pop .5s cubic-bezier(.2,.8,.3,1) both; }
+.pay-ring { animation: pay-ring 1s ease-out .2s both; }
+@keyframes pin-shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-9px); } 40%,80% { transform: translateX(9px); } }
+.pin-shake { animation: pin-shake .38s ease-in-out; }
+
+
+/* ---- App-wide polish: crisper text, instant press feedback, smooth theme / hover changes ---- */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
+button, [role="button"], a {
+  transition: background-color .15s ease, color .15s ease, scale .12s ease, opacity .15s ease;
+}
+button:active:not(:disabled), [role="button"]:active {
+  scale: .97; /* the separate 'scale' property never fights Tailwind's translate / rotate */
+}
+/* round, soft focus ring for keyboard users only */
+:focus-visible {
+  outline: 2px solid #25D366;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+:focus:not(:focus-visible) { outline: none; }
+/* sheets and popups slide in softly */
+@keyframes waPopIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+.wa-pop-in { animation: waPopIn .18s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

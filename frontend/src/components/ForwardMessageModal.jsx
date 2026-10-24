@@ -1,0 +1,65 @@
+import { useState } from "react";
+import { optimizeImage } from "../lib/cdn";
+import { X, Send } from "lucide-react";
+import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
+
+const ForwardMessageModal = ({ message, messages, onClose }) => {
+  const { users, groups, forwardMessage } = useChatStore();
+  const [selected, setSelected] = useState(null);
+  const [sending, setSending] = useState(false);
+
+  const lockedChats = useAuthStore((st) => st.authUser?.lockedChats) || [];
+  const items = [
+    ...users.map((u) => ({ type: "direct", data: u, key: `d-${u._id}`, name: u.fullName, avatar: u.profilePic })),
+    ...groups.map((g) => ({ type: "group", data: g, key: `g-${g._id}`, name: g.name, avatar: g.groupPic })),
+  ].filter((i) => !lockedChats.includes(`${i.type === "group" ? "g" : "d"}:${i.data._id}`));
+
+  const handleSend = async () => {
+    if (!selected) return;
+    setSending(true);
+    for (const m of messages || [message]) await forwardMessage(m, selected);
+    setSending(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[150] bg-black/60 flex items-center justify-center p-4">
+      <div className="bg-wa-surface rounded-2xl w-full max-w-sm max-h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <h3 className="font-semibold text-wa-text">Forward to</h3>
+          <button onClick={onClose} className="text-wa-muted hover:text-wa-text">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {items.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setSelected({ type: item.type, data: item.data })}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-white/5 ${
+                selected?.data._id === item.data._id ? "bg-white/10" : ""
+              }`}
+            >
+              <img src={optimizeImage(item.avatar || "/avatar.png", 120)} loading="lazy" decoding="async" alt={item.name} className="size-10 rounded-full object-cover" />
+              <span className="text-wa-text2 truncate">{item.name}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-white/10">
+          <button
+            onClick={handleSend}
+            disabled={!selected || sending}
+            className="btn w-full bg-[#00A884] hover:bg-[#02906f] text-white border-none gap-2"
+          >
+            <Send size={16} /> {sending ? "Sending…" : "Forward"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ForwardMessageModal;

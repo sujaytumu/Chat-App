@@ -1,0 +1,168 @@
+import { useEffect, useState } from "react";
+import SpeedVideo from "./SpeedVideo";
+import { ArrowLeft, FileText, Link2, Play, Download, X } from "lucide-react";
+import { axiosInstance } from "../lib/axios";
+import { useBackToClose } from "../lib/useBackToClose";
+import ImageLightbox from "./ImageLightbox";
+
+const fmtDur = (s) => (s ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}` : "");
+const fmtSize = (b) => (!b ? "" : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+const fmtDate = (d) => new Date(d).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+
+// Small hook shared by the info-screen preview strip and the full screen.
+export function useChatMedia(chatType, chatId) {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setData(null);
+    axiosInstance
+      .get(`/messages/media/${chatType}/${chatId}`)
+      .then((r) => alive && setData(r.data))
+      .catch(() => alive && setData({ media: [], docs: [], links: [] }));
+    return () => {
+      alive = false;
+    };
+  }, [chatType, chatId]);
+  return data;
+}
+
+// Still frame for a video: Cloudinary can render one as a jpg; otherwise fall back to the video's first frame.
+const videoPoster = (url) =>
+  /res\.cloudinary\.com\/.+\/video\/upload\//.test(url || "")
+    ? url.replace("/video/upload/", "/video/upload/so_0,w_400,h_400,c_fill,q_auto/").replace(/\.[a-z0-9]+(\?.*)?$/i, ".jpg")
+    : null;
+
+const VideoFrame = ({ url }) => {
+  const [poster, setPoster] = useState(() => videoPoster(url));
+  return poster ? (
+    <img src={poster} alt="" loading="lazy" className="size-full object-cover" onError={() => setPoster(null)} />
+  ) : (
+    <video src={`${url}#t=0.1`} preload="metadata" muted playsInline disablePictureInPicture className="size-full object-cover pointer-events-none" />
+  );
+};
+
+export const MediaThumb = ({ item, className = "", onClick }) => (
+  <button type="button" onClick={onClick} className={`relative overflow-hidden bg-wa-surface ${className}`}>
+    {item.kind === "image" ? (
+      <img src={item.url} alt="" loading="lazy" className="size-full object-cover" />
+    ) : (
+      <>
+        <VideoFrame url={item.url} />
+        <span className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-black/55 to-transparent" />
+        <span className="absolute left-1.5 bottom-1 flex items-center gap-1 text-[11px] text-white">
+          <Play size={12} fill="white" /> {fmtDur(item.duration)}
+        </span>
+      </>
+    )}
+  </button>
+);
+
+const ChatMediaPanel = ({ data, title, onClose }) => {
+  const [tab, setTab] = useState("media");
+  const [image, setImage] = useState(null);
+  const [video, setVideo] = useState(null);
+  useBackToClose(true, onClose);
+
+  const tabs = [
+    ["media", "Media", data?.media.length],
+    ["docs", "Docs", data?.docs.length],
+    ["links", "Links", data?.links.length],
+  ];
+  const empty = <p className="text-center text-wa-muted py-16 text-[13px]">Nothing here yet</p>;
+
+  return (
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+      <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
+        <button onClick={onClose} aria-label="Back">
+          <ArrowLeft size={24} />
+        </button>
+        <h3 className="text-[16px] truncate">{title}</h3>
+      </div>
+      <div className="flex shrink-0 bg-wa-panel border-b border-white/10">
+        {tabs.map(([id, label, n]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex-1 py-3 text-[13px] border-b-2 ${tab === id ? "border-[#00A884] text-[#00A884]" : "border-transparent text-wa-muted"}`}
+          >
+            {label}
+            {n ? ` (${n})` : ""}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {!data ? (
+          <p className="text-center text-wa-muted py-16">Loading…</p>
+        ) : tab === "media" ? (
+          data.media.length ? (
+            <div className="grid grid-cols-3 gap-0.5">
+              {data.media.map((m) => (
+                <MediaThumb
+                  key={m._id}
+                  item={m}
+                  className="aspect-square"
+                  onClick={() => (m.kind === "image" ? setImage(m.url) : setVideo(m.url))}
+                />
+              ))}
+            </div>
+          ) : (
+            empty
+          )
+        ) : tab === "docs" ? (
+          data.docs.length ? (
+            data.docs.map((d) => (
+              <a
+                key={d._id}
+                href={d.url}
+                target="_blank"
+                rel="noreferrer"
+                download={d.name}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-white/5"
+              >
+                <span className="size-11 rounded-lg bg-wa-surface flex items-center justify-center shrink-0">
+                  <FileText size={22} className="text-wa-muted" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px]">{d.name || "Document"}</span>
+                  <span className="block text-[11px] text-wa-muted">
+                    {[fmtSize(d.size), fmtDate(d.createdAt)].filter(Boolean).join(" · ")}
+                  </span>
+                </span>
+                <Download size={18} className="text-wa-muted" />
+              </a>
+            ))
+          ) : (
+            empty
+          )
+        ) : data.links.length ? (
+          data.links.map((l) => (
+            <a key={l._id} href={l.url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
+              <span className="size-11 rounded-lg bg-wa-surface flex items-center justify-center shrink-0">
+                <Link2 size={22} className="text-wa-muted" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px] text-[#53BDEB]">{l.url}</span>
+                <span className="block text-[11px] text-wa-muted">{fmtDate(l.createdAt)}</span>
+              </span>
+            </a>
+          ))
+        ) : (
+          empty
+        )}
+      </div>
+
+      {image && <ImageLightbox src={image} onClose={() => setImage(null)} />}
+      {video && (
+        <div className="fixed inset-0 z-[100] bg-black flex items-center justify-center" onClick={() => setVideo(null)}>
+          <button className="absolute top-4 right-4 text-white" aria-label="Close">
+            <X size={26} />
+          </button>
+          <SpeedVideo src={video} controls autoPlay className="max-h-[90vh] max-w-full" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatMediaPanel;

@@ -1,0 +1,38 @@
+import express from "express";
+import { protectRoute } from "../middleware/auth.middleware.js";
+import {
+  createGroup,
+  getUserGroups,
+  getGroupMessages,
+  sendGroupMessage,
+  addMembers,
+  removeMember,
+  setGroupAdmin,
+  leaveGroup,
+  updateGroupInfo,
+  updateGroupPermissions,
+  setDisappearing,
+  reportGroup,
+} from "../controllers/group.controller.js";
+
+import { getInvite, previewInvite, joinByInvite } from "../controllers/groupInvite.controller.js";
+
+const router = express.Router();
+
+router.get("/", protectRoute, getUserGroups);
+router.get("/join/:code", protectRoute, previewInvite);
+router.post("/join/:code", protectRoute, joinByInvite);
+router.post("/:id/invite", protectRoute, getInvite);
+router.post("/", protectRoute, createGroup);
+router.get("/:id/messages", protectRoute, getGroupMessages);
+router.post("/:id/messages", protectRoute, sendGroupMessage);
+router.put("/:id", protectRoute, updateGroupInfo);
+router.post("/:id/report", protectRoute, reportGroup);
+router.put("/:id/disappearing", protectRoute, setDisappearing);
+router.put("/:id/permissions", protectRoute, updateGroupPermissions);
+router.post("/:id/members", protectRoute, addMembers);
+router.delete("/:id/members/:memberId", protectRoute, removeMember);
+router.put("/:id/admins/:memberId", protectRoute, setGroupAdmin);
+router.post("/:id/leave", protectRoute, leaveGroup);
+
+export default router;

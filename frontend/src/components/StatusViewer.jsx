@@ -1,0 +1,700 @@
+import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { optimizeImage } from "../lib/cdn";
+import { STATUS_FONTS } from "../lib/statusFonts";
+import { X, Eye, Loader2, ChevronUp, ChevronRight, Heart, MessageCircle, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
+import { SongBars, SongSheet } from "./StatusSong";
+import StatusComments from "./StatusComments";
+import { MoreVertical } from "./icons/WaGlyphs";
+import toast from "react-hot-toast";
+import { axiosInstance } from "../lib/axios";
+import { useBackToClose } from "../lib/useBackToClose";
+import { useAuthStore } from "../store/useAuthStore";
+
+const DURATION_MS = 15000; // how long a picture / text stays up, like WhatsApp
+
+const sizeLabel = (b) => (!b ? "" : b > 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+
+// Turns web links in text into tappable links.
+const linkify = (text) =>
+  String(text)
+    .split(/(https?:\/\/[^\s<>"']+)/gi)
+    .map((part, i) =>
+      /^https?:\/\//i.test(part) ? (
+        <a key={i} href={part} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="underline text-[#53BDEB] break-all">
+          {part}
+        </a>
+      ) : (
+        part
+      )
+    );
+
+const ago = (iso) => {
+  const d = new Date(iso);
+  const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
+  return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${t}`;
+};
+
+// highlight: when set, this plays a saved highlight. It works like a live status: viewers can reply and heart it, the owner sees views and hearts.
+// onAddToHighlight(status): my own live status -> "save to highlights". onEditHighlight(highlight): rename / manage.
+// Songs already being downloaded in the background, so the music starts the instant a status opens.
+const warmedSongs = new Map();
+const warmSong = (url) => {
+  if (!url || warmedSongs.has(url) || typeof Audio === "undefined") return;
+  try {
+    const a = new Audio();
+    a.preload = "auto";
+    a.src = url;
+    a.load();
+    warmedSongs.set(url, a);
+    if (warmedSongs.size > 12) warmedSongs.delete(warmedSongs.keys().next().value);
+  } catch {
+    /* ignore */
+  }
+};
+
+const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = null, onAddToHighlight, onEditHighlight, hold = false }) => {
+  const [list, setList] = useState(initial);
+  const [index, setIndex] = useState(0);
+  const [progress, setProgress] = useState(0); // 0..1 of the current update
+  const [paused, setPaused] = useState(false);
+  const [showViewers, setShowViewers] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false); // the ⋮ menu
+  const [deleting, setDeleting] = useState(false);
+  const current = list[index];
+  const [mediaMs, setMediaMs] = useState(0); // length of the current video / audio
+  const mediaEl = useRef(null);
+  const [videoReady, setVideoReady] = useState(false); // first frame decoded: until then the video stays hidden (no grey placeholder)
+  const [showSpinner, setShowSpinner] = useState(false);
+  const readyRef = useRef(false);
+  const advancedRef = useRef(null); // status id already moved on from (end / trim end can both fire)
+  const songEl = useRef(null);
+  const [songBlocked, setSongBlocked] = useState(false);
+  const [showSong, setShowSong] = useState(false); // the song sheet (tap the song line)
+  const [songMuted, setSongMuted] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentCounts, setCommentCounts] = useState({}); // { [statusOrItemId]: number }
+  const swipeStart = useRef(null);
+  const swipedAt = useRef(0);
+  const replyInput = useRef(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyFocus, setReplyFocus] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [heartPop, setHeartPop] = useState(0); // bumps to replay the little pop animation
+  useBackToClose(true, onClose);
+
+  // Start downloading every song in this viewer up front (current first), so no status waits for its music.
+  useEffect(() => {
+    list.slice(index).concat(list.slice(0, index)).forEach((st) => warmSong(st.song?.url));
+  }, [list, index]);
+
+  // My own update: new views and hearts show up live (like WhatsApp / Instagram) instead of only after a reload.
+  useEffect(() => {
+    if (!isOwn) return undefined;
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return undefined;
+    const onViewed = ({ statusId, user: who, at }) =>
+      setList((prev) =>
+        prev.map((st) =>
+          String(st._id) !== String(statusId) || (st.views || []).some((v) => String(v.user?._id || v.user) === String(who._id))
+            ? st
+            : { ...st, views: [...(st.views || []), { user: who, at }], viewedBy: [...(st.viewedBy || []), who._id] }
+        )
+      );
+    const onLiked = ({ statusId, user: who }) =>
+      setList((prev) =>
+        prev.map((st) =>
+          String(st._id) !== String(statusId) || (st.likes || []).some((l) => String(l.user?._id || l.user) === String(who._id))
+            ? st
+            : { ...st, likes: [...(st.likes || []), { user: who, at: new Date().toISOString() }] }
+        )
+      );
+    socket.on("statusViewed", onViewed);
+    socket.on("statusLiked", onLiked);
+    return () => {
+      socket.off("statusViewed", onViewed);
+      socket.off("statusLiked", onLiked);
+    };
+  }, [isOwn]);
+
+  // How many comments the current update has (for the icon's count)
+  useEffect(() => {
+    if (!current?._id) return;
+    const id = current._id;
+    axiosInstance
+      .get(`/status-comments/${id}`)
+      .then((r) => setCommentCounts((m) => ({ ...m, [id]: r.data.total || 0 })))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?._id]);
+
+  // A new comment on one of my updates shows up live
+  useEffect(() => {
+    if (!isOwn) return undefined;
+    const socket = useAuthStore.getState().socket;
+    if (!socket) return undefined;
+    const onComment = ({ targetId }) => setCommentCounts((m) => (targetId in m ? { ...m, [targetId]: m[targetId] + 1 } : m));
+    socket.on("statusComment", onComment);
+    return () => socket.off("statusComment", onComment);
+  }, [isOwn]);
+
+  // Mark as seen when someone else's update comes up.
+  useEffect(() => {
+    if (!isOwn && current) axiosInstance.put(highlight ? `/highlights/${highlight._id}/items/${current._id}/view` : `/status/${current._id}/view`).catch(() => {});
+    setProgress(0);
+    setMediaMs(0);
+    setVideoReady(false);
+    setShowSpinner(false);
+    readyRef.current = false;
+    advancedRef.current = null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?._id]);
+
+  readyRef.current = videoReady;
+  // A tiny spinner only if the video is genuinely slow to arrive (never flashes for a fast one).
+  useEffect(() => {
+    if (current?.type !== "video" || videoReady) return;
+    const id = setTimeout(() => setShowSpinner(true), 900);
+    return () => clearTimeout(id);
+  }, [current?._id, current?.type, videoReady]);
+
+  const next = useCallback(() => {
+    if (index >= list.length - 1) onClose();
+    else setIndex((i) => i + 1);
+  }, [index, list.length, onClose]);
+  const advanceOnce = () => {
+    if (advancedRef.current === current?._id) return;
+    advancedRef.current = current?._id;
+    next();
+  };
+  const prev = () => (index > 0 ? setIndex((i) => i - 1) : setProgress(0));
+
+  // Timer: fills the bar, then moves on. Held still while paused / a sheet is open.
+  const stop = paused || showViewers || showSong || showComments || confirmDelete || replyFocus || hold || menuOpen; // hold: a sheet on top (save to highlights) keeps it still
+  const last = useRef(0);
+  useEffect(() => {
+    if (!current || stop) return;
+    last.current = performance.now();
+    let raf;
+    const tick = (now) => {
+      const dt = now - last.current;
+      last.current = now;
+      setProgress((p) => {
+        if (current.type === "video") {
+          // Follow the video itself: nothing moves until the first frame is showing.
+          const el = mediaEl.current;
+          const t = current.trim;
+          if (!el || !readyRef.current) return p;
+          const st = t ? t.start : 0;
+          const len = t ? t.end - t.start : el.duration;
+          if (!len || !Number.isFinite(len)) return p;
+          return Math.min(1, Math.max(0, (el.currentTime - st) / len));
+        }
+        const isMedia = current.type === "video" || current.type === "audio";
+        const total = isMedia ? Math.max(mediaMs, 1000) : current.song?.length ? current.song.length * 1000 : DURATION_MS; // a song's chosen length (15 – 30 s) sets how long a picture / text stays
+        const np = p + dt / total;
+        if (np >= 1) {
+          queueMicrotask(next);
+          return 1;
+        }
+        return np;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [current?._id, stop, next, mediaMs]);
+
+  // Video / audio / song play only while the status is actually running.
+  useEffect(() => {
+    for (const el of [mediaEl.current, songEl.current]) {
+      if (!el) continue;
+      if (stop) el.pause();
+      else {
+        const pr = el.play?.();
+        // Only a genuine autoplay block needs the "tap" prompt. An interrupted / not-yet-loaded play
+        // is retried by the audio's own canplay handler below.
+        if (pr && pr.catch) pr.catch((err) => { if (el === songEl.current && err?.name === "NotAllowedError") setSongBlocked(true); });
+      }
+    }
+  }, [stop, current?._id, mediaMs]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target?.tagName === "INPUT") return; // typing a reply
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") next();
+      if (e.key === "ArrowLeft") prev();
+      if (e.key === " " && e.target?.tagName !== "BUTTON") {
+        e.preventDefault(); // laptop: Space pauses / resumes the status
+        setPaused((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  // Heart / un-heart (optimistic; rolls back if the request fails)
+  const toggleLike = async () => {
+    if (!current || isOwn) return;
+    const next = !current.liked;
+    const id = current._id;
+    setList((l) => l.map((s) => (s._id === id ? { ...s, liked: next } : s)));
+    if (next) setHeartPop((n) => n + 1);
+    try {
+      await axiosInstance.put(highlight ? `/highlights/${highlight._id}/items/${id}/like` : `/status/${id}/like`, { liked: next });
+    } catch {
+      setList((l) => l.map((s) => (s._id === id ? { ...s, liked: !next } : s)));
+      toast.error("Couldn't update your like");
+    }
+  };
+
+  const [burst, setBurst] = useState(null); // an emoji reaction floating up after it is sent
+  const sendReply = async (e, quick) => {
+    e?.preventDefault();
+    const t = (quick || replyText).trim();
+    if (!t || sendingReply) return;
+    if (quick) {
+      setBurst({ e: quick, k: Date.now() });
+      setTimeout(() => setBurst(null), 1200);
+    }
+    setSendingReply(true);
+    try {
+      await axiosInstance.post(`/messages/send/${user._id}`, highlight ? { text: t, highlightId: highlight._id, itemId: current._id } : { text: t, statusId: current._id });
+      setReplyText("");
+      setReplyFocus(false);
+      document.activeElement?.blur?.();
+      if (!quick) toast.success("Reply sent");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Couldn't send the reply");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      if (highlight) {
+        // take just this update out of the highlight (the highlight goes too if it was the last one)
+        const r = await axiosInstance.put(`/highlights/${highlight._id}`, { removeItemIds: [current._id] });
+        toast.success("Removed from highlight");
+        if (r.data?.deleted) return onClose();
+      } else {
+        await axiosInstance.delete(`/status/${current._id}`);
+        toast.success("Status deleted");
+      }
+      const rest = list.filter((s) => s._id !== current._id);
+      setConfirmDelete(false);
+      if (rest.length === 0) return onClose();
+      setList(rest);
+      setIndex((i) => Math.min(i, rest.length - 1));
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Couldn't delete the status");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (!current) return null;
+
+  const views = (current.views || []).filter((v) => v.user).sort((a, b) => new Date(b.at) - new Date(a.at));
+  const viewCount = Math.max(views.length, current.viewedBy?.length || 0);
+  const likers = new Set((current.likes || []).filter((l) => l.user).map((l) => l.user._id));
+  const likeCount = likers.size;
+
+  return createPortal(
+    <div className="wa-dark fixed inset-0 z-[150] bg-black flex items-center justify-center select-none">
+      {/* Progress bars */}
+      <div className="absolute top-0 inset-x-0 flex gap-1 px-2 pt-[calc(8px+env(safe-area-inset-top))] z-20">
+        {list.map((s, i) => (
+          <div key={s._id} className="flex-1 h-[3px] bg-white/30 rounded-full overflow-hidden">
+            <div className="h-full bg-white" style={{ width: `${(i < index ? 1 : i === index ? progress : 0) * 100}%` }} />
+          </div>
+        ))}
+      </div>
+
+      {/* Header */}
+      <div className="absolute top-[calc(18px+env(safe-area-inset-top))] inset-x-0 flex items-center gap-3 px-3 z-20 bg-gradient-to-b from-black/50 to-transparent pb-6 pt-1">
+        <img src={optimizeImage(user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt={user.fullName} className="size-10 rounded-full object-cover" />
+        <div className="min-w-0 flex-1">
+          <p className="text-white text-[13.5px] font-medium truncate">{highlight ? highlight.title : isOwn ? "My status" : user.fullName}</p>
+          <p className="flex items-center gap-1.5 text-white/85 text-[12px] min-w-0">
+            <span className="shrink-0">{ago(current.createdAt)}</span>
+            {current.song?.url && (
+              <>
+                <span className="shrink-0">•</span>
+                <button
+                  type="button"
+                  onClick={() => setShowSong(true)}
+                  className="flex items-center gap-1.5 min-w-0 text-white text-[13.5px] leading-5 active:opacity-70"
+                  aria-label="Song details"
+                >
+                  <SongBars playing={!stop && !songBlocked && !songMuted} className="shrink-0" />
+                  <span className="truncate">{current.song.name || "Song"}</span>
+                  <ChevronRight size={16} className="shrink-0" />
+                </button>
+              </>
+            )}
+            {current.closeFriends && <span className="ml-1 shrink-0 inline-flex items-center gap-1 rounded-full bg-[#21C063] text-[#0B141A] px-2 py-px text-[10px] font-semibold">★ Close friends</span>}
+          </p>
+          {current.location?.name && (
+            <a
+              href={
+                current.location.lat != null
+                  ? `https://www.google.com/maps/search/?api=1&query=${current.location.lat},${current.location.lng}`
+                  : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(current.location.name)}`
+              }
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 text-white/90 text-[11px] leading-5 min-w-0"
+            >
+              <MapPin size={13} className="shrink-0 text-[#F15C6D]" />
+              <span className="truncate">{current.location.name}</span>
+            </a>
+          )}
+        </div>
+        {isOwn && (
+          <div className="relative">
+            <button onClick={() => setMenuOpen((o) => !o)} className="size-10 flex items-center justify-center text-white" aria-label="More options">
+              <MoreVertical size={22} />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                {/* WhatsApp-style dropdown: plain text rows, destructive one last */}
+                <div className="absolute right-0 top-11 z-30 min-w-[220px] rounded-xl bg-wa-pop text-wa-text shadow-2xl py-2 text-[15px]" onPointerDown={(e) => e.stopPropagation()}>
+                  {!highlight && onAddToHighlight && (
+                    <button onClick={() => { setMenuOpen(false); onAddToHighlight(current); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
+                      Add to highlights
+                    </button>
+                  )}
+                  {highlight && onEditHighlight && (
+                    <button onClick={() => { setMenuOpen(false); onEditHighlight(highlight); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
+                      Edit highlight
+                    </button>
+                  )}
+                  <button onClick={() => { setMenuOpen(false); setConfirmDelete(true); }} className="w-full text-left px-5 py-3 text-[#F15C6D] hover:bg-white/5 active:bg-white/10">
+                    {highlight ? "Remove from highlight" : "Delete"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        <button onClick={onClose} className="size-10 flex items-center justify-center text-white" aria-label="Close">
+          <X size={26} />
+        </button>
+      </div>
+
+      {/* The update; tap left / right to move, hold to pause */}
+      <div
+        className="w-full h-full max-w-md relative flex items-center justify-center"
+        style={{ touchAction: "none" }}
+        onPointerDown={(e) => {
+          swipeStart.current = { x: e.clientX, y: e.clientY };
+          setPaused(true);
+        }}
+        onPointerUp={(e) => {
+          setPaused(false);
+          // Swipe up, like WhatsApp: viewers open the reply box, the owner opens the viewers list
+          const st = swipeStart.current;
+          swipeStart.current = null;
+          if (st && st.y - e.clientY > 70 && Math.abs(e.clientX - st.x) < 90) {
+            swipedAt.current = Date.now();
+            if (isOwn) setShowViewers(true);
+            else replyInput.current?.focus();
+          }
+          const a = songEl.current;
+          if (a && a.paused) a.play().then(() => setSongBlocked(false)).catch(() => {});
+        }}
+        onPointerLeave={() => setPaused(false)}
+        onPointerCancel={() => setPaused(false)}
+      >
+        {current.type === "text" && (
+          <div className="w-full h-full flex items-center justify-center p-8" style={{ backgroundColor: current.backgroundColor }}>
+            <p
+              className="text-white leading-snug text-center break-words whitespace-pre-wrap"
+              style={{ fontFamily: STATUS_FONTS[current.font || 0].css, fontWeight: STATUS_FONTS[current.font || 0].weight, fontSize: current.content.length > 220 ? 20 : current.content.length > 90 ? 26 : 34 }}
+            >{linkify(current.content)}</p>
+          </div>
+        )}
+        {current.type === "image" && <img src={optimizeImage(current.content, 1080)} decoding="async" alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
+        {current.type === "video" && (
+          <>
+            <video
+              ref={mediaEl}
+              key={current._id}
+              src={current.content}
+              autoPlay
+              playsInline
+              preload="auto"
+              className={`w-full h-full object-contain bg-black ${videoReady ? "opacity-100" : "opacity-0"}`}
+              onLoadedMetadata={(e) => {
+                const el = e.currentTarget;
+                const t = current.trim;
+                if (t && t.end > t.start) {
+                  el.currentTime = t.start; // long video: play only the part the poster chose
+                  setMediaMs(Math.round((t.end - t.start) * 1000));
+                } else {
+                  setMediaMs(Math.round((el.duration || 0) * 1000));
+                }
+              }}
+              onLoadedData={() => setVideoReady(true)}
+              onPlaying={() => setVideoReady(true)}
+              onTimeUpdate={(e) => {
+                const t = current.trim;
+                if (t && e.currentTarget.currentTime >= t.end) advanceOnce();
+              }}
+              onEnded={advanceOnce}
+            />
+            {!videoReady && showSpinner && (
+              <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <Loader2 size={34} className="animate-spin text-white/80" />
+              </span>
+            )}
+          </>
+        )}
+        {current.type === "audio" && (
+          <div className="flex flex-col items-center gap-5 px-8 text-center">
+            <span className="size-28 rounded-full bg-[#ff8f4d] flex items-center justify-center">
+              <Headphones size={48} className="text-white" />
+            </span>
+            <p className="text-white text-[14.5px] break-all">{current.file?.name || "Audio"}</p>
+            <audio
+              ref={mediaEl}
+              src={current.content}
+              autoPlay
+              onLoadedMetadata={(e) => setMediaMs(Math.round((e.currentTarget.duration || 0) * 1000))}
+              onEnded={next}
+            />
+          </div>
+        )}
+        {current.type === "file" && (
+          <div className="flex flex-col items-center gap-4 px-8 text-center">
+            <span className="size-24 rounded-2xl bg-[#7f66ff] flex items-center justify-center">
+              <FileText size={44} className="text-white" />
+            </span>
+            <p className="text-white text-[14.5px] break-all">{current.file?.name || "File"}</p>
+            <p className="text-white/70 text-[12px]">{sizeLabel(current.file?.size)}</p>
+            <a
+              href={current.content}
+              target="_blank"
+              rel="noreferrer"
+              download={current.file?.name}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="relative z-30 mt-1 flex items-center gap-2 rounded-full bg-[#00A884] text-white px-6 py-3 text-[13px]"
+            >
+              <Download size={18} /> Open / download
+            </a>
+          </div>
+        )}
+        {current.song?.url && <audio ref={songEl} key={current._id} src={current.song.url} muted={songMuted} autoPlay loop preload="auto" onLoadedMetadata={(e) => { if (current.song.start) e.currentTarget.currentTime = current.song.start; }} onTimeUpdate={(e) => { const a = e.currentTarget; const st = current.song.start || 0; if (current.song.length && (a.currentTime >= st + current.song.length || a.currentTime < st - 0.3)) a.currentTime = st; }} onPlaying={() => setSongBlocked(false)} onCanPlay={(e) => { if (!stop && e.currentTarget.paused) e.currentTarget.play().catch((err) => { if (err?.name === "NotAllowedError") setSongBlocked(true); }); }} />}
+        {current.song?.url && songBlocked && (
+          <button
+            onClick={(e) => { e.stopPropagation(); songEl.current?.play?.().then(() => setSongBlocked(false)).catch(() => {}); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute z-30 bottom-28 left-1/2 -translate-x-1/2 flex items-center gap-2 rounded-full bg-black/70 text-white px-4 py-2 text-[12.5px]"
+          >
+            <Music size={16} /> Tap to play song
+          </button>
+        )}
+
+        {/* Caption */}
+        {current.caption && (
+          <p className={`absolute inset-x-0 ${isOwn ? "bottom-24" : "bottom-[calc(64px+env(safe-area-inset-bottom))]"} z-20 px-5 py-3 text-center text-white text-[13.5px] bg-black/50 break-words`}>
+            {linkify(current.caption)}
+          </p>
+        )}
+        <button className="absolute left-0 top-24 bottom-24 w-1/3" onClick={() => Date.now() - swipedAt.current > 450 && prev()} aria-label="Previous" />
+        <button className="absolute right-0 top-24 bottom-24 w-1/3" onClick={() => Date.now() - swipedAt.current > 450 && next()} aria-label="Next" />
+      </div>
+
+      {/* Viewer: reply to this status (arrives in the chat with its owner) */}
+      {!isOwn && (
+        <form
+          onSubmit={sendReply}
+          className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto flex items-center gap-2 px-3 pt-2 pb-[calc(10px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black/70 to-transparent"
+        >
+          {/* Instagram-style quick reactions: open while the reply box is focused */}
+          {replyFocus && !replyText.trim() && (
+            <div
+              className="absolute bottom-full inset-x-0 flex justify-center gap-1.5 px-3 pb-2"
+              onMouseDown={(e) => e.preventDefault()}
+              onTouchStart={(e) => e.preventDefault()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {["❤️", "🔥", "😂", "😮", "😢", "👏"].map((em) => (
+                <button key={em} type="button" onClick={() => sendReply(null, em)} className="size-11 rounded-full bg-black/40 backdrop-blur text-[24px] leading-none flex items-center justify-center active:scale-125 transition-transform" aria-label={`React ${em}`}>
+                  {em}
+                </button>
+              ))}
+            </div>
+          )}
+          <input
+            ref={replyInput}
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onFocus={() => setReplyFocus(true)}
+            onBlur={() => setReplyFocus(false)}
+            maxLength={500}
+            placeholder="Reply"
+            className="flex-1 h-11 rounded-full bg-white/15 backdrop-blur px-4 text-[14px] text-white placeholder:text-white/70 outline-none"
+          />
+          {!replyText.trim() && (
+            <button
+              type="button"
+              onClick={() => setShowComments(true)}
+              className="relative size-11 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+              aria-label="Comments"
+            >
+              <MessageCircle size={22} className="text-white" />
+              {(commentCounts[current._id] || 0) > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-[#3897F0] text-white text-[10.5px] font-semibold flex items-center justify-center">
+                  {commentCounts[current._id] > 99 ? "99+" : commentCounts[current._id]}
+                </span>
+              )}
+            </button>
+          )}
+          {!replyText.trim() && (
+            <button
+              type="button"
+              onClick={toggleLike}
+              className="size-11 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0 active:scale-90 transition-transform"
+              aria-label={current.liked ? "Unlike status" : "Like status"}
+              aria-pressed={!!current.liked}
+            >
+              <Heart
+                key={heartPop}
+                size={22}
+                className={`${current.liked ? "text-[#FF3B5C] animate-[heartpop_0.35s_ease-out]" : "text-white"}`}
+                fill={current.liked ? "currentColor" : "none"}
+              />
+            </button>
+          )}
+          {replyText.trim() && (
+            <button type="submit" disabled={sendingReply} className="size-11 rounded-full bg-[#00A884] text-white flex items-center justify-center shrink-0" aria-label="Send reply">
+              <Send size={20} />
+            </button>
+          )}
+        </form>
+      )}
+
+      {burst && (
+        <span key={burst.k} className="pointer-events-none absolute left-1/2 bottom-28 z-30 -translate-x-1/2 text-[64px] leading-none animate-[heartpop_1.1s_ease-out_forwards]">
+          {burst.e}
+        </span>
+      )}
+
+      {/* Owner: views and hearts, like WhatsApp's pill at the bottom-left */}
+      {isOwn && (
+        <div className="absolute bottom-0 inset-x-0 z-20 max-w-md mx-auto pt-8 pb-[calc(14px+env(safe-area-inset-bottom))] px-3 bg-gradient-to-t from-black/75 to-transparent">
+          <button onClick={() => setShowViewers(true)} className="mx-auto flex flex-col items-center text-white/85" aria-label="Who viewed this">
+            <ChevronUp size={20} />
+          </button>
+          <div className="mt-1 flex items-center gap-2">
+          <button
+            onClick={() => setShowViewers(true)}
+            className="h-12 pl-4 pr-5 rounded-full bg-[#1F2C34]/90 backdrop-blur flex items-center gap-2 text-white text-[14.5px] active:bg-[#2A3942]"
+            aria-label={`${viewCount} views, ${likeCount} likes`}
+          >
+            <Eye size={22} />
+            <span>{viewCount}</span>
+            <Heart size={20} className={likeCount > 0 ? "ml-2 text-[#FF3B5C]" : "ml-2 text-white/80"} fill={likeCount > 0 ? "currentColor" : "none"} />
+            <span>{likeCount}</span>
+          </button>
+          <button
+            onClick={() => setShowComments(true)}
+            className="h-12 pl-4 pr-5 rounded-full bg-[#1F2C34]/90 backdrop-blur flex items-center gap-2 text-white text-[14.5px] active:bg-[#2A3942]"
+            aria-label={`${commentCounts[current._id] || 0} comments`}
+          >
+            <MessageCircle size={21} />
+            <span>{commentCounts[current._id] || 0}</span>
+          </button>
+          </div>
+        </div>
+      )}
+
+      {showComments && (
+        <StatusComments
+          targetId={current._id}
+          onTotal={(n) => setCommentCounts((m) => ({ ...m, [current._id]: n }))}
+          onClose={() => setShowComments(false)}
+        />
+      )}
+
+      {showSong && current.song?.url && (
+        <SongSheet
+          song={current.song}
+          playing={!songBlocked}
+          muted={songMuted}
+          onToggleMute={() => setSongMuted((m) => !m)}
+          onClose={() => setShowSong(false)}
+        />
+      )}
+
+      {/* Viewers sheet */}
+      {showViewers && (
+        <div className="absolute inset-0 z-30 bg-black/60 flex items-end" onClick={() => setShowViewers(false)}>
+          <div
+            className="w-full max-w-md mx-auto max-h-[75%] bg-wa-panel rounded-t-3xl flex flex-col pb-[env(safe-area-inset-bottom)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20" />
+            <div className="flex items-center gap-3 px-5 py-3">
+              <Eye size={20} className="text-wa-muted" />
+              <h3 className="flex-1 text-[15.5px] text-wa-text">Viewed by {viewCount}</h3>
+              <button onClick={() => setShowViewers(false)} className="text-wa-muted" aria-label="Close">
+                <X size={22} />
+              </button>
+            </div>
+            <div className="overflow-y-auto pb-3">
+              {views.length === 0 ? (
+                <p className="text-center text-wa-muted py-10 text-[13px]">
+                  {viewCount > 0 ? "Viewer names aren't available for this older update." : "No views yet"}
+                </p>
+              ) : (
+                views.map((v) => (
+                  <div key={v.user._id} className="flex items-center gap-3 px-5 py-2.5">
+                    <img src={optimizeImage(v.user.profilePic || "/avatar.png", 120)} loading="lazy" decoding="async" alt="" className="size-11 rounded-full object-cover" />
+                    <div className="min-w-0">
+                      <p className="text-[13.5px] text-wa-text truncate">{v.user.fullName}</p>
+                      <p className="text-[11.5px] text-wa-muted">{ago(v.at)}</p>
+                    </div>
+                    {likers.has(v.user._id) && (
+                      <Heart size={20} fill="currentColor" className="ml-auto text-[#FF3B5C] shrink-0" aria-label="Liked" />
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-30 bg-black/60 flex items-center justify-center p-6" onClick={() => setConfirmDelete(false)}>
+          <div className="w-full max-w-xs rounded-2xl bg-wa-pop p-5" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[15.5px] text-wa-text mb-1">{highlight ? "Remove from this highlight?" : "Delete this status update?"}</h3>
+            <p className="text-[12px] text-wa-muted mb-5">{highlight ? "It will no longer show in this highlight." : "It will be removed for everyone who could see it."}</p>
+            <div className="flex justify-end gap-6 text-[13px]">
+              <button onClick={() => setConfirmDelete(false)} className="text-[#21C063]" disabled={deleting}>
+                Cancel
+              </button>
+              <button onClick={handleDelete} className="text-[#F15C6D] flex items-center gap-1.5" disabled={deleting}>
+                {deleting && <Loader2 size={14} className="animate-spin" />} {highlight ? "Remove" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+};
+
+export default StatusViewer;

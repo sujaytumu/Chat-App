@@ -1,0 +1,28 @@
+{
+  "appId": "com.sujaytumu.talkies",
+  "appName": "Talkies",
+  "webDir": "www",
+  "backgroundColor": "#FFFFFF",
+  "appendUserAgent": "TalkiesApp",
+  "server": {
+    "url": "https://chat-app-jjcg.onrender.com",
+    "cleartext": false,
+    "allowNavigation": [
+      "*.razorpay.com",
+      "razorpay.com",
+      "*.onrender.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#FFFFFF"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover",
+      "style": "DEFAULT"
+    }
+  }
+}

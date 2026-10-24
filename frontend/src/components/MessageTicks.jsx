@@ -1,0 +1,41 @@
+import { Check, CheckCheck, Clock, AlertCircle } from "lucide-react";
+import { useChatStore } from "../store/useChatStore";
+
+// WhatsApp-style receipt ticks for direct messages:
+// single gray = sent, double gray = delivered, double blue = seen
+const MessageTicks = ({ message }) => {
+  if (message.failed)
+    return (
+      <button type="button" onClick={() => useChatStore.getState().retryFailed()} className="flex items-center gap-0.5 text-red-400" title="Tap to retry">
+        <AlertCircle size={14} /> <span className="text-[10px]">Tap to retry</span>
+      </button>
+    );
+  if (message.pending) return <Clock size={13} className="opacity-70" />;
+  if (message.seen) return <CheckCheck size={15} strokeWidth={2.4} style={{ color: "var(--ct-seen, #53BDEB)" }} />;
+  if (message.delivered) return <CheckCheck size={15} className="opacity-90" strokeWidth={2.2} />;
+  return <Check size={15} className="opacity-90" strokeWidth={2.2} />;
+};
+
+// Group version: double blue only once EVERY member has read it, double grey
+// once every member's device has it, single tick until then — exactly like
+// WhatsApp. Open "Message info" to see who, member by member.
+export const receiptsFor = (message, members = [], senderId) => {
+  const others = members.filter((m) => m._id !== senderId);
+  const seenIds = new Set([...(message.seenBy || []), ...(message.seenLog || []).map((s) => s.user)].map(String));
+  const deliveredIds = new Set([...seenIds, ...(message.deliveredTo || []).map((d) => String(d.user))]);
+  return {
+    others,
+    seen: others.filter((m) => seenIds.has(String(m._id))),
+    delivered: others.filter((m) => deliveredIds.has(String(m._id))),
+  };
+};
+
+export const GroupMessageTicks = ({ message, members, senderId }) => {
+  if (message.pending) return <Clock size={13} className="opacity-70" />;
+  const { others, seen, delivered } = receiptsFor(message, members, senderId);
+  if (others.length > 0 && seen.length === others.length) return <CheckCheck size={15} strokeWidth={2.4} style={{ color: "var(--ct-seen, #53BDEB)" }} />;
+  if (others.length > 0 && delivered.length === others.length) return <CheckCheck size={15} className="opacity-90" strokeWidth={2.2} />;
+  return <Check size={15} className="opacity-90" strokeWidth={2.2} />;
+};
+
+export default MessageTicks;

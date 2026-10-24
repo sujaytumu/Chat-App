@@ -1,0 +1,63 @@
+import mongoose from "mongoose";
+import Visibility from "../models/visibility.model.js";
+import Message from "../models/message.model.js";
+import User from "../models/user.model.js";
+import { pairKey } from "../models/directChatSetting.model.js";
+
+// Nobody sees other people in the app unless the OWNER has allowed it. Only two things make two people visible to
+// each other: the owner allowed the pair, or one of them is the owner. (Having chatted before no longer counts.)
+export const OWNER_EMAIL = (process.env.OWNER_EMAIL || "sujaybabutumu@gmail.com").trim().toLowerCase();
+export const isOwner = (user) => String(user?.email || "").trim().toLowerCase() === OWNER_EMAIL;
+
+let ownerIdCache = { id: null, at: 0 };
+async function ownerId() {
+  if (ownerIdCache.id && Date.now() - ownerIdCache.at < 60_000) return ownerIdCache.id;
+  const o = await User.findOne({ email: OWNER_EMAIL }).select("_id").lean();
+  ownerIdCache = { id: o ? String(o._id) : null, at: Date.now() };
+  return ownerIdCache.id;
+}
+
+// null = everybody (the owner); otherwise the set of user ids this person may see.
+const listCache = new Map(); // userId -> { ids, at }  (a few seconds, so the chat list opens fast)
+export const forgetPair = (a, b) => { listCache.delete(String(a)); listCache.delete(String(b)); };
+export const forgetVisibility = () => { listCache.clear(); seenCache.clear(); };
+export async function visibleUserIds(me) {
+  if (me.email !== undefined && isOwner(me)) return null;
+  const k = String(me._id || me);
+  const c = listCache.get(k);
+  if (c && Date.now() - c.at < 8000) return c.ids;
+  const ids = await computeVisible(me);
+  if (listCache.size > 2000) listCache.clear();
+  listCache.set(k, { ids, at: Date.now() });
+  return ids;
+}
+async function computeVisible(me) {
+  const myId = new mongoose.Types.ObjectId(String(me._id || me));
+  if (me.email !== undefined && isOwner(me)) return null;
+  const [pairs, owner] = await Promise.all([Visibility.find({ $or: [{ a: myId }, { b: myId }] }).select("a b").lean(), ownerId()]);
+  if (owner && owner === String(myId)) return null; // the owner sees everybody
+  const ids = new Set();
+  for (const p of pairs) ids.add(String(String(p.a) === String(myId) ? p.b : p.a));
+  if (owner) ids.add(owner);
+  ids.delete(String(myId));
+  return ids;
+}
+
+const seenCache = new Map(); // "me:other" -> expires
+export async function canSee(me, otherId) {
+  const myId = String(me._id || me);
+  const other = String(otherId);
+  if (me.email !== undefined && isOwner(me)) return true;
+  const ck = `${myId}:${other}`;
+  const hit = seenCache.get(ck);
+  if (hit && hit > Date.now()) return true;
+  const [owner, allowed] = await Promise.all([ownerId(), Visibility.exists({ key: pairKey(myId, other) })]);
+  const ok = other === myId || other === owner || myId === owner || !!allowed;
+  if (ok) {
+    if (seenCache.size > 5000) seenCache.clear();
+    seenCache.set(ck, Date.now() + 10 * 60_000);
+  }
+  return ok;
+}
+
+export { Visibility, pairKey };
