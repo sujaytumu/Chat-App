@@ -9,6 +9,7 @@ import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
 import StatusMusicSheet from "../components/StatusMusicSheet";
 import { SongBars } from "../components/StatusSong";
+import { ReelHeart, ReelComment, ReelRepost, ReelSend, ReelSave, ReelMenu } from "../components/icons/ReelIcons";
 import { readFileAsBase64 } from "../lib/fileUtils";
 
 // Reels: short vertical videos from people you can see — swipe up for the next one, double-tap to like,
@@ -34,7 +35,7 @@ const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n /
 
 const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   <button onClick={onClick} className="flex flex-col items-center gap-1 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.6)] active:scale-90 transition-transform">
-    <Icon size={size} className={active ? "text-[#ff3040]" : ""} fill={fill ? "currentColor" : "none"} strokeWidth={1.7} />
+    <Icon size={size} className={active ? "text-[#ff3040]" : ""} fill={fill ? "currentColor" : "none"} strokeWidth={2} />
     {label !== undefined && <span className="text-[13px] font-semibold tabular-nums leading-none">{label}</span>}
   </button>
 );
@@ -185,12 +186,12 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/75 to-transparent pointer-events-none" />
 
       <div className="absolute right-3 bottom-8 flex flex-col items-center gap-[22px] z-10">
-        <Rail icon={Heart} size={32} label={count(reel.likeCount)} active={reel.liked} fill={reel.liked} onClick={() => onLike(reel, !reel.liked)} />
-        <Rail icon={MessageCircle} size={31} label={count(reel.comments)} onClick={() => onComments(reel)} />
-        <Rail icon={Repeat2} size={31} label={count(reel.reposts)} active={reel.reposted} onClick={() => onRepost(reel)} />
-        <Rail icon={Send} size={29} label={count(reel.views)} onClick={() => onShare(reel)} />
-        <Rail icon={Bookmark} size={29} label={count(reel.saves)} fill={reel.saved} onClick={() => onSave(reel)} />
-        <Rail icon={AlignJustify} size={26} onClick={() => onMenu(reel)} />
+        <Rail icon={ReelHeart} size={31} label={count(reel.likeCount)} active={reel.liked} fill={reel.liked} onClick={() => onLike(reel, !reel.liked)} />
+        <Rail icon={ReelComment} size={29} label={count(reel.comments)} onClick={() => onComments(reel)} />
+        <Rail icon={ReelRepost} size={30} label={count(reel.reposts)} active={reel.reposted} onClick={() => onRepost(reel)} />
+        <Rail icon={ReelSend} size={28} label={count(reel.views)} onClick={() => onShare(reel)} />
+        <Rail icon={ReelSave} size={28} label={count(reel.saves)} fill={reel.saved} onClick={() => onSave(reel)} />
+        <Rail icon={ReelMenu} size={27} onClick={() => onMenu(reel)} />
       </div>
 
       <div className="absolute left-4 right-[72px] bottom-6 text-white z-10">
