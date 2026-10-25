@@ -8,9 +8,9 @@ import Repost from "../models/repost.model.js";
 import ReelHide from "../models/reelHide.model.js";
 import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
-import { visibleUserIds, canSee } from "../lib/visibility.js";
+import { visibleUserIds, canSee, isOwner } from "../lib/visibility.js";
 import { MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
-import { sendPushToUser } from "../lib/webPush.js";
+import { sendPushToUser, sendPushToUsers } from "../lib/webPush.js";
 
 const FILTERS = ["none", "warm", "cool", "mono", "vivid", "fade", "vintage", "dream"];
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
@@ -50,6 +50,24 @@ const withCounts = async (rows, meId) => {
   }
   return rows.filter((r) => r.userId || r.externalId).map((r) => shape(r, meId, counts));
 };
+
+// "…/video/upload/v123/chat-app/reels/abc.mp4" -> "chat-app/reels/abc" (so the file can be removed when its reel is)
+const publicIdOf = (url) => {
+  const m = /\/(?:video|image)\/upload\/(?:v\d+\/)?(chat-app\/(?:reels|reel-music)\/[^.?]+)/.exec(String(url || ""));
+  return m ? m[1] : null;
+};
+async function removeReelFiles(r) {
+  for (const url of [r.videoUrl, r.song?.url]) {
+    const id = publicIdOf(url);
+    if (id) await cloudinary.uploader.destroy(id, { resource_type: "video" }).catch(() => {});
+  }
+  await Promise.all([
+    StatusComment.deleteMany({ targetId: r._id }).catch(() => {}),
+    Repost.deleteMany({ reelId: r._id }).catch(() => {}),
+    ReelHide.deleteMany({ reelId: r._id }).catch(() => {}),
+    SavedReel.deleteMany({ key: `reel:${r._id}` }).catch(() => {}),
+  ]);
+}
 
 export const extractTags = (text) =>
   [...new Set((String(text || "").match(/#[\p{L}\p{M}\p{N}_]{2,30}/gu) || []).map((t) => t.slice(1).toLowerCase()))].slice(0, 10);
@@ -241,7 +259,7 @@ export const getReelFeed = async (req, res) => {
       more = px <= 30;
     }
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ reels: out, more, px, localMore, next: page.length ? page[page.length - 1].createdAt : null });
+    res.status(200).json({ owner: isOwner(me), reels: out, more, px, localMore, next: page.length ? page[page.length - 1].createdAt : null });
   } catch (error) {
     console.log("Error in getReelFeed:", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -378,6 +396,15 @@ export const createReel = async (req, res) => {
     });
     await reel.populate("userId", "fullName profilePic");
     res.status(201).json((await withCounts([reel.toObject()], req.user._id))[0]);
+    // tell the people who follow this person (and may see them) about the new reel
+    (async () => {
+      const followers = await Follow.find({ following: req.user._id }).select("follower").limit(150).lean();
+      const ok = [];
+      for (const f of followers) if (await canSee({ _id: f.follower }, req.user._id)) ok.push(f.follower);
+      if (ok.length) {
+        await sendPushToUsers(ok, { title: "Talkies", body: `🎬 ${req.user.fullName} posted a new reel`, icon: req.user.profilePic || "/icon-v2-192.png", tag: `reel-new-${reel._id}`, data: { url: `/reels?r=${reel._id}` } }, { urgency: "normal", TTL: 3600 });
+      }
+    })().catch(() => {});
   } catch (error) {
     console.log("Error in createReel:", error.message);
     res.status(500).json({ error: "Couldn't post the reel" });
@@ -422,7 +449,7 @@ export const deleteReel = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const r = await Reel.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
     if (!r) return res.status(404).json({ error: "Not found" });
-    StatusComment.deleteMany({ targetId: r._id }).catch(() => {});
+    removeReelFiles(r);
     res.status(200).json({ ok: true });
   } catch (error) {
     console.log("Error in deleteReel:", error.message);
@@ -610,6 +637,62 @@ export const hideReel = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (error) {
     console.log("Error in hideReel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- App owner: review reported reels ----
+export const reportedReels = async (req, res) => {
+  try {
+    if (!isOwner(req.user)) return res.status(403).json({ error: "Owner only" });
+    const agg = await ReelHide.aggregate([
+      { $match: { reason: { $ne: "" } } },
+      { $group: { _id: "$reelId", n: { $sum: 1 }, reasons: { $push: "$reason" }, last: { $max: "$createdAt" } } },
+      { $sort: { n: -1, last: -1 } },
+      { $limit: 50 },
+    ]);
+    const reels = await Reel.find({ _id: { $in: agg.map((a) => a._id) } }).populate("userId", "fullName profilePic").lean();
+    const byId = new Map(reels.map((r) => [String(r._id), r]));
+    const out = agg
+      .filter((a) => byId.has(String(a._id)))
+      .map((a) => {
+        const r = byId.get(String(a._id));
+        const tally = {};
+        for (const x of a.reasons) tally[x] = (tally[x] || 0) + 1;
+        return { _id: r._id, poster: r.poster, videoUrl: r.videoUrl, caption: r.caption, user: r.userId ? { _id: r.userId._id, fullName: r.userId.fullName } : null, reports: a.n, reasons: tally };
+      });
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: out });
+  } catch (error) {
+    console.log("Error in reportedReels:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Owner removes any reel (and clears its reports).
+export const adminDeleteReel = async (req, res) => {
+  try {
+    if (!isOwner(req.user)) return res.status(403).json({ error: "Owner only" });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const r = await Reel.findByIdAndDelete(req.params.id);
+    if (!r) return res.status(404).json({ error: "Not found" });
+    removeReelFiles(r);
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in adminDeleteReel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Owner dismisses the reports on a reel (it stays up).
+export const dismissReports = async (req, res) => {
+  try {
+    if (!isOwner(req.user)) return res.status(403).json({ error: "Owner only" });
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    await ReelHide.updateMany({ reelId: req.params.id }, { $set: { reason: "" } });
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in dismissReports:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };
