@@ -20,9 +20,42 @@ const canSee = (s, viewerId) => {
   return a.mode === "only" ? listed : !listed;
 };
 
+const pollView = (poll, myId, owner) => {
+  const counts = poll.options.map((_, i) => (poll.votes || []).filter((v) => v.option === i).length);
+  const mine = (poll.votes || []).find((v) => String(v.user) === String(myId));
+  return { question: poll.question, options: poll.options, counts, total: (poll.votes || []).length, myVote: mine ? mine.option : null, owner: !!owner };
+};
+
+export const voteStatus = async (req, res) => {
+  try {
+    const myId = req.user._id;
+    const option = Number(req.body?.option);
+    const status = await Status.findOne({ _id: req.params.id, expiresAt: { $gt: new Date() } }).select("userId audience poll");
+    if (!status?.poll?.question || (!status.userId.equals(myId) && !canSee(status, myId))) return res.status(404).json({ error: "Poll not found" });
+    if (status.userId.equals(myId)) return res.status(400).json({ error: "You can't vote on your own poll" });
+    if (!Number.isInteger(option) || option < 0 || option >= status.poll.options.length) return res.status(400).json({ error: "Bad option" });
+    await Status.updateOne({ _id: status._id }, { $pull: { "poll.votes": { user: myId } } });
+    await Status.updateOne({ _id: status._id }, { $push: { "poll.votes": { user: myId, option } } });
+    const fresh = await Status.findById(status._id).select("poll");
+    const ownerId = status.userId.toString();
+    const sid = getReceiverSocketId(ownerId);
+    if (sid) io.to(sid).emit("statusVoted", { statusId: String(status._id), poll: pollView(fresh.poll, ownerId, true) });
+    sendPushToUser(ownerId, {
+      title: "Talkies",
+      body: `📊 ${req.user.fullName} voted on your poll`,
+      icon: req.user.profilePic || "/icon-v2-192.png",
+      tag: `status-vote-${status._id}`,
+      data: { url: "/status" },
+    });
+    res.json(pollView(fresh.poll, myId, false));
+  } catch (e) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const createStatus = async (req, res) => {
   try {
-    const { type, content, backgroundColor, caption, file, song, location, font, trim, audience } = req.body;
+    const { type, content, backgroundColor, caption, file, song, location, font, trim, audience, poll } = req.body;
     const myId = req.user._id;
 
     if (!["text", "image", "video", "audio", "file"].includes(type) || !content) {
@@ -83,6 +116,11 @@ export const createStatus = async (req, res) => {
       };
     }
 
+    if (poll && typeof poll.question === "string" && Array.isArray(poll.options)) {
+      const opts = poll.options.map((o) => String(o || "").trim().slice(0, 40)).filter(Boolean).slice(0, 4);
+      if (poll.question.trim() && opts.length >= 2) doc.poll = { question: poll.question.trim().slice(0, 120), options: opts, votes: [] };
+    }
+
     if (location && typeof location.name === "string" && location.name.trim()) {
       const lat = Number(location.lat);
       const lng = Number(location.lng);
@@ -135,7 +173,12 @@ export const getStatusFeed = async (req, res) => {
       { path: "views.user", select: "fullName profilePic" },
       { path: "likes.user", select: "fullName profilePic" },
     ]);
-    const myStatuses = myDocs.map((d) => d.toObject());
+    const myStatuses = myDocs.map((d) => {
+      const o = d.toObject();
+      if (o.poll?.question) o.poll = pollView(o.poll, myId, true);
+      else delete o.poll;
+      return o;
+    });
 
     const others = Array.from(byUser.values()).map((entry) => ({
       user: entry.user,
@@ -144,6 +187,8 @@ export const getStatusFeed = async (req, res) => {
         const o = s.toObject();
         o.seen = s.viewedBy.some((v) => v.equals(myId));
         o.liked = (s.likes || []).some((l) => l.user.equals(myId)); // only my own heart
+        if (o.poll?.question) o.poll = pollView(o.poll, myId, false);
+        else delete o.poll;
         delete o.viewedBy;
         delete o.views;
         delete o.likes;

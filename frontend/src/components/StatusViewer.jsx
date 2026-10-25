@@ -112,10 +112,13 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
         )
       );
     socket.on("statusViewed", onViewed);
+    const onVoted = ({ statusId, poll }) => setList((prev) => prev.map((st) => (String(st._id) === String(statusId) ? { ...st, poll } : st)));
     socket.on("statusLiked", onLiked);
+    socket.on("statusVoted", onVoted);
     return () => {
       socket.off("statusViewed", onViewed);
       socket.off("statusLiked", onLiked);
+      socket.off("statusVoted", onVoted);
     };
   }, [isOwn]);
 
@@ -251,6 +254,14 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
     }
   };
 
+  const voteOn = async (id, option) => {
+    try {
+      const { data } = await axiosInstance.put(`/status/${id}/vote`, { option });
+      setList((l) => l.map((s) => (s._id === id ? { ...s, poll: data } : s)));
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Couldn't vote");
+    }
+  };
   const [burst, setBurst] = useState(null); // an emoji reaction floating up after it is sent
   const sendReply = async (e, quick) => {
     e?.preventDefault();
@@ -501,6 +512,30 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           >
             <Music size={16} /> Tap to play song
           </button>
+        )}
+
+        {current.poll?.question && (
+          <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} className="absolute z-30 inset-x-5 top-1/2 -translate-y-1/2 rounded-2xl bg-white/95 text-black p-3.5 shadow-xl">
+            <p className="text-[14.5px] font-semibold text-center mb-2.5 break-words">{current.poll.question}</p>
+            <div className="space-y-1.5">
+              {current.poll.options.map((o, i) => {
+                const showRes = isOwn || current.poll.myVote != null;
+                const pct = current.poll.total ? Math.round((current.poll.counts[i] / current.poll.total) * 100) : 0;
+                return (
+                  <button
+                    key={i}
+                    disabled={isOwn}
+                    onClick={() => voteOn(current._id, i)}
+                    className={`relative w-full overflow-hidden rounded-xl border text-left px-3 py-2 text-[13.5px] ${current.poll.myVote === i ? "border-[#00A884] font-semibold" : "border-black/10"}`}
+                  >
+                    {showRes && <span className="absolute inset-y-0 left-0 bg-[#00A884]/20" style={{ width: `${pct}%` }} />}
+                    <span className="relative flex justify-between gap-2"><span className="break-words">{o}</span>{showRes && <span>{pct}%</span>}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-center text-[11px] text-black/50">{current.poll.total} vote{current.poll.total === 1 ? "" : "s"}</p>
+          </div>
         )}
 
         {/* Caption */}
