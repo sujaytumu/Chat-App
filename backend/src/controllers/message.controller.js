@@ -1626,3 +1626,47 @@ export const summarizeChat = async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 };
+
+// 🔥 chat streak: consecutive local days on which BOTH people sent a message
+export const getStreak = async (req, res) => {
+  try {
+    const me = new mongoose.Types.ObjectId(req.user._id);
+    const other = new mongoose.Types.ObjectId(req.params.userId);
+    const tz = Math.max(-840, Math.min(840, parseInt(req.query.tz) || 330));
+    const since = new Date(Date.now() - 400 * 864e5);
+    const rows = await Message.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: since },
+          system: { $exists: false },
+          $or: [
+            { senderId: me, receiverId: other },
+            { senderId: other, receiverId: me },
+          ],
+        },
+      },
+      {
+        $group: {
+          _id: {
+            d: { $dateToString: { format: "%Y-%m-%d", date: { $add: ["$createdAt", tz * 60000] } } },
+            s: "$senderId",
+          },
+        },
+      },
+    ]);
+    const by = {};
+    for (const r of rows) (by[r._id.d] ||= new Set()).add(String(r._id.s));
+    const both = (d) => by[d]?.size >= 2;
+    const day = (offset) => new Date(Date.now() + tz * 60000 - offset * 864e5).toISOString().slice(0, 10);
+    const todayDone = both(day(0));
+    let i = todayDone ? 0 : 1;
+    let streak = 0;
+    while (both(day(i)) && streak < 400) {
+      streak++;
+      i++;
+    }
+    res.json({ streak, todayDone, atRisk: streak > 0 && !todayDone });
+  } catch (e) {
+    res.status(500).json({ streak: 0 });
+  }
+};

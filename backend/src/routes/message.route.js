@@ -42,6 +42,7 @@ import {
   summarizeChat,
   setDirectVanish,
   clearVanish,
+  getStreak,
 } from "../controllers/message.controller.js";
 
 const router = express.Router();
@@ -57,6 +58,7 @@ router.put("/live-location/:id", protectRoute, updateLiveLocation);
 router.put("/live-location/:id/stop", protectRoute, updateLiveLocation);
 router.put("/vanish/:id", protectRoute, setDirectVanish);
 router.post("/vanish/clear/:id", protectRoute, clearVanish);
+router.get("/streak/:userId", protectRoute, getStreak);
 router.get("/starred/all", protectRoute, getStarredMessages);
 router.get("/media/:chatType/:chatId", protectRoute, getChatMedia);
 router.get("/search/all", protectRoute, searchMessages);
