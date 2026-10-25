@@ -5,6 +5,7 @@ import Status from "../models/status.model.js";
 import Follow from "../models/follow.model.js";
 import SavedReel from "../models/savedReel.model.js";
 import Repost from "../models/repost.model.js";
+import ReelHide from "../models/reelHide.model.js";
 import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
@@ -49,6 +50,35 @@ const withCounts = async (rows, meId) => {
   }
   return rows.filter((r) => r.userId || r.externalId).map((r) => shape(r, meId, counts));
 };
+
+export const extractTags = (text) =>
+  [...new Set((String(text || "").match(/#[\p{L}\p{M}\p{N}_]{2,30}/gu) || []).map((t) => t.slice(1).toLowerCase()))].slice(0, 10);
+
+// Adds what only this viewer knows (following / saved / reposted) to shaped reels.
+async function decorate(items, me) {
+  const myId = String(me._id);
+  const [follows, saved, reposted] = await Promise.all([
+    Follow.find({ follower: me._id }).select("following").lean(),
+    SavedReel.find({ userId: me._id }).select("key").lean(),
+    Repost.find({ userId: me._id }).select("reelId").lean(),
+  ]);
+  const f = new Set(follows.map((x) => String(x.following)));
+  const sv = new Set(saved.map((x) => x.key));
+  const rp = new Set(reposted.map((x) => String(x.reelId)));
+  return items.map((r) => ({ ...r, source: "reel", following: f.has(String(r.user?._id)), saved: sv.has(`reel:${r._id}`), reposted: rp.has(String(r._id)), mine: String(r.user?._id) === myId }));
+}
+
+// Reels from people this person may see (and not hidden / blocked), for lists that are not the main feed.
+async function visibleReels(me, extraQuery, limit = 40) {
+  const ids = await visibleUserIds(me);
+  const q = { ...extraQuery };
+  if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
+  const hidden = (await ReelHide.find({ userId: me._id }).select("reelId").lean()).map((h) => h.reelId);
+  if (hidden.length) q._id = { $nin: hidden };
+  const blocked = new Set((me.blockedUsers || []).map(String));
+  const rows = await Reel.find(q).sort({ createdAt: -1 }).limit(limit).populate("userId", "fullName profilePic").lean();
+  return (await decorate(await withCounts(rows.filter((r) => !blocked.has(String(r.userId?._id))), me._id), me));
+}
 
 // ---- "Discover": popular vertical videos that appear on their own (needs PEXELS_API_KEY, free at pexels.com/api) ----
 const discoverCache = new Map(); // page -> { at, items }
@@ -117,6 +147,7 @@ export const getReelFeed = async (req, res) => {
     const ids = await visibleUserIds(me);
     const follows = new Set((await Follow.find({ follower: me._id }).select("following").lean()).map((f) => String(f.following)));
     const blocked = new Set((me.blockedUsers || []).map(String));
+    const hiddenIds = (await ReelHide.find({ userId: me._id }).select("reelId").lean()).map((h) => String(h.reelId));
 
     let allowed = ids === null ? null : new Set([myId, ...[...ids].map(String)]);
     if (friendsTab) {
@@ -184,7 +215,9 @@ export const getReelFeed = async (req, res) => {
         saved: false,
       }));
     const seenIds = new Set();
+    const hiddenSet = new Set(hiddenIds);
     const merged = [...reelItems, ...repostItems, ...statusItems]
+      .filter((x) => !hiddenSet.has(String(x._id)))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .filter((x) => (seenIds.has(String(x._id)) ? false : (seenIds.add(String(x._id)), true)))
       .filter((x) => x.user && !blocked.has(String(x.user._id))).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -306,6 +339,8 @@ export const createReel = async (req, res) => {
   try {
     const { video, caption, duration, filter, trim, song } = req.body || {};
     const secs = Number(duration) || 0;
+    const today = await Reel.countDocuments({ userId: req.user._id, createdAt: { $gt: new Date(Date.now() - 24 * 3600 * 1000) } });
+    if (today >= 20) return res.status(429).json({ error: "You can post up to 20 reels a day — try again tomorrow" });
     if (typeof video !== "string" || !video.startsWith("data:video/")) return res.status(400).json({ error: "Pick a video" });
     if (video.length > MAX_BASE64_LENGTH) return res.status(413).json({ error: "That video is too large (max about 10 MB)" });
     if (secs > MAX_SECONDS + 0.5) return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
@@ -332,6 +367,7 @@ export const createReel = async (req, res) => {
     }
     const reel = await Reel.create({
       filter: cleanFilter,
+      hashtags: extractTags(caption),
       trim: cleanTrim,
       ...(cleanSong ? { song: cleanSong } : {}),
       userId: req.user._id,
@@ -476,6 +512,104 @@ export const repostReel = async (req, res) => {
     res.status(200).json({ reposted: want, reposts: fresh?.reposts || 0 });
   } catch (error) {
     console.log("Error in repostReel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// ---- Lists outside the main feed ----
+export const reelsByTag = async (req, res) => {
+  try {
+    const tag = String(req.params.tag || "").toLowerCase().replace(/[^\p{L}\p{M}\p{N}_]/gu, "").slice(0, 30);
+    if (!tag) return res.status(400).json({ error: "Invalid tag" });
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: await visibleReels(req.user, { hashtags: tag }), more: false });
+  } catch (error) {
+    console.log("Error in reelsByTag:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const reelsByUser = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    if (String(req.params.id) !== String(req.user._id) && !(await canSee(req.user, req.params.id))) return res.status(404).json({ error: "Not found" });
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: await visibleReels(req.user, { userId: new mongoose.Types.ObjectId(req.params.id) }), more: false });
+  } catch (error) {
+    console.log("Error in reelsByUser:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export const searchReels = async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim().slice(0, 60);
+    if (q.length < 2) return res.status(200).json({ reels: [], more: false });
+    const tag = q.replace(/^#/, "").toLowerCase();
+    const User = (await import("../models/user.model.js")).default;
+    const people = await User.find({ fullName: new RegExp(esc(q), "i") }).select("_id").limit(20).lean();
+    const or = [{ caption: new RegExp(esc(q), "i") }, { hashtags: tag }];
+    if (people.length) or.push({ userId: { $in: people.map((p) => p._id) } });
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: await visibleReels(req.user, { $or: or }), more: false });
+  } catch (error) {
+    console.log("Error in searchReels:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Popular hashtags among reels this person may see (last 14 days).
+export const trendingTags = async (req, res) => {
+  try {
+    const ids = await visibleUserIds(req.user);
+    const match = { createdAt: { $gt: new Date(Date.now() - 14 * 86400 * 1000) }, hashtags: { $exists: true, $ne: [] } };
+    if (ids !== null) match.userId = { $in: [req.user._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
+    const agg = await Reel.aggregate([{ $match: match }, { $unwind: "$hashtags" }, { $group: { _id: "$hashtags", n: { $sum: 1 } } }, { $sort: { n: -1 } }, { $limit: 12 }]);
+    res.status(200).json({ tags: agg.map((a) => ({ tag: a._id, count: a.n })) });
+  } catch (error) {
+    console.log("Error in trendingTags:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Insights for the owner of a reel.
+export const reelInsights = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const r = await Reel.findOne({ _id: req.params.id, userId: req.user._id }).populate("likes", "fullName profilePic").lean();
+    if (!r) return res.status(404).json({ error: "Not found" });
+    const [comments, reposters] = await Promise.all([
+      StatusComment.countDocuments({ targetId: r._id }),
+      Repost.find({ reelId: r._id }).sort({ createdAt: -1 }).limit(10).populate("userId", "fullName profilePic").lean(),
+    ]);
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({
+      views: r.views || 0,
+      likes: (r.likes || []).length,
+      comments,
+      saves: r.saves || 0,
+      reposts: r.reposts || 0,
+      likedBy: (r.likes || []).slice(-10).reverse().map((u) => ({ _id: u._id, fullName: u.fullName, profilePic: u.profilePic })),
+      repostedBy: reposters.filter((x) => x.userId).map((x) => ({ _id: x.userId._id, fullName: x.userId.fullName, profilePic: x.userId.profilePic })),
+      postedAt: r.createdAt,
+      engagement: r.views ? Math.round((((r.likes || []).length + comments + (r.saves || 0) + (r.reposts || 0)) / r.views) * 1000) / 10 : 0,
+    });
+  } catch (error) {
+    console.log("Error in reelInsights:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// "Not interested" (reason empty) or "Report" (with a reason): the reel leaves this person's feed for good.
+export const hideReel = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const reason = ["spam", "abuse", "inappropriate", "scam", "other"].includes(req.body?.reason) ? req.body.reason : "";
+    await ReelHide.updateOne({ userId: req.user._id, reelId: req.params.id }, { $set: { reason }, $setOnInsert: { userId: req.user._id, reelId: req.params.id } }, { upsert: true });
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.log("Error in hideReel:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

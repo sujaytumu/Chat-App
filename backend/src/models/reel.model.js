@@ -8,6 +8,7 @@ const reelSchema = new mongoose.Schema(
     videoUrl: { type: String, required: true },
     poster: { type: String, default: "" },
     caption: { type: String, default: "", maxlength: 300 },
+    hashtags: { type: [String], default: [], index: true },
     duration: { type: Number, default: 0 },
     filter: { type: String, default: "none" },
     trim: { start: { type: Number, default: 0 }, end: { type: Number, default: 0 } }, // end 0 = whole video

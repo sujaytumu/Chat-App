@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2 } from "lucide-react";
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Search, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -40,7 +40,7 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   </button>
 );
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near }) => {
+const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, onTag, onUser }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -230,8 +230,10 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
           <p className="mb-1.5 flex items-center gap-1.5 text-[12.5px] text-white/85"><Repeat2 size={14} /> {reel.repostedBy.fullName} reposted</p>
         )}
         <div className="flex items-center gap-2.5">
-          <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-10 rounded-full object-cover border border-white/30 bg-neutral-800" />
-          <span className="font-semibold text-[15.5px] drop-shadow truncate max-w-[40vw]">{reel.user?.fullName}</span>
+          <button onClick={() => !reel.external && onUser(reel.user)} className="flex items-center gap-2.5 min-w-0">
+            <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-10 rounded-full object-cover border border-white/30 bg-neutral-800" />
+            <span className="font-semibold text-[15.5px] drop-shadow truncate max-w-[40vw]">{reel.user?.fullName}</span>
+          </button>
           {!reel.mine && !reel.external && reel.source !== "discover" && (
             <button
               onClick={() => onFollow(reel)}
@@ -248,7 +250,13 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         )}
         {reel.caption && (
           <p onClick={() => setMore((m) => !m)} className={`mt-1.5 text-[14.5px] leading-snug drop-shadow whitespace-pre-wrap break-words ${more ? "max-h-40 overflow-y-auto" : "line-clamp-1"}`}>
-            {reel.caption}
+            {reel.caption.split(/(#[\p{L}\p{M}\p{N}_]{2,30})/gu).map((part, i) =>
+              part.startsWith("#") && part.length > 2 ? (
+                <button key={i} onClick={(e) => { e.stopPropagation(); onTag(part.slice(1).toLowerCase()); }} className="font-semibold text-white underline-offset-2 active:underline">{part}</button>
+              ) : (
+                part
+              )
+            )}
           </p>
         )}
       </div>
@@ -425,6 +433,118 @@ const NewReel = ({ onClose, onPosted }) => {
   );
 };
 
+const REPORT_REASONS = [["spam", "Spam"], ["abuse", "Bullying or abuse"], ["inappropriate", "Inappropriate content"], ["scam", "Scam or fraud"], ["other", "Something else"]];
+
+const Stat = ({ icon: Icon, label, value }) => (
+  <div className="rounded-2xl bg-white/10 px-3 py-3 flex flex-col items-center gap-1">
+    <Icon size={20} className="text-white/80" />
+    <span className="text-[20px] font-bold tabular-nums">{count(value)}</span>
+    <span className="text-[12px] text-white/60">{label}</span>
+  </div>
+);
+
+const Insights = ({ reel, onClose }) => {
+  const [d, setD] = useState(null);
+  useEffect(() => {
+    axiosInstance.get(`/reels/${reel._id}/insights`).then((r) => setD(r.data)).catch(() => { toast.error("Couldn't load insights"); onClose(); });
+  }, [reel._id, onClose]);
+  const People = ({ title, list }) =>
+    list?.length ? (
+      <div className="mt-4">
+        <p className="text-[13px] text-white/60 mb-2">{title}</p>
+        <div className="flex flex-wrap gap-2">
+          {list.map((u) => (
+            <span key={u._id} className="flex items-center gap-1.5 rounded-full bg-white/10 pl-1 pr-3 py-1 text-[13px]">
+              <img src={optimizeImage(u.profilePic || "/avatar.png", 64)} alt="" className="size-6 rounded-full object-cover" /> {u.fullName}
+            </span>
+          ))}
+        </div>
+      </div>
+    ) : null;
+  return (
+    <div className="absolute inset-0 z-50 bg-black/60 flex items-end" onClick={onClose}>
+      <div className="w-full max-h-[80%] overflow-y-auto bg-neutral-900 rounded-t-3xl p-5 pb-8 text-white wa-pop-in" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/25" />
+        <h3 className="text-[17px] font-semibold mb-3">Reel insights</h3>
+        {!d ? (
+          <div className="py-10 flex justify-center"><Loader2 className="animate-spin" /></div>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2">
+              <Stat icon={Eye} label="Views" value={d.views} />
+              <Stat icon={Heart} label="Likes" value={d.likes} />
+              <Stat icon={MessageCircle} label="Comments" value={d.comments} />
+              <Stat icon={Bookmark} label="Saves" value={d.saves} />
+              <Stat icon={Repeat2} label="Reposts" value={d.reposts} />
+              <Stat icon={BarChart3} label="Engagement" value={`${d.engagement}%`} />
+            </div>
+            <People title="Recently liked by" list={d.likedBy} />
+            <People title="Reposted by" list={d.repostedBy} />
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SearchReels = ({ onClose, onOpen, onTag }) => {
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState(null);
+  const [tags, setTags] = useState([]);
+  const seq = useRef(0);
+  useEffect(() => {
+    axiosInstance.get("/reels/trending").then((r) => setTags(r.data.tags || [])).catch(() => {});
+  }, []);
+  useEffect(() => {
+    const t = q.trim();
+    if (t.length < 2) return setResults(null);
+    const my = ++seq.current;
+    const h = setTimeout(() => {
+      axiosInstance.get("/reels/search", { params: { q: t } }).then((r) => my === seq.current && setResults(r.data.reels || [])).catch(() => my === seq.current && setResults([]));
+    }, 300);
+    return () => clearTimeout(h);
+  }, [q]);
+  return (
+    <div className="absolute inset-0 z-[70] bg-black text-white flex flex-col">
+      <div className="flex items-center gap-2 px-3 pt-[calc(10px+env(safe-area-inset-top))] pb-2">
+        <button onClick={onClose} className="size-10 flex items-center justify-center" aria-label="Back"><ChevronLeft size={26} /></button>
+        <div className="flex-1 flex items-center gap-2 bg-white/10 rounded-full px-3 py-2.5">
+          <Search size={17} className="text-white/60" />
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reels, #tags, people" className="bg-transparent outline-none flex-1 text-[15px] placeholder:text-white/50" />
+          {q && <button onClick={() => setQ("")}><X size={16} className="text-white/60" /></button>}
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pb-6">
+        {results === null ? (
+          <>
+            <p className="text-[13px] text-white/60 mt-3 mb-2">Trending</p>
+            {tags.length ? (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((t) => (
+                  <button key={t.tag} onClick={() => onTag(t.tag)} className="rounded-full bg-white/10 px-3.5 py-2 text-[14px] font-medium">#{t.tag} <span className="text-white/50 text-[12px]">{t.count}</span></button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-white/50 text-[14px]">No trending tags yet — add #hashtags to your captions.</p>
+            )}
+          </>
+        ) : !results.length ? (
+          <p className="text-center text-white/50 mt-16">No reels found</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-1 mt-2">
+            {results.map((r) => (
+              <button key={r._id} onClick={() => onOpen(r, q.trim())} className="relative aspect-[9/16] bg-neutral-800 overflow-hidden rounded-md">
+                {r.poster && <img src={r.poster} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
+                <span className="absolute left-1.5 bottom-1.5 flex items-center gap-1 text-[11px] font-semibold drop-shadow"><Play size={11} fill="currentColor" /> {count(r.views)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -441,6 +561,10 @@ const ReelsPage = () => {
   const [menuFor, setMenuFor] = useState(null);
   const [pickTab, setPickTab] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [view, setView] = useState(null); // { kind: tag | user | search, arg, label, startId } — a list outside the main tabs
+  const [searching, setSearching] = useState(false);
+  const [insightsFor, setInsightsFor] = useState(null);
+  const [reportFor, setReportFor] = useState(null);
   const box = useRef(null);
   const loadingMore = useRef(false);
   const cursor = useRef({ before: null, px: 1 });
@@ -456,7 +580,13 @@ const ReelsPage = () => {
         if (cursor.current.before) params.before = cursor.current.before;
         params.px = cursor.current.px;
       }
-      const { data } = tab === "saved" ? await axiosInstance.get("/reels/saved", { timeout: 20000 }) : await axiosInstance.get("/reels", { params, timeout: 20000 });
+      let url = "/reels";
+      let cfg = { params, timeout: 20000 };
+      if (view?.kind === "tag") { url = `/reels/tag/${encodeURIComponent(view.arg)}`; cfg = { timeout: 20000 }; }
+      else if (view?.kind === "user") { url = `/reels/by-user/${view.arg}`; cfg = { timeout: 20000 }; }
+      else if (view?.kind === "search") { url = "/reels/search"; cfg = { params: { q: view.arg }, timeout: 20000 }; }
+      else if (tab === "saved") { url = "/reels/saved"; cfg = { timeout: 20000 }; }
+      const { data } = await axiosInstance.get(url, cfg);
       if (my !== gen.current) return;
       if (data.next) cursor.current.before = data.next;
       if (data.px) cursor.current.px = data.px;
@@ -474,7 +604,7 @@ const ReelsPage = () => {
       loadingMore.current = false;
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, view]);
 
   // (re)load whenever the tab changes; a shared reel link is shown first
   useEffect(() => {
@@ -484,7 +614,7 @@ const ReelsPage = () => {
     setActiveId(null);
     box.current?.scrollTo({ top: 0 });
     (async () => {
-      const wanted = tab === "foryou" ? params.get("r") : null;
+      const wanted = tab === "foryou" && !view ? params.get("r") : null;
       if (wanted) {
         try {
           const { data } = await axiosInstance.get(`/reels/${wanted}`);
@@ -495,7 +625,7 @@ const ReelsPage = () => {
       }
       load(true);
     })();
-  }, [tab, params, load]);
+  }, [tab, view, params, load]);
 
   // the reel filling the screen is the one that plays
   useEffect(() => {
@@ -512,10 +642,21 @@ const ReelsPage = () => {
   }, [reels.length]);
 
   useEffect(() => {
-    if (!activeId || !more || tab === "saved") return;
+    if (!activeId || !more || tab === "saved" || view) return;
     const i = reels.findIndex((r) => r._id === activeId);
     if (i >= reels.length - 3 && reels.length) load(false);
-  }, [activeId, reels, more, load, tab]);
+  }, [activeId, reels, more, load, tab, view]);
+
+  // opening a reel from search / a profile list: jump straight to it
+  useEffect(() => {
+    if (!view?.startId || !reels.length) return;
+    const el = box.current?.querySelector(`[data-reel="${view.startId}"]`);
+    if (el) {
+      el.scrollIntoView({ block: "start" });
+      setActiveId(view.startId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reels.length, view?.startId]);
 
   // Called when a reel finishes: slide to the next one. Returns false on the last reel so it can replay.
   const goNext = useCallback((id) => {
@@ -625,6 +766,16 @@ const ReelsPage = () => {
     }
   };
 
+  const hide = async (reel, reason = "") => {
+    setReels((l) => l.filter((r) => r._id !== reel._id));
+    try {
+      await axiosInstance.put(`/reels/${reel._id}/hide`, { reason });
+      toast(reason ? "Thanks — we won't show it to you again" : "Okay, you'll see fewer like this", { icon: reason ? "🚩" : "🙈" });
+    } catch {
+      toast.error("Couldn't do that");
+    }
+  };
+
   const remove = async (reel) => {
     if (!window.confirm("Delete this reel?")) return;
     try {
@@ -654,9 +805,16 @@ const ReelsPage = () => {
     <div className="fixed inset-0 z-[60] bg-black">
       <style>{"@keyframes reelHeart{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:0}}"}</style>
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(14px+env(safe-area-inset-top))] pointer-events-none">
-        <button onClick={() => setCreating(true)} className="pointer-events-auto text-white drop-shadow" aria-label="New reel">
-          <Plus size={34} strokeWidth={1.8} />
-        </button>
+        {view ? (
+          <button onClick={() => setView(null)} className="pointer-events-auto text-white drop-shadow" aria-label="Back"><ChevronLeft size={34} strokeWidth={1.8} /></button>
+        ) : (
+          <button onClick={() => setCreating(true)} className="pointer-events-auto text-white drop-shadow" aria-label="New reel">
+            <Plus size={34} strokeWidth={1.8} />
+          </button>
+        )}
+        {view ? (
+          <h2 className="pointer-events-auto text-white text-[19px] font-bold drop-shadow truncate max-w-[60vw]">{view.label}</h2>
+        ) : (
         <div className="pointer-events-auto flex items-center gap-5 relative">
           <div className="flex items-center gap-1">
             {tabBtn(tab === "saved" ? "saved" : "foryou", tab === "saved" ? "Saved" : "Reels")}
@@ -673,7 +831,12 @@ const ReelsPage = () => {
             </div>
           )}
         </div>
-        <span className="size-8" aria-hidden />
+        )}
+        {view ? (
+          <span className="size-8" aria-hidden />
+        ) : (
+          <button onClick={() => setSearching(true)} className="pointer-events-auto text-white drop-shadow" aria-label="Search"><Search size={28} strokeWidth={1.8} /></button>
+        )}
       </div>
 
       <div className="absolute inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom))]">
@@ -697,7 +860,7 @@ const ReelsPage = () => {
         ) : (
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
             {reels.map((r, idx) => (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} />
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
             ))}
           </div>
         )}
@@ -709,6 +872,17 @@ const ReelsPage = () => {
             onTotal={(n) => setReels((l) => l.map((r) => (r._id === commentsFor._id ? { ...r, comments: n } : r)))}
           />
         )}
+        {insightsFor && <Insights reel={insightsFor} onClose={() => setInsightsFor(null)} />}
+        {reportFor && (
+          <div className="absolute inset-0 z-50 bg-black/60 flex items-end" onClick={() => setReportFor(null)}>
+            <div className="w-full bg-neutral-900 rounded-t-3xl pb-4 text-white wa-pop-in" onClick={(e) => e.stopPropagation()}>
+              <p className="px-6 pt-5 pb-2 text-[16px] font-semibold">Why are you reporting this reel?</p>
+              {REPORT_REASONS.map(([id, label]) => (
+                <button key={id} onClick={() => { const r = reportFor; setReportFor(null); hide(r, id); }} className="w-full text-left px-6 py-3.5 text-[16px] active:bg-white/10">{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
         {sendFor && <SendReelModal reel={sendFor} onClose={() => setSendFor(null)} />}
         {menuFor && (
           <div className="absolute inset-0 z-50 bg-black/60 flex items-end" onClick={() => setMenuFor(null)}>
@@ -719,6 +893,8 @@ const ReelsPage = () => {
                 { icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) },
                 { icon: Link2, label: "Copy link", run: async () => { const r = await asReel(menuFor); if (r) copyLink(r); } },
                 { icon: Bookmark, label: "Saved reels", run: () => setTab("saved") },
+                ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: BarChart3, label: "Insights", run: () => setInsightsFor(menuFor) }] : []),
+                ...(!menuFor.mine ? [{ icon: EyeOff, label: "Not interested", run: () => hide(menuFor) }, { icon: Flag, label: "Report", run: () => setReportFor(menuFor), danger: true }] : []),
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Delete reel", run: () => remove(menuFor), danger: true }] : []),
               ].map((it) => (
                 <button key={it.label} onClick={() => { setMenuFor(null); it.run(); }} className={`w-full flex items-center gap-4 px-6 py-3.5 text-[16px] active:bg-white/10 ${it.danger ? "text-red-400" : ""}`}>
@@ -741,6 +917,13 @@ const ReelsPage = () => {
         </button>
       </nav>
 
+      {searching && (
+        <SearchReels
+          onClose={() => setSearching(false)}
+          onTag={(t) => { setSearching(false); setView({ kind: "tag", arg: t, label: `#${t}` }); }}
+          onOpen={(r, q) => { setSearching(false); setView({ kind: "search", arg: q, label: q, startId: r._id }); }}
+        />
+      )}
       {creating && (
         <NewReel
           onClose={() => setCreating(false)}
