@@ -1,11 +1,14 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
-import { getReelFeed, getReel, createReel, likeReel, viewReel, deleteReel, toggleFollow, toggleSave, getSaved, importDiscover, importStatus, repostReel, getUserReels, reelsByTag, reelsByUser, searchReels, trendingTags, reelInsights, hideReel } from "../controllers/reel.controller.js";
+import { getReelFeed, getReel, createReel, likeReel, viewReel, deleteReel, toggleFollow, toggleSave, getSaved, importDiscover, importStatus, repostReel, getUserReels, reelsByTag, reelsByUser, searchReels, trendingTags, reelInsights, hideReel, reportedReels, adminDeleteReel, dismissReports } from "../controllers/reel.controller.js";
 
 const router = express.Router();
 
 router.get("/", protectRoute, getReelFeed);
 router.get("/saved", protectRoute, getSaved);
+router.get("/admin/reports", protectRoute, reportedReels);
+router.delete("/admin/:id", protectRoute, adminDeleteReel);
+router.put("/admin/:id/dismiss", protectRoute, dismissReports);
 router.get("/search", protectRoute, searchReels);
 router.get("/trending", protectRoute, trendingTags);
 router.get("/tag/:tag", protectRoute, reelsByTag);

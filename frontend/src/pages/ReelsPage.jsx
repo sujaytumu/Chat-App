@@ -545,6 +545,57 @@ const SearchReels = ({ onClose, onOpen, onTag }) => {
   );
 };
 
+const ReportsReview = ({ onClose, onRemoved }) => {
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    axiosInstance.get("/reels/admin/reports").then((r) => setList(r.data.reels || [])).catch(() => { toast.error("Couldn't load reports"); onClose(); });
+  }, [onClose]);
+  const act = async (r, kind) => {
+    try {
+      if (kind === "remove") {
+        if (!window.confirm("Remove this reel for everyone?")) return;
+        await axiosInstance.delete(`/reels/admin/${r._id}`);
+        onRemoved(r._id);
+      } else {
+        await axiosInstance.put(`/reels/admin/${r._id}/dismiss`);
+      }
+      setList((l) => l.filter((x) => x._id !== r._id));
+    } catch {
+      toast.error("Couldn't do that");
+    }
+  };
+  return (
+    <div className="absolute inset-0 z-[70] bg-black text-white flex flex-col">
+      <div className="flex items-center gap-2 px-3 pt-[calc(10px+env(safe-area-inset-top))] pb-2">
+        <button onClick={onClose} className="size-10 flex items-center justify-center" aria-label="Back"><ChevronLeft size={26} /></button>
+        <h3 className="text-[18px] font-semibold">Reported reels</h3>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 pb-6 space-y-3">
+        {list === null ? (
+          <div className="py-16 flex justify-center"><Loader2 className="animate-spin" /></div>
+        ) : !list.length ? (
+          <p className="text-center text-white/50 mt-20">No reports. All clear.</p>
+        ) : (
+          list.map((r) => (
+            <div key={r._id} className="flex gap-3 rounded-2xl bg-white/10 p-3">
+              <div className="w-20 aspect-[9/16] rounded-lg overflow-hidden bg-neutral-800 shrink-0">{r.poster && <img src={r.poster} alt="" className="w-full h-full object-cover" />}</div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold truncate">{r.user?.fullName || "Unknown"}</p>
+                <p className="text-[13px] text-white/70 line-clamp-2 break-words">{r.caption || "No caption"}</p>
+                <p className="text-[12.5px] text-red-300 mt-1">{r.reports} report{r.reports > 1 ? "s" : ""}: {Object.entries(r.reasons).map(([k, n]) => `${k} ×${n}`).join(", ")}</p>
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => act(r, "remove")} className="px-3.5 py-1.5 rounded-full bg-red-500 text-white text-[13px] font-semibold">Remove</button>
+                  <button onClick={() => act(r, "dismiss")} className="px-3.5 py-1.5 rounded-full bg-white/15 text-[13px] font-semibold">Keep</button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -564,6 +615,8 @@ const ReelsPage = () => {
   const [view, setView] = useState(null); // { kind: tag | user | search, arg, label, startId } — a list outside the main tabs
   const [searching, setSearching] = useState(false);
   const [insightsFor, setInsightsFor] = useState(null);
+  const [isOwner, setIsOwner] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
   const [reportFor, setReportFor] = useState(null);
   const box = useRef(null);
   const loadingMore = useRef(false);
@@ -588,6 +641,7 @@ const ReelsPage = () => {
       else if (tab === "saved") { url = "/reels/saved"; cfg = { timeout: 20000 }; }
       const { data } = await axiosInstance.get(url, cfg);
       if (my !== gen.current) return;
+      if (typeof data.owner === "boolean") setIsOwner(data.owner);
       if (data.next) cursor.current.before = data.next;
       if (data.px) cursor.current.px = data.px;
       setReels((cur) => {
@@ -896,6 +950,8 @@ const ReelsPage = () => {
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: BarChart3, label: "Insights", run: () => setInsightsFor(menuFor) }] : []),
                 ...(!menuFor.mine ? [{ icon: EyeOff, label: "Not interested", run: () => hide(menuFor) }, { icon: Flag, label: "Report", run: () => setReportFor(menuFor), danger: true }] : []),
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Delete reel", run: () => remove(menuFor), danger: true }] : []),
+                ...(isOwner ? [{ icon: Flag, label: "Review reported reels", run: () => setReviewing(true) }] : []),
+                ...(isOwner && !menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Remove reel (owner)", run: async () => { if (!window.confirm("Remove this reel for everyone?")) return; try { await axiosInstance.delete(`/reels/admin/${menuFor._id}`); setReels((l) => l.filter((r) => r._id !== menuFor._id)); } catch { toast.error("Couldn't remove"); } }, danger: true }] : []),
               ].map((it) => (
                 <button key={it.label} onClick={() => { setMenuFor(null); it.run(); }} className={`w-full flex items-center gap-4 px-6 py-3.5 text-[16px] active:bg-white/10 ${it.danger ? "text-red-400" : ""}`}>
                   <it.icon size={22} /> {it.label}
@@ -917,6 +973,7 @@ const ReelsPage = () => {
         </button>
       </nav>
 
+      {reviewing && <ReportsReview onClose={() => setReviewing(false)} onRemoved={(id) => setReels((l) => l.filter((r) => r._id !== id))} />}
       {searching && (
         <SearchReels
           onClose={() => setSearching(false)}
