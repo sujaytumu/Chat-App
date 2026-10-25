@@ -99,13 +99,28 @@ async function visibleReels(me, extraQuery, limit = 40) {
 }
 
 // ---- "Discover": popular vertical videos that appear on their own (needs PEXELS_API_KEY, free at pexels.com/api) ----
+const QUOTES = [
+  "Start where you are. Use what you have. Do what you can.",
+  "Small steps every day beat big plans someday.",
+  "Discipline is choosing what you want most over what you want now.",
+  "You don't need to be perfect, you need to be consistent.",
+  "Your future self is watching what you do today.",
+  "Hard days build strong people.",
+  "Don't wait for motivation. Show up anyway.",
+  "One more rep. One more page. One more try.",
+  "Quiet work, loud results.",
+  "Progress, not perfection.",
+];
 const discoverCache = new Map(); // page -> { at, items }
 const discoverOn = () => !!process.env.PEXELS_API_KEY;
 async function discoverPage(page) {
   const hit = discoverCache.get(page);
   if (hit && Date.now() - hit.at < 30 * 60_000) return hit.items;
   try {
-    const r = await fetch(`https://api.pexels.com/videos/popular?per_page=15&page=${page}&min_duration=5&max_duration=45`, {
+    // Motivational themes, rotated page by page so the feed keeps changing (DISCOVER_QUERIES="a,b,c" changes them)
+    const themes = (process.env.DISCOVER_QUERIES || "motivation,success mindset,gym workout,sunrise nature,running athlete,focus study,mountain climb,self improvement,city night hustle,meditation calm").split(",").map((x) => x.trim()).filter(Boolean);
+    const q = themes[(page - 1) % themes.length];
+    const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(q)}&orientation=portrait&size=medium&per_page=15&page=${Math.ceil(page / themes.length)}&min_duration=5&max_duration=45`, {
       headers: { Authorization: process.env.PEXELS_API_KEY },
     });
     if (!r.ok) throw new Error(`pexels ${r.status}`);
@@ -121,7 +136,7 @@ async function discoverPage(page) {
           source: "discover",
           videoUrl: f.link,
           poster: v.image || "",
-          caption: "",
+          caption: QUOTES[Number(v.id) % QUOTES.length] + " #motivation",
           duration: v.duration || 0,
           filter: "none",
           trim: null,
@@ -247,7 +262,7 @@ export const getReelFeed = async (req, res) => {
     let out = page;
     let more = localMore;
     if (!friendsTab && discoverOn()) {
-      const found = (await discoverPage(px)).slice(0, 4);
+      const found = (await discoverPage(px)).slice(0, 6);
       px += 1;
       out = [];
       let d = 0;
