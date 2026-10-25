@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
-import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette, Play, Pause } from "lucide-react";
+import PollSheet from "./PollSheet";
+import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette, Play, Pause, BarChart3 } from "lucide-react";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import StatusMusicSheet from "./StatusMusicSheet";
@@ -190,6 +191,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [caption, setCaption] = useState("");
   const [song, setSong] = useState(null); // { data, name, size }
   const [place, setPlace] = useState(null); // { name, lat, lng }
+  const [poll, setPoll] = useState(null); // { question, options[] }
+  const [showPoll, setShowPoll] = useState(false);
   const [showPlaces, setShowPlaces] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
   const [editSong, setEditSong] = useState(false); // WhatsApp's "choose the part of the song" screen
@@ -272,6 +275,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         ...(kind === "video" && trim ? { trim } : {}),
         ...(song ? { song: { data: song.data, name: song.name, size: song.size, mime: song.mime, start: song.start, length: song.length } } : {}),
         ...(place ? { location: place } : {}),
+        ...(poll ? { poll } : {}),
         ...(audience.mode !== "all" ? { audience } : {}),
       };
       await axiosInstance.post("/status", body, { timeout: 180000 });
@@ -338,6 +342,8 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           </>
         )}
       </div>
+
+      {showPoll && <PollSheet initial={poll} onClose={() => setShowPoll(false)} onDone={(p) => { setPoll(p); setShowPoll(false); }} />}
 
       {isMedia && kind === "image" && (
         <StatusPhotoEditor
@@ -475,6 +481,9 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
             />
           </div>
           <div className="flex items-center gap-2 bg-[#0A0E11] px-2.5 pt-2.5 pb-[calc(10px+env(safe-area-inset-bottom))]">
+            <button className={`h-9 px-3 rounded-full bg-[#101418] text-[13px] flex items-center gap-1.5 ${poll ? "text-[#21C063]" : "text-white/90"}`} onClick={() => setShowPoll(true)} aria-label="Poll">
+              <BarChart3 size={16} /> Poll
+            </button>
             <button className="h-9 pl-3 pr-3.5 rounded-full bg-[#101418] text-white/90 text-[13px] flex items-center gap-1.5" onClick={() => setShowAudience(true)}>
               <StatusRing size={18} /> Status ({audienceLabel(audience)})
             </button>
@@ -499,6 +508,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           {tool(FileText, "File", () => fileRef.current?.click(), kind === "file")}
           {tool(Music, "Song", () => songRef.current?.click(), !!song)}
           {tool(MapPin, "Location", () => setShowPlaces(true), !!place)}
+          {tool(BarChart3, "Poll", () => setShowPoll(true), !!poll)}
         </div>
         <button
           onClick={post}

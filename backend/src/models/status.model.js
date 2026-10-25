@@ -31,6 +31,12 @@ const statusSchema = new mongoose.Schema(
       lat: { type: Number },
       lng: { type: Number },
     },
+    // A poll sticker: viewers pick one option; the owner sees the results
+    poll: {
+      question: { type: String },
+      options: [{ type: String }],
+      votes: [{ _id: false, user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, option: { type: Number } }],
+    },
     closeFriends: { type: Boolean, default: false }, // shared with the owner's Close friends list (green star)
     // Who may see it: everyone (my contacts), everyone except some people, or only some people
     audience: {
