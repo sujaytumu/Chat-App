@@ -1,3 +1,4 @@
+import { axiosInstance } from "../lib/axios.js";
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Clock, Timer, Ghost, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen, Sparkles } from "lucide-react";
 import { useChatLockStore } from "../store/useChatLockStore";
@@ -73,6 +74,19 @@ const ChatHeader = () => {
   const directSecs = useChatStore((st) => (directId ? st.directDisappear[directId] || 0 : 0));
   useEffect(() => {
     if (directId) useChatStore.getState().loadDirectDisappear(directId);
+  }, [directId]);
+  const [streak, setStreak] = useState(null);
+  useEffect(() => {
+    setStreak(null);
+    if (!directId) return;
+    let off = false;
+    axiosInstance
+      .get(`/messages/streak/${directId}`, { params: { tz: -new Date().getTimezoneOffset() } })
+      .then((r) => !off && setStreak(r.data))
+      .catch(() => {});
+    return () => {
+      off = true;
+    };
   }, [directId]);
   const [keepStarred, setKeepStarred] = useState(true);
   useBackToClose(showClear, () => setShowClear(false));
@@ -152,7 +166,14 @@ const ChatHeader = () => {
       >
         <Avatar src={isGroup ? data.groupPic : data.profilePic} name={name} isGroup={isGroup} size="size-11" textSize="text-xl" />
         <div className="min-w-0">
-          <h3 className="text-[16px] leading-6 font-medium text-wa-text truncate">{name}</h3>
+          <h3 className="text-[16px] leading-6 font-medium text-wa-text truncate">
+            {name}
+            {streak?.streak >= 2 && (
+              <span className={`ml-1.5 text-[12px] font-semibold ${streak.atRisk ? "opacity-60" : ""}`} title={streak.atRisk ? "Send a message today to keep your streak" : "Chat streak"}>
+                🔥{streak.streak}
+              </span>
+            )}
+          </h3>
           <p className={`text-[11px] leading-4 truncate ${isOnline || status.endsWith("typing…") || status === "recording audio…" ? "text-[#25D366]" : "text-wa-muted"}`}>
             {status.startsWith("last seen") ? <LastSeenLine text={status} /> : status}
           </p>
