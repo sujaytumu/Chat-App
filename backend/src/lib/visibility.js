@@ -10,7 +10,7 @@ export const OWNER_EMAIL = (process.env.OWNER_EMAIL || "sujaybabutumu@gmail.com"
 export const isOwner = (user) => String(user?.email || "").trim().toLowerCase() === OWNER_EMAIL;
 
 let ownerIdCache = { id: null, at: 0 };
-async function ownerId() {
+export async function ownerId() {
   if (ownerIdCache.id && Date.now() - ownerIdCache.at < 60_000) return ownerIdCache.id;
   const o = await User.findOne({ email: OWNER_EMAIL }).select("_id").lean();
   ownerIdCache = { id: o ? String(o._id) : null, at: Date.now() };
