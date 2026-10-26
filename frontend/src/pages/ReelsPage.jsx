@@ -357,6 +357,8 @@ const NewReel = ({ onClose, onPosted }) => {
   const [range, setRange] = useState([0, 0]); // trim start / end in seconds (end 0 = untouched)
   const [song, setSong] = useState(null); // { data, name, size, mime }
   const [showMusic, setShowMusic] = useState(false);
+  const [extras, setExtras] = useState([]); // more videos picked in the same go: posted one after another after this one
+  const [progress, setProgress] = useState(""); // "Posting 2 of 4"
   const pick = useRef(null);
   const prev = useRef(null);
   const songInput = useRef(null);
@@ -365,6 +367,38 @@ const NewReel = ({ onClose, onPosted }) => {
   const effLen = Math.max(0, effEnd - range[0]);
 
   useEffect(() => () => url && URL.revokeObjectURL(url), [url]);
+
+  const chooseMany = (list) => {
+    const files = Array.from(list || []);
+    if (!files.length) return;
+    const ok = [];
+    for (const f of files) {
+      if (!f.type.startsWith("video/")) { toast.error(`${f.name}: not a video`); continue; }
+      if (f.size > MAX_MB * 1024 * 1024) { toast.error(`${f.name}: keep it under ${MAX_MB} MB`); continue; }
+      ok.push(f);
+    }
+    if (!ok.length) return;
+    choose(ok[0]);
+    setExtras(ok.slice(1));
+  };
+
+  // length of a video file (needed by the server), read without playing it
+  const probeDuration = (f) =>
+    new Promise((resolve) => {
+      const u = URL.createObjectURL(f);
+      const v = document.createElement("video");
+      v.preload = "metadata";
+      v.onloadedmetadata = () => { resolve(v.duration || 0); URL.revokeObjectURL(u); };
+      v.onerror = () => { resolve(0); URL.revokeObjectURL(u); };
+      v.src = u;
+    });
+  const toDataUrl = (f) =>
+    new Promise((ok, bad) => {
+      const r = new FileReader();
+      r.onload = () => ok(r.result);
+      r.onerror = bad;
+      r.readAsDataURL(f);
+    });
 
   const choose = (f) => {
     if (!f) return;
@@ -388,8 +422,22 @@ const NewReel = ({ onClose, onPosted }) => {
         r.readAsDataURL(file);
       });
       const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
-      toast.success("Reel posted");
-      onPosted(res.data);
+      const posted = [res.data];
+      for (let i = 0; i < extras.length; i++) {
+        setProgress(`Posting ${i + 2} of ${extras.length + 1}`);
+        setPct(0);
+        try {
+          const f = extras[i];
+          const d = await probeDuration(f);
+          if (d > MAX_SECONDS + 0.5) { toast.error(`${f.name} is longer than ${MAX_SECONDS}s — skipped`); continue; }
+          const r2 = await axiosInstance.post("/reels", { video: await toDataUrl(f), caption: "", duration: d, filter: "none" }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+          posted.push(r2.data);
+        } catch (e2) {
+          toast.error(e2.response?.data?.error || `Couldn't post video ${i + 2}`);
+        }
+      }
+      toast.success(posted.length > 1 ? `${posted.length} reels posted` : "Reel posted");
+      posted.forEach((r) => onPosted(r));
     } catch (err) {
       toast.error(err.response?.data?.error || "Couldn't post the reel");
       setBusy(false);
@@ -426,12 +474,14 @@ const NewReel = ({ onClose, onPosted }) => {
         ) : (
           <button onClick={() => pick.current?.click()} className="flex flex-col items-center gap-3 text-white/80">
             <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
-            <span className="text-[15px]">Choose a video (up to {MAX_SECONDS}s, {MAX_MB} MB)</span>
+            <span className="text-[15px]">Choose videos (up to {MAX_SECONDS}s, {MAX_MB} MB each) — pick several at once</span>
           </button>
         )}
-        <input ref={pick} type="file" accept="video/*" hidden onChange={(e) => choose(e.target.files?.[0])} />
+        <input ref={pick} type="file" accept="video/*" multiple hidden onChange={(e) => { chooseMany(e.target.files); e.target.value = ""; }} />
       </div>
       <div className="px-4 pb-[calc(16px+env(safe-area-inset-bottom))] space-y-2">
+        {extras.length > 0 && !busy && <p className="text-[13px] text-white/70">+ {extras.length} more video{extras.length > 1 ? "s" : ""} will be posted right after this one</p>}
+        {busy && progress && <p className="text-[13px] text-white/80">{progress}…</p>}
         {busy && (
           <div className="h-1.5 rounded-full bg-white/20 overflow-hidden"><div className="h-full bg-[#25D366] transition-all" style={{ width: `${pct}%` }} /></div>
         )}
