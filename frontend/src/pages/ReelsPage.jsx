@@ -42,22 +42,31 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
 );
 
 // A curated Instagram reel shown with Instagram's official embed (plays with sound after you tap it).
-const InstaReel = ({ reel, active, near }) => (
-  <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden pt-14 pb-1" data-reel={reel._id}>
-    {active || near ? (
-      <iframe
-        title="Instagram reel"
-        src={`https://www.instagram.com/${reel.igPath}/${reel.igCode}/embed/`}
-        allow="autoplay; encrypted-media; fullscreen"
-        allowFullScreen
-        scrolling="no"
-        className="h-full w-full max-w-[460px] border-0 bg-black"
-      />
-    ) : (
-      <span className="text-white/40 text-sm">Instagram reel</span>
-    )}
-  </section>
-);
+const InstaReel = ({ reel, active, near }) => {
+  // Show only the video part of Instagram's embed: the iframe is made wider than the screen (cuts the black side
+  // bars) and pulled up (hides the name / "View profile" bar); the box around it hides the likes / comment footer.
+  const W = "min(100vw, calc((100dvh - 126px) * 0.5625))";
+  const HEADER = 62; // px of embed header to hide
+  return (
+    <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden" data-reel={reel._id}>
+      {active || near ? (
+        <div className="relative overflow-hidden bg-black" style={{ width: `calc(${W})`, height: `calc(${W} * 1.779)` }}>
+          <iframe
+            title="Instagram reel"
+            src={`https://www.instagram.com/${reel.igPath}/${reel.igCode}/embed/`}
+            allow="autoplay; encrypted-media; fullscreen"
+            allowFullScreen
+            scrolling="no"
+            className="absolute border-0 bg-black"
+            style={{ top: -HEADER, left: `calc(${W} * -0.2124)`, width: `calc(${W} / 0.702)`, height: `calc(${W} * 1.779 + ${HEADER}px + 520px)` }}
+          />
+        </div>
+      ) : (
+        <span className="text-white/40 text-sm">Reel</span>
+      )}
+    </section>
+  );
+};
 
 const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, onTag, onUser }) => {
   const video = useRef(null);
