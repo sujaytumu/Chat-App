@@ -1,3 +1,4 @@
+import { INSTAGRAM_REELS } from "../data/instagramReels.js";
 import mongoose from "mongoose";
 import Reel from "../models/reel.model.js";
 import StatusComment from "../models/statusComment.model.js";
@@ -112,7 +113,28 @@ const QUOTES = [
   "Progress, not perfection.",
 ];
 const discoverCache = new Map(); // page -> { at, items }
-const discoverOn = () => !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY);
+const discoverOn = () => INSTAGRAM_REELS.length > 0 || !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY);
+
+// Curated Instagram reels (official embed, with sound). Each feed page gets the next 4 in the list, wrapping around.
+function instagramClips(page) {
+  const n = INSTAGRAM_REELS.length;
+  return Array.from({ length: Math.min(4, n) }, (_, i) => {
+    const ig = INSTAGRAM_REELS[((page - 1) * 4 + i) % n];
+    return {
+      _id: `ig-${ig.code}-${page}`,
+      source: "instagram",
+      igPath: ig.path,
+      igCode: ig.code,
+      videoUrl: "",
+      poster: "",
+      caption: "",
+      duration: 0,
+      createdAt: new Date().toISOString(),
+      user: { _id: `ig-u-${ig.code}`, fullName: "Instagram", profilePic: "" },
+      likeCount: 0, liked: false, views: 0, comments: 0, saves: 0, mine: false, following: false, saved: false,
+    };
+  });
+}
 
 // Pixabay videos (royalty-free). Pixabay asks apps to show where clips come from, so the author line says "via Pixabay".
 async function pixabayClips(q, page) {
@@ -149,6 +171,7 @@ async function pixabayClips(q, page) {
     .filter(Boolean);
 }
 async function discoverPage(page) {
+  if (INSTAGRAM_REELS.length) return instagramClips(page);
   const hit = discoverCache.get(page);
   if (hit && Date.now() - hit.at < (process.env.PIXABAY_API_KEY ? 24 * 60 * 60_000 : 30 * 60_000)) return hit.items; // Pixabay requires 24h caching
   try {
