@@ -98,7 +98,7 @@ async function visibleReels(me, extraQuery, limit = 40) {
   return (await decorate(await withCounts(rows.filter((r) => !blocked.has(String(r.userId?._id))), me._id), me));
 }
 
-// ---- "Discover": popular vertical videos that appear on their own (needs PEXELS_API_KEY, free at pexels.com/api) ----
+// ---- "Discover": popular vertical videos that appear on their own (needs PIXABAY_API_KEY (free, pixabay.com/api/docs) or PEXELS_API_KEY (pexels.com/api)) ----
 const QUOTES = [
   "Start where you are. Use what you have. Do what you can.",
   "Small steps every day beat big plans someday.",
@@ -112,14 +112,55 @@ const QUOTES = [
   "Progress, not perfection.",
 ];
 const discoverCache = new Map(); // page -> { at, items }
-const discoverOn = () => !!process.env.PEXELS_API_KEY;
+const discoverOn = () => !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY);
+
+// Pixabay videos (royalty-free). Pixabay asks apps to show where clips come from, so the author line says "via Pixabay".
+async function pixabayClips(q, page) {
+  const r = await fetch(`https://pixabay.com/api/videos/?key=${encodeURIComponent(process.env.PIXABAY_API_KEY)}&q=${encodeURIComponent(q.slice(0, 100))}&per_page=20&page=${page}&safesearch=true`);
+  if (!r.ok) throw new Error(`pixabay ${r.status}`);
+  const j = await r.json();
+  return (j.hits || [])
+    .filter((v) => v.duration >= 5 && v.duration <= 60)
+    .map((v) => {
+      const f = v.videos?.small?.url ? v.videos.small : v.videos?.medium?.url ? v.videos.medium : null;
+      if (!f) return null;
+      return {
+        _id: `pb-${v.id}`,
+        source: "discover",
+        videoUrl: f.url,
+        poster: f.thumbnail || "",
+        caption: QUOTES[Number(v.id) % QUOTES.length] + " #motivation",
+        duration: v.duration || 0,
+        filter: "none",
+        trim: null,
+        song: null,
+        createdAt: new Date().toISOString(),
+        user: { _id: `pb-u-${v.user_id || v.id}`, fullName: `${v.user || "Creator"} via Pixabay`, profilePic: "" },
+        likeCount: 0,
+        liked: false,
+        views: 0,
+        comments: 0,
+        saves: 0,
+        mine: false,
+        following: false,
+        saved: false,
+      };
+    })
+    .filter(Boolean);
+}
 async function discoverPage(page) {
   const hit = discoverCache.get(page);
-  if (hit && Date.now() - hit.at < 30 * 60_000) return hit.items;
+  if (hit && Date.now() - hit.at < (process.env.PIXABAY_API_KEY ? 24 * 60 * 60_000 : 30 * 60_000)) return hit.items; // Pixabay requires 24h caching
   try {
     // Motivational themes, rotated page by page so the feed keeps changing (DISCOVER_QUERIES="a,b,c" changes them)
     const themes = (process.env.DISCOVER_QUERIES || "motivation,success mindset,gym workout,sunrise nature,running athlete,focus study,mountain climb,self improvement,city night hustle,meditation calm").split(",").map((x) => x.trim()).filter(Boolean);
     const q = themes[(page - 1) % themes.length];
+    if (process.env.PIXABAY_API_KEY) {
+      const items = await pixabayClips(q, Math.ceil(page / themes.length));
+      if (discoverCache.size > 40) discoverCache.clear();
+      discoverCache.set(page, { at: Date.now(), items });
+      return items;
+    }
     const r = await fetch(`https://api.pexels.com/videos/search?query=${encodeURIComponent(q)}&orientation=portrait&size=medium&per_page=15&page=${Math.ceil(page / themes.length)}&min_duration=5&max_duration=45`, {
       headers: { Authorization: process.env.PEXELS_API_KEY },
     });
@@ -300,7 +341,7 @@ export const toggleFollow = async (req, res) => {
 export const toggleSave = async (req, res) => {
   try {
     const { key, snapshot, saved } = req.body || {};
-    if (typeof key !== "string" || !/^(reel:[a-f0-9]{24}|px:px-\d+|status:[a-f0-9]{24})$/.test(key)) return res.status(400).json({ error: "Invalid" });
+    if (typeof key !== "string" || !/^(reel:[a-f0-9]{24}|px:(?:px|pb)-\d+|status:[a-f0-9]{24})$/.test(key)) return res.status(400).json({ error: "Invalid" });
     if (saved === false) {
       await SavedReel.deleteOne({ userId: req.user._id, key });
       if (key.startsWith("reel:")) await Reel.updateOne({ _id: key.slice(5), saves: { $gt: 0 } }, { $inc: { saves: -1 } });
@@ -478,7 +519,7 @@ export const importDiscover = async (req, res) => {
   try {
     const c = req.body?.clip || {};
     const id = String(c._id || "");
-    if (!/^px-\d+$/.test(id) || typeof c.videoUrl !== "string" || !/^https:\/\//.test(c.videoUrl)) return res.status(400).json({ error: "Invalid clip" });
+    if (!/^(px|pb)-\d+$/.test(id) || typeof c.videoUrl !== "string" || !/^https:\/\//.test(c.videoUrl)) return res.status(400).json({ error: "Invalid clip" });
     const reel = await Reel.findOneAndUpdate(
       { externalId: id },
       {
