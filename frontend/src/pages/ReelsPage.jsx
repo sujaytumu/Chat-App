@@ -1108,7 +1108,7 @@ const ReelsPage = () => {
         <button onClick={() => navigate("/")} className="flex-1 flex justify-center text-white" aria-label="Chats"><House size={28} strokeWidth={1.8} /></button>
         <button onClick={() => navigate("/status")} className="flex-1 flex justify-center text-white" aria-label="Updates"><CircleDashed size={28} strokeWidth={1.8} /></button>
         <span className="flex-1 flex justify-center"><span className="px-5 py-2 rounded-full bg-white/15 text-white"><Film size={26} fill="currentColor" strokeWidth={1.5} /></span></span>
-        <button onClick={() => navigate("/explore")} className="flex-1 flex justify-center text-white" aria-label="Explore"><Compass size={27} strokeWidth={1.8} /></button>
+        <button onClick={() => navigate("/explore")} className="flex-1 flex justify-center text-white" aria-label="Explore"><Search size={27} strokeWidth={1.8} /></button>
         <button onClick={() => navigate("/calls")} className="flex-1 flex justify-center text-white" aria-label="Calls"><Phone size={26} strokeWidth={1.8} /></button>
         <button onClick={() => navigate("/profile")} className="flex-1 flex justify-center" aria-label="You">
           <img src={optimizeImage(me?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover" />
