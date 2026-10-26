@@ -21,7 +21,8 @@ const items = [
 
 // WhatsApp's persistent nav: Chats / Updates / Calls / You — a vertical rail
 // on desktop, a bottom tab bar (with a pill behind the active icon) on phones.
-const MainNav = () => {
+// bottomOnly: full-screen pages (Reels, Explore) use the same bottom bar at every screen size.
+const MainNav = ({ bottomOnly = false }) => {
   const { authUser } = useAuthStore();
   const archived = authUser?.archivedChats;
   const lockedKeys = authUser?.lockedChats;
@@ -52,6 +53,7 @@ const MainNav = () => {
   return (
     <>
       {/* Desktop: vertical rail */}
+      {!bottomOnly && (
       <nav className="hidden lg:flex flex-col items-center w-[72px] bg-wa-panel border-r border-white/5 py-4 gap-3 shrink-0">
         {items.map(({ to, icon: Icon, label, end }) => (
           <NavLink
@@ -86,12 +88,13 @@ const MainNav = () => {
           <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-8" textSize="text-sm" />
         </NavLink>
       </nav>
+      )}
 
       {/* Phone: bottom bar */}
       <nav
         className={`${
           hideOnPhone ? "hidden" : "flex"
-        } lg:hidden fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
+        } ${bottomOnly ? "" : "lg:hidden"} fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
       >
         {items.map(({ to, icon: Icon, label, end }) => (
           <NavLink key={to} to={to} end={end} onClick={tabClick(to)} className="flex-1 flex flex-col items-center justify-center gap-1">
