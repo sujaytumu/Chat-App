@@ -9,7 +9,7 @@ import Repost from "../models/repost.model.js";
 import ReelHide from "../models/reelHide.model.js";
 import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
-import { visibleUserIds, canSee, isOwner } from "../lib/visibility.js";
+import { visibleUserIds, canSee, isOwner, ownerId as getOwnerId } from "../lib/visibility.js";
 import { MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUser, sendPushToUsers } from "../lib/webPush.js";
 
@@ -120,6 +120,21 @@ const discoverCache = new Map(); // page -> { at, items }
 const discoverOn = () => !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY); // real video files only: Instagram embeds are not shown
 
 // Curated Instagram reels (official embed, with sound). Each feed page gets the next 4 in the list, wrapping around.
+function allInstagramClips() {
+  return INSTAGRAM_REELS.map((ig) => ({
+    _id: `ig-${ig.code}`,
+    source: "instagram",
+    igPath: ig.path,
+    igCode: ig.code,
+    videoUrl: "",
+    poster: "",
+    caption: "",
+    duration: 0,
+    createdAt: new Date().toISOString(),
+    user: { _id: `ig-u-${ig.code}`, fullName: "Instagram", profilePic: "" },
+    likeCount: 0, liked: false, views: 0, comments: 0, saves: 0, mine: false, following: false, saved: false,
+  }));
+}
 function instagramClips(page) {
   const n = INSTAGRAM_REELS.length;
   return Array.from({ length: Math.min(4, n) }, (_, i) => {
@@ -239,6 +254,8 @@ const audienceAllows = (a, viewerId) => {
 // The Reels feed: reels people posted + their video statuses (they appear on their own, nobody has to
 // upload twice) + "Discover" clips. tab=friends shows only people I follow.
 // ?before=<ISO date of the last local item> pages further back, ?px=<discover page>.
+const rawTagForOwner = (req) => !!String(req.query.tag || "").replace(/\W/g, "");
+
 export const getReelFeed = async (req, res) => {
   try {
     const me = req.user;
@@ -258,8 +275,12 @@ export const getReelFeed = async (req, res) => {
     const before = req.query.before ? new Date(String(req.query.before)) : null;
     const dateQ = before && !Number.isNaN(before.getTime()) ? { createdAt: { $lt: before } } : {};
 
+    // The owner's own reels are pinned to the front of the first page (all together), then the curated links,
+    // and only then everyone else's reels and the stock clips. So they are left out of the normal paging below.
+    const ownerOid = req.query.tab === "friends" || rawTagForOwner(req) ? null : await getOwnerId();
+    const ownerQ = ownerOid ? { userId: { $ne: new mongoose.Types.ObjectId(ownerOid) } } : {};
     const [reelRows, statusRows, saved] = await Promise.all([
-      Reel.find({ ...userQ, ...dateQ }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
+      Reel.find({ ...userQ, ...dateQ, ...(ownerOid ? { $and: [ownerQ] } : {}) }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
       Promise.resolve([]), // video statuses are NOT shown as reels
       SavedReel.find({ userId: me._id }).select("key").lean(),
     ]);
@@ -339,6 +360,13 @@ export const getReelFeed = async (req, res) => {
       });
       while (d < found.length && out.length < PAGE + found.length) out.push({ ...found[d++] });
       more = px <= 30;
+    }
+    if (ownerOid && !before) {
+      const ownRows = await Reel.find({ userId: ownerOid }).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
+      const ownItems = (await withCounts(ownRows, me._id))
+        .filter((r) => !hiddenSet.has(String(r._id)))
+        .map((r) => ({ ...r, source: "reel", following: follows.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`), reposted: mineReposted.has(String(r._id)) }));
+      out = [...ownItems, ...allInstagramClips(), ...out];
     }
     res.set("Cache-Control", "no-store");
     res.status(200).json({ owner: isOwner(me), reels: out, more, px, localMore, next: page.length ? page[page.length - 1].createdAt : null });

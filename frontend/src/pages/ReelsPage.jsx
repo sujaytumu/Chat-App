@@ -43,7 +43,7 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
 
 // A curated Instagram reel shown with Instagram's official embed (plays with sound after you tap it).
 const InstaReel = ({ reel, active, near }) => (
-  <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden pt-16 pb-14" data-reel={reel._id}>
+  <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden pt-14 pb-1" data-reel={reel._id}>
     {active || near ? (
       <iframe
         title="Instagram reel"
@@ -51,12 +51,11 @@ const InstaReel = ({ reel, active, near }) => (
         allow="autoplay; encrypted-media; fullscreen"
         allowFullScreen
         scrolling="no"
-        className="h-full w-full max-w-[420px] border-0 bg-black"
+        className="h-full w-full max-w-[460px] border-0 bg-black"
       />
     ) : (
       <span className="text-white/40 text-sm">Instagram reel</span>
     )}
-    <p className="absolute bottom-4 inset-x-0 text-center text-[12px] text-white/45 pointer-events-none">Tap the video to play with sound · swipe up here for next</p>
   </section>
 );
 
