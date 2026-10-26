@@ -16,7 +16,8 @@ import { sendPushToUser, sendPushToUsers } from "../lib/webPush.js";
 const FILTERS = ["none", "warm", "cool", "mono", "vivid", "fade", "vintage", "dream"];
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 
-const MAX_SECONDS = 60;
+const MAX_SECONDS = 180;
+const MAX_REEL_BASE64 = 70 * 1000 * 1000; // ≈ 50 MB video once base64-encoded
 const PAGE = 8;
 
 const shape = (r, meId, commentCounts) => ({
@@ -439,9 +440,15 @@ export const createReel = async (req, res) => {
     const today = await Reel.countDocuments({ userId: req.user._id, createdAt: { $gt: new Date(Date.now() - 24 * 3600 * 1000) } });
     if (today >= 20) return res.status(429).json({ error: "You can post up to 20 reels a day — try again tomorrow" });
     if (typeof video !== "string" || !video.startsWith("data:video/")) return res.status(400).json({ error: "Pick a video" });
-    if (video.length > MAX_BASE64_LENGTH) return res.status(413).json({ error: "That video is too large (max about 10 MB)" });
+    if (video.length > MAX_REEL_BASE64) return res.status(413).json({ error: "That video is too large (max about 50 MB)" });
     if (secs > MAX_SECONDS + 0.5) return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
-    const up = await cloudinary.uploader.upload(video, { folder: "chat-app/reels", resource_type: "video" });
+    // Big videos go up in chunks so Cloudinary and the server never hold one huge request
+    const up = video.length > 15 * 1000 * 1000
+      ? await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_chunked_stream({ folder: "chat-app/reels", resource_type: "video", chunk_size: 20 * 1000 * 1000 }, (err, r) => (err ? reject(err) : resolve(r)));
+          stream.end(Buffer.from(video.slice(video.indexOf(",") + 1), "base64"));
+        })
+      : await cloudinary.uploader.upload(video, { folder: "chat-app/reels", resource_type: "video" });
     if (up.duration && up.duration > MAX_SECONDS + 1) {
       cloudinary.uploader.destroy(up.public_id, { resource_type: "video" }).catch(() => {});
       return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
