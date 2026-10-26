@@ -23,7 +23,8 @@ const PAGE = 8;
 const shape = (r, meId, commentCounts) => ({
   _id: r._id,
   videoUrl: r.videoUrl,
-  poster: r.poster,
+  // a still first frame (small picture, cheap to load) so a reel never opens on a black screen
+  poster: r.poster || (/^https:\/\/res\.cloudinary\.com\/[^/]+\/video\/upload\//.test(r.videoUrl || "") ? r.videoUrl.replace("/video/upload/", "/video/upload/so_0,w_540,q_auto,f_jpg/").replace(/\.[A-Za-z0-9]+(\?.*)?$/, ".jpg") : ""),
   caption: r.caption,
   duration: r.duration,
   filter: r.filter || "none",
