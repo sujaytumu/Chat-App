@@ -5,6 +5,7 @@ import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X,
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
+import MainNav from "../components/MainNav";
 import { useAuthStore } from "../store/useAuthStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
@@ -1028,7 +1029,7 @@ const ReelsPage = () => {
         )}
       </div>
 
-      <div className="absolute inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom))]">
+      <div className="absolute inset-x-0 top-0 bottom-[calc(72px+env(safe-area-inset-bottom))]">
         {mode === "feed" ? (
           <FeedView onCreate={() => setNewPost(true)} refreshKey={feedKey} />
         ) : loading && !reels.length ? (
@@ -1103,17 +1104,7 @@ const ReelsPage = () => {
         )}
       </div>
 
-      {/* Bottom bar like Instagram: Home · Reels · Updates · Calls · You */}
-      <nav className="absolute bottom-0 inset-x-0 h-[calc(56px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-black flex items-center justify-around z-30">
-        <button onClick={() => navigate("/")} className="flex-1 flex justify-center text-white" aria-label="Chats"><House size={28} strokeWidth={1.8} /></button>
-        <button onClick={() => navigate("/status")} className="flex-1 flex justify-center text-white" aria-label="Updates"><CircleDashed size={28} strokeWidth={1.8} /></button>
-        <span className="flex-1 flex justify-center"><span className="px-5 py-2 rounded-full bg-white/15 text-white"><Film size={26} fill="currentColor" strokeWidth={1.5} /></span></span>
-        <button onClick={() => navigate("/explore")} className="flex-1 flex justify-center text-white" aria-label="Explore"><Search size={27} strokeWidth={1.8} /></button>
-        <button onClick={() => navigate("/calls")} className="flex-1 flex justify-center text-white" aria-label="Calls"><Phone size={26} strokeWidth={1.8} /></button>
-        <button onClick={() => navigate("/profile")} className="flex-1 flex justify-center" aria-label="You">
-          <img src={optimizeImage(me?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover" />
-        </button>
-      </nav>
+      <MainNav bottomOnly />
 
       {newPost && <NewPost onClose={() => setNewPost(false)} onPosted={() => { setNewPost(false); setFeedKey((k) => k + 1); }} />}
       {reviewing && <ReportsReview onClose={() => setReviewing(false)} onRemoved={(id) => setReels((l) => l.filter((r) => r._id !== id))} />}
