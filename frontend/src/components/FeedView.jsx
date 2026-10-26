@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, ImagePlus, Loader2, Trash2, X, Image as ImageIcon } from "lucide-react";
+import { Heart, MessageCircle, Send, ImagePlus, Loader2, Trash2, X, Image as ImageIcon } from "lucide-react";
+import StatusComments from "./StatusComments";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -77,6 +78,8 @@ const FeedView = ({ onCreate, refreshKey }) => {
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [commentsFor, setCommentsFor] = useState(null);
+  const [pop, setPop] = useState(null);
   const next = useRef(null);
   const busy = useRef(false);
 
@@ -116,6 +119,24 @@ const FeedView = ({ onCreate, refreshKey }) => {
       setPosts((l) => l.map((x) => (x._id === p._id ? { ...x, liked: !liked, likeCount: x.likeCount + (liked ? -1 : 1) } : x)));
     }
   };
+  const share = async (p) => {
+    const url = p.image;
+    const text = `${p.user?.fullName || "Talkies"}${p.caption ? ": " + p.caption : ""}`;
+    try {
+      if (navigator.share) await navigator.share({ title: "Talkies", text, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copied");
+      }
+    } catch {
+      /* cancelled */
+    }
+  };
+  const doubleTap = (p) => {
+    setPop(p._id);
+    setTimeout(() => setPop((x) => (x === p._id ? null : x)), 800);
+    if (!p.liked) like(p);
+  };
   const remove = async (p) => {
     if (!window.confirm("Delete this post?")) return;
     try {
@@ -145,25 +166,46 @@ const FeedView = ({ onCreate, refreshKey }) => {
       ) : (
         <>
           {posts.map((p) => (
-            <article key={p._id} className="mb-5">
+            <article key={p._id} className="mb-5" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover" />
                 <span className="flex-1 text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                 <span className="text-[12px] text-white/50">{ago(p.createdAt)}</span>
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
-              <img src={optimizeImage(p.image, 900)} alt="" loading="lazy" onDoubleClick={() => !p.liked && like(p)} className="w-full max-h-[75vh] object-cover bg-white/5" />
+              <div className="relative" onDoubleClick={() => doubleTap(p)}>
+                <img src={optimizeImage(p.image, 900)} alt="" loading="lazy" decoding="async" className="w-full max-h-[75vh] object-cover bg-white/5" />
+                {pop === p._id && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <Heart size={96} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />
+                  </div>
+                )}
+              </div>
               <div className="px-3 pt-2.5">
-                <button onClick={() => like(p)} className="flex items-center gap-1.5" aria-label="Like">
-                  <Heart size={26} className={p.liked ? "text-red-500" : ""} fill={p.liked ? "currentColor" : "none"} strokeWidth={1.8} />
-                  <span className="text-[13.5px]">{p.likeCount > 0 ? p.likeCount : ""}</span>
-                </button>
+                <div className="flex items-center gap-5">
+                  <button onClick={() => like(p)} className="flex items-center gap-1.5 active:scale-90 transition-transform" aria-label="Like">
+                    <Heart size={26} className={p.liked ? "text-red-500" : ""} fill={p.liked ? "currentColor" : "none"} strokeWidth={1.8} />
+                    <span className="text-[13.5px] tabular-nums">{p.likeCount > 0 ? p.likeCount : ""}</span>
+                  </button>
+                  <button onClick={() => setCommentsFor(p)} className="flex items-center gap-1.5 active:scale-90 transition-transform" aria-label="Comments">
+                    <MessageCircle size={25} strokeWidth={1.8} />
+                    <span className="text-[13.5px] tabular-nums">{p.comments > 0 ? p.comments : ""}</span>
+                  </button>
+                  <button onClick={() => share(p)} className="active:scale-90 transition-transform" aria-label="Share"><Send size={24} strokeWidth={1.8} /></button>
+                </div>
                 {p.caption && <p className="mt-1 text-[14px] break-words"><b className="mr-1.5">{p.user?.fullName}</b>{p.caption}</p>}
               </div>
             </article>
           ))}
           {more && <div className="flex justify-center"><button onClick={() => load(false)} className="px-6 py-2.5 rounded-full bg-white/10 text-[14px]">Load more</button></div>}
         </>
+      )}
+      {commentsFor && (
+        <StatusComments
+          targetId={commentsFor._id}
+          onClose={() => setCommentsFor(null)}
+          onTotal={(n) => setPosts((l) => l.map((x) => (x._id === commentsFor._id ? { ...x, comments: n } : x)))}
+        />
       )}
     </div>
   );

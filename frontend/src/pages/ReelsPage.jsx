@@ -65,7 +65,14 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
   const [burst, setBurst] = useState(0);
-  const [progress, setProgress] = useState(0);
+  const fillEl = useRef(null);
+  const dotEl = useRef(null);
+  const setProg = (f) => {
+    if (fillEl.current) fillEl.current.style.transform = `scaleX(${f})`;
+    if (dotEl.current) dotEl.current.style.left = `${f * 100}%`;
+  };
+  const [rate, setRateState] = useState(() => { try { return Number(localStorage.getItem("reelRate")) || 1; } catch { return 1; } });
+  const [rateOpen, setRateOpen] = useState(false);
   const [more, setMore] = useState(false);
   const [scrub, setScrub] = useState(false);
   const [fast, setFast] = useState(false); // holding the screen = 2x speed
@@ -82,6 +89,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       setPaused(false);
       v.currentTime = reel.trim?.start || 0;
       v.muted = muted;
+      try { const r = Number(localStorage.getItem("reelRate")) || 1; setRateState(r); v.playbackRate = r; if (songEl.current) songEl.current.playbackRate = r; } catch { /* ignore */ }
       if (songEl.current) {
         songEl.current.currentTime = reel.song?.start || 0;
         songEl.current.play().catch(() => {});
@@ -115,8 +123,25 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       finished();
       return;
     }
-    setProgress(end > start ? Math.min(1, Math.max(0, (v.currentTime - start) / (end - start))) : 0);
   };
+
+  // smooth progress bar: follows the video every frame without re-rendering the reel
+  useEffect(() => {
+    if (!active) return undefined;
+    let raf;
+    const tick = () => {
+      const v = video.current;
+      if (v && !scrub) {
+        const start = reel.trim?.start || 0;
+        const end = reel.trim?.end || v.duration || 0;
+        if (end > start) setProg(Math.min(1, Math.max(0, (v.currentTime - start) / (end - start))));
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, scrub, reel._id]);
 
   // Played to the end: go to the next reel by itself (the last one starts over).
   const finished = () => {
@@ -140,7 +165,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
     const t = start + f * (end - start);
     v.currentTime = Math.min(t, Math.max(start, end - 0.1));
     if (songEl.current && reel.song) songEl.current.currentTime = (reel.song.start || 0) + (t - start);
-    setProgress(f);
+    setProg(f);
   };
   const scrubDown = (e) => {
     e.stopPropagation();
@@ -157,6 +182,12 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
     if (video.current) video.current.playbackRate = r;
     if (songEl.current) songEl.current.playbackRate = r;
   };
+  const chooseRate = (r) => {
+    setRateState(r);
+    setRate(r);
+    setRateOpen(false);
+    try { localStorage.setItem("reelRate", String(r)); } catch { /* ignore */ }
+  };
   const holdStart = () => {
     heldRef.current = false;
     clearTimeout(holdTimer.current);
@@ -169,7 +200,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
   const holdEnd = () => {
     clearTimeout(holdTimer.current);
     if (heldRef.current) {
-      setRate(1);
+      setRate(rate);
       setFast(false);
       setTimeout(() => (heldRef.current = false), 60); // swallow the click that follows a hold
     }
@@ -202,7 +233,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
   };
 
   return (
-    <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden" data-reel={reel._id}>
+    <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden" style={{ contain: "layout paint" }} data-reel={reel._id}>
       <video
         ref={video}
         src={reel.videoUrl}
@@ -222,6 +253,16 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
           <span className="px-3 py-1 rounded-full bg-black/55 text-white text-[13px] font-semibold">2× speed</span>
         </div>
       )}
+      <div className="absolute z-20 right-3 top-[calc(64px+env(safe-area-inset-top))] flex flex-col items-end gap-1.5">
+        <button onClick={() => setRateOpen((o) => !o)} className="min-w-[44px] h-8 px-2.5 rounded-full bg-black/45 text-white text-[13px] font-bold tabular-nums active:scale-95 transition-transform" aria-label="Playback speed">{rate}×</button>
+        {rateOpen && (
+          <div className="flex flex-col rounded-2xl bg-black/75 py-1 wa-pop-in">
+            {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
+              <button key={r} onClick={() => chooseRate(r)} className={`px-4 py-1.5 text-[14px] tabular-nums text-left ${r === rate ? "text-[#25D366] font-bold" : "text-white"}`}>{r}×</button>
+            ))}
+          </div>
+        )}
+      </div>
       {paused && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <span className="size-20 rounded-full bg-black/40 flex items-center justify-center text-white">
@@ -289,8 +330,8 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
         onClick={(e) => e.stopPropagation()}
       >
         <div ref={bar} className={`relative w-full bg-white/25 transition-[height] ${scrub ? "h-[7px]" : "h-[3px]"}`}>
-          <div className="h-full bg-white" style={{ width: `${progress * 100}%` }} />
-          {scrub && <span className="absolute top-1/2 size-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow" style={{ left: `${progress * 100}%` }} />}
+          <div ref={fillEl} className="h-full w-full bg-white origin-left will-change-transform" style={{ transform: "scaleX(0)" }} />
+          <span ref={dotEl} className={`absolute top-1/2 size-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow transition-opacity ${scrub ? "opacity-100" : "opacity-0"}`} style={{ left: 0 }} />
         </div>
       </div>
     </section>
@@ -765,9 +806,14 @@ const ReelsPage = () => {
   };
 
   const like = async (item, liked) => {
+    if (item.source === "discover") patch(item._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
     const reel = await materialize(item);
-    if (!reel) return;
-    patch(reel._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
+    if (!reel) {
+      if (item.source === "discover") patch(item._id, (r) => ({ liked: !liked, likeCount: Math.max(0, r.likeCount + (liked ? -1 : 1)) }));
+      return;
+    }
+    if (item.source === "discover") patch(reel._id, () => ({ liked, likeCount: Math.max(0, (reel.likeCount || 0) + (liked ? 1 : 0)) }));
+    else patch(reel._id, (r) => ({ liked, likeCount: Math.max(0, r.likeCount + (liked ? 1 : -1)) }));
     try {
       await axiosInstance.put(reel.source === "status" ? `/status/${reel._id}/like` : `/reels/${reel._id}/like`, { liked });
     } catch (err) {

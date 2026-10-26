@@ -352,3 +352,9 @@ button:active:not(:disabled), [role="button"]:active {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 @keyframes sheet-up { from { transform: translateY(40%); opacity: .4; } to { transform: none; opacity: 1; } }
+
+/* smoothness: no tap delay / flash, GPU-friendly scrolling, respect reduced motion */
+button, a, [role="button"], input, textarea { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.no-scrollbar, .overflow-y-auto, .overflow-y-scroll { -webkit-overflow-scrolling: touch; }
+video { transform: translateZ(0); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
