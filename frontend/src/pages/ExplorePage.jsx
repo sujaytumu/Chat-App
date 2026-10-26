@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Loader2, Eye, X, House, CircleDashed, Phone, Film } from "lucide-react";
+import { Search, Eye, X, Film } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
@@ -54,23 +54,34 @@ const ExplorePage = () => {
             <button onClick={() => setQ("")} aria-label="Clear" className="text-white/70"><X size={18} /></button>
           )}
         </div>
+        {!q && (
+          <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
+            {["#motivation", "#gym", "#study", "#focus", "#fitness"].map((t) => (
+              <button key={t} onClick={() => setQ(t)} className="shrink-0 px-3.5 py-1.5 rounded-full bg-white/10 text-[13.5px] active:bg-white/20">{t}</button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto pb-[calc(90px+env(safe-area-inset-bottom))]">
         {loading && !list.length ? (
-          <div className="flex justify-center py-16"><Loader2 className="animate-spin" /></div>
+          <div className="grid grid-cols-3 gap-1 px-1">
+            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[9/14] rounded-md bg-white/10 animate-pulse" />)}
+          </div>
         ) : !list.length ? (
           <p className="text-center text-white/55 py-16 text-[15px]">{q.trim().length >= 2 ? "No reels found" : "No reels yet"}</p>
         ) : (
-          <div className="grid grid-cols-3 gap-0.5">
+          <div className="grid grid-cols-3 gap-1 px-1">
             {list.map((r) => (
-              <button key={r._id} onClick={() => navigate(`/reels?r=${r._id}`)} className="relative aspect-[9/14] bg-neutral-900 overflow-hidden active:opacity-80">
+              <button key={r._id} onClick={() => navigate(`/reels?r=${r._id}`)} className="relative aspect-[9/14] bg-neutral-900 overflow-hidden rounded-md active:scale-[0.97] transition-transform">
                 {r.poster ? (
                   <img src={r.poster} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                 ) : (
                   <video src={`${r.videoUrl}#t=0.1`} preload="metadata" muted playsInline className="size-full object-cover pointer-events-none" />
                 )}
-                <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[15px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,.8)]">
+                <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+                <Film size={16} className="absolute top-2 right-2 text-white drop-shadow" />
+                <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[14px] font-semibold drop-shadow-[0_1px_3px_rgba(0,0,0,.8)]">
                   <Eye size={17} /> {count(r.views)}
                 </span>
               </button>

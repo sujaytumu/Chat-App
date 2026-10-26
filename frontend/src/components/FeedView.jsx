@@ -5,6 +5,20 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 
+// Loads the next posts by itself when you scroll near the end (no "Load more" tap)
+const MoreSentinel = ({ onVisible }) => {
+  const el = useRef(null);
+  useEffect(() => {
+    const node = el.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && onVisible(), { rootMargin: "400px" });
+    io.observe(node);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return <div ref={el} className="h-10 flex justify-center items-center"><Loader2 size={18} className="animate-spin text-white/40" /></div>;
+};
+
 const ago = (d) => {
   const s = Math.max(1, Math.floor((Date.now() - new Date(d)) / 1000));
   if (s < 60) return "now";
@@ -150,7 +164,15 @@ const FeedView = ({ onCreate, refreshKey }) => {
   return (
     <div className="h-full overflow-y-auto pt-[calc(60px+env(safe-area-inset-top))] pb-6 bg-black text-white overscroll-contain">
       {loading && !posts.length ? (
-        <div className="py-20 flex justify-center"><Loader2 className="animate-spin" /></div>
+        <div className="px-3 space-y-6">
+          {[0, 1].map((i) => (
+            <div key={i} className="animate-pulse">
+              <div className="flex items-center gap-2.5 py-2"><div className="size-8 rounded-full bg-white/10" /><div className="h-3 w-28 rounded bg-white/10" /></div>
+              <div className="aspect-square w-full rounded-xl bg-white/10" />
+              <div className="h-3 w-40 rounded bg-white/10 mt-3" />
+            </div>
+          ))}
+        </div>
       ) : failed && !posts.length ? (
         <div className="py-20 text-center px-8">
           <p className="font-semibold">Couldn&apos;t load the feed</p>
@@ -166,9 +188,9 @@ const FeedView = ({ onCreate, refreshKey }) => {
       ) : (
         <>
           {posts.map((p) => (
-            <article key={p._id} className="mb-5" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
+            <article key={p._id} className="mb-5 pb-4 border-b border-white/[0.06]" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
               <div className="flex items-center gap-2.5 px-3 py-2">
-                <img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover" />
+                <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
                 <span className="flex-1 text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                 <span className="text-[12px] text-white/50">{ago(p.createdAt)}</span>
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
@@ -197,7 +219,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
               </div>
             </article>
           ))}
-          {more && <div className="flex justify-center"><button onClick={() => load(false)} className="px-6 py-2.5 rounded-full bg-white/10 text-[14px]">Load more</button></div>}
+          {more && <MoreSentinel key={posts.length} onVisible={() => load(false)} />}
         </>
       )}
       {commentsFor && (
