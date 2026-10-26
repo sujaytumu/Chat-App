@@ -40,6 +40,25 @@ const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   </button>
 );
 
+// A curated Instagram reel shown with Instagram's official embed (plays with sound after you tap it).
+const InstaReel = ({ reel, active, near }) => (
+  <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden pt-16 pb-14" data-reel={reel._id}>
+    {active || near ? (
+      <iframe
+        title="Instagram reel"
+        src={`https://www.instagram.com/${reel.igPath}/${reel.igCode}/embed/`}
+        allow="autoplay; encrypted-media; fullscreen"
+        allowFullScreen
+        scrolling="no"
+        className="h-full w-full max-w-[420px] border-0 bg-black"
+      />
+    ) : (
+      <span className="text-white/40 text-sm">Instagram reel</span>
+    )}
+    <p className="absolute bottom-4 inset-x-0 text-center text-[12px] text-white/45 pointer-events-none">Tap the video to play with sound · swipe up here for next</p>
+  </section>
+);
+
 const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, onTag, onUser }) => {
   const video = useRef(null);
   const songEl = useRef(null);
@@ -914,7 +933,11 @@ const ReelsPage = () => {
         ) : (
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
             {reels.map((r, idx) => (
+              r.source === "instagram" ? (
+                <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx > activeIdx && idx <= activeIdx + 2} />
+              ) : (
               <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
+              )
             ))}
           </div>
         )}
