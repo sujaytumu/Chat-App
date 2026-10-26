@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import FeedView, { NewPost } from "../components/FeedView";
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Search, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -619,6 +620,9 @@ const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const me = useAuthStore((s) => s.authUser);
+  const [mode, setMode] = useState("reels"); // feed | reels
+  const [newPost, setNewPost] = useState(false);
+  const [feedKey, setFeedKey] = useState(0);
   const [tab, setTab] = useState("foryou"); // foryou | friends | saved
   const [reels, setReels] = useState([]);
   const [more, setMore] = useState(true);
@@ -869,7 +873,7 @@ const ReelsPage = () => {
   };
 
   const tabBtn = (id, label) => (
-    <button onClick={() => setTab(id)} className={`text-[21px] font-bold drop-shadow ${tab === id ? "text-white" : "text-white/55"}`}>
+    <button onClick={() => { setTab(id); setMode("reels"); }} className={`text-[18px] font-bold drop-shadow ${mode === "reels" && tab === id ? "text-white" : "text-white/55"}`}>
       {label}
     </button>
   );
@@ -881,14 +885,15 @@ const ReelsPage = () => {
         {view ? (
           <button onClick={() => setView(null)} className="pointer-events-auto text-white drop-shadow" aria-label="Back"><ChevronLeft size={34} strokeWidth={1.8} /></button>
         ) : (
-          <button onClick={() => setCreating(true)} className="pointer-events-auto text-white drop-shadow" aria-label="New reel">
+          <button onClick={() => (mode === "feed" ? setNewPost(true) : setCreating(true))} className="pointer-events-auto text-white drop-shadow" aria-label={mode === "feed" ? "New post" : "New reel"}>
             <Plus size={34} strokeWidth={1.8} />
           </button>
         )}
         {view ? (
           <h2 className="pointer-events-auto text-white text-[19px] font-bold drop-shadow truncate max-w-[60vw]">{view.label}</h2>
         ) : (
-        <div className="pointer-events-auto flex items-center gap-5 relative">
+        <div className="pointer-events-auto flex items-center gap-4 relative">
+          <button onClick={() => setMode("feed")} className={`text-[18px] font-bold drop-shadow ${mode === "feed" ? "text-white" : "text-white/55"}`}>Feed</button>
           <div className="flex items-center gap-1">
             {tabBtn(tab === "saved" ? "saved" : "foryou", tab === "saved" ? "Saved" : "Reels")}
             <button onClick={() => setPickTab((v) => !v)} className="text-white drop-shadow" aria-label="Choose feed"><ChevronDown size={20} /></button>
@@ -913,7 +918,9 @@ const ReelsPage = () => {
       </div>
 
       <div className="absolute inset-x-0 top-0 bottom-[calc(56px+env(safe-area-inset-bottom))]">
-        {loading && !reels.length ? (
+        {mode === "feed" ? (
+          <FeedView onCreate={() => setNewPost(true)} refreshKey={feedKey} />
+        ) : loading && !reels.length ? (
           <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
         ) : !reels.length && failed ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
@@ -996,6 +1003,7 @@ const ReelsPage = () => {
         </button>
       </nav>
 
+      {newPost && <NewPost onClose={() => setNewPost(false)} onPosted={() => { setNewPost(false); setFeedKey((k) => k + 1); }} />}
       {reviewing && <ReportsReview onClose={() => setReviewing(false)} onRemoved={(id) => setReels((l) => l.filter((r) => r._id !== id))} />}
       {searching && (
         <SearchReels
