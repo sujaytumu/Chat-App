@@ -3,6 +3,7 @@ import Status from "../models/status.model.js";
 import Highlight from "../models/highlight.model.js";
 import StatusComment from "../models/statusComment.model.js";
 import Reel from "../models/reel.model.js";
+import Post from "../models/post.model.js";
 import { canSee } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { sendPushToUser } from "../lib/webPush.js";
@@ -26,6 +27,11 @@ const resolveTarget = async (targetId, viewerId) => {
   if (reel) {
     if (!reel.userId) return { ownerId: null }; // an imported Discover clip: open to everyone
     return (await canSee({ _id: viewerId }, reel.userId)) ? { ownerId: String(reel.userId) } : null;
+  }
+  const post = await Post.findById(targetId).select("userId").lean();
+  if (post) {
+    const own = String(post.userId) === String(viewerId);
+    return own || (await canSee({ _id: viewerId }, post.userId)) ? { ownerId: String(post.userId) } : null;
   }
   const h = await Highlight.findOne({ "items._id": targetId }).select("userId items._id items.audience").lean();
   const item = h?.items?.find((i) => String(i._id) === String(targetId));

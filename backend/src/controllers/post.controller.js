@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Post from "../models/post.model.js";
+import StatusComment from "../models/statusComment.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee } from "../lib/visibility.js";
 import { sendPushToUser } from "../lib/webPush.js";
@@ -7,7 +8,8 @@ import { sendPushToUser } from "../lib/webPush.js";
 const PAGE = 16;
 const MAX_IMG = 13 * 1024 * 1024;
 
-const shape = (p, me) => ({
+const shape = (p, me, comments = 0) => ({
+  comments,
   _id: p._id,
   user: p.userId && { _id: p.userId._id, fullName: p.userId.fullName, profilePic: p.userId.profilePic },
   image: p.image,
@@ -31,7 +33,10 @@ export const getFeed = async (req, res) => {
     const blocked = new Set((me.blockedUsers || []).map(String));
     const rows = await Post.find(q).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean();
     const more = rows.length > PAGE;
-    const posts = rows.slice(0, PAGE).filter((p) => p.userId && !blocked.has(String(p.userId._id))).map((p) => shape(p, me._id));
+    const page = rows.slice(0, PAGE).filter((p) => p.userId && !blocked.has(String(p.userId._id)));
+    const agg = await StatusComment.aggregate([{ $match: { targetId: { $in: page.map((p) => p._id) } } }, { $group: { _id: "$targetId", n: { $sum: 1 } } }]);
+    const cm = new Map(agg.map((a) => [String(a._id), a.n]));
+    const posts = page.map((p) => shape(p, me._id, cm.get(String(p._id)) || 0));
     res.json({ posts, more, next: rows.length ? rows[Math.min(rows.length, PAGE) - 1].createdAt : null });
   } catch (e) {
     console.log("getFeed:", e.message);
