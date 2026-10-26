@@ -117,7 +117,7 @@ const QUOTES = [
   "Progress, not perfection.",
 ];
 const discoverCache = new Map(); // page -> { at, items }
-const discoverOn = () => INSTAGRAM_REELS.length > 0 || !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY);
+const discoverOn = () => !!(process.env.PIXABAY_API_KEY || process.env.PEXELS_API_KEY); // real video files only: Instagram embeds are not shown
 
 // Curated Instagram reels (official embed, with sound). Each feed page gets the next 4 in the list, wrapping around.
 function instagramClips(page) {
@@ -175,7 +175,6 @@ async function pixabayClips(q, page) {
     .filter(Boolean);
 }
 async function discoverPage(page) {
-  if (INSTAGRAM_REELS.length) return instagramClips(page);
   const hit = discoverCache.get(page);
   if (hit && Date.now() - hit.at < (process.env.PIXABAY_API_KEY ? 24 * 60 * 60_000 : 30 * 60_000)) return hit.items; // Pixabay requires 24h caching
   try {
