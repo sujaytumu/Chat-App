@@ -692,6 +692,22 @@ export const reelsByUser = async (req, res) => {
 };
 
 const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// The Explore grid: up to 16 reels (same visibility rules as the feed).
+export const exploreReels = async (req, res) => {
+  try {
+    let list = await visibleReels(req.user, {}, 60);
+    if (OWNER_ONLY) {
+      const oid = await getOwnerId();
+      list = list.filter((r) => String(r.user?._id) === String(oid));
+    }
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ reels: list.slice(0, 16) });
+  } catch (error) {
+    console.log("Error in exploreReels:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const searchReels = async (req, res) => {
   try {
     const q = String(req.query.q || "").trim().slice(0, 60);
