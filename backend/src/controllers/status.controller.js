@@ -155,7 +155,8 @@ export const getStatusFeed = async (req, res) => {
     const visible = await visibleUserIds(req.user);
     const statuses = await Status.find({ expiresAt: { $gt: new Date() }, ...(visible ? { userId: { $in: [...visible, String(myId)] } } : {}) })
       .populate("userId", "fullName profilePic")
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: 1 })
+      .lean();
 
     const byUser = new Map();
     for (const s of statuses) {
@@ -174,7 +175,7 @@ export const getStatusFeed = async (req, res) => {
       { path: "likes.user", select: "fullName profilePic" },
     ]);
     const myStatuses = myDocs.map((d) => {
-      const o = d.toObject();
+      const o = d;
       if (o.poll?.question) o.poll = pollView(o.poll, myId, true);
       else delete o.poll;
       return o;
@@ -184,7 +185,7 @@ export const getStatusFeed = async (req, res) => {
       user: entry.user,
       hasUnseen: entry.statuses.some((s) => !s.viewedBy.some((v) => v.equals(myId))),
       statuses: entry.statuses.map((s) => {
-        const o = s.toObject();
+        const o = s;
         o.seen = s.viewedBy.some((v) => v.equals(myId));
         o.liked = (s.likes || []).some((l) => l.user.equals(myId)); // only my own heart
         if (o.poll?.question) o.poll = pollView(o.poll, myId, false);

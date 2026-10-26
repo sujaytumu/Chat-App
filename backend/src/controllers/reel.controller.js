@@ -77,10 +77,13 @@ export const extractTags = (text) =>
 // Adds what only this viewer knows (following / saved / reposted) to shaped reels.
 async function decorate(items, me) {
   const myId = String(me._id);
+  // only look up the rows for THIS page (not every follow / save / repost the person ever made)
+  const owners = [...new Set(items.map((r) => String(r.user?._id || r.userId?._id || "")).filter(Boolean))];
+  const reelIds = items.map((r) => r._id);
   const [follows, saved, reposted] = await Promise.all([
-    Follow.find({ follower: me._id }).select("following").lean(),
-    SavedReel.find({ userId: me._id }).select("key").lean(),
-    Repost.find({ userId: me._id }).select("reelId").lean(),
+    owners.length ? Follow.find({ follower: me._id, following: { $in: owners } }).select("following").lean() : [],
+    reelIds.length ? SavedReel.find({ userId: me._id, key: { $in: reelIds.map((i) => `reel:${i}`) } }).select("key").lean() : [],
+    reelIds.length ? Repost.find({ userId: me._id, reelId: { $in: reelIds } }).select("reelId").lean() : [],
   ]);
   const f = new Set(follows.map((x) => String(x.following)));
   const sv = new Set(saved.map((x) => x.key));

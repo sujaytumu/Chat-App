@@ -72,6 +72,7 @@ statusSchema.index({ userId: 1, createdAt: -1 });
 // whole history and save any of it to a highlight); expiresAt only decides what other people can still see.
 // Every read of "live" statuses filters on expiresAt > now. (db.js drops the old TTL index on startup.)
 statusSchema.index({ expiresAt: 1 });
+statusSchema.index({ expiresAt: 1, createdAt: 1 });
 
 const Status = mongoose.model("Status", statusSchema);
 export default Status;

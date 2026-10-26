@@ -13,7 +13,8 @@ export const getCallHistory = async (req, res) => {
       .populate("callerId", "fullName profilePic")
       .populate("calleeId", "fullName profilePic")
       .sort({ createdAt: -1 })
-      .limit(100);
+      .limit(100)
+      .lean();
 
     res.status(200).json(calls.filter((c) => c.callerId && c.calleeId));
   } catch (error) {

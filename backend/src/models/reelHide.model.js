@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 // also kept (reason) so the app owner can review it.
 const reelHideSchema = new mongoose.Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     reelId: { type: mongoose.Schema.Types.ObjectId, ref: "Reel", required: true },
     reason: { type: String, enum: ["", "spam", "abuse", "inappropriate", "scam", "other"], default: "" },
   },
