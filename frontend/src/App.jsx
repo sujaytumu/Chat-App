@@ -30,6 +30,7 @@ import { startVersionWatcher } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
 
 import { Loader } from "lucide-react";
+import { warmReels } from "./lib/reelsCache";
 import { Toaster } from "react-hot-toast";
 
 // Secondary screens load on demand so the chat screen (what people open the
@@ -114,6 +115,13 @@ const App = () => {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Warm up the first Reels so the tab opens instantly
+  useEffect(() => {
+    if (!authUser?._id) return;
+    const t = setTimeout(warmReels, 1500);
+    return () => clearTimeout(t);
+  }, [authUser?._id]);
 
   // Signed in after opening a call link: go to that call
   useEffect(() => {

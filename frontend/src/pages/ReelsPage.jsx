@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
+import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
 import { useAuthStore } from "../store/useAuthStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
@@ -69,7 +70,7 @@ const InstaReel = ({ reel, active, near }) => {
   );
 };
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, onTag, onUser }) => {
+const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, onTag, onUser }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -106,7 +107,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       v.play().catch(() => {
         // sound blocked until a tap: start muted so it still plays
         v.muted = true;
-        setMuted(true);
+        setMuted(true, true);
         v.play().catch(() => {});
       });
       if (reel.source === "reel" || !reel.source) axiosInstance.put(`/reels/${reel._id}/view`).catch(() => {});
@@ -226,6 +227,7 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
       return;
     }
     lastTap.current = now;
+    if (soundBlocked) { setMuted(false); return; } // first tap turns the sound on, like Instagram
     tapTimer.current = setTimeout(() => {
       const v = video.current;
       if (!v) return;
@@ -284,6 +286,11 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
           <span className="size-20 rounded-full bg-black/40 flex items-center justify-center text-white">
             <Play size={38} fill="currentColor" />
           </span>
+        </div>
+      )}
+      {active && soundBlocked && (
+        <div className="absolute top-[calc(76px+env(safe-area-inset-top))] inset-x-0 flex justify-center pointer-events-none">
+          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/55 text-white text-[12.5px]"><VolumeX size={14} /> Tap for sound</span>
         </div>
       )}
       {burst > 0 && (
@@ -735,7 +742,13 @@ const ReelsPage = () => {
   const [more, setMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState(null);
-  const [muted, setMuted] = useState(false);
+  const [muted, setMutedState] = useState(() => { try { return localStorage.getItem("reelMuted") === "1"; } catch { return false; } });
+  const [soundBlocked, setSoundBlocked] = useState(false); // the browser muted us until the first tap
+  const setMuted = useCallback((v, auto) => {
+    setMutedState(v);
+    setSoundBlocked(!!auto && v);
+    if (!auto) { try { localStorage.setItem("reelMuted", v ? "1" : "0"); } catch { /* ignore */ } }
+  }, []);
   const [commentsFor, setCommentsFor] = useState(null);
   const [creating, setCreating] = useState(false);
   const [sendFor, setSendFor] = useState(null);
@@ -781,6 +794,7 @@ const ReelsPage = () => {
       });
       setMore(!!data.more);
       setFailed(false);
+      if (reset && tab === "foryou" && !view) writeReelsCache(data.reels || []);
     } catch {
       // the server may be waking up / updating: say so, and let the person retry (never a spinner forever)
       if (my === gen.current) setFailed(true);
@@ -793,8 +807,9 @@ const ReelsPage = () => {
   // (re)load whenever the tab changes; a shared reel link is shown first
   useEffect(() => {
     cursor.current = { before: null, px: 1 };
-    setLoading(true);
-    setReels([]);
+    const cached = tab === "foryou" && !view && !params.get("r") ? readReelsCache() : null;
+    setLoading(!cached);
+    setReels(cached || []);
     setActiveId(null);
     box.current?.scrollTo({ top: 0 });
     (async () => {
@@ -1055,7 +1070,7 @@ const ReelsPage = () => {
               r.source === "instagram" ? (
                 <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx === activeIdx + 1} mount={Math.abs(idx - activeIdx) <= 1} />
               ) : (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} soundBlocked={soundBlocked} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
               )
             ))}
           </div>
