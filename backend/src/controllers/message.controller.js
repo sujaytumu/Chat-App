@@ -97,6 +97,7 @@ export const getUsersForSidebar = async (req, res) => {
             groupId: null,
             system: null, // on/off notes never become the chat's "last message"
             deletedFor: { $ne: loggedInUserId },
+            createdAt: { $gte: new Date(Date.now() - 45 * 864e5) }, // recent window keeps this fast however long the history is; quiet chats are filled in below
             $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
           },
         },
@@ -124,6 +125,24 @@ export const getUsersForSidebar = async (req, res) => {
     ]);
 
     const lastMessageByUser = new Map(lastMessages.map((m) => [m._id.toString(), m]));
+    // contacts whose last message is older than the window: one cheap indexed lookup each (bounded)
+    const quiet = filteredUsers.filter((u) => !lastMessageByUser.has(String(u._id))).slice(0, 60);
+    if (quiet.length) {
+      const olds = await Promise.all(
+        quiet.map((u) =>
+          Message.findOne({
+            groupId: null,
+            system: null,
+            deletedFor: { $ne: loggedInUserId },
+            $or: [{ senderId: loggedInUserId, receiverId: u._id }, { senderId: u._id, receiverId: loggedInUserId }],
+          })
+            .sort({ createdAt: -1 })
+            .select("text image viewOnce file createdAt senderId delivered seen")
+            .lean()
+        )
+      );
+      quiet.forEach((u, i) => olds[i] && lastMessageByUser.set(String(u._id), olds[i]));
+    }
     const unreadByUser = new Map(unreadCounts.map((u) => [u._id.toString(), u.count]));
 
     // People who haven't connected since "last seen" was introduced have no
