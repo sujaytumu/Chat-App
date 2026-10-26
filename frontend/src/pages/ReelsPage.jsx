@@ -68,7 +68,7 @@ const InstaReel = ({ reel, active, near }) => {
   );
 };
 
-const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, onTag, onUser }) => {
+const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, onTag, onUser }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -242,18 +242,25 @@ const ReelItem = ({ reel, active, muted, setMuted, onLike, onComments, onShare, 
 
   return (
     <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden" style={{ contain: "layout paint" }} data-reel={reel._id}>
-      <video
-        ref={video}
-        src={reel.videoUrl}
-        poster={reel.poster}
-        playsInline
-        preload={active || near ? "auto" : "metadata"}
-        onTimeUpdate={onTime}
-        onEnded={finished}
-        onLoadedMetadata={(e) => { if (reel.trim?.start) e.currentTarget.currentTime = reel.trim.start; }}
-        style={{ filter: filterCss(reel.filter) }}
-        className="absolute inset-0 w-full h-full object-contain"
-      />
+      {/* Only the reel on screen and its neighbours get a real video player; the rest are just a still picture.
+          That keeps phone memory and the video decoder free, which is what stops the lag. */}
+      {mount ? (
+        <video
+          ref={video}
+          src={reel.videoUrl}
+          poster={reel.poster}
+          playsInline
+          disablePictureInPicture
+          preload={active || near ? "auto" : "metadata"}
+          onTimeUpdate={onTime}
+          onEnded={finished}
+          onLoadedMetadata={(e) => { if (reel.trim?.start) e.currentTarget.currentTime = reel.trim.start; }}
+          style={{ filter: reel.filter && reel.filter !== "none" ? filterCss(reel.filter) : undefined, transform: "translateZ(0)" }}
+          className="absolute inset-0 w-full h-full object-contain"
+        />
+      ) : (
+        reel.poster && <img src={reel.poster} alt="" decoding="async" className="absolute inset-0 w-full h-full object-contain" />
+      )}
       {reel.song?.url && <audio ref={songEl} src={reel.song.url} loop preload={active ? "auto" : "none"} />}
       <div className="absolute inset-0 touch-pan-y select-none" onClick={tap} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()} />
       {fast && (
@@ -1045,7 +1052,7 @@ const ReelsPage = () => {
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
             {reels.map((r, idx) => (
               r.source === "instagram" ? (
-                <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx > activeIdx && idx <= activeIdx + 2} />
+                <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx === activeIdx + 1} mount={Math.abs(idx - activeIdx) <= 1} />
               ) : (
               <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
               )
