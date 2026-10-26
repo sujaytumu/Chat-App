@@ -24,6 +24,8 @@ const reelSchema = new mongoose.Schema(
   { timestamps: true }
 );
 reelSchema.index({ createdAt: -1 });
+reelSchema.index({ userId: 1, createdAt: -1 });
+reelSchema.index({ hashtags: 1, createdAt: -1 });
 
 const Reel = mongoose.model("Reel", reelSchema);
 export default Reel;

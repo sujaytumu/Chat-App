@@ -4,7 +4,7 @@ import mongoose from "mongoose";
 // `targetId` is the status id, or the highlight item id; both are unique ObjectIds so they never collide.
 const statusCommentSchema = new mongoose.Schema(
   {
-    targetId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+    targetId: { type: mongoose.Schema.Types.ObjectId, required: true },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // owner of the status / highlight
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     parentId: { type: mongoose.Schema.Types.ObjectId, default: null, index: true }, // set on replies
