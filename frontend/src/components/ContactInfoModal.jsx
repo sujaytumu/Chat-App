@@ -11,7 +11,6 @@ import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import MuteSheet from "./MuteSheet";
 import ProfileHighlights from "./ProfileHighlights";
-import ProfileReels from "./ProfileReels";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
 const row = "w-full flex items-center gap-4 px-5 py-4 text-left hover:bg-white/5 border-b border-white/10";
@@ -88,7 +87,6 @@ const ContactInfoModal = ({ user, status, onClose }) => {
           )}
 
           <ProfileHighlights user={user} />
-          <ProfileReels user={user} />
 
           <button onClick={() => setShowMedia(true)} className={`${row} !border-b-0`}>
             <span className="flex-1 text-[13.5px]">Media, links and docs</span>

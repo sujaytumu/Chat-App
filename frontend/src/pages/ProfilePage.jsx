@@ -1,4 +1,3 @@
-import ProfileReels from "../components/ProfileReels";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShieldCheck, Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode, Megaphone, IndianRupee } from "lucide-react";
@@ -174,7 +173,6 @@ const ProfilePage = () => {
         )}
 
 
-        {!query && authUser && <ProfileReels user={authUser} />}
 
         {rows.map((r) =>
           r.to ? (
