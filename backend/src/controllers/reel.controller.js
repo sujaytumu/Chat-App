@@ -254,6 +254,7 @@ const audienceAllows = (a, viewerId) => {
 // The Reels feed: reels people posted + their video statuses (they appear on their own, nobody has to
 // upload twice) + "Discover" clips. tab=friends shows only people I follow.
 // ?before=<ISO date of the last local item> pages further back, ?px=<discover page>.
+const OWNER_ONLY = process.env.REELS_OWNER_ONLY !== "false";
 const rawTagForOwner = (req) => !!String(req.query.tag || "").replace(/\W/g, "");
 
 export const getReelFeed = async (req, res) => {
@@ -366,7 +367,12 @@ export const getReelFeed = async (req, res) => {
       const ownItems = (await withCounts(ownRows, me._id))
         .filter((r) => !hiddenSet.has(String(r._id)))
         .map((r) => ({ ...r, source: "reel", following: follows.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`), reposted: mineReposted.has(String(r._id)) }));
-      out = [...ownItems, ...allInstagramClips(), ...out];
+      out = [...ownItems, ...(OWNER_ONLY ? [] : allInstagramClips()), ...out];
+    }
+    if (OWNER_ONLY && ownerOid) {
+      // only the owner's own reels are shown (nothing is deleted: set REELS_OWNER_ONLY=false on the server to bring the rest back)
+      out = out.filter((x) => x.source === "reel" && String(x.user?._id) === String(ownerOid));
+      more = false;
     }
     res.set("Cache-Control", "no-store");
     res.status(200).json({ owner: isOwner(me), reels: out, more, px, localMore, next: page.length ? page[page.length - 1].createdAt : null });
