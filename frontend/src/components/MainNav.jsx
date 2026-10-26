@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { goTab } from "../lib/tabNav";
-import { Clapperboard } from "lucide-react";
+import { Clapperboard, Search } from "lucide-react";
 import { WaChats, WaUpdates, WaCalls } from "./icons/WaIcons";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
@@ -9,10 +9,13 @@ import Avatar from "./Avatar";
 
 const ReelIcon = ({ size = 24 }) => <Clapperboard size={size} strokeWidth={2} />;
 
+const SearchIcon = ({ size = 24 }) => <Search size={size} strokeWidth={2} />;
+
 const items = [
   { to: "/", icon: WaChats, label: "Chats", end: true },
   { to: "/status", icon: WaUpdates, label: "Updates" },
   { to: "/reels", icon: ReelIcon, label: "Reels" },
+  { to: "/explore", icon: SearchIcon, label: "Search" },
   { to: "/calls", icon: WaCalls, label: "Calls" },
 ];
 

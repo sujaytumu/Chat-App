@@ -1024,7 +1024,7 @@ const ReelsPage = () => {
         {view ? (
           <span className="size-8" aria-hidden />
         ) : (
-          <button onClick={() => setSearching(true)} className="pointer-events-auto text-white drop-shadow" aria-label="Search"><Search size={28} strokeWidth={1.8} /></button>
+          <button onClick={() => navigate("/explore")} className="pointer-events-auto text-white drop-shadow" aria-label="Search"><Search size={28} strokeWidth={1.8} /></button>
         )}
       </div>
 
