@@ -28,9 +28,9 @@ export const FILTERS = [
 ];
 const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css || "none";
 
-const MAX_MB = 10;
-const MAX_TOTAL_MB = 12; // video + song together (they travel in one request)
-const MAX_SECONDS = 60;
+const MAX_MB = 50;
+const MAX_TOTAL_MB = 54; // video + song together (they travel in one request)
+const MAX_SECONDS = 180;
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
 const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
@@ -337,7 +337,7 @@ const NewReel = ({ onClose, onPosted }) => {
         r.onerror = bad;
         r.readAsDataURL(file);
       });
-      const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}) }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+      const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
       toast.success("Reel posted");
       onPosted(res.data);
     } catch (err) {

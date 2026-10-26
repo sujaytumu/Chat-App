@@ -57,7 +57,10 @@ app.set("trust proxy", 1);
 // CSP is left to the page itself — the app loads fonts/images/CDN media.
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false, crossOriginResourcePolicy: false }));
 app.use(compression()); // gzip API responses for faster loads on slow connections
-app.use(express.json({ limit: "18mb" })); // fits base64 image/video/document/audio payloads
+// Posting a reel can carry a video up to ~50 MB (base64 ≈ 67 MB); every other route stays at 18 MB.
+const jsonDefault = express.json({ limit: "18mb" }); // fits base64 image/video/document/audio payloads
+const jsonReel = express.json({ limit: "72mb" });
+app.use((req, res, next) => (req.method === "POST" && req.path === "/api/reels" ? jsonReel : jsonDefault)(req, res, next));
 app.use(cookieParser());
 app.use(
   cors({
