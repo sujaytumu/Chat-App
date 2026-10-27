@@ -29,7 +29,7 @@ export const InstallAppControl = () => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-wa-surface">
+    <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-wa-surface">
       <div className="flex items-center gap-3">
         {isInstalled ? (
           <CheckCircle2 className="text-[#25D366] shrink-0" size={22} />
@@ -83,31 +83,31 @@ export const AppearancePage = () => {
         }}
       />
 
-      <button onClick={() => setPicking(true)} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field">
-        <span className="block text-[13.5px]">Default wallpaper</span>
-        <span className="block text-[11.5px] text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Wallpaper.</span>
+      <button onClick={() => setPicking(true)} className="w-full text-left p-4 rounded-2xl bg-wa-surface hover:bg-wa-field">
+        <span className="block text-[15px] font-medium">Default wallpaper</span>
+        <span className="block text-[12.5px] leading-snug text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Wallpaper.</span>
       </button>
       {chatCount > 0 && (
-        <button onClick={clearAllChats} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[13px]">
+        <button onClick={clearAllChats} className="w-full text-left p-4 rounded-2xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[13px]">
           Reset {chatCount} chat{chatCount > 1 ? "s" : ""} with their own wallpaper
         </button>
       )}
       {picking && <WallpaperPicker scope="default" onClose={() => setPicking(false)} />}
 
-      <button onClick={() => setThemeOpen(true)} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field">
-        <span className="block text-[13.5px]">Chat theme &amp; font</span>
-        <span className="block text-[11.5px] text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Theme &amp; font.</span>
+      <button onClick={() => setThemeOpen(true)} className="w-full text-left p-4 rounded-2xl bg-wa-surface hover:bg-wa-field">
+        <span className="block text-[15px] font-medium">Chat theme &amp; font</span>
+        <span className="block text-[12.5px] leading-snug text-wa-muted">Used in every chat. To give one chat its own, open it, tap ⋮ and choose Theme &amp; font.</span>
       </button>
       {themedChats > 0 && (
-        <button onClick={clearThemedChats} className="w-full text-left p-4 rounded-xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[13px]">
+        <button onClick={clearThemedChats} className="w-full text-left p-4 rounded-2xl bg-wa-surface hover:bg-wa-field text-[#F15C6D] text-[13px]">
           Reset {themedChats} chat{themedChats > 1 ? "s" : ""} with their own theme
         </button>
       )}
       {themeOpen && <ChatThemeSheet scope="default" onClose={() => setThemeOpen(false)} />}
 
-      <div className="rounded-xl bg-wa-surface p-4">
-        <span className="block text-[13.5px]">Chat colour</span>
-        <span className="block text-[11.5px] text-wa-muted mb-3">The colour of your own message bubbles</span>
+      <div className="rounded-2xl bg-wa-surface p-4">
+        <span className="block text-[15px] font-medium">Chat colour</span>
+        <span className="block text-[12.5px] leading-snug text-wa-muted mb-3">The colour of your own message bubbles</span>
         <div className="flex flex-wrap gap-3">
           {CHAT_COLORS.map((c) => (
             <button
@@ -192,9 +192,9 @@ function FontStyleCard() {
     preloadAllFonts();
   }, []);
   return (
-    <div className="rounded-xl bg-wa-surface p-4">
-      <span className="block text-[13.5px]">Font style</span>
-      <span className="block text-[11.5px] text-wa-muted mb-3">The typeface used across the whole app</span>
+    <div className="rounded-2xl bg-wa-surface p-4">
+      <span className="block text-[15px] font-medium">Font style</span>
+      <span className="block text-[12.5px] leading-snug text-wa-muted mb-3">The typeface used across the whole app</span>
       <div className="grid grid-cols-2 gap-2">
         {APP_FONTS.map((f) => (
           <button
@@ -221,9 +221,9 @@ function FontStyleCard() {
 function AccentCard() {
   const [accent, setAcc] = useState(getAccent());
   return (
-    <div className="rounded-xl bg-wa-surface p-4">
-      <span className="block text-[13.5px]">Accent colour</span>
-      <span className="block text-[11.5px] text-wa-muted mb-3">Buttons, badges, links and highlights across the app</span>
+    <div className="rounded-2xl bg-wa-surface p-4">
+      <span className="block text-[15px] font-medium">Accent colour</span>
+      <span className="block text-[12.5px] leading-snug text-wa-muted mb-3">Buttons, badges, links and highlights across the app</span>
       <div className="flex flex-wrap gap-3">
         {ACCENTS.map((c) => (
           <button
