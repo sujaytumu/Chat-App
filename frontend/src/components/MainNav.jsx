@@ -106,7 +106,7 @@ const MainNav = ({ bottomOnly = false }) => {
         } ${bottomOnly ? "" : "lg:hidden"} fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
       >
         {items.map((it) => { const { to, icon: Icon, label, end, mode } = it; return (
-          <NavLink key={label} to={to} end={end} onClick={tabClick(to, mode)} className="flex-1 flex flex-col items-center justify-center gap-1">
+          <NavLink key={label} to={to} end={end} onClick={tabClick(to, mode)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
             {({ isActive: routerActive }) => { const isActive = isOn(it, routerActive); return (
               <>
                 <span
@@ -121,18 +121,18 @@ const MainNav = ({ bottomOnly = false }) => {
                     </span>
                   )}
                 </span>
-                <span className={`text-[11px] leading-none text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
+                <span className={`text-[10.5px] leading-none whitespace-nowrap text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
               </>
             ); }}
           </NavLink>
         ); })}
-        <NavLink to="/profile" onClick={tabClick("/profile")} className="flex-1 flex flex-col items-center justify-center gap-1">
+        <NavLink to="/profile" onClick={tabClick("/profile")} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
           <span className={`h-8 w-12 rounded-full flex items-center justify-center`}>
             <span className={`rounded-full p-[3px] ${youActive ? "bg-wa-tint ring-0" : ""}`}>
               <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
             </span>
           </span>
-          <span className={`text-[11px] leading-none text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
+          <span className={`text-[10.5px] leading-none whitespace-nowrap text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
         </NavLink>
       </nav>
     </>
