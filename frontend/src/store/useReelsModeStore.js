@@ -5,4 +5,6 @@ import { create } from "zustand";
 export const useReelsModeStore = create((set) => ({
   mode: "reels",
   setMode: (mode) => set({ mode }),
+  feedTick: 0, // goes up when a post is shared from the bottom bar, so the Feed reloads
+  bumpFeed: () => set((s) => ({ feedTick: s.feedTick + 1 })),
 }));

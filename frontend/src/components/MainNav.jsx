@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { goTab } from "../lib/tabNav";
-import { Clapperboard, Search, House } from "lucide-react";
+import { Clapperboard, Search, SquarePlus } from "lucide-react";
 import { WaChats, WaUpdates, WaCalls } from "./icons/WaIcons";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
@@ -10,15 +10,18 @@ import Avatar from "./Avatar";
 
 const ReelIcon = ({ size = 24 }) => <Clapperboard size={size} strokeWidth={2} />;
 
-const FeedIcon = ({ size = 24 }) => <House size={size} strokeWidth={2} />;
+const PostIcon = ({ size = 24 }) => <SquarePlus size={size} strokeWidth={2} />;
+
+// The post composer opens right from the bar, on any screen
+const NewPost = lazy(() => import("./FeedView").then((m) => ({ default: m.NewPost })));
 
 const SearchIcon = ({ size = 24 }) => <Search size={size} strokeWidth={2} />;
 
 const items = [
   { to: "/", icon: WaChats, label: "Chats", end: true },
   { to: "/status", icon: WaUpdates, label: "Updates" },
-  { to: "/reels", icon: FeedIcon, label: "Feed", mode: "feed" },
-  { to: "/reels", icon: ReelIcon, label: "Reels", mode: "reels" },
+  { action: "post", icon: PostIcon, label: "Post" },
+  { to: "/reels", icon: ReelIcon, label: "Reels" },
   { to: "/explore", icon: SearchIcon, label: "Search" },
   { to: "/calls", icon: WaCalls, label: "Calls" },
 ];
@@ -44,15 +47,19 @@ const MainNav = ({ bottomOnly = false }) => {
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const reelsMode = useReelsModeStore((s) => s.mode);
   const setReelsMode = useReelsModeStore((s) => s.setMode);
-  // Feed and Reels share one screen (/reels); the buttons switch its side
-  const isOn = (it, routerActive) => (it.mode ? pathname === "/reels" && reelsMode === it.mode : routerActive);
-  const tabClick = (to, mode) => (e) => {
+  const bumpFeed = useReelsModeStore((s) => s.bumpFeed);
+  const [posting, setPosting] = useState(false);
+  const tabClick = (to) => (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
-    if (mode) setReelsMode(mode);
-    if (!(mode && pathname === "/reels")) goTab(navigate, pathname, to);
+    goTab(navigate, pathname, to);
+  };
+  const posted = () => {
+    setPosting(false);
+    setReelsMode("feed");
+    bumpFeed();
+    if (pathname !== "/reels") goTab(navigate, pathname, "/reels");
   };
   const youActive = pathname === "/profile" || pathname === "/starred" || pathname.startsWith("/settings");
 
@@ -64,16 +71,18 @@ const MainNav = ({ bottomOnly = false }) => {
       {/* Desktop: vertical rail */}
       {!bottomOnly && (
       <nav className="hidden lg:flex flex-col items-center w-[72px] bg-wa-panel border-r border-white/5 py-4 gap-3 shrink-0">
-        {items.map((it) => { const { to, icon: Icon, label, end, mode } = it; return (
+        {items.map((it) => { const { to, icon: Icon, label, end } = it; return it.action ? (
+          <button key={label} onClick={() => setPosting(true)} title={label} className="size-11 rounded-xl flex items-center justify-center text-wa-icon hover:bg-white/5"><Icon size={24} /></button>
+        ) : (
           <NavLink
             key={label}
             to={to}
             end={end}
-            onClick={tabClick(to, mode)}
+            onClick={tabClick(to)}
             title={label}
             className={({ isActive }) =>
               `relative size-11 rounded-xl flex items-center justify-center transition-colors ${
-                isOn(it, isActive) ? "bg-wa-field text-wa-text" : "text-wa-icon hover:bg-white/5"
+                isActive ? "bg-wa-field text-wa-text" : "text-wa-icon hover:bg-white/5"
               }`
             }
           >
@@ -105,9 +114,14 @@ const MainNav = ({ bottomOnly = false }) => {
           hideOnPhone ? "hidden" : "flex"
         } ${bottomOnly ? "" : "lg:hidden"} fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
       >
-        {items.map((it) => { const { to, icon: Icon, label, end, mode } = it; return (
-          <NavLink key={label} to={to} end={end} onClick={tabClick(to, mode)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
-            {({ isActive: routerActive }) => { const isActive = isOn(it, routerActive); return (
+        {items.map((it) => { const { to, icon: Icon, label, end } = it; return it.action ? (
+          <button key={label} onClick={() => setPosting(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
+            <span className="h-8 w-10 rounded-full flex items-center justify-center text-wa-text2 active:bg-white/5"><Icon size={26} /></span>
+            <span className="text-[10.5px] leading-none whitespace-nowrap text-wa-text">{label}</span>
+          </button>
+        ) : (
+          <NavLink key={label} to={to} end={end} onClick={tabClick(to)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
+            {({ isActive }) => { return (
               <>
                 <span
                   className={`relative h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
@@ -135,6 +149,11 @@ const MainNav = ({ bottomOnly = false }) => {
           <span className={`text-[10.5px] leading-none whitespace-nowrap text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
         </NavLink>
       </nav>
+      {posting && (
+        <Suspense fallback={null}>
+          <NewPost onClose={() => setPosting(false)} onPosted={posted} />
+        </Suspense>
+      )}
     </>
   );
 };

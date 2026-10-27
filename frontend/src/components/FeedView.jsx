@@ -8,12 +8,12 @@ import { optimizeImage } from "../lib/cdn";
 // One photo, or a swipeable set with a 1/3 counter and dots
 const PostImages = ({ images }) => {
   const [i, setI] = useState(0);
-  if (images.length < 2) return <img src={optimizeImage(images[0], 900)} alt="" loading="lazy" decoding="async" className="w-full max-h-[75vh] object-cover bg-white/5" />;
+  if (images.length < 2) return <img src={optimizeImage(images[0], 1080)} alt="" loading="lazy" decoding="async" className="w-full h-auto max-h-[80vh] object-contain bg-black/40" />;
   return (
     <div className="relative">
-      <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar" onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+      <div className="flex items-center bg-black/40 overflow-x-auto snap-x snap-mandatory no-scrollbar" onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
         {images.map((src, k) => (
-          <img key={k} src={optimizeImage(src, 900)} alt="" loading="lazy" decoding="async" className="w-full shrink-0 snap-center max-h-[75vh] object-cover bg-white/5" />
+          <img key={k} src={optimizeImage(src, 1080)} alt="" loading="lazy" decoding="async" className="w-full h-auto shrink-0 snap-center self-center max-h-[80vh] object-contain bg-black/40" />
         ))}
       </div>
       <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white">{i + 1}/{images.length}</span>
@@ -98,7 +98,7 @@ export const NewPost = ({ onClose, onPosted }) => {
           <div className="flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
             {imgs.map((src, i) => (
               <div key={i} className="relative shrink-0 snap-center w-[78%] max-w-[360px]">
-                <img src={src} alt="" className="w-full h-[48vh] object-cover rounded-xl bg-white/5" />
+                <img src={src} alt="" className="w-full h-[48vh] object-contain rounded-xl bg-black/40" />
                 <button onClick={() => setImgs((c) => c.filter((_, k) => k !== i))} aria-label="Remove photo" className="absolute top-2 right-2 size-7 rounded-full bg-black/60 flex items-center justify-center"><X size={16} /></button>
                 <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[12px]">{i + 1}/{imgs.length}</span>
               </div>
