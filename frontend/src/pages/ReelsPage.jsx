@@ -1016,7 +1016,7 @@ const ReelsPage = () => {
   };
 
   const tabBtn = (id, label) => (
-    <button onClick={() => { setTab(id); setMode("reels"); }} className={`text-[18px] font-bold drop-shadow ${mode === "reels" && tab === id ? "text-white" : "text-white/55"}`}>
+    <button onClick={() => { setTab(id); setMode("reels"); }} className={`text-[17px] font-bold drop-shadow ${mode === "reels" && tab === id ? "text-white" : "text-white/55"}`}>
       {label}
     </button>
   );
@@ -1024,19 +1024,19 @@ const ReelsPage = () => {
   return (
     <div className="fixed inset-0 z-[60] bg-black">
       <style>{"@keyframes reelHeart{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:0}}"}</style>
-      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(14px+env(safe-area-inset-top))] pointer-events-none">
+      <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between gap-2 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pointer-events-none">
         {view ? (
           <button onClick={() => setView(null)} className="pointer-events-auto text-white drop-shadow" aria-label="Back"><ChevronLeft size={34} strokeWidth={1.8} /></button>
         ) : (
           <button onClick={() => (mode === "feed" ? setNewPost(true) : setCreating(true))} className="pointer-events-auto text-white drop-shadow" aria-label={mode === "feed" ? "New post" : "New reel"}>
-            <Plus size={34} strokeWidth={1.8} />
+            <Plus size={30} strokeWidth={1.8} />
           </button>
         )}
         {view ? (
           <h2 className="pointer-events-auto text-white text-[19px] font-bold drop-shadow truncate max-w-[60vw]">{view.label}</h2>
         ) : (
-        <div className="pointer-events-auto flex items-center gap-4 relative">
-          <button onClick={() => setMode("feed")} className={`text-[18px] font-bold drop-shadow ${mode === "feed" ? "text-white" : "text-white/55"}`}>Feed</button>
+        <div className="pointer-events-auto flex items-center gap-3 relative min-w-0">
+          <button onClick={() => setMode("feed")} className={`text-[17px] font-bold drop-shadow ${mode === "feed" ? "text-white" : "text-white/55"}`}>Feed</button>
           <div className="flex items-center gap-1">
             {tabBtn(tab === "saved" ? "saved" : "foryou", tab === "saved" ? "Saved" : "Reels")}
             <button onClick={() => setPickTab((v) => !v)} className="text-white drop-shadow" aria-label="Choose feed"><ChevronDown size={20} /></button>
@@ -1054,14 +1054,14 @@ const ReelsPage = () => {
         </div>
         )}
         {view ? (
-          <span className="size-8" aria-hidden />
+          <span className="w-14" aria-hidden />
         ) : (
-          <div className="pointer-events-auto flex items-center gap-4">
+          <div className="pointer-events-auto flex items-center gap-3.5 shrink-0">
             <button onClick={() => { setUnread(0); navigate("/activity"); }} className="relative text-white drop-shadow" aria-label="Activity">
-              <Heart size={27} strokeWidth={1.8} />
+              <Heart size={25} strokeWidth={1.8} />
               {unread > 0 && <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff3b5c] text-[11px] font-bold flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>}
             </button>
-            <button onClick={() => navigate("/explore")} className="text-white drop-shadow" aria-label="Search"><Search size={28} strokeWidth={1.8} /></button>
+            <button onClick={() => navigate("/explore")} className="text-white drop-shadow" aria-label="Search"><Search size={25} strokeWidth={1.8} /></button>
           </div>
         )}
       </div>
