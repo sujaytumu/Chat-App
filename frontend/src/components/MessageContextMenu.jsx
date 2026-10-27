@@ -38,7 +38,7 @@ const MessageContextMenu = ({ message, isMe, authUserId, menu, x, y, align, onCl
             menu.onReact(e);
             onClose();
           }}
-          className={`size-9 rounded-full text-[22px] leading-none flex items-center justify-center hover:scale-125 transition-transform ${mine === e ? "bg-wa-surface" : ""}`}
+          className={`size-10 rounded-full text-[24px] leading-none flex items-center justify-center hover:scale-125 active:scale-110 transition-transform ${mine === e ? "bg-wa-surface" : ""}`}
           aria-label={`React ${e}`}
         >
           {e}
