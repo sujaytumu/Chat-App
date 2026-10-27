@@ -27,10 +27,10 @@ const PickContact = ({ users, onPick, onClose }) => {
         <button onClick={onClose} aria-label="Close" className="size-11 rounded-full flex items-center justify-center active:bg-white/10">
           <X size={24} />
         </button>
-        <h2 className="text-[18.5px] font-normal">Send payment to…</h2>
+        <h2 className="text-[20px] font-semibold">Send payment to…</h2>
       </div>
       <div className="px-4 pb-2">
-        <div className="flex items-center gap-3 h-11 rounded-full bg-wa-field px-4">
+        <div className="flex items-center gap-3 h-12 rounded-full bg-wa-field px-4 shadow-[var(--sh-1)]">
           <Search size={18} className="text-wa-muted" />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name" className="flex-1 bg-transparent outline-none text-[15px] placeholder:text-wa-muted" autoFocus />
         </div>
@@ -40,9 +40,9 @@ const PickContact = ({ users, onPick, onClose }) => {
           <p className="text-center text-wa-muted text-[14px] py-12">No one found</p>
         ) : (
           list.map((u) => (
-            <button key={u._id} onClick={() => onPick(u)} className="w-full flex items-center gap-4 px-5 py-3 text-left active:bg-white/5">
+            <button key={u._id} onClick={() => onPick(u)} className="w-full flex items-center gap-4 px-5 py-3.5 text-left active:bg-white/5">
               <Avatar src={u.profilePic} name={u.fullName || ""} size="size-12" textSize="text-lg" />
-              <span className="text-[16px] truncate">{u.fullName}</span>
+              <span className="text-[16.5px] font-medium truncate">{u.fullName}</span>
             </button>
           ))
         )}

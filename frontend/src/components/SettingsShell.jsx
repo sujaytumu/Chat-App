@@ -14,11 +14,11 @@ const SettingsShell = ({ title, children, back = "/profile", right = null, flush
       <button onClick={goBack} className="size-12 rounded-full flex items-center justify-center active:bg-white/10" aria-label="Back">
         <WaBack size={24} />
       </button>
-      <h1 className="text-[18.5px] font-normal pl-3 truncate flex-1">{title}</h1>
+      <h1 className="text-[20px] font-semibold pl-3 truncate flex-1">{title}</h1>
       {right}
     </div>
     <div ref={scrollRef} className="flex-1 overflow-y-auto pb-[calc(88px+env(safe-area-inset-bottom))] lg:pb-8">
-      <div className={`mx-auto w-full max-w-2xl ${flush ? "" : "px-4 space-y-4"}`}>{children}</div>
+      <div className={`mx-auto w-full max-w-2xl ${flush ? "" : "px-4 space-y-3.5"}`}>{children}</div>
     </div>
   </div>
   );
@@ -47,13 +47,13 @@ export const ToggleRow = ({ title, sub, checked, onChange }) => (
   <button
     type="button"
     onClick={() => onChange(!checked)}
-    className="w-full flex items-center gap-4 p-4 rounded-xl bg-wa-surface text-left"
+    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-wa-surface text-left shadow-[var(--sh-1)] active:bg-wa-field"
     role="switch"
     aria-checked={checked}
   >
     <span className="flex-1 min-w-0">
-      <span className="block text-[13.5px] text-wa-text">{title}</span>
-      {sub && <span className="block text-[11.5px] text-wa-muted mt-0.5">{sub}</span>}
+      <span className="block text-[15px] font-medium text-wa-text">{title}</span>
+      {sub && <span className="block text-[12.5px] leading-snug text-wa-muted mt-0.5">{sub}</span>}
     </span>
     <Switch checked={checked} />
   </button>
