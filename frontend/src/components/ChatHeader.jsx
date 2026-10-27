@@ -154,7 +154,7 @@ const ChatHeader = () => {
 
   return (
     <>
-    <div data-chat-header className="chat-header relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5">
+    <div data-chat-header className="chat-header relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5 shadow-[0_1px_8px_-4px_rgba(0,0,0,0.3)]">
       {/* Back to the chat list (phone) */}
       <button onClick={() => setSelectedChat(null)} className={`${iconBtn} lg:hidden shrink-0`} aria-label="Back">
         <WaBack size={24} />
@@ -166,7 +166,7 @@ const ChatHeader = () => {
       >
         <Avatar src={isGroup ? data.groupPic : data.profilePic} name={name} isGroup={isGroup} size="size-11" textSize="text-xl" />
         <div className="min-w-0">
-          <h3 className="text-[16px] leading-6 font-medium text-wa-text truncate">
+          <h3 className="text-[17px] leading-6 font-semibold text-wa-text truncate">
             {name}
             {streak?.streak >= 2 && (
               <span className={`ml-1.5 text-[12px] font-semibold ${streak.atRisk ? "opacity-60" : ""}`} title={streak.atRisk ? "Send a message today to keep your streak" : "Chat streak"}>
@@ -174,7 +174,7 @@ const ChatHeader = () => {
               </span>
             )}
           </h3>
-          <p className={`text-[11px] leading-4 truncate ${isOnline || status.endsWith("typing…") || status === "recording audio…" ? "text-[#25D366]" : "text-wa-muted"}`}>
+          <p className={`text-[12px] leading-4 truncate ${isOnline || status.endsWith("typing…") || status === "recording audio…" ? "text-[#25D366]" : "text-wa-muted"}`}>
             {status.startsWith("last seen") ? <LastSeenLine text={status} /> : status}
           </p>
         </div>
@@ -219,7 +219,7 @@ const ChatHeader = () => {
             <WaKebab size={24} />
           </button>
           {showMenu && (
-            <div className="absolute right-0 top-full mt-1 w-[232px] lg:w-52 bg-wa-pop rounded-xl lg:rounded-2xl shadow-2xl py-2 z-30 overflow-hidden origin-top-right animate-[menu-pop_.14s_ease-out]">
+            <div className="absolute right-0 top-full mt-1 w-[240px] lg:w-52 bg-wa-pop rounded-2xl shadow-2xl ring-1 ring-black/10 py-2 z-30 overflow-hidden origin-top-right animate-[menu-pop_.14s_ease-out]">
               {isGroup && (
                 <button
                   className={menuItem}
