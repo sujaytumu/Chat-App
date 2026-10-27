@@ -98,7 +98,7 @@ const MainNav = ({ bottomOnly = false }) => {
       <nav
         className={`${
           hideOnPhone ? "hidden" : "flex"
-        } ${bottomOnly ? "" : "lg:hidden"} fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
+        } ${bottomOnly ? "" : "lg:hidden"} fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg/95 backdrop-blur-md border-t border-white/5 shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.25)] items-stretch justify-around z-30`}
       >
         {items.map((it) => { const { to, icon: Icon, label, end } = it; return (
           <NavLink key={label} to={to} end={end} onClick={tabClick(to)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
@@ -106,7 +106,7 @@ const MainNav = ({ bottomOnly = false }) => {
               <>
                 <span
                   className={`relative h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    isActive ? "w-12 bg-wa-tint text-wa-tinttext" : "w-10 text-wa-text2 active:bg-white/5"
+                    isActive ? "w-14 bg-wa-tint text-wa-tinttext" : "w-10 text-wa-text2 active:bg-white/5"
                   }`}
                 >
                   <Icon size={26} filled={isActive} />
@@ -116,18 +116,18 @@ const MainNav = ({ bottomOnly = false }) => {
                     </span>
                   )}
                 </span>
-                <span className={`text-[10.5px] leading-none whitespace-nowrap text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
+                <span className={`text-[11px] leading-none whitespace-nowrap ${isActive ? "font-semibold text-wa-text" : "font-medium text-wa-muted"}`}>{label}</span>
               </>
             ); }}
           </NavLink>
         ); })}
         <NavLink to="/profile" onClick={tabClick("/profile")} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1">
-          <span className={`h-8 w-12 rounded-full flex items-center justify-center`}>
+          <span className={`h-8 w-14 rounded-full flex items-center justify-center`}>
             <span className={`rounded-full p-[3px] ${youActive ? "bg-wa-tint ring-0" : ""}`}>
               <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
             </span>
           </span>
-          <span className={`text-[10.5px] leading-none whitespace-nowrap text-wa-text ${youActive ? "font-semibold" : ""}`}>You</span>
+          <span className={`text-[11px] leading-none whitespace-nowrap ${youActive ? "font-semibold text-wa-text" : "font-medium text-wa-muted"}`}>You</span>
         </NavLink>
       </nav>
     </>
