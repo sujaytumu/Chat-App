@@ -4,12 +4,15 @@ import { Search, Eye, X, Film } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
+import { useTabSwipe } from "../lib/useTabSwipe";
 import { useAuthStore } from "../store/useAuthStore";
 
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
 // Explore: a search bar and a grid of up to 16 reels (tap one to watch it in the Reels player).
 const ExplorePage = () => {
+  const swipeRoot = useRef(null);
+  useTabSwipe(swipeRoot); // swipe left/right = next / previous tab
   const navigate = useNavigate();
   const me = useAuthStore((s) => s.authUser);
   const [q, setQ] = useState("");
@@ -40,7 +43,7 @@ const ExplorePage = () => {
   }, [q]);
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex flex-col">
+    <div ref={swipeRoot} className="fixed inset-0 bg-black text-white flex flex-col">
       <div className="px-4 pt-[calc(12px+env(safe-area-inset-top))] pb-3">
         <div className="flex items-center gap-2.5 h-12 rounded-full bg-white/10 px-4">
           <Search size={20} className="text-white/70 shrink-0" />
