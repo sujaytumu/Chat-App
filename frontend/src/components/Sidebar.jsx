@@ -785,7 +785,7 @@ const Sidebar = () => {
               }`}
             >
               <div className="relative shrink-0">
-                <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-12" />
+                <Avatar src={item.avatar} name={item.name} isGroup={item.type === "group"} size="size-[52px]" />
                 {selected.has(item.key) && (
                   <span className="absolute -bottom-1 -right-1 size-[22px] rounded-full bg-[#21C063] text-wa-bg ring-2 ring-wa-bg flex items-center justify-center">
                     <WaCheck size={14} />
@@ -798,10 +798,10 @@ const Sidebar = () => {
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-[14.5px] lg:text-[13.5px] leading-[22px] text-wa-text truncate">{item.name}</span>
+                  <span className={`text-[15.5px] lg:text-[14px] leading-[22px] text-wa-text truncate ${hasUnread || item.markedUnread ? "font-semibold" : "font-medium"}`}>{item.name}</span>
                   {item.lastMessage && (
                     <span
-                      className={`text-[10px] lg:text-[10.5px] leading-none shrink-0 ${(hasUnread || item.markedUnread) ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
+                      className={`text-[11.5px] lg:text-[11px] leading-none shrink-0 ${(hasUnread || item.markedUnread) ? "text-[#25D366] font-medium" : "text-wa-muted"}`}
                     >
                       {formatChatListTime(item.lastMessage.createdAt)}
                     </span>
@@ -812,8 +812,8 @@ const Sidebar = () => {
                     <span className="min-w-0 truncate text-[13px] text-[#25D366]">{isRecordingNow && !isTyping ? "recording audio…" : item.type === "group" ? groupTypingLabel(typingUsers[`group:${item.data._id}`], item.data.members, true) : "typing…"}</span>
                   ) : (
                   <span
-                    className={`flex items-center gap-1 min-w-0 text-[12.5px] lg:text-[12px] leading-5 ${
-                      hasUnread ? "text-wa-text" : "text-wa-muted"
+                    className={`flex items-center gap-1 min-w-0 text-[13.5px] lg:text-[12.5px] leading-5 ${
+                      hasUnread ? "text-wa-text font-medium" : "text-wa-muted"
                     }`}
                   >
                     {!draftText && sentByMe && item.type === "direct" && (
@@ -843,7 +843,7 @@ const Sidebar = () => {
                     {item.muted && <WaBellOff size={16} />}
                     {hasUnread ? (
                       <span
-                        className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10.5px] font-medium flex items-center justify-center ${
+                        className={`min-w-[22px] h-[22px] px-1.5 rounded-full text-[11.5px] font-semibold flex items-center justify-center ${
                           item.muted ? "bg-[#3B4A54] text-wa-text" : "bg-[#25D366] text-wa-bg"
                         }`}
                       >
