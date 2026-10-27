@@ -19,9 +19,9 @@ import { TAB_ORDER } from "../lib/useTabSwipe";
 // Phone tabs in WhatsApp's order. Swiping the screen left/right moves between
 // them, just like tapping the bottom bar.
 const TABS = ["/", "/status", "/calls", "/profile"];
-// Swipe order = the bottom bar: Chats, Updates, Reels, Search, Calls, You (Reels and Search are full-screen pages)
+// Swipe order = the bottom bar: Chats, Updates, Post, Reels, Search, Calls, You (Post, Reels and Search are full-screen pages)
 const ORDER = TAB_ORDER;
-const FULL_SCREEN_LABEL = { "/reels": "Reels", "/explore": "Search" };
+const FULL_SCREEN_LABEL = { "/post": "Post", "/reels": "Reels", "/explore": "Search" };
 
 // The neighbouring tab is rendered next to the current one while you drag, so
 // the pages move together under your finger (and stop wherever you stop).

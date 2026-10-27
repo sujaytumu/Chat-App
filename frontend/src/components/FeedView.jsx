@@ -64,7 +64,7 @@ const shrink = (dataUrl, max = 1600) =>
     img.src = dataUrl;
   });
 
-export const NewPost = ({ onClose, onPosted }) => {
+export const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const [imgs, setImgs] = useState([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
@@ -87,7 +87,7 @@ export const NewPost = ({ onClose, onPosted }) => {
     }
   };
   return (
-    <div className="fixed inset-0 z-[80] bg-black flex flex-col text-white">
+    <div className={`${embedded ? "absolute inset-0" : "fixed inset-0 z-[80]"} bg-black flex flex-col text-white`}>
       <div className="flex items-center gap-3 px-4 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
         <button onClick={onClose} aria-label="Close"><X size={26} /></button>
         <h3 className="flex-1 text-[17px] font-semibold">New post</h3>
