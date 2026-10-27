@@ -4,7 +4,8 @@ import mongoose from "mongoose";
 const postSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    image: { type: String, required: true },
+    image: { type: String, required: true }, // first photo (older posts have only this)
+    images: [{ type: String }], // all photos, up to 10
     caption: { type: String, default: "", maxlength: 500 },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
   },

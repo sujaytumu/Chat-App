@@ -734,7 +734,7 @@ const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const me = useAuthStore((s) => s.authUser);
-  const [mode, setMode] = useState("reels"); // feed | reels
+  const [mode, setMode] = useState(params.get("feed") ? "feed" : "reels"); // feed | reels
   const [newPost, setNewPost] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
   const [tab, setTab] = useState("foryou"); // foryou | friends | saved
@@ -743,6 +743,15 @@ const ReelsPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState(null);
   const [muted, setMutedState] = useState(() => { try { return localStorage.getItem("reelMuted") === "1"; } catch { return false; } });
+  const [unread, setUnread] = useState(0); // new likes / comments on your reels and posts
+  const socket = useAuthStore((s) => s.socket);
+  useEffect(() => {
+    let alive = true;
+    axiosInstance.get("/activity/unread").then((r) => alive && setUnread(r.data.unread || 0)).catch(() => {});
+    const bump = () => setUnread((n) => n + 1);
+    socket?.on("activity", bump);
+    return () => { alive = false; socket?.off("activity", bump); };
+  }, [socket]);
   const [soundBlocked, setSoundBlocked] = useState(false); // the browser muted us until the first tap
   const setMuted = useCallback((v, auto) => {
     setMutedState(v);
@@ -1040,7 +1049,13 @@ const ReelsPage = () => {
         {view ? (
           <span className="size-8" aria-hidden />
         ) : (
-          <button onClick={() => navigate("/explore")} className="pointer-events-auto text-white drop-shadow" aria-label="Search"><Search size={28} strokeWidth={1.8} /></button>
+          <div className="pointer-events-auto flex items-center gap-4">
+            <button onClick={() => { setUnread(0); navigate("/activity"); }} className="relative text-white drop-shadow" aria-label="Activity">
+              <Heart size={27} strokeWidth={1.8} />
+              {unread > 0 && <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ff3b5c] text-[11px] font-bold flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>}
+            </button>
+            <button onClick={() => navigate("/explore")} className="text-white drop-shadow" aria-label="Search"><Search size={28} strokeWidth={1.8} /></button>
+          </div>
         )}
       </div>
 
