@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { goTab } from "./tabNav";
 
 // The phone tabs in bottom-bar order. Swiping left/right always goes to the neighbour in this list.
-export const TAB_ORDER = ["/", "/status", "/reels", "/explore", "/calls", "/profile"];
+export const TAB_ORDER = ["/", "/status", "/post", "/reels", "/explore", "/calls", "/profile"];
 
 // Swipe left/right on a full-screen page (Reels, Search) to move to the next/previous tab.
 // Drags that start on something that scrolls sideways, a text field or a slider are left alone.

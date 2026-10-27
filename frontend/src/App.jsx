@@ -57,6 +57,7 @@ const StarredPage = more("StarredPage");
 const PaymentsPage = lazy(() => import("./pages/PaymentsPage"));
 const ReelsPage = lazy(() => import("./pages/ReelsPage"));
 const ActivityPage = lazy(() => import("./pages/ActivityPage"));
+const PostPage = lazy(() => import("./pages/PostPage"));
 const ExplorePage = lazy(() => import("./pages/ExplorePage"));
 const PrivacyPage = more("PrivacyPage");
 const TwoStepPage = more("TwoStepPage");
@@ -278,6 +279,7 @@ const App = () => {
             }
           />
           <Route path="/reels" element={authUser ? <ReelsPage /> : <Navigate to="/login" />} />
+          <Route path="/post" element={authUser ? <PostPage /> : <Navigate to="/login" />} />
           <Route path="/activity" element={authUser ? <ActivityPage /> : <Navigate to="/login" />} />
           <Route path="/explore" element={authUser ? <ExplorePage /> : <Navigate to="/login" />} />
           <Route
