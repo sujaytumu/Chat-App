@@ -147,8 +147,8 @@ const StatusPage = () => {
 
   return (
     <div className="relative flex-1 flex flex-col bg-wa-bg overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
-      <div className="flex items-center justify-between px-4 pt-4 pb-3">
-        <h1 className="text-[24px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
+      <div className="flex items-center justify-between px-5 pt-5 pb-4">
+        <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -159,20 +159,20 @@ const StatusPage = () => {
         ) : (
           <>
             {/* One slim row you swipe sideways (like WhatsApp's status bar): my status first, then everyone else's */}
-            <div className="flex gap-4 overflow-x-auto no-scrollbar px-4 pt-1 pb-3 border-b border-white/5">
+            <div className="flex gap-[18px] overflow-x-auto no-scrollbar px-5 pt-2 pb-4 border-b border-white/5">
               <button
                 onClick={() =>
                   feed.myStatuses.length > 0
                     ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
                     : setShowCreate("image")
                 }
-                className="shrink-0 w-[68px] flex flex-col items-center gap-1.5 active:scale-95 transition-transform"
+                className="shrink-0 w-[72px] flex flex-col items-center gap-2 active:scale-95 transition-transform"
               >
                 <div className="relative">
                   <img
                     src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
                     alt="My status"
-                    className={`size-[60px] rounded-full object-cover ${feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""}`}
+                    className={`size-[64px] rounded-full object-cover ${feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""}`}
                   />
                   <span
                     onClick={(e) => {
@@ -184,7 +184,7 @@ const StatusPage = () => {
                     <Plus size={14} strokeWidth={3} />
                   </span>
                 </div>
-                <span className="text-[12px] text-wa-text truncate w-full text-center">My status</span>
+                <span className="text-[12.5px] font-medium text-wa-text truncate w-full text-center">My status</span>
               </button>
 
               {[
@@ -206,26 +206,26 @@ const StatusPage = () => {
                     e.preventDefault();
                     setRowSheet({ user, statuses });
                   }}
-                  className={`shrink-0 w-[68px] flex flex-col items-center gap-1.5 select-none active:scale-95 transition-transform ${tone === "muted" ? "opacity-60" : ""}`}
+                  className={`shrink-0 w-[72px] flex flex-col items-center gap-2 select-none active:scale-95 transition-transform ${tone === "muted" ? "opacity-60" : ""}`}
                 >
                   <img
                     src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
                     alt={user.fullName}
-                    className={`size-[60px] rounded-full object-cover ring-2 ${hasUnseen && tone !== "muted" ? "ring-[#00A884]" : "ring-wa-muted/40"} ring-offset-2 ring-offset-wa-bg`}
+                    className={`size-[64px] rounded-full object-cover ring-2 ${hasUnseen && tone !== "muted" ? "ring-[#00A884]" : "ring-wa-muted/40"} ring-offset-2 ring-offset-wa-bg`}
                     draggable={false}
                   />
-                  <span className={`text-[12px] truncate w-full text-center ${tone === "new" ? "text-wa-text font-medium" : "text-wa-muted"}`}>{(user.fullName || "").split(" ")[0]}</span>
+                  <span className={`text-[12.5px] truncate w-full text-center ${tone === "new" ? "text-wa-text font-medium" : "text-wa-muted"}`}>{(user.fullName || "").split(" ")[0]}</span>
                 </button>
               ))}
             </div>
 
             {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
             <div className="mt-3 pb-1 border-t border-white/5 pt-3">
-              <div className="flex items-center gap-2 px-4 pb-1">
+              <div className="flex items-center gap-2 px-5 pb-2">
                 <span className="size-6 rounded-lg flex items-center justify-center text-white" style={{ background: HL_GRADIENT }}>
                   <Bookmark size={13} />
                 </span>
-                <p className="text-[14px] font-semibold text-wa-text">Highlights</p>
+                <p className="text-[15.5px] font-semibold text-wa-text">Highlights</p>
                 <p className="ml-auto text-[11.5px] text-wa-muted">{myHighlights.length > 0 ? "Hold one to edit" : "Keep your best updates"}</p>
               </div>
               <HighlightsRow
@@ -237,7 +237,7 @@ const StatusPage = () => {
               />
               {otherHighlights.length > 0 && (
                 <>
-                  <p className="px-4 pt-2 text-[12px] font-medium text-wa-muted">From others</p>
+                  <p className="px-5 pt-3 pb-1 text-[12px] font-semibold uppercase tracking-wider text-wa-muted">From others</p>
                   <HighlightsRow
                     showOwner
                     highlights={otherHighlights.flatMap((g) => g.highlights.map((h) => ({ ...h, user: g.user })))}
@@ -265,14 +265,14 @@ const StatusPage = () => {
       <div className="absolute right-4 bottom-[calc(92px+env(safe-area-inset-bottom))] lg:bottom-6 flex flex-col items-center gap-3.5">
         <button
           onClick={() => setShowCreate("text")}
-          className="size-12 rounded-2xl bg-wa-field hover:bg-wa-surface text-wa-icon shadow-lg flex items-center justify-center active:scale-95"
+          className="size-12 rounded-2xl bg-wa-field hover:bg-wa-surface text-wa-icon shadow-lg ring-1 ring-black/5 flex items-center justify-center active:scale-95"
           aria-label="Text status"
         >
           <Pencil size={20} />
         </button>
         <button
           onClick={() => setShowCreate("image")}
-          className="size-14 rounded-2xl bg-[#00A884] hover:bg-[#02906f] text-white shadow-lg flex items-center justify-center active:scale-95"
+          className="size-14 rounded-[20px] bg-[#00A884] hover:bg-[#02906f] text-white shadow-xl shadow-[#00A884]/30 flex items-center justify-center active:scale-95"
           aria-label="Photo status"
         >
           <Camera size={24} />
