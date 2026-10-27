@@ -7,6 +7,7 @@ import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
+import { useTabSwipe } from "../lib/useTabSwipe";
 import { useAuthStore } from "../store/useAuthStore";
 import { useReelsModeStore } from "../store/useReelsModeStore";
 import StatusComments from "../components/StatusComments";
@@ -353,7 +354,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
         onPointerCancel={scrubUp}
         onClick={(e) => e.stopPropagation()}
       >
-        <div ref={bar} className={`relative w-full bg-white/25 transition-[height] ${scrub ? "h-[7px]" : "h-[3px]"}`}>
+        <div ref={bar} data-no-swipe className={`relative w-full bg-white/25 transition-[height] ${scrub ? "h-[7px]" : "h-[3px]"}`}>
           <div ref={fillEl} className="h-full w-full bg-white origin-left will-change-transform" style={{ transform: "scaleX(0)" }} />
           <span ref={dotEl} className={`absolute top-1/2 size-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow transition-opacity ${scrub ? "opacity-100" : "opacity-0"}`} style={{ left: 0 }} />
         </div>
@@ -738,6 +739,8 @@ const ReelsPage = () => {
   const mode = useReelsModeStore((s) => s.mode); // feed | reels (the bottom bar switches it too)
   const setMode = useReelsModeStore((s) => s.setMode);
   const feedTick = useReelsModeStore((s) => s.feedTick);
+  const swipeRoot = useRef(null);
+  useTabSwipe(swipeRoot); // swipe left/right = next / previous tab
   useEffect(() => {
     if (params.get("feed")) setMode("feed");
     else if (params.get("r")) setMode("reels");
@@ -1023,7 +1026,7 @@ const ReelsPage = () => {
   );
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black">
+    <div ref={swipeRoot} className="fixed inset-0 z-[60] bg-black">
       <style>{"@keyframes reelHeart{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:0}}"}</style>
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between gap-2 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pointer-events-none">
         {view ? (

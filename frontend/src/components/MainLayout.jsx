@@ -5,6 +5,7 @@ import MainNav from "./MainNav";
 import ChatLockHost from "./ChatLockHost";
 import { goTab } from "../lib/tabNav";
 
+import { TAB_ORDER } from "../lib/useTabSwipe";
 // Shared shell for the main app screens (Chats / Updates / Calls) — puts the
 // persistent WhatsApp-style nav (rail on desktop, bottom bar on mobile)
 // alongside whichever page is active.
@@ -18,6 +19,9 @@ import { goTab } from "../lib/tabNav";
 // Phone tabs in WhatsApp's order. Swiping the screen left/right moves between
 // them, just like tapping the bottom bar.
 const TABS = ["/", "/status", "/calls", "/profile"];
+// Swipe order = the bottom bar: Chats, Updates, Reels, Search, Calls, You (Reels and Search are full-screen pages)
+const ORDER = TAB_ORDER;
+const FULL_SCREEN_LABEL = { "/reels": "Reels", "/explore": "Search" };
 
 // The neighbouring tab is rendered next to the current one while you drag, so
 // the pages move together under your finger (and stop wherever you stop).
@@ -45,7 +49,7 @@ const MainLayout = ({ children }) => {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
-  const tabIndex = TABS.indexOf(pathname);
+  const tabIndex = ORDER.indexOf(pathname);
   const swipeable = tabIndex !== -1 && !(pathname === "/" && hasOpenChat);
   // Opened straight on Calls / Updates / You (app reopened, reload, link): there is no
   // history behind it, so Back would leave the app. Put Chats underneath, like WhatsApp.
@@ -102,7 +106,7 @@ const MainLayout = ({ children }) => {
     d.lastX = t.clientX;
     d.lastT = now;
     const next = tabIndex + (dx < 0 ? 1 : -1);
-    const exists = next >= 0 && next < TABS.length;
+    const exists = next >= 0 && next < ORDER.length;
     d.dx = exists ? dx : dx * 0.25; // edge: rubber-band
     if (exists) setPeek((p) => (p === next ? p : next));
     else setPeek(null);
@@ -116,12 +120,12 @@ const MainLayout = ({ children }) => {
     }
     const dir = d.dx < 0 ? 1 : -1;
     const next = tabIndex + dir;
-    const exists = next >= 0 && next < TABS.length;
+    const exists = next >= 0 && next < ORDER.length;
     const flung = Math.abs(d.v) > 0.5 && Math.sign(d.v) === Math.sign(d.dx);
     if (exists && (Math.abs(d.dx) > d.w * 0.33 || flung)) {
       d.busy = true;
       setX(-dir * d.w, true);
-      setTimeout(() => goTab(navigate, pathname, TABS[next]), 220);
+      setTimeout(() => goTab(navigate, pathname, ORDER[next]), 220);
     } else {
       setX(0, true);
       setTimeout(() => {
@@ -193,8 +197,8 @@ const MainLayout = ({ children }) => {
             >
               <Suspense fallback={null}>
                 {(() => {
-                  const Peek = PEEK[TABS[peek]];
-                  return <Peek />;
+                  const Peek = PEEK[ORDER[peek]];
+                  return Peek ? <Peek /> : <div className="h-full w-full bg-black flex items-center justify-center text-white/50 text-[15px]">{FULL_SCREEN_LABEL[ORDER[peek]]}</div>;
                 })()}
               </Suspense>
             </div>
