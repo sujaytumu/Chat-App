@@ -27,7 +27,7 @@ const Row = ({ c, onOpen, onFollow }) => (
     {onFollow ? (
       <button onClick={(e) => { e.stopPropagation(); onFollow(c); }} className="h-8 px-4 rounded-full bg-[#21C063]/15 text-[#21C063] text-[13px] font-semibold">Follow</button>
     ) : (
-      <span className="text-[11.5px] text-wa-muted shrink-0">{when(c.lastPost?.createdAt)}</span>
+      <span className="text-[12px] text-wa-muted shrink-0">{when(c.lastPost?.createdAt)}</span>
     )}
   </div>
 );
@@ -268,7 +268,7 @@ const ChannelsPage = () => {
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-wa-bg overflow-hidden">
       <div className="flex items-center h-14 pl-4 pr-2 shrink-0">
-        <h1 className="flex-1 text-[24px] font-normal text-wa-text">Channels</h1>
+        <h1 className="flex-1 text-[28px] font-bold tracking-tight text-wa-text">Channels</h1>
         <button onClick={() => setCreating(true)} aria-label="New channel" className="size-12 rounded-full flex items-center justify-center text-wa-text active:bg-white/10"><Plus size={26} /></button>
       </div>
       <div className="px-4 pb-2">

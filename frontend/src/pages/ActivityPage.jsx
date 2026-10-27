@@ -44,7 +44,7 @@ const ActivityPage = () => {
     <div className="fixed inset-0 z-[60] bg-black text-white flex flex-col">
       <div className="flex items-center gap-3 px-3 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
         <button onClick={() => navigate("/reels")} aria-label="Back"><ChevronLeft size={32} strokeWidth={1.8} /></button>
-        <h1 className="text-[20px] font-bold">Activity</h1>
+        <h1 className="text-[24px] font-bold tracking-tight">Activity</h1>
       </div>
       <div className="flex-1 overflow-y-auto pb-[calc(96px+env(safe-area-inset-bottom))]">
         {failed ? (
