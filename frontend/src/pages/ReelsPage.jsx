@@ -8,6 +8,7 @@ import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
 import { useAuthStore } from "../store/useAuthStore";
+import { useReelsModeStore } from "../store/useReelsModeStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
 import StatusMusicSheet from "../components/StatusMusicSheet";
@@ -734,7 +735,13 @@ const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const me = useAuthStore((s) => s.authUser);
-  const [mode, setMode] = useState(params.get("feed") ? "feed" : "reels"); // feed | reels
+  const mode = useReelsModeStore((s) => s.mode); // feed | reels (the bottom bar switches it too)
+  const setMode = useReelsModeStore((s) => s.setMode);
+  useEffect(() => {
+    if (params.get("feed")) setMode("feed");
+    else if (params.get("r")) setMode("reels");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [newPost, setNewPost] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
   const [tab, setTab] = useState("foryou"); // foryou | friends | saved

@@ -1,20 +1,24 @@
 import { useMemo } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { goTab } from "../lib/tabNav";
-import { Clapperboard, Search } from "lucide-react";
+import { Clapperboard, Search, House } from "lucide-react";
 import { WaChats, WaUpdates, WaCalls } from "./icons/WaIcons";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatStore } from "../store/useChatStore";
+import { useReelsModeStore } from "../store/useReelsModeStore";
 import Avatar from "./Avatar";
 
 const ReelIcon = ({ size = 24 }) => <Clapperboard size={size} strokeWidth={2} />;
+
+const FeedIcon = ({ size = 24 }) => <House size={size} strokeWidth={2} />;
 
 const SearchIcon = ({ size = 24 }) => <Search size={size} strokeWidth={2} />;
 
 const items = [
   { to: "/", icon: WaChats, label: "Chats", end: true },
   { to: "/status", icon: WaUpdates, label: "Updates" },
-  { to: "/reels", icon: ReelIcon, label: "Reels" },
+  { to: "/reels", icon: FeedIcon, label: "Feed", mode: "feed" },
+  { to: "/reels", icon: ReelIcon, label: "Reels", mode: "reels" },
   { to: "/explore", icon: SearchIcon, label: "Search" },
   { to: "/calls", icon: WaCalls, label: "Calls" },
 ];
@@ -40,10 +44,15 @@ const MainNav = ({ bottomOnly = false }) => {
   const hasOpenChat = useChatStore((s) => !!s.selectedChat);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const tabClick = (to) => (e) => {
+  const reelsMode = useReelsModeStore((s) => s.mode);
+  const setReelsMode = useReelsModeStore((s) => s.setMode);
+  // Feed and Reels share one screen (/reels); the buttons switch its side
+  const isOn = (it, routerActive) => (it.mode ? pathname === "/reels" && reelsMode === it.mode : routerActive);
+  const tabClick = (to, mode) => (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
-    goTab(navigate, pathname, to);
+    if (mode) setReelsMode(mode);
+    if (!(mode && pathname === "/reels")) goTab(navigate, pathname, to);
   };
   const youActive = pathname === "/profile" || pathname === "/starred" || pathname.startsWith("/settings");
 
@@ -55,16 +64,16 @@ const MainNav = ({ bottomOnly = false }) => {
       {/* Desktop: vertical rail */}
       {!bottomOnly && (
       <nav className="hidden lg:flex flex-col items-center w-[72px] bg-wa-panel border-r border-white/5 py-4 gap-3 shrink-0">
-        {items.map(({ to, icon: Icon, label, end }) => (
+        {items.map((it) => { const { to, icon: Icon, label, end, mode } = it; return (
           <NavLink
-            key={to}
+            key={label}
             to={to}
             end={end}
-            onClick={tabClick(to)}
+            onClick={tabClick(to, mode)}
             title={label}
             className={({ isActive }) =>
               `relative size-11 rounded-xl flex items-center justify-center transition-colors ${
-                isActive ? "bg-wa-field text-wa-text" : "text-wa-icon hover:bg-white/5"
+                isOn(it, isActive) ? "bg-wa-field text-wa-text" : "text-wa-icon hover:bg-white/5"
               }`
             }
           >
@@ -75,7 +84,7 @@ const MainNav = ({ bottomOnly = false }) => {
               </span>
             )}
           </NavLink>
-        ))}
+        ); })}
         <div className="flex-1" />
         <NavLink
           to="/profile"
@@ -96,13 +105,13 @@ const MainNav = ({ bottomOnly = false }) => {
           hideOnPhone ? "hidden" : "flex"
         } ${bottomOnly ? "" : "lg:hidden"} fixed bottom-0 inset-x-0 h-[calc(72px+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] bg-wa-bg border-t border-white/5 items-stretch justify-around z-30`}
       >
-        {items.map(({ to, icon: Icon, label, end }) => (
-          <NavLink key={to} to={to} end={end} onClick={tabClick(to)} className="flex-1 flex flex-col items-center justify-center gap-1">
-            {({ isActive }) => (
+        {items.map((it) => { const { to, icon: Icon, label, end, mode } = it; return (
+          <NavLink key={label} to={to} end={end} onClick={tabClick(to, mode)} className="flex-1 flex flex-col items-center justify-center gap-1">
+            {({ isActive: routerActive }) => { const isActive = isOn(it, routerActive); return (
               <>
                 <span
                   className={`relative h-8 rounded-full flex items-center justify-center transition-all duration-200 ${
-                    isActive ? "w-16 bg-wa-tint text-wa-tinttext" : "w-12 text-wa-text2 active:bg-white/5"
+                    isActive ? "w-12 bg-wa-tint text-wa-tinttext" : "w-10 text-wa-text2 active:bg-white/5"
                   }`}
                 >
                   <Icon size={26} filled={isActive} />
@@ -114,11 +123,11 @@ const MainNav = ({ bottomOnly = false }) => {
                 </span>
                 <span className={`text-[11px] leading-none text-wa-text ${isActive ? "font-semibold" : ""}`}>{label}</span>
               </>
-            )}
+            ); }}
           </NavLink>
-        ))}
+        ); })}
         <NavLink to="/profile" onClick={tabClick("/profile")} className="flex-1 flex flex-col items-center justify-center gap-1">
-          <span className={`h-8 w-16 rounded-full flex items-center justify-center`}>
+          <span className={`h-8 w-12 rounded-full flex items-center justify-center`}>
             <span className={`rounded-full p-[3px] ${youActive ? "bg-wa-tint ring-0" : ""}`}>
               <Avatar src={authUser?.profilePic} name={authUser?.fullName} size="size-7" textSize="text-xs" />
             </span>
