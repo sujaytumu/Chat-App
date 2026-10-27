@@ -34,11 +34,11 @@ const ReelCard = ({ reel }) => {
     );
   }
   return (
-    <button onClick={() => navigate(`/reels?r=${reel.id}`)} className="block w-[220px] max-w-full mb-1 rounded-lg overflow-hidden bg-black/10 text-left">
+    <button onClick={() => navigate(`/reels?r=${reel.id}`)} className="block w-[220px] max-w-full mb-1 rounded-2xl overflow-hidden shadow-md bg-black/10 text-left">
       <div className="relative aspect-[9/14] bg-black">
         {info?.poster && <img src={info.poster} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />}
         <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-          <span className="size-12 rounded-full bg-black/50 text-white flex items-center justify-center"><Play size={24} fill="currentColor" /></span>
+          <span className="size-12 rounded-full bg-black/50 backdrop-blur-sm ring-1 ring-white/20 text-white flex items-center justify-center"><Play size={24} fill="currentColor" /></span>
         </div>
         <span className="absolute top-2 left-2 flex items-center gap-1 text-white text-[11px] font-medium bg-black/45 rounded-full px-2 py-0.5"><Film size={11} /> Reel</span>
       </div>

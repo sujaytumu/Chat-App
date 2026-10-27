@@ -41,7 +41,7 @@ const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n /
 const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
   <button onClick={onClick} className="flex flex-col items-center gap-1 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,.6)] active:scale-90 transition-transform">
     <Icon size={size} className={active ? "text-[#ff3040]" : ""} fill={fill ? "currentColor" : "none"} strokeWidth={2} />
-    {label !== undefined && <span className="text-[13px] font-semibold tabular-nums leading-none">{label}</span>}
+    {label !== undefined && <span className="text-[13.5px] font-semibold tabular-nums leading-none">{label}</span>}
   </button>
 );
 
@@ -274,7 +274,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
         </div>
       )}
       <div className="absolute z-20 right-3 top-[calc(64px+env(safe-area-inset-top))] flex flex-col items-end gap-1.5">
-        <button onClick={() => setRateOpen((o) => !o)} className="min-w-[44px] h-8 px-2.5 rounded-full bg-black/45 text-white text-[13px] font-bold tabular-nums active:scale-95 transition-transform" aria-label="Playback speed">{rate}×</button>
+        <button onClick={() => setRateOpen((o) => !o)} className="min-w-[44px] h-8 px-2.5 rounded-full bg-black/45 backdrop-blur-sm ring-1 ring-white/15 text-white text-[13px] font-bold tabular-nums active:scale-95 transition-transform" aria-label="Playback speed">{rate}×</button>
         {rateOpen && (
           <div className="flex flex-col rounded-2xl bg-black/75 py-1 wa-pop-in">
             {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
@@ -300,9 +300,9 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
           <Heart size={110} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />
         </div>
       )}
-      <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/75 to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black/85 via-black/35 to-transparent pointer-events-none" />
 
-      <div className="absolute right-3 bottom-8 flex flex-col items-center gap-[22px] z-10">
+      <div className="absolute right-3 bottom-8 flex flex-col items-center gap-6 z-10">
         <Rail icon={ReelHeart} size={31} label={count(reel.likeCount)} active={reel.liked} fill={reel.liked} onClick={() => onLike(reel, !reel.liked)} />
         <Rail icon={ReelComment} size={29} label={count(reel.comments)} onClick={() => onComments(reel)} />
         <Rail icon={ReelRepost} size={30} label={count(reel.reposts)} active={reel.reposted} onClick={() => onRepost(reel)} />
@@ -317,7 +317,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
         )}
         <div className="flex items-center gap-2.5">
           <button onClick={() => !reel.external && onUser(reel.user)} className="flex items-center gap-2.5 min-w-0">
-            <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-10 rounded-full object-cover border border-white/30 bg-neutral-800" />
+            <img src={optimizeImage(reel.user?.profilePic || "/avatar.png", 96)} alt="" className="size-11 rounded-full object-cover border-2 border-white/60 bg-neutral-800 shadow-md" />
             <span className="font-semibold text-[15.5px] drop-shadow truncate max-w-[40vw]">{reel.user?.fullName}</span>
           </button>
           {!reel.mine && !reel.external && reel.source !== "discover" && (
