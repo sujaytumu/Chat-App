@@ -737,6 +737,7 @@ const ReelsPage = () => {
   const me = useAuthStore((s) => s.authUser);
   const mode = useReelsModeStore((s) => s.mode); // feed | reels (the bottom bar switches it too)
   const setMode = useReelsModeStore((s) => s.setMode);
+  const feedTick = useReelsModeStore((s) => s.feedTick);
   useEffect(() => {
     if (params.get("feed")) setMode("feed");
     else if (params.get("r")) setMode("reels");
@@ -1068,7 +1069,7 @@ const ReelsPage = () => {
 
       <div className="absolute inset-x-0 top-0 bottom-[calc(72px+env(safe-area-inset-bottom))]">
         {mode === "feed" ? (
-          <FeedView onCreate={() => setNewPost(true)} refreshKey={feedKey} />
+          <FeedView onCreate={() => setNewPost(true)} refreshKey={feedKey + feedTick} />
         ) : loading && !reels.length ? (
           <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
         ) : !reels.length && failed ? (
