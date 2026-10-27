@@ -62,3 +62,12 @@ textarea.wa-input-field:focus-visible, textarea.wa-input-field:focus { box-shado
   /* the old floating-pill glow must not apply to the laptop bar */
   form:focus-within .wa-input-field { box-shadow: none; }
 }
+
+/* Chats list: soft dividers that start after the avatar, calmer tap feedback */
+.group > button.w-full.select-none { position: relative; padding-top: 12px; padding-bottom: 12px; }
+.group > button.w-full.select-none::after {
+  content: ""; position: absolute; left: 76px; right: 0; bottom: 0; height: 1px;
+  background: rgb(var(--wa-muted) / .12); pointer-events: none;
+}
+.group:last-child > button.w-full.select-none::after { display: none; }
+.group > button.w-full.select-none:active { background-color: rgb(var(--wa-hover) / .9); }
