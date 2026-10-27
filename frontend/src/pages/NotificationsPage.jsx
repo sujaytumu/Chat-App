@@ -157,7 +157,7 @@ const ChoiceDialog = ({ title, options, value, onPreview, onSave, onClose, kind,
           {all.map((o) => (
             <button key={o.id} type="button" onClick={() => pick(o.id)} className="w-full flex items-center gap-4 px-6 py-3 text-left hover:bg-white/5">
               <Radio on={sel === o.id} />
-              <span className="text-[13.5px] text-wa-text truncate">{o.label}</span>
+              <span className="text-[15px] text-wa-text truncate">{o.label}</span>
             </button>
           ))}
           {allowCustom && (

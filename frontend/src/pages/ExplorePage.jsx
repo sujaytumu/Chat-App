@@ -60,7 +60,7 @@ const ExplorePage = () => {
         {!q && (
           <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
             {["#motivation", "#gym", "#study", "#focus", "#fitness"].map((t) => (
-              <button key={t} onClick={() => setQ(t)} className="shrink-0 px-3.5 py-1.5 rounded-full bg-white/10 text-[13.5px] active:bg-white/20">{t}</button>
+              <button key={t} onClick={() => setQ(t)} className="shrink-0 px-3.5 py-1.5 rounded-full bg-white/10 text-[14.5px] font-medium active:bg-white/20">{t}</button>
             ))}
           </div>
         )}
