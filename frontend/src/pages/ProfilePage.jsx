@@ -84,8 +84,8 @@ const ProfilePage = () => {
         <r.icon size={26} strokeWidth={1.7} className={iconCls} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[14.5px] leading-[22px] text-wa-text">{r.title}</span>
-        {r.sub && <span className="block text-[12.5px] leading-5 text-wa-muted mt-0.5">{r.sub}</span>}
+        <span className="block text-[15.5px] leading-[22px] font-medium text-wa-text">{r.title}</span>
+        {r.sub && <span className="block text-[13px] leading-5 text-wa-muted mt-0.5">{r.sub}</span>}
       </span>
     </>
   );
@@ -117,7 +117,7 @@ const ProfilePage = () => {
         ) : (
           <>
             <h1
-              className={`flex-1 min-w-0 truncate text-[24px] leading-none font-normal text-wa-text transition-opacity ${
+              className={`flex-1 min-w-0 truncate text-[28px] leading-none font-bold tracking-tight text-wa-text transition-opacity ${
                 scrolled ? "opacity-100" : "opacity-0"
               }`}
             >
@@ -146,7 +146,7 @@ const ProfilePage = () => {
           <div className="relative">
             <div className="relative flex flex-col items-center pt-6 pb-6">
               {authUser?.about && (
-                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-wa-surface px-5 py-3 text-[13.5px] text-wa-text text-center">
+                <Link to="/settings/account" className="relative mb-3 max-w-[80%] rounded-3xl bg-wa-surface px-5 py-3 text-[14.5px] shadow-[var(--sh-1)] text-wa-text text-center">
                   <span className="line-clamp-2 break-words">{authUser.about}</span>
                   <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 size-3 rotate-45 bg-wa-surface" />
                 </Link>
@@ -164,7 +164,7 @@ const ProfilePage = () => {
                 )}
               </button>
               <div className="mt-6 flex items-center gap-2 px-6 max-w-full">
-                <h2 className="text-[24px] leading-8 font-normal text-wa-text truncate">{authUser?.fullName}</h2>
+                <h2 className="text-[26px] leading-8 font-semibold text-wa-text truncate">{authUser?.fullName}</h2>
                 <ChevronDown size={22} className="text-wa-muted shrink-0" />
               </div>
               <button onClick={() => setShowUsername(true)} className={`mt-1 text-[14.5px] truncate max-w-full px-6 ${authUser?.username ? "text-wa-muted" : "text-[#21C063]"}`}>{handle}</button>
@@ -202,7 +202,7 @@ const ProfilePage = () => {
               <span className="size-12 flex items-center justify-center shrink-0">
                 <LogOut size={26} strokeWidth={1.7} className="text-red-400" />
               </span>
-              <span className="text-[14.5px] text-red-400">Log out</span>
+              <span className="text-[15.5px] font-medium text-red-400">Log out</span>
             </button>
           </>
         )}
