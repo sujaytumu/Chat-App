@@ -14,7 +14,6 @@ const ExplorePage = () => {
   const swipeRoot = useRef(null);
   useTabSwipe(swipeRoot); // swipe left/right = next / previous tab
   const navigate = useNavigate();
-  const me = useAuthStore((s) => s.authUser);
   const [q, setQ] = useState("");
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
