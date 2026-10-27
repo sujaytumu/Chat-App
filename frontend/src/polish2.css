@@ -71,3 +71,13 @@ textarea.wa-input-field:focus-visible, textarea.wa-input-field:focus { box-shado
 }
 .group:last-child > button.w-full.select-none::after { display: none; }
 .group > button.w-full.select-none:active { background-color: rgb(var(--wa-hover) / .9); }
+
+/* Chat screen: roomier bubbles, softer own-message colour edge, floating input bar */
+.msg-row .bg-wa-out, .msg-row .bg-wa-surface { border-radius: 18px; }
+.msg-row .bubble-tail-out.rounded-tr-none, .msg-row .bubble-tail-out { border-top-right-radius: 4px; }
+.msg-row .bubble-tail-in.rounded-tl-none, .msg-row .bubble-tail-in { border-top-left-radius: 4px; }
+.msg-row { padding-top: 1px; padding-bottom: 1px; }
+.wa-input-field { caret-color: #21C063; }
+@media (max-width: 1023px) {
+  .wa-input-field { background: rgb(var(--wa-surface)); border-radius: 22px; padding: 10px 14px; min-height: 44px; box-shadow: var(--sh-1); }
+}
