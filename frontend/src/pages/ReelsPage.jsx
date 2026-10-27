@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import FeedView, { NewPost } from "../components/FeedView";
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -85,6 +85,20 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   };
   const [rate, setRateState] = useState(() => { try { return Number(localStorage.getItem("reelRate")) || 1; } catch { return 1; } });
   const [rateOpen, setRateOpen] = useState(false);
+  // "Play same reel": keep replaying this reel instead of moving to the next one
+  const readRepeat = () => { try { return localStorage.getItem("reelRepeat") === "1"; } catch { return false; } };
+  const [repeatOn, setRepeatOn] = useState(readRepeat);
+  useEffect(() => {
+    const sync = () => setRepeatOn(readRepeat());
+    window.addEventListener("reelrepeat", sync);
+    return () => window.removeEventListener("reelrepeat", sync);
+  }, []);
+  const toggleRepeat = () => {
+    const next = !readRepeat();
+    try { localStorage.setItem("reelRepeat", next ? "1" : "0"); } catch { /* ignore */ }
+    setRepeatOn(next);
+    window.dispatchEvent(new Event("reelrepeat"));
+  };
   const [more, setMore] = useState(false);
   const [scrub, setScrub] = useState(false);
   const [fast, setFast] = useState(false); // holding the screen = 2x speed
@@ -159,7 +173,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const finished = () => {
     const v = video.current;
     if (!v || !active) return;
-    if (onNext && onNext(reel._id)) return;
+    if (!readRepeat() && onNext && onNext(reel._id)) return;
     v.currentTime = reel.trim?.start || 0;
     if (songEl.current) songEl.current.currentTime = reel.song?.start || 0;
     v.play().catch(() => {});
@@ -275,6 +289,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       )}
       <div className="absolute z-20 right-3 top-[calc(64px+env(safe-area-inset-top))] flex flex-col items-end gap-1.5">
         <button onClick={() => setRateOpen((o) => !o)} className="min-w-[44px] h-8 px-2.5 rounded-full bg-black/45 backdrop-blur-sm ring-1 ring-white/15 text-white text-[13px] font-bold tabular-nums active:scale-95 transition-transform" aria-label="Playback speed">{rate}×</button>
+        <button onClick={toggleRepeat} className={`size-8 rounded-full backdrop-blur-sm ring-1 flex items-center justify-center active:scale-95 transition-transform ${repeatOn ? "bg-[#25D366] ring-[#25D366] text-black" : "bg-black/45 ring-white/15 text-white"}`} aria-label={repeatOn ? "Play same reel: on" : "Play same reel: off"} title="Play same reel"><Repeat1 size={16} /></button>
         {rateOpen && (
           <div className="flex flex-col rounded-2xl bg-black/75 py-1 wa-pop-in">
             {[0.5, 0.75, 1, 1.25, 1.5, 2].map((r) => (
