@@ -1,12 +1,15 @@
 import { useSyncExternalStore, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
 import { useCallStore } from "../store/useCallStore";
+import { useChatStore } from "../store/useChatStore";
 
 // Keeps every device on the newest build. When a newer build exists, ONE big popup asks the person to
 // update (never during a call); otherwise the app just runs normally. The Update button stays until the person taps it and the new build is running.
 
 const ENTRY_RE = /assets\/index-[A-Za-z0-9_-]+\.js/;
 const RELOAD_LOG_KEY = "talkies-auto-reloads";
-const CHECK_EVERY_MS = 5 * 60 * 1000;
+const CHECK_EVERY_MS = 2 * 60 * 1000;
 
 function currentEntry() {
   const el = document.querySelector('script[type="module"][src*="assets/index-"]');
@@ -129,6 +132,30 @@ export function UpdateButton() {
       className="h-8 px-3.5 mr-1 rounded-full bg-[#25D366] text-[#0b141a] text-[13px] font-semibold disabled:opacity-70 active:scale-95 transition-transform"
     >
       {updating ? "Updating…" : "Update"}
+    </button>
+  );
+}
+
+// The same Update button on EVERY screen (Reels, Feed, Post, Search, Updates, Calls, You), floating above the
+// bottom bar. Chats keeps its own pill at the top of the list, and it stays away from calls and open chats.
+export function GlobalUpdatePill() {
+  const ready = useSyncExternalStore((cb) => (listeners.add(cb), () => listeners.delete(cb)), () => updateReady);
+  const busyCall = useCallStore((s) => s.callStatus !== "idle");
+  const chatOpen = useChatStore((s) => !!s.selectedChat);
+  const { pathname } = useLocation();
+  const [updating, setUpdating] = useState(false);
+  if (!ready || busyCall || pathname === "/" || chatOpen || pathname === "/login" || pathname === "/signup") return null;
+  return (
+    <button
+      disabled={updating}
+      onClick={() => {
+        setUpdating(true);
+        applyUpdate();
+      }}
+      className="fixed left-1/2 -translate-x-1/2 bottom-[calc(84px+env(safe-area-inset-bottom))] lg:bottom-6 z-[95] h-10 pl-3.5 pr-4 rounded-full bg-[#25D366] text-[#0b141a] text-[14px] font-semibold shadow-[0_6px_20px_rgba(0,0,0,.45)] flex items-center gap-2 disabled:opacity-70 active:scale-95 transition-transform"
+    >
+      <RefreshCw size={16} className={updating ? "animate-spin" : ""} />
+      {updating ? "Updating…" : "Update available"}
     </button>
   );
 }
