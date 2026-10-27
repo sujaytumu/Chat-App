@@ -232,8 +232,8 @@ const CallsPage = () => {
           )}
         </div>
       ) : (
-        <div className="flex items-center justify-between pl-4 pr-2 h-16 shrink-0">
-          <h1 className="text-[22px] lg:text-[22px] leading-none font-normal text-wa-text">Calls</h1>
+        <div className="flex items-center justify-between pl-5 pr-2 h-16 shrink-0">
+          <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Calls</h1>
           <div className="flex items-center">
             <button onClick={() => setSearching(true)} className="size-11 rounded-full flex items-center justify-center text-wa-text active:bg-white/10" aria-label="Search calls">
               <Search size={24} />
@@ -262,7 +262,7 @@ const CallsPage = () => {
               <button onClick={() => setPicker(true)} className={circleBtn} aria-label="Call">
                 <Phone size={24} />
               </button>
-              <span className="text-[13px] text-wa-muted">Call</span>
+              <span className="text-[13px] font-medium text-wa-text/80">Call</span>
             </div>
             <div className="flex flex-col items-center gap-2 w-[76px] shrink-0">
               <button
@@ -272,19 +272,19 @@ const CallsPage = () => {
               >
                 <Heart size={24} />
               </button>
-              <span className="text-[13px] text-wa-muted">Favourites</span>
+              <span className="text-[13px] font-medium text-wa-text/80">Favourites</span>
             </div>
             <div className="flex flex-col items-center gap-2 w-[76px] shrink-0">
               <button onClick={() => setLinkSheet("schedule")} className={circleBtn} aria-label="Schedule call">
                 <CalendarClock size={24} />
               </button>
-              <span className="text-[13px] text-wa-muted">Schedule</span>
+              <span className="text-[13px] font-medium text-wa-text/80">Schedule</span>
             </div>
             <div className="flex flex-col items-center gap-2 w-[76px] shrink-0">
               <button onClick={() => setLinkSheet("link")} className={circleBtn} aria-label="Call link">
                 <Link2 size={24} />
               </button>
-              <span className="text-[13px] text-wa-muted">Call link</span>
+              <span className="text-[13px] font-medium text-wa-text/80">Call link</span>
             </div>
             {quick.map((u) => (
               <button key={u._id} onClick={() => callBack(u, "audio")} className="flex flex-col items-center gap-2 w-[76px] shrink-0 active:opacity-70">
@@ -297,7 +297,7 @@ const CallsPage = () => {
 
         {!searching && upcoming.length > 0 && (
           <>
-            <h2 className="px-4 pb-1 text-[16px] text-wa-text">Upcoming and links</h2>
+            <h2 className="px-5 pb-1 text-[12px] font-semibold uppercase tracking-wider text-wa-muted">Upcoming and links</h2>
             {upcoming.map((l) => {
               const mine = l.creatorId === myId;
               return (
@@ -328,9 +328,9 @@ const CallsPage = () => {
           </>
         )}
 
-        {!searching && <h2 className="px-4 pb-1 text-[16px] lg:text-[16px] text-wa-text">Recent</h2>}
+        {!searching && <h2 className="px-5 pb-1 text-[12px] font-semibold uppercase tracking-wider text-wa-muted">Recent</h2>}
         {!searching && (
-          <div className="flex gap-2 px-4 pt-1 pb-2">
+          <div className="flex gap-2 px-5 pt-1 pb-3">
             {[["all", "All"], ["missed", "Missed"], ["video", "Video"]].map(([id, label]) => (
               <button
                 key={id}
@@ -357,10 +357,10 @@ const CallsPage = () => {
             const red = r.d.missedIncoming;
             return (
               <div key={first._id} className="flex items-center hover:bg-wa-surface/70 active:bg-wa-surface transition-colors">
-                <button onClick={() => setInfo(r)} className="flex-1 min-w-0 flex items-center gap-3 lg:gap-3.5 pl-3 py-2.5 text-left">
+                <button onClick={() => setInfo(r)} className="flex-1 min-w-0 flex items-center gap-3 lg:gap-3.5 pl-4 py-3 text-left">
                   <Avatar src={r.other.profilePic} name={r.other.fullName} size="size-12" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[17px] lg:text-[16px] leading-[22px] truncate" style={{ color: red ? RED : undefined }}>
+                    <p className="text-[16.5px] lg:text-[15.5px] font-medium leading-[22px] truncate" style={{ color: red ? RED : undefined }}>
                       <span className={red ? "" : "text-wa-text"}>{r.other.fullName}</span>
                       {r.calls.length > 1 && <span className={red ? "" : "text-wa-text"}> ({r.calls.length})</span>}
                     </p>
@@ -386,7 +386,7 @@ const CallsPage = () => {
       {/* New call button */}
       <button
         onClick={() => setPicker(true)}
-        className="absolute bottom-[calc(88px+env(safe-area-inset-bottom))] lg:bottom-5 right-4 size-14 rounded-2xl bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-wa-bg flex items-center justify-center shadow-lg shadow-black/40 transition-all"
+        className="absolute bottom-[calc(88px+env(safe-area-inset-bottom))] lg:bottom-5 right-4 size-14 rounded-[20px] bg-[#21C063] hover:bg-[#1fb85f] active:scale-95 text-wa-bg flex items-center justify-center shadow-xl shadow-[#21C063]/30 transition-all"
         aria-label="New call"
         title="New call"
       >
