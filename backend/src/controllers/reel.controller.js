@@ -1,4 +1,5 @@
 import { INSTAGRAM_REELS } from "../data/instagramReels.js";
+import { logActivity } from "../lib/activity.js";
 import mongoose from "mongoose";
 import Reel from "../models/reel.model.js";
 import StatusComment from "../models/statusComment.model.js";
@@ -537,7 +538,7 @@ export const createReel = async (req, res) => {
 export const likeReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    const r = await Reel.findById(req.params.id).select("userId likes").lean();
+    const r = await Reel.findById(req.params.id).select("userId likes poster").lean();
     if (!r || (r.userId && !(await canSee(req.user, r.userId)))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.liked !== false;
     const already = (r.likes || []).some((l) => String(l) === String(req.user._id));
@@ -550,6 +551,7 @@ export const likeReel = async (req, res) => {
         tag: `reel-like-${req.params.id}`,
         data: { url: `/reels?r=${req.params.id}` },
       }).catch(() => {});
+      logActivity({ to: r.userId, actor: req.user, type: "like", kind: "reel", targetId: req.params.id, thumb: r.poster || "" });
     }
     res.status(200).json({ liked: want, likeCount: upd.likes.length });
   } catch (error) {

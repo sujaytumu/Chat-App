@@ -5,6 +5,25 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 
+// One photo, or a swipeable set with a 1/3 counter and dots
+const PostImages = ({ images }) => {
+  const [i, setI] = useState(0);
+  if (images.length < 2) return <img src={optimizeImage(images[0], 900)} alt="" loading="lazy" decoding="async" className="w-full max-h-[75vh] object-cover bg-white/5" />;
+  return (
+    <div className="relative">
+      <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar" onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+        {images.map((src, k) => (
+          <img key={k} src={optimizeImage(src, 900)} alt="" loading="lazy" decoding="async" className="w-full shrink-0 snap-center max-h-[75vh] object-cover bg-white/5" />
+        ))}
+      </div>
+      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white">{i + 1}/{images.length}</span>
+      <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
+        {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
+      </div>
+    </div>
+  );
+};
+
 // Loads the next posts by itself when you scroll near the end (no "Load more" tap)
 const MoreSentinel = ({ onVisible }) => {
   const el = useRef(null);
@@ -46,18 +65,21 @@ const shrink = (dataUrl, max = 1600) =>
   });
 
 export const NewPost = ({ onClose, onPosted }) => {
-  const [img, setImg] = useState(null);
+  const [imgs, setImgs] = useState([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
   const pick = async (e) => {
-    const f = e.target.files?.[0];
+    const files = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 10 - imgs.length);
     e.target.value = "";
-    if (f?.type.startsWith("image/")) setImg(await shrink(await readFile(f)));
+    if (!files.length) return;
+    const out = [];
+    for (const f of files) out.push(await shrink(await readFile(f)));
+    setImgs((cur) => [...cur, ...out].slice(0, 10));
   };
   const post = async () => {
     setBusy(true);
     try {
-      const { data } = await axiosInstance.post("/posts", { image: img, caption }, { timeout: 120000 });
+      const { data } = await axiosInstance.post("/posts", { images: imgs, caption }, { timeout: 120000 });
       onPosted(data);
     } catch (e) {
       toast.error(e.response?.data?.error || "Couldn't post");
@@ -69,15 +91,29 @@ export const NewPost = ({ onClose, onPosted }) => {
       <div className="flex items-center gap-3 px-4 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
         <button onClick={onClose} aria-label="Close"><X size={26} /></button>
         <h3 className="flex-1 text-[17px] font-semibold">New post</h3>
-        <button disabled={!img || busy} onClick={post} className="text-[#25D366] font-semibold disabled:opacity-40">{busy ? "Posting…" : "Share"}</button>
+        <button disabled={!imgs.length || busy} onClick={post} className="text-[#25D366] font-semibold disabled:opacity-40">{busy ? "Posting…" : "Share"}</button>
       </div>
       <div className="flex-1 overflow-y-auto px-4">
-        {img ? (
-          <img src={img} alt="" className="w-full max-h-[55vh] object-contain rounded-xl bg-white/5" />
+        {imgs.length ? (
+          <div className="flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
+            {imgs.map((src, i) => (
+              <div key={i} className="relative shrink-0 snap-center w-[78%] max-w-[360px]">
+                <img src={src} alt="" className="w-full h-[48vh] object-cover rounded-xl bg-white/5" />
+                <button onClick={() => setImgs((c) => c.filter((_, k) => k !== i))} aria-label="Remove photo" className="absolute top-2 right-2 size-7 rounded-full bg-black/60 flex items-center justify-center"><X size={16} /></button>
+                <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[12px]">{i + 1}/{imgs.length}</span>
+              </div>
+            ))}
+            {imgs.length < 10 && (
+              <label className="shrink-0 w-[34%] h-[48vh] rounded-xl bg-white/10 flex flex-col items-center justify-center gap-2 text-white/70 cursor-pointer text-[13px] text-center">
+                <ImagePlus size={28} /> Add more
+                <input type="file" accept="image/*" multiple className="hidden" onChange={pick} />
+              </label>
+            )}
+          </div>
         ) : (
           <label className="h-64 rounded-xl bg-white/10 flex flex-col items-center justify-center gap-2 text-white/70 cursor-pointer">
-            <ImagePlus size={36} /> Choose a photo
-            <input type="file" accept="image/*" className="hidden" onChange={pick} />
+            <ImagePlus size={36} /> Choose photos (up to 10)
+            <input type="file" accept="image/*" multiple className="hidden" onChange={pick} />
           </label>
         )}
         <textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} rows={3} placeholder="Write a caption…" className="mt-3 w-full rounded-xl bg-white/10 px-3.5 py-3 text-[14.5px] placeholder:text-white/50 outline-none resize-none" />
@@ -196,7 +232,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative" onDoubleClick={() => doubleTap(p)}>
-                <img src={optimizeImage(p.image, 900)} alt="" loading="lazy" decoding="async" className="w-full max-h-[75vh] object-cover bg-white/5" />
+                <PostImages images={p.images?.length ? p.images : [p.image]} />
                 {pop === p._id && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <Heart size={96} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />

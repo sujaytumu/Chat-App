@@ -7,6 +7,7 @@ import Post from "../models/post.model.js";
 import { canSee } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import { sendPushToUser } from "../lib/webPush.js";
+import { logActivity } from "../lib/activity.js";
 
 const canSeeAudience = (a, viewerId) => {
   if (!a || !a.mode || a.mode === "all") return true;
@@ -23,15 +24,15 @@ const resolveTarget = async (targetId, viewerId) => {
     const own = String(st.userId) === String(viewerId);
     return own || canSeeAudience(st.audience, viewerId) ? { ownerId: String(st.userId) } : null;
   }
-  const reel = await Reel.findById(targetId).select("userId").lean();
+  const reel = await Reel.findById(targetId).select("userId poster").lean();
   if (reel) {
     if (!reel.userId) return { ownerId: null }; // an imported Discover clip: open to everyone
-    return (await canSee({ _id: viewerId }, reel.userId)) ? { ownerId: String(reel.userId) } : null;
+    return (await canSee({ _id: viewerId }, reel.userId)) ? { ownerId: String(reel.userId), kind: "reel", thumb: reel.poster || "", url: `/reels?r=${targetId}` } : null;
   }
-  const post = await Post.findById(targetId).select("userId").lean();
+  const post = await Post.findById(targetId).select("userId image").lean();
   if (post) {
     const own = String(post.userId) === String(viewerId);
-    return own || (await canSee({ _id: viewerId }, post.userId)) ? { ownerId: String(post.userId) } : null;
+    return own || (await canSee({ _id: viewerId }, post.userId)) ? { ownerId: String(post.userId), kind: "post", thumb: post.image, url: "/reels?feed=1" } : null;
   }
   const h = await Highlight.findOne({ "items._id": targetId }).select("userId items._id items.audience").lean();
   const item = h?.items?.find((i) => String(i._id) === String(targetId));
@@ -104,8 +105,9 @@ export const addComment = async (req, res) => {
         body: `💬 ${req.user.fullName} ${uid === parentAuthor && uid !== target.ownerId ? "replied to your comment" : "commented"}: ${text.slice(0, 80)}`,
         icon: req.user.profilePic || "/icon-v2-192.png",
         tag: `status-comment-${targetId}`,
-        data: { url: "/status" },
+        data: { url: target.url || "/status" },
       });
+      if (target.kind) logActivity({ to: uid, actor: req.user, type: uid === parentAuthor && uid !== target.ownerId ? "reply" : "comment", kind: target.kind, targetId, thumb: target.thumb, text });
     }
     res.status(201).json(out);
   } catch (error) {
