@@ -42,7 +42,7 @@ const Row = ({ icon: Icon, title, subtitle, right, onClick, danger, disabled }) 
       <Icon size={19} />
     </span>
     <span className="flex-1 min-w-0">
-      <span className={`block text-[13.5px] ${danger ? "text-[#F15C6D]" : "text-wa-text"}`}>{title}</span>
+      <span className={`block text-[15px] ${danger ? "text-[#F15C6D]" : "text-wa-text"}`}>{title}</span>
       {subtitle && <span className="block text-[12.5px] text-wa-muted mt-0.5">{subtitle}</span>}
     </span>
     {right}
@@ -330,7 +330,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                             setMenu(false);
                             o.run();
                           }}
-                          className="w-full flex items-center gap-4 px-5 py-3 text-left text-[13.5px] hover:bg-white/5"
+                          className="w-full flex items-center gap-4 px-5 py-3 text-left text-[15px] hover:bg-white/5"
                         >
                           <o.icon size={19} className="text-wa-icon" /> {o.label}
                         </button>
@@ -421,14 +421,14 @@ const GroupInfoModal = ({ group, onClose }) => {
                   rows={3}
                   onChange={(e) => setDescDraft(e.target.value)}
                   placeholder="Add group description"
-                  className="w-full rounded-xl bg-wa-field px-4 py-3 text-[13.5px] focus:outline-none resize-none"
+                  className="w-full rounded-xl bg-wa-field px-4 py-3 text-[15px] focus:outline-none resize-none"
                   aria-label="Group description"
                 />
               </div>
             ) : (
               <>
                 <h4 className="mt-3 text-[22px] font-medium tracking-tight leading-tight text-center break-words max-w-full">{group.name}</h4>
-                <p className="mt-1 text-[13.5px] text-wa-muted">
+                <p className="mt-1 text-[15px] text-wa-muted">
                   Group · {group.members.length} member{group.members.length === 1 ? "" : "s"}
                 </p>
                 {group.description ? (
@@ -441,7 +441,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                         setDescDraft("");
                         setEditMode(true);
                       }}
-                      className="mt-3 text-[13.5px] text-[#21C063]"
+                      className="mt-3 text-[15px] text-[#21C063]"
                     >
                       Add group description
                     </button>
@@ -467,7 +467,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               <button
                 key={t}
                 onClick={() => goTab(t)}
-                className={`flex-1 py-2.5 text-[13.5px] transition-colors duration-200 ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
+                className={`flex-1 py-2.5 text-[15px] transition-colors duration-200 ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
               >
                 {t}
               </button>
@@ -484,7 +484,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
                 {memberSearch == null ? (
                   <>
-                    <span className="text-[13.5px] text-wa-muted">
+                    <span className="text-[15px] text-wa-muted">
                       {group.members.length} member{group.members.length === 1 ? "" : "s"}
                     </span>
                     <button onClick={() => setMemberSearch("")} className="text-wa-muted p-1" aria-label="Search members">
@@ -499,7 +499,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                       value={memberSearch}
                       onChange={(e) => setMemberSearch(e.target.value)}
                       placeholder="Search members"
-                      className="flex-1 bg-transparent outline-none text-[13.5px]"
+                      className="flex-1 bg-transparent outline-none text-[15px]"
                     />
                     <button onClick={() => setMemberSearch(null)} aria-label="Close search">
                       <X size={18} className="text-wa-muted" />
@@ -529,7 +529,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                           onChange={() => setToAdd((prev) => (prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]))}
                         />
                         <Avatar src={u.profilePic} name={u.fullName} size="size-8" textSize="text-sm" />
-                        <span className="text-[13.5px]">{u.fullName}</span>
+                        <span className="text-[15px]">{u.fullName}</span>
                       </label>
                     ))}
                     {nonMembers.length === 0 && <p className="text-xs text-wa-muted">Everyone is already in this group</p>}
@@ -584,17 +584,17 @@ const GroupInfoModal = ({ group, onClose }) => {
                           <>
                             <div className="fixed inset-0 z-30" onClick={() => setMemberMenu(null)} />
                             <div style={memberMenuPos} className="fixed z-40 w-52 overflow-y-auto bg-wa-pop rounded-2xl shadow-2xl border border-white/10 py-2">
-                              <button className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate" onClick={() => messageMember(member)}>
+                              <button className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate" onClick={() => messageMember(member)}>
                                 Message {member.fullName}
                               </button>
-                              <button className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate" onClick={() => callMember(member, "audio")}>
+                              <button className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "audio")}>
                                 Voice call {member.fullName}
                               </button>
-                              <button className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate" onClick={() => callMember(member, "video")}>
+                              <button className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "video")}>
                                 Video call {member.fullName}
                               </button>
                               <button
-                                className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5 truncate"
+                                className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate"
                                 onClick={() => {
                                   setMemberMenu(null);
                                   setViewMember(memberUser(member));
@@ -605,7 +605,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                               {isAdmin && (
                                 <>
                               <button
-                                className="w-full text-left px-4 py-2.5 text-[13.5px] hover:bg-white/5"
+                                className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5"
                                 onClick={() => {
                                   setMemberMenu(null);
                                   setGroupAdmin(group._id, member._id, !memberIsAdmin);
@@ -614,7 +614,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                                 {memberIsAdmin ? "Dismiss as admin" : "Make group admin"}
                               </button>
                               <button
-                                className="w-full text-left px-4 py-2.5 text-[13.5px] text-[#F15C6D] hover:bg-white/5 flex items-center gap-2"
+                                className="w-full text-left px-4 py-2.5 text-[15px] text-[#F15C6D] hover:bg-white/5 flex items-center gap-2"
                                 onClick={() => {
                                   setMemberMenu(null);
                                   confirm(`Remove ${member.fullName} from the group?`) && removeMemberFromGroup(group._id, member._id);
@@ -639,7 +639,7 @@ const GroupInfoModal = ({ group, onClose }) => {
             <div ref={(n) => (sectionRefs.current.Media = n)} className="pb-8 border-t border-white/10">
               <button onClick={() => setShowMedia(true)} className="w-full flex items-center justify-between px-5 pt-4 pb-3 text-left">
                 <span className="text-[14.5px]">Media, links and docs</span>
-                <span className="flex items-center gap-1 text-wa-muted text-[13.5px]">
+                <span className="flex items-center gap-1 text-wa-muted text-[15px]">
                   {mediaCount} <ChevronRight size={18} />
                 </span>
               </button>
@@ -656,7 +656,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                 <Row icon={Star} title="Starred messages" right={<span className="flex items-center gap-1 text-wa-muted">{starred?.length || ""}<ChevronRight size={18} /></span>} onClick={() => setShowStarred(true)} />
               </div>
 
-              <p className="px-5 pt-5 pb-1 text-[13.5px] text-wa-muted">Settings</p>
+              <p className="px-5 pt-5 pb-1 text-[15px] text-wa-muted">Settings</p>
               <Row icon={Settings} title="Group permissions" onClick={() => setShowPerms(true)} />
               <Row
                 icon={Bell}

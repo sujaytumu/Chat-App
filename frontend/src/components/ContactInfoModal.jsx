@@ -49,7 +49,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
           <button onClick={onClose} aria-label="Close">
             <X size={24} />
           </button>
-          <h3 className="text-[16px]">Contact info</h3>
+          <h3 className="text-[18px] font-semibold">Contact info</h3>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -62,7 +62,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
             >
               <img src={optimizeImage(user.profilePic || "/avatar.png", 320)} alt={user.fullName} className="size-full object-cover" />
             </button>
-            <h2 className="text-[22px] mt-2 text-center break-words">{user.fullName}</h2>
+            <h2 className="text-[24px] font-semibold mt-2 text-center break-words">{user.fullName}</h2>
             <p className="text-[13px] text-wa-muted">{status}</p>
             <div className="flex gap-3 mt-4 w-full justify-center">
               {actions.map((a) => (
@@ -81,15 +81,15 @@ const ContactInfoModal = ({ user, status, onClose }) => {
 
           {user.about && (
             <div className="px-5 py-4 border-b border-white/10">
-              <p className="text-[13.5px] break-words whitespace-pre-wrap">{user.about}</p>
-              <p className="text-[11.5px] text-wa-muted mt-0.5">About</p>
+              <p className="text-[15px] break-words whitespace-pre-wrap">{user.about}</p>
+              <p className="text-[12.5px] text-wa-muted mt-0.5">About</p>
             </div>
           )}
 
           <ProfileHighlights user={user} />
 
           <button onClick={() => setShowMedia(true)} className={`${row} !border-b-0`}>
-            <span className="flex-1 text-[13.5px]">Media, links and docs</span>
+            <span className="flex-1 text-[15px]">Media, links and docs</span>
             <span className="text-wa-muted">{mediaCount || ""}</span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
@@ -103,13 +103,13 @@ const ContactInfoModal = ({ user, status, onClose }) => {
 
           <button onClick={() => setShowStarred(true)} className={row}>
             <Star size={22} className="text-wa-muted" />
-            <span className="flex-1 text-[13.5px]">Starred messages</span>
+            <span className="flex-1 text-[15px]">Starred messages</span>
             <span className="text-wa-muted">{starred?.length || ""}</span>
             <ChevronRight size={18} className="text-wa-muted" />
           </button>
           <button onClick={() => (muted ? setChatMuted(chat, false) : setShowMute(true))} className={row}>
             {muted ? <BellOff size={22} className="text-wa-muted" /> : <Bell size={22} className="text-wa-muted" />}
-            <span className="flex-1 text-[13.5px]">Mute notifications</span>
+            <span className="flex-1 text-[15px]">Mute notifications</span>
             <span
               className={`relative w-10 h-6 rounded-full transition-colors ${muted ? "bg-[#00A884]" : "bg-wa-field"}`}
               aria-hidden="true"
@@ -120,7 +120,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
           <button onClick={() => setShowDisappear(true)} className={row}>
             <Timer size={22} className="text-wa-muted" />
             <span className="flex-1">
-              <span className="block text-[13.5px]">Disappearing messages</span>
+              <span className="block text-[15px]">Disappearing messages</span>
               <span className="block text-[11.5px] text-wa-muted">{DISAPPEAR_LABELS[secs] || "Off"}</span>
             </span>
             <ChevronRight size={18} className="text-wa-muted" />
@@ -134,14 +134,14 @@ const ContactInfoModal = ({ user, status, onClose }) => {
             className={`${row} text-[#F15C6D]`}
           >
             <Ban size={22} />
-            <span className="flex-1 text-[13.5px]">{blocked ? "Unblock" : "Block"} {user.fullName}</span>
+            <span className="flex-1 text-[15px]">{blocked ? "Unblock" : "Block"} {user.fullName}</span>
           </button>
           <button
             onClick={() => toast("Thanks — we'll review this contact.", { icon: "🚩" })}
             className={`${row} text-[#F15C6D] !border-b-0`}
           >
             <ThumbsDown size={22} />
-            <span className="flex-1 text-[13.5px]">Report {user.fullName}</span>
+            <span className="flex-1 text-[15px]">Report {user.fullName}</span>
           </button>
         </div>
       </div>
