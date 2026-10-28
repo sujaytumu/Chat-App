@@ -81,6 +81,13 @@ public class MainActivity extends BridgeActivity {
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 super.onPageStarted(view, url, favicon);
                 view.evaluateJavascript(ADD_LISTENER_PATCH, null);
+                // a fresh page load never starts with a private photo open: drop the "secure window" flag
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        PrivacyScreenPlugin.clear(MainActivity.this);
+                    }
+                });
             }
 
             @Override
@@ -192,6 +199,7 @@ public class MainActivity extends BridgeActivity {
         // Custom plugins must be registered before super.onCreate
         registerPlugin(ScreenSharePlugin.class);
         registerPlugin(AppChromePlugin.class);
+        registerPlugin(PrivacyScreenPlugin.class);
         registerPlugin(TalkiesPushPlugin.class);
         registerPlugin(CallKeepAlivePlugin.class);
         showOverLockScreenIfCall(getIntent());

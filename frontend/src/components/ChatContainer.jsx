@@ -6,6 +6,7 @@ import ChatHeader from "./ChatHeader";
 import MessageInput from "./MessageInput";
 import MessageSkeleton from "./skeletons/MessageSkeleton";
 import ImageLightbox from "./ImageLightbox";
+import ViewOnceViewer from "./ViewOnceViewer";
 import MessageTicks, { GroupMessageTicks } from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
@@ -214,6 +215,8 @@ const ChatContainer = () => {
   const messageEndRef = useRef(null);
   const messageRefs = useRef({});
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [viewOnceSrc, setViewOnceSrc] = useState(null); // a view-once photo being looked at (private viewer, not the gallery)
+  const openingViewOnce = useRef(false);
   const galleryImages = useMemo(() => messages.filter((m) => m.image && !m.viewOnce && !m.deletedForEveryone).map((m) => m.image), [messages]);
   const [hoveredId, setHoveredId] = useState(null);
   const [forwardingMessage, setForwardingMessage] = useState(null);
@@ -755,8 +758,14 @@ const ChatContainer = () => {
                       type="button"
                       disabled={message.viewOnceOpened || isMe}
                       onClick={async () => {
-                        const url = await openViewOnce(message._id);
-                        if (url) setLightboxSrc(url);
+                        if (openingViewOnce.current) return; // a double tap must not spend the one view twice
+                        openingViewOnce.current = true;
+                        try {
+                          const url = await openViewOnce(message._id);
+                          if (url) setViewOnceSrc(url);
+                        } finally {
+                          openingViewOnce.current = false;
+                        }
                       }}
                       className={`flex items-center gap-2 py-0.5 text-[13px] ${message.viewOnceOpened ? "text-wa-muted" : "text-wa-text"}`}
                     >
@@ -940,6 +949,7 @@ const ChatContainer = () => {
         );
       })()}
       <ImageLightbox src={lightboxSrc} gallery={galleryImages} onClose={() => setLightboxSrc(null)} />
+      <ViewOnceViewer src={viewOnceSrc} onClose={() => setViewOnceSrc(null)} />
       {forwardingMessage && (
         <ForwardMessageModal message={forwardingMessage} onClose={() => setForwardingMessage(null)} />
       )}

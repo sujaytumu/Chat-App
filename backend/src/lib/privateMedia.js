@@ -131,6 +131,36 @@ export function deliveryUrl(raw, { width } = {}) {
   return cloudinary.url(id, opts);
 }
 
+// A view-once photo that nobody opens is thrown away after this long.
+export const VIEW_ONCE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+// The picture's bytes, read by the server itself. A view-once photo is handed to the receiver
+// from here, so no long-lived (signed) Cloudinary address ever reaches the browser.
+export async function fetchPrivateImage(raw, { maxBytes = 15 * 1024 * 1024 } = {}) {
+  const resp = await fetch(deliveryUrl(raw), { signal: AbortSignal.timeout(15000) });
+  if (!resp.ok) throw new Error(`storage answered ${resp.status}`);
+  const type = resp.headers.get("content-type") || "";
+  if (!type.startsWith("image/")) throw new Error("not an image");
+  const buf = Buffer.from(await resp.arrayBuffer());
+  if (!buf.length || buf.length > maxBytes) throw new Error("bad image size");
+  return { buf, type };
+}
+
+// Delete a private file from Cloudinary for good (and drop it from the CDN cache). Used for a
+// view-once photo the moment it has been opened, so any address that leaked stops working.
+export async function destroyPrivateAsset(raw) {
+  const m = PARSE.exec(String(raw).split("?")[0]);
+  if (!m) return false;
+  const [, resourceType, type, , rest] = m;
+  let id = decodeURIComponent(rest);
+  if (resourceType !== "raw") {
+    const dot = id.lastIndexOf(".");
+    if (dot > 0) id = id.slice(0, dot);
+  }
+  const r = await cloudinary.uploader.destroy(id, { resource_type: resourceType, type, invalidate: true });
+  return r?.result === "ok";
+}
+
 // Forwarding sends back the /api/media/ address it was shown: turn it into a fetchable one (after checking access).
 export async function resolveMediaRef(ref, userId) {
   if (typeof ref !== "string" || !ref.startsWith("/api/media/")) return ref;

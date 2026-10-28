@@ -6,6 +6,8 @@ import { io } from "./socket.js";
 import CallLink from "../models/callLink.model.js";
 import { sendPushToUsers, sendPushToUser } from "./webPush.js";
 import Reminder from "../models/reminder.model.js";
+import Message from "../models/message.model.js";
+import { destroyPrivateAsset, VIEW_ONCE_TTL_MS } from "./privateMedia.js";
 
 // Every few seconds: send whatever has come due, through the normal send code
 // (so ticks, push notifications, blocking and disappearing timers all behave).
@@ -82,7 +84,23 @@ async function messageReminders() {
   }
 }
 
+// View-once photos nobody opened within 14 days: delete the hidden file so it doesn't sit there forever.
+let lastViewOncePurge = 0;
+async function purgeExpiredViewOnce() {
+  if (Date.now() - lastViewOncePurge < 30 * 60 * 1000) return;
+  lastViewOncePurge = Date.now();
+  const stale = await Message.find({ viewOnce: true, viewOnceOpened: false, createdAt: { $lt: new Date(Date.now() - VIEW_ONCE_TTL_MS) } })
+    .select("+viewOnceUrl")
+    .limit(50);
+  for (const m of stale) {
+    const url = m.viewOnceUrl;
+    const claimed = await Message.findOneAndUpdate({ _id: m._id, viewOnceOpened: false }, { $set: { viewOnceOpened: true }, $unset: { viewOnceUrl: 1 } });
+    if (claimed && url) await destroyPrivateAsset(url).catch((e) => console.log("View-once cleanup failed:", e.message));
+  }
+}
+
 async function tick() {
+  await purgeExpiredViewOnce().catch((e) => console.log("View-once purge error:", e.message));
   await messageReminders().catch((e) => console.log("Message reminder error:", e.message));
   await callReminders().catch((e) => console.log("Call reminder error:", e.message));
   await endExpiredMutes().catch((e) => console.log("Mute expiry error:", e.message));
