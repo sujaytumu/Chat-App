@@ -759,14 +759,28 @@ export const useChatStore = create((set, get) => ({
       toast.error(error.response?.data?.error || "Couldn't save your vote");
     }
   },
+  // The server sends the picture itself (bytes, not a link). Returns a temporary in-memory address
+  // for the viewer, which draws it and discards it; null if it can't be opened.
   openViewOnce: async (messageId) => {
+    const markOpened = () => set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, viewOnceOpened: true } : m)) }));
     try {
-      const res = await axiosInstance.post(`/messages/view-once/${messageId}`);
-      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, viewOnceOpened: true } : m)) }));
-      return res.data.image;
+      const res = await axiosInstance.post(`/messages/view-once/${messageId}`, null, { responseType: "blob" });
+      markOpened();
+      return URL.createObjectURL(res.data);
     } catch (error) {
-      toast.error(error.response?.data?.error || "Couldn't open photo");
-      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, viewOnceOpened: true } : m)) }));
+      // with responseType "blob" the error body arrives as a Blob too
+      let msg = "Couldn't open photo";
+      let gone = false;
+      try {
+        const data = error.response?.data;
+        const body = data instanceof Blob ? JSON.parse(await data.text()) : data;
+        if (body?.error) msg = body.error;
+        gone = [404, 410].includes(error.response?.status);
+      } catch {
+        /* keep the default message */
+      }
+      toast.error(msg);
+      if (gone) markOpened(); // already opened / expired: nothing left to tap
       return null;
     }
   },

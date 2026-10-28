@@ -16,7 +16,7 @@ import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUser } from "../lib/webPush.js";
 import { getUserLean, getUserDoc } from "../lib/authCache.js";
 import { rememberMessage } from "../lib/recentMessages.js";
-import { resolveMediaRef, deliveryUrl } from "../lib/privateMedia.js";
+import { resolveMediaRef, deliveryUrl, fetchPrivateImage, destroyPrivateAsset, VIEW_ONCE_TTL_MS } from "../lib/privateMedia.js";
 import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
 import Reminder from "../models/reminder.model.js";
@@ -564,6 +564,15 @@ export const deleteMessage = async (req, res) => {
       if (!message.senderId.equals(myId)) {
         return res.status(403).json({ error: "You can only delete your own messages for everyone" });
       }
+      // A view-once photo nobody opened yet: delete the hidden file too, not just the message.
+      if (message.viewOnce && !message.viewOnceOpened) {
+        const hidden = await Message.findOneAndUpdate(
+          { _id: message._id, viewOnceOpened: false },
+          { $set: { viewOnceOpened: true }, $unset: { viewOnceUrl: 1 } }
+        ).select("+viewOnceUrl");
+        message.viewOnceOpened = true;
+        if (hidden?.viewOnceUrl) destroyPrivateAsset(hidden.viewOnceUrl).catch((e) => console.log("View-once cleanup failed:", e.message));
+      }
       message.deletedForEveryone = true;
       message.text = "";
       message.image = "";
@@ -1076,28 +1085,63 @@ export const votePoll = async (req, res) => {
   }
 };
 
-// Open a view-once photo: only the receiver, only once. The picture is handed
-// over in this response and then removed from the server.
+// Open a view-once photo: only the receiver, only once. The server reads the picture itself and
+// sends the bytes in this one response (never a link), then deletes the stored file, so there is
+// no address to copy, share or open a second time.
 export const openViewOnce = async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
-    const message = await Message.findOne({ _id: id, receiverId: req.user._id, viewOnce: true, viewOnceOpened: false })
-      .select("+viewOnceUrl senderId receiverId");
+    const message = await Message.findOne({
+      _id: id,
+      receiverId: req.user._id,
+      viewOnce: true,
+      viewOnceOpened: false,
+      deletedForEveryone: { $ne: true },
+      deletedFor: { $ne: req.user._id },
+    }).select("+viewOnceUrl senderId receiverId createdAt");
     if (!message || !message.viewOnceUrl) return res.status(404).json({ error: "This photo has already been opened" });
     const url = message.viewOnceUrl;
+
+    const notifyOpened = () =>
+      [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
+        const socketId = getReceiverSocketId(uid);
+        if (socketId) io.to(socketId).emit("messageViewOnce", { _id: id });
+      });
     // claim it atomically so two devices can't both open it
-    const claimed = await Message.findOneAndUpdate(
-      { _id: id, viewOnceOpened: false },
-      { $set: { viewOnceOpened: true }, $unset: { viewOnceUrl: 1 } }
-    );
-    if (!claimed) return res.status(404).json({ error: "This photo has already been opened" });
-    [message.senderId.toString(), message.receiverId.toString()].forEach((uid) => {
-      const socketId = getReceiverSocketId(uid);
-      if (socketId) io.to(socketId).emit("messageViewOnce", { _id: id });
+    const claim = () =>
+      Message.findOneAndUpdate({ _id: id, viewOnceOpened: false }, { $set: { viewOnceOpened: true }, $unset: { viewOnceUrl: 1 } });
+
+    // Not opened in time: it is gone.
+    if (Date.now() - new Date(message.createdAt).getTime() > VIEW_ONCE_TTL_MS) {
+      if (await claim()) {
+        notifyOpened();
+        destroyPrivateAsset(url).catch((e) => console.log("View-once cleanup failed:", e.message));
+      }
+      return res.status(410).json({ error: "This photo has expired" });
+    }
+
+    // Read the picture BEFORE claiming it, so a storage hiccup doesn't burn the person's one view.
+    let image;
+    try {
+      image = await fetchPrivateImage(url);
+    } catch (e) {
+      console.log("View-once fetch failed:", e.message);
+      return res.status(502).json({ error: "Couldn't load this photo. Try again." });
+    }
+    if (!(await claim())) return res.status(404).json({ error: "This photo has already been opened" });
+    notifyOpened();
+    destroyPrivateAsset(url).catch((e) => console.log("View-once cleanup failed:", e.message));
+
+    res.set({
+      "Content-Type": image.type,
+      "Content-Length": String(image.buf.length),
+      "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+      Pragma: "no-cache",
+      "Content-Disposition": "inline",
+      "X-Content-Type-Options": "nosniff",
     });
-    res.locals.noMask = true; // this one is the real (signed) address, shown once
-    res.status(200).json({ image: deliveryUrl(url) });
+    res.status(200).end(image.buf);
   } catch (error) {
     console.log("Error in openViewOnce controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });

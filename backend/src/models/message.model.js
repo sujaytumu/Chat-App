@@ -198,6 +198,7 @@ messageSchema.index({ receiverId: 1, delivered: 1 });
 messageSchema.index({ image: 1 }, { partialFilterExpression: { image: { $type: "string", $gt: "" } } }); // who may open this file (/api/media)
 messageSchema.index({ "file.url": 1 }, { partialFilterExpression: { "file.url": { $type: "string", $gt: "" } } });
 messageSchema.index({ groupId: 1, seenBy: 1 });
+messageSchema.index({ createdAt: 1 }, { partialFilterExpression: { viewOnce: true, viewOnceOpened: false } }); // finds view-once photos nobody opened in time
 
 const Message = mongoose.model("Message", messageSchema);
 
