@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useBackToClose } from "../lib/useBackToClose";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import FeedView, { NewPost } from "../components/FeedView";
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
@@ -747,6 +748,14 @@ const ReportsReview = ({ onClose, onRemoved }) => {
   );
 };
 
+// Where you were inside Reels (tab / a tag, person or search list): kept while you visit other screens and come back
+let reelsMemo = null;
+const readReelsMemo = () => {
+  if (reelsMemo) return reelsMemo;
+  try { reelsMemo = JSON.parse(sessionStorage.getItem("reelsMemo") || "null"); } catch { /* ignore */ }
+  return reelsMemo;
+};
+
 const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -763,7 +772,7 @@ const ReelsPage = () => {
   }, []);
   const [newPost, setNewPost] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
-  const [tab, setTab] = useState("foryou"); // foryou | friends | saved
+  const [tab, setTab] = useState(() => (params.get("r") ? "foryou" : readReelsMemo()?.tab || "foryou")); // foryou | friends | saved
   const [reels, setReels] = useState([]);
   const [more, setMore] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -790,7 +799,12 @@ const ReelsPage = () => {
   const [menuFor, setMenuFor] = useState(null);
   const [pickTab, setPickTab] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [view, setView] = useState(null); // { kind: tag | user | search, arg, label, startId } — a list outside the main tabs
+  const [view, setView] = useState(() => (params.get("r") ? null : readReelsMemo()?.view || null)); // { kind: tag | user | search, arg, label, startId } — a list outside the main tabs
+  useEffect(() => {
+    reelsMemo = { tab, view };
+    try { sessionStorage.setItem("reelsMemo", JSON.stringify(reelsMemo)); } catch { /* ignore */ }
+  }, [tab, view]);
+  useBackToClose(!!view, () => setView(null)); // Back closes a tag / person / search list first
   const [searching, setSearching] = useState(false);
   const [insightsFor, setInsightsFor] = useState(null);
   const [isOwner, setIsOwner] = useState(false);

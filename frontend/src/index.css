@@ -358,3 +358,7 @@ button, a, [role="button"], input, textarea { touch-action: manipulation; -webki
 .no-scrollbar, .overflow-y-auto, .overflow-y-scroll { -webkit-overflow-scrolling: touch; }
 video { transform: translateZ(0); }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* switching tabs: a quick fade instead of a hard cut */
+@keyframes routeIn { from { opacity: 0; } to { opacity: 1; } }
+main > * { animation: routeIn .16s ease-out both; }

@@ -145,38 +145,32 @@ const App = () => {
     if (userId) syncPreferences();
   }, [userId]);
 
-  // Like WhatsApp, the app always opens on Chats: if it is (re)opened on
-  // Updates / Calls / Profile / Settings, or you come back to it after being
-  // away for a while, land on the main chat list instead.
-  const OTHER_SCREENS = ["/status", "/calls", "/profile", "/starred"];
-  const isOther = (path) => OTHER_SCREENS.includes(path) || path.startsWith("/settings");
+  // Remember where you were (Updates / Calls / Reels / Search / Post / You) and come back to exactly that
+  // screen when the app is reopened or resumed — it no longer throws you back to Chats.
+  const REMEMBER = ["/status", "/calls", "/profile", "/reels", "/explore", "/post"];
   const signedIn = !!authUser;
   useEffect(() => {
-    if (signedIn && isOther(pathRef.current)) navigate("/", { replace: true });
+    const p = location.pathname;
+    try {
+      if (REMEMBER.includes(p)) localStorage.setItem("lastScreen", JSON.stringify({ p, at: Date.now() }));
+      else if (p === "/" ) localStorage.removeItem("lastScreen");
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+  useEffect(() => {
+    if (!signedIn || pathRef.current !== "/" || location.search || location.hash) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem("lastScreen") || "null");
+      if (saved && REMEMBER.includes(saved.p) && Date.now() - saved.at < 6 * 3600 * 1000) navigate(saved.p);
+    } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
-  useEffect(() => {
-    if (!signedIn) return;
-    let hiddenAt = null;
-    const onChange = () => {
-      if (document.visibilityState === "hidden") {
-        hiddenAt = Date.now();
-        return;
-      }
-      const away = hiddenAt ? Date.now() - hiddenAt : 0;
-      hiddenAt = null;
-      if (away > 15000 && isOther(pathRef.current)) navigate("/", { replace: true });
-    };
-    document.addEventListener("visibilitychange", onChange);
-    return () => document.removeEventListener("visibilitychange", onChange);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedIn, navigate]);
 
   // Warm the other screens' code in the background once the app is idle.
   useEffect(() => {
     if (!authUser) return;
     const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
-    const id = idle(() => Object.values(loaders).forEach((load) => load().catch(() => {})));
+    const id = idle(() => { Object.values(loaders).forEach((load) => load().catch(() => {})); [() => import("./pages/ReelsPage"), () => import("./pages/ExplorePage"), () => import("./pages/PostPage")].forEach((load) => load().catch(() => {})); });
     return () => (window.cancelIdleCallback || clearTimeout)(id);
   }, [authUser]);
 
