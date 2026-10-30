@@ -43,7 +43,7 @@ export const requestAccess = async (req, res) => {
     await AccessRequest.findOneAndUpdate({ userId: req.user._id }, { $set: { status: "pending", note } }, { upsert: true });
     const owner = await User.findOne({ email: OWNER_EMAIL }).select("_id").lean();
     if (owner) {
-      tell(owner._id, "accessRequest", { userId: String(req.user._id), fullName: req.user.fullName, profilePic: req.user.profilePic || "" });
+      tell(owner._id, "accessRequest", { userId: String(req.user._id), fullName: req.user.fullName, profilePic: req.user.profilePic || "", note });
       sendPushToUser(owner._id, {
         title: "Access request",
         body: `${req.user.fullName} wants to see more people on Talkies`,
@@ -93,6 +93,7 @@ export const decideRequest = async (req, res) => {
     const ownerName = String(req.user.fullName || "The owner").split(" ")[0];
     const summary = names.length ? names.slice(0, 5).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "") : "";
     tell(userId, "accessDecision", { status, people: names, by: ownerName });
+    tell(req.user._id, "accessRequestResolved", { userId: String(userId), status }); // every owner device drops that popup
     tell(userId, "visibilityChanged");
     sendPushToUser(userId, {
       title: "Talkies",

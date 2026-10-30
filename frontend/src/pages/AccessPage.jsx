@@ -4,6 +4,8 @@ import { ArrowLeft, Search, Check, ShieldCheck } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import Avatar from "../components/Avatar";
+import { useAuthStore } from "../store/useAuthStore";
+import { closeAccessPopup, closeAllAccessPopups } from "../lib/accessPopups";
 
 // Owner only: choose which people can see each other. Everyone else sees only the people allowed here
 // (plus people they already chat with, and the owner).
@@ -31,6 +33,9 @@ const AccessPage = () => {
   const [saving, setSaving] = useState(false);
   const isOwnerUser = (u) => (ownerIdSrv ? u?._id === ownerIdSrv : String(u?.email || "").trim().toLowerCase() === OWNER_EMAIL_FALLBACK);
 
+  const socket = useAuthStore((s) => s.socket);
+  const loadRequests = () => axiosInstance.get("/admin/requests").then((r) => setRequests(r.data)).catch(() => {});
+
   const key = (a, b) => [a, b].sort().join("|");
   useEffect(() => {
     axiosInstance
@@ -42,8 +47,27 @@ const AccessPage = () => {
       })
       .catch((e) => setDenied(e.response?.status === 403))
       .finally(() => setLoading(false));
-    axiosInstance.get("/admin/requests").then((r) => setRequests(r.data)).catch(() => {});
+    loadRequests();
+    closeAllAccessPopups(); // the waiting people are listed right here
   }, []);
+
+  // Live: a new request appears at once; one answered on another device disappears.
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onNew = () => loadRequests();
+    const onGone = ({ userId }) => {
+      closeAccessPopup(userId);
+      setRequests((r) => r.filter((x) => String(x.user._id) !== String(userId)));
+    };
+    socket.on("accessRequest", onNew);
+    socket.on("accessRequestResolved", onGone);
+    socket.on("connect", onNew);
+    return () => {
+      socket.off("accessRequest", onNew);
+      socket.off("accessRequestResolved", onGone);
+      socket.off("connect", onNew);
+    };
+  }, [socket]);
 
   // Opened from a request: go straight to that person.
   useEffect(() => {
@@ -63,6 +87,7 @@ const AccessPage = () => {
     try {
       await axiosInstance.put(`/admin/requests/${r.user._id}`, { status: "declined" });
       setRequests((list) => list.filter((x) => x.user._id !== r.user._id));
+      closeAccessPopup(r.user._id);
       toast.success("Declined — they have been told");
       return true;
     } catch {
@@ -90,6 +115,7 @@ const AccessPage = () => {
       if (pendingForWho) {
         await axiosInstance.put(`/admin/requests/${who._id}`, { status: "approved" });
         setRequests((r) => r.filter((x) => x.user._id !== who._id));
+        closeAccessPopup(who._id);
         toast.success(`${who.fullName?.split(" ")[0] || "They"} can now see ${chosenCount} ${chosenCount === 1 ? "person" : "people"} — they have been told`);
       } else {
         toast.success("Saved");
