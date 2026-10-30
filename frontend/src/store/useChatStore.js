@@ -1325,20 +1325,28 @@ export const useChatStore = create((set, get) => ({
 // PRIVACY: nothing of one account may stay in memory for the next one. When the signed-in person
 // changes (log out, or another account logs in on the same phone/browser), every chat, photo,
 // cached page, queued message and unlocked-chat flag of the previous account is wiped.
+// (Runs after all modules have loaded: the stores import each other, so touching the other
+// stores while this file is still loading would crash the app at start-up.)
 const initialChatState = useChatStore.getState();
-const initialLockState = useChatLockStore.getState();
-let lastAuthId = useAuthStore.getState().authUser?._id || null;
-useAuthStore.subscribe((s) => {
-  const id = s.authUser?._id || null;
-  if (id === lastAuthId) return;
-  const hadAccount = lastAuthId !== null;
-  lastAuthId = id;
-  if (!hadAccount) return;
-  msgCache.clear();
-  outbox.clear();
-  prefetchedFor = null;
-  usersInFlight = null;
-  groupsInFlight = null;
-  useChatStore.setState(initialChatState, true);
-  useChatLockStore.setState(initialLockState, true);
-});
+setTimeout(() => {
+  try {
+    const initialLockState = useChatLockStore.getState();
+    let lastAuthId = useAuthStore.getState().authUser?._id || null;
+    useAuthStore.subscribe((s) => {
+      const id = s.authUser?._id || null;
+      if (id === lastAuthId) return;
+      const hadAccount = lastAuthId !== null;
+      lastAuthId = id;
+      if (!hadAccount) return;
+      msgCache.clear();
+      outbox.clear();
+      prefetchedFor = null;
+      usersInFlight = null;
+      groupsInFlight = null;
+      useChatStore.setState(initialChatState, true);
+      useChatLockStore.setState(initialLockState, true);
+    });
+  } catch {
+    /* never block start-up */
+  }
+}, 0);
