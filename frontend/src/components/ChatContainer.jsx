@@ -133,9 +133,9 @@ const ChatContainer = () => {
     if (id) {
       lp.current.timer = setTimeout(() => {
         lp.current.fired = true;
-        navigator.vibrate?.(15);
+        navigator.vibrate?.(12);
         if (!useChatStore.getState().selectedMsgIds.includes(id)) useChatStore.getState().toggleSelectMessage(id);
-      }, 450);
+      }, 380);
     }
     if (useChatStore.getState().selectedMsgIds.length) return;
     const t = e.touches[0];
@@ -592,8 +592,8 @@ const ChatContainer = () => {
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`msg-row relative flex items-end group rounded-lg transition-colors duration-700 ${
-                highlightId === message._id || selectedMsgIds.includes(message._id) ? "bg-[#25D366]/20" : ""
+              className={`msg-row relative flex items-end group rounded-lg transition-colors ${highlightId === message._id && !selectedMsgIds.includes(message._id) ? "duration-700" : "duration-100"} ${
+                selectedMsgIds.includes(message._id) ? "msg-sel bg-[#25D366]/25" : highlightId === message._id ? "bg-[#25D366]/20" : ""
               } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
               onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
@@ -620,6 +620,7 @@ const ChatContainer = () => {
                 } else if (selectedMsgIds.length) {
                   e.preventDefault();
                   e.stopPropagation();
+                  navigator.vibrate?.(8);
                   toggleSelectMessage(message._id);
                 }
               }}
