@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check,
-  Loader2, Smile, ChevronRight, Star, Settings, Timer, ThumbsDown, Link2, MoreVertical, QrCode, Share2, Lock,
+  Loader2, Smile, ChevronRight, ChevronDown, Star, Settings, Timer, ThumbsDown, Link2, MoreVertical, QrCode, Share2, Lock,
   Heart, ListPlus, Upload, Eraser, UsersRound, Users, Bell,
 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -69,6 +69,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [lastMin, setLastMin] = useState(0); // keeps the last section tall enough to reach the top
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState(false);
+  const [callMenu, setCallMenu] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [nameDraft, setNameDraft] = useState(group.name);
   const [descDraft, setDescDraft] = useState(group.description || "");
@@ -134,9 +135,9 @@ const GroupInfoModal = ({ group, onClose }) => {
   const memberIds = new Set(group.members.map((m) => m._id || m));
   const nonMembers = users.filter((u) => !memberIds.has(u._id));
 
-  const shownMembers = group.members.filter(
-    (m) => memberSearch == null || (m.fullName || "").toLowerCase().includes(memberSearch.trim().toLowerCase())
-  );
+  const shownMembers = group.members
+    .filter((m) => memberSearch == null || (m.fullName || "").toLowerCase().includes(memberSearch.trim().toLowerCase()))
+    .sort((a, b) => (b._id === authUser._id) - (a._id === authUser._id)); // "You" first, like WhatsApp
 
   // ---- actions ----
   const placeCall = (type) => {
@@ -275,11 +276,9 @@ const GroupInfoModal = ({ group, onClose }) => {
     }
   };
   const actionBtns = [
-    { icon: Phone, label: "Voice", run: () => placeCall("audio"), disabled: callBusy },
-    { icon: Video, label: "Video", run: () => placeCall("video"), disabled: callBusy },
-    isAdmin
-      ? { icon: Share2, label: "Share", run: () => setShowInvite(true) }
-      : canAddMembers && { icon: UserPlus, label: "Add", run: () => { goTab("Members"); setShowAddMembers(true); } },
+    { icon: Video, label: "Call", chevron: true, run: () => (groupCallActive ? placeCall("audio") : setCallMenu((o) => !o)), disabled: callBusy },
+    canAddMembers && { icon: UserPlus, label: "Add", run: () => { goTab("Members"); setShowAddMembers(true); } },
+    isAdmin && { icon: Share2, label: "Share", run: () => setShowInvite(true) },
     { icon: Search, label: "Search", run: goSearch },
   ].filter(Boolean);
 
@@ -349,11 +348,11 @@ const GroupInfoModal = ({ group, onClose }) => {
               <button
                 type="button"
                 onClick={() => (editMode || canEdit ? setPhotoMenu((o) => !o) : group.groupPic && setViewPhoto(true))}
-                className={`relative block overflow-hidden bg-wa-field ${group.groupPic ? "rounded-[28px]" : "size-[128px] rounded-full"}`}
+                className={`relative block overflow-hidden bg-wa-field size-[120px] rounded-full`}
                 aria-label={editMode || canEdit ? "Change group photo" : "View group photo"}
               >
                 {group.groupPic ? (
-                  <img src={optimizeImage(group.groupPic, 720)} decoding="async" alt={group.name} className="block max-h-[230px] w-auto max-w-[min(86vw,340px)] min-h-[128px] object-cover" />
+                  <img src={optimizeImage(group.groupPic, 720)} decoding="async" alt={group.name} className="block size-full object-cover" />
                 ) : (
                   <span className="size-full flex items-center justify-center text-7xl text-wa-muted">
                     <UsersRound size={60} />
@@ -427,12 +426,12 @@ const GroupInfoModal = ({ group, onClose }) => {
               </div>
             ) : (
               <>
-                <h4 className="mt-3 text-[22px] font-medium tracking-tight leading-tight text-center break-words max-w-full">{group.name}</h4>
-                <p className="mt-1 text-[15px] text-wa-muted">
+                <h4 className="mt-4 text-[26px] font-normal leading-tight text-center break-words max-w-full">{group.name}</h4>
+                <p className="mt-1 text-[14.5px] text-wa-muted">
                   Group · {group.members.length} member{group.members.length === 1 ? "" : "s"}
                 </p>
                 {group.description ? (
-                  <p className="mt-3 text-[14.5px] leading-snug text-wa-muted text-center whitespace-pre-wrap break-words max-w-full">{group.description}</p>
+                  <p className="mt-3 text-[17px] leading-snug text-wa-muted text-center whitespace-pre-wrap break-words max-w-full">{group.description}</p>
                 ) : (
                   canEdit && (
                     <button
@@ -447,14 +446,30 @@ const GroupInfoModal = ({ group, onClose }) => {
                     </button>
                   )
                 )}
-                <div className="mt-4 flex items-start justify-center gap-2.5 w-full">
+                <div className="mt-6 flex items-start justify-between w-full max-w-[340px] px-1">
                   {actionBtns.map((b) => (
-                    <button key={b.label} onClick={b.run} disabled={b.disabled} className="flex flex-col items-center gap-1.5 flex-1 max-w-[80px] disabled:opacity-40">
-                      <span className="w-full h-10 rounded-2xl bg-wa-field hover:bg-wa-hover active:bg-wa-hover flex items-center justify-center">
-                        <b.icon size={19} />
-                      </span>
-                      <span className="text-[12.5px]">{b.label}</span>
-                    </button>
+                    <div key={b.label} className="relative flex flex-col items-center gap-2">
+                      <button onClick={b.run} disabled={b.disabled} className="flex flex-col items-center gap-2 disabled:opacity-40" aria-label={b.label}>
+                        <span className="w-16 h-12 rounded-full bg-wa-field hover:bg-wa-hover active:bg-wa-hover flex items-center justify-center gap-0.5">
+                          <b.icon size={24} />
+                          {b.chevron && <ChevronDown size={16} />}
+                        </span>
+                        <span className="text-[15px]">{b.label}</span>
+                      </button>
+                      {b.chevron && callMenu && (
+                        <>
+                          <div className="fixed inset-0 z-[15]" onClick={() => setCallMenu(false)} />
+                          <div className="absolute z-20 top-[56px] left-0 w-44 rounded-2xl bg-wa-pop border border-white/10 shadow-2xl py-2">
+                            <button onClick={() => { setCallMenu(false); placeCall("audio"); }} className="w-full flex items-center gap-3.5 px-4 py-3 text-left text-[15px] hover:bg-white/5 active:bg-white/10">
+                              <Phone size={19} className="text-wa-icon" /> Voice call
+                            </button>
+                            <button onClick={() => { setCallMenu(false); placeCall("video"); }} className="w-full flex items-center gap-3.5 px-4 py-3 text-left text-[15px] hover:bg-white/5 active:bg-white/10">
+                              <Video size={19} className="text-wa-icon" /> Video call
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   ))}
                 </div>
               </>
@@ -462,19 +477,19 @@ const GroupInfoModal = ({ group, onClose }) => {
           </div>
 
           {/* Tabs (stick to the top while scrolling) */}
-          <div ref={tabsRef} className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex relative">
+          <div ref={tabsRef} className="sticky top-0 z-[5] bg-wa-bg border-y border-white/10 flex justify-center relative">
             {TABS.map((t) => (
               <button
                 key={t}
                 onClick={() => goTab(t)}
-                className={`flex-1 py-2.5 text-[15px] transition-colors duration-200 ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
+                className={`w-[88px] py-[18px] text-[17px] transition-colors duration-200 ${tab === t ? "text-wa-text" : "text-wa-muted"}`}
               >
                 {t}
               </button>
             ))}
             <span
-              className="absolute bottom-0 h-[3px] w-10 rounded-full bg-[#21C063] transition-[left] duration-300 ease-out"
-              style={{ left: `calc(${((TABS.indexOf(tab) + 0.5) / TABS.length) * 100}% - 20px)` }}
+              className="absolute bottom-0 h-[3px] w-[60px] rounded-full bg-[#21C063] transition-[left] duration-300 ease-out"
+              style={{ left: `calc(50% + ${(TABS.indexOf(tab) - 1) * 88}px - 30px)` }}
             />
           </div>
 
@@ -509,11 +524,11 @@ const GroupInfoModal = ({ group, onClose }) => {
               </div>
 
               {canAddMembers && memberSearch == null && (
-                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-3.5 px-4 py-2 text-left hover:bg-white/5">
-                  <span className="size-10 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
+                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-3.5 px-4 py-[13px] text-left hover:bg-white/5">
+                  <span className="size-[42px] rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
                     <UserPlus size={19} />
                   </span>
-                  <span className="text-[14.5px]">Add members</span>
+                  <span className="text-[17px]">Add members</span>
                 </button>
               )}
 
@@ -544,17 +559,16 @@ const GroupInfoModal = ({ group, onClose }) => {
                 const isYou = member._id === authUser._id;
                 const memberIsAdmin = group.admins.some((a) => (a._id || a) === member._id);
                 return (
-                  <div key={member._id} className="flex items-center gap-3.5 px-4 py-2">
+                  <div key={member._id} className="flex items-center gap-3.5 px-4 py-[13px]">
                     <Avatar src={member.profilePic} name={member.fullName} size="size-[42px]" textSize="text-base" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[14.5px] truncate">{isYou ? "You" : member.fullName}</p>
-                      {member.about && <p className="text-[12.5px] text-wa-muted truncate">{member.about}</p>}
+                      <p className="text-[17px] truncate">{isYou ? "You" : member.fullName}</p>
+                      {member.about && <p className="text-[14.5px] text-wa-muted truncate">{member.about}</p>}
                     </div>
                     {memberIsAdmin && (
-                      <span className="text-[10.5px] px-2 py-0.5 rounded-md bg-wa-tint text-wa-tinttext shrink-0 border border-[#21C063]/30">Group Admin</span>
+                      <span className="text-[13.5px] px-3 py-1 rounded-md bg-[#21C063]/20 text-[#21C063] shrink-0">Group Admin</span>
                     )}
-                    {isYou && <div className="w-8 shrink-0" aria-hidden="true" />}
-                    {!isYou && (
+                                        {!isYou && (
                       <div className="relative shrink-0">
                         <button
                           onClick={(e) => {
