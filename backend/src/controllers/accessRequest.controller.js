@@ -76,10 +76,6 @@ export const decideRequest = async (req, res) => {
     const userId = req.params.userId;
     const status = req.body?.status === "approved" ? "approved" : req.body?.status === "declined" ? "declined" : null;
     if (!mongoose.isValidObjectId(userId) || !status) return res.status(400).json({ error: "Invalid request" });
-    await AccessRequest.updateOne(
-      { userId },
-      status === "declined" ? { $set: { status, declinedAt: new Date() }, $inc: { declines: 1 } } : { $set: { status, declines: 0, declinedAt: null } }
-    );
     // Names of the people this person may now see (the owner is always included, so not listed)
     let names = [];
     if (status === "approved") {
@@ -87,7 +83,13 @@ export const decideRequest = async (req, res) => {
       const ids = rows.map((r) => (String(r.a) === String(userId) ? r.b : r.a));
       const people = await User.find({ _id: { $in: ids }, email: { $ne: OWNER_EMAIL }, deleted: { $ne: true } }).select("fullName").lean();
       names = people.map((p) => p.fullName).filter(Boolean);
+      // An approval with nobody chosen would tell the person "approved" while changing nothing for them.
+      if (!names.length) return res.status(400).json({ error: "Choose at least one person before approving" });
     }
+    await AccessRequest.updateOne(
+      { userId },
+      status === "declined" ? { $set: { status, declinedAt: new Date() }, $inc: { declines: 1 } } : { $set: { status, declines: 0, declinedAt: null } }
+    );
     const ownerName = String(req.user.fullName || "The owner").split(" ")[0];
     const summary = names.length ? names.slice(0, 5).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "") : "";
     tell(userId, "accessDecision", { status, people: names, by: ownerName });
