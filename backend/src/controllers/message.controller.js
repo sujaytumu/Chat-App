@@ -841,7 +841,8 @@ export const getChatMedia = async (req, res) => {
     const visible = { ...scope, deletedFor: { $ne: myId }, deletedForEveryone: { $ne: true } };
     const pick = "image file text senderId createdAt";
     const [media, docs, linkMsgs] = await Promise.all([
-      Message.find({ ...visible, $or: [{ image: { $nin: ["", null] } }, { "file.type": "video", "file.url": { $nin: ["", null] } }] }) // ($ne: "" also matched every message with no image at all)
+      // $and, not a second $or key: a plain "$or" here replaced the "only these two people" $or inside `visible`, so every one-to-one chat listed everyone's photos.
+      Message.find({ $and: [visible, { $or: [{ image: { $nin: ["", null] } }, { "file.type": "video", "file.url": { $nin: ["", null] } }] }] })
         .sort({ createdAt: -1 }).limit(300).select(pick).lean(),
       Message.find({ ...visible, "file.type": "document" }).sort({ createdAt: -1 }).limit(200).select(pick).lean(),
       Message.find({ ...visible, text: /https?:\/\//i }).sort({ createdAt: -1 }).limit(200).select(pick).lean(),
