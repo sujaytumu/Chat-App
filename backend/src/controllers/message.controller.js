@@ -22,7 +22,7 @@ import { sanitizeLiveLocation, cleanPosition } from "../lib/liveLocation.js";
 import Reminder from "../models/reminder.model.js";
 import { summarizeTranscript } from "../lib/chatSummary.js";
 import { sendFcmClearChat } from "../lib/fcm.js";
-import { visibleUserIds, canSee, forgetPair } from "../lib/visibility.js";
+import { visibleUserIds, canSee, forgetPair, isOwner } from "../lib/visibility.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -171,6 +171,7 @@ export const getUsersForSidebar = async (req, res) => {
       if (user.note && (!user.note.text || !user.note.expiresAt || new Date(user.note.expiresAt) < new Date())) user.note = null; // expired notes are gone
       return {
         ...user,
+        isOwner: isOwner(user), // everyone always has the owner in their chat list, whatever the owner has approved for them
         lastMessage: lm
           ? {
               text: lm.text,
