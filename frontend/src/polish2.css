@@ -90,3 +90,17 @@ textarea.wa-input-field:focus-visible, textarea.wa-input-field:focus { box-shado
 .auth-form .label-text { font-size: 14px; }
 .auth-form .auth-logo { width: 64px; height: 64px; border-radius: 20px; }
 .auth-form a.block.border-2 { border-radius: 1rem; }
+
+/* WhatsApp-feel: chat slides in from the right, list eases back, message selection is instant + full width */
+@keyframes chatSlideIn { from { transform: translate3d(28px,0,0); opacity: .35; } to { transform: none; opacity: 1; } }
+@keyframes listBackIn { from { transform: translate3d(-18px,0,0); opacity: .5; } to { transform: none; opacity: 1; } }
+@keyframes selBarIn { from { transform: translate3d(0,-10px,0); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .chat-slide-in { animation: chatSlideIn .22s cubic-bezier(.2,.8,.2,1) both; will-change: transform, opacity; }
+  .list-back-in { animation: listBackIn .2s cubic-bezier(.2,.8,.2,1) both; }
+  .sel-bar-in { animation: selBarIn .14s ease-out both; }
+}
+.msg-row { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+@media (max-width: 639px) {
+  .msg-row.msg-sel { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; border-radius: 0; }
+}
