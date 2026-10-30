@@ -13,8 +13,9 @@ export async function askMorePeople() {
     if (data.owner) return toast("You can already see everyone", { icon: "✅" });
     if (data.status === "pending") return toast("Your request is with the owner — you'll be told when they answer", { icon: "⏳" });
     if (data.retryAt && data.retryAt > Date.now()) return toast(`You can ask again in ${waitText(data.retryAt - Date.now())}`, { icon: "⏳" });
-    if (data.status === "declined" && !window.confirm("Your last request was declined. Send it again?")) return;
-    await axiosInstance.post("/access/request", {});
+    const note = window.prompt(data.status === "declined" ? "Your last request was declined. Who would you like to see, and why? (optional)" : "Who would you like to see, and why? (optional)", "");
+    if (note === null) return; // cancelled
+    await axiosInstance.post("/access/request", { note: note.trim().slice(0, 200) });
     toast.success("Request sent to the owner");
   } catch (e) {
     const retryAt = e.response?.data?.retryAt;

@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import User from "../models/user.model.js";
-import { Visibility, pairKey, isOwner, forgetVisibility } from "../lib/visibility.js";
+import { Visibility, pairKey, isOwner, forgetVisibility, ownerId } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 
 // Owner only: see everyone, and choose who can see whom.
@@ -13,7 +13,7 @@ export const listAccess = async (req, res) => {
       Visibility.find({}).select("a b").lean(),
     ]);
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ users, pairs: pairs.map((p) => [String(p.a), String(p.b)]) });
+    res.status(200).json({ users, pairs: pairs.map((p) => [String(p.a), String(p.b)]), ownerId: await ownerId() });
   } catch (e) {
     console.log("Error in listAccess:", e.message);
     res.status(500).json({ error: "Internal server error" });
