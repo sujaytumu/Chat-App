@@ -575,7 +575,7 @@ const ChatContainer = () => {
           };
 
           return (
-            <div key={message._id} className={`${isFirstInGroup && !showDateDivider ? "mt-2 lg:mt-3.5" : "mt-0.5 lg:mt-1"}${isFreshMsg(message._id) ? " msg-in" : ""}`}>
+            <div key={message._id} className={isFreshMsg(message._id) ? "msg-in" : undefined}>
             {unreadDividerId === message._id && unreadMark.count > 0 && (
               <div className="flex justify-center my-3">
                 <span className="px-3 py-1 rounded-lg bg-wa-surface/90 text-wa-muted text-[11.5px] uppercase tracking-wide">
@@ -592,8 +592,8 @@ const ChatContainer = () => {
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`msg-row relative flex items-end group rounded-lg transition-colors ${highlightId === message._id && !selectedMsgIds.includes(message._id) ? "duration-700" : "duration-100"} ${
-                selectedMsgIds.includes(message._id) ? "msg-sel bg-[#25D366]/25" : highlightId === message._id ? "bg-[#25D366]/20" : ""
+              className={`msg-row relative flex items-end group transition-colors ${isFirstInGroup && !showDateDivider ? "pt-2 lg:pt-3.5" : "pt-0.5 lg:pt-1"} pb-px rounded-lg ${highlightId === message._id && !selectedMsgIds.includes(message._id) ? "duration-700" : "duration-100"} ${
+                selectedMsgIds.includes(message._id) ? "msg-sel" : highlightId === message._id ? "bg-[#25D366]/20" : ""
               } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
               onMouseLeave={() => setHoveredId((id) => (id === message._id ? null : id))}
