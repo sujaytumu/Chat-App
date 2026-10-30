@@ -264,8 +264,8 @@ const Sidebar = () => {
   const items = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    // A contact only gets a chat row once there are messages (deleting a chat removes the row; searching still finds the person).
-    const showWithoutChat = (u) => !!q || filter === "online" || !!activeKeys || pinnedSet.has(`d:${u._id}`) || (selectedChat?.type === "direct" && selectedChat.data?._id === u._id);
+    // A contact only gets a chat row once there are messages (deleting a chat removes the row; searching still finds the person) — except the owner (sujay), who is in everyone's list from the start.
+    const showWithoutChat = (u) => !!u.isOwner || !!q || filter === "online" || !!activeKeys || pinnedSet.has(`d:${u._id}`) || (selectedChat?.type === "direct" && selectedChat.data?._id === u._id);
     const directItems = users
       .filter((u) => !!u.lastMessage || showWithoutChat(u))
       .filter((u) => (q.startsWith("@") ? (u.username || "").includes(q.slice(1)) : u.fullName.toLowerCase().includes(q) || (!!u.username && u.username.includes(q))))
