@@ -18,10 +18,10 @@ const HomePage = () => {
         selectedChat ? "pb-0" : "pb-[calc(72px+env(safe-area-inset-bottom))]"
       } lg:pb-0`}
     >
-      <div className={`${selectedChat ? "hidden lg:flex" : "flex"} w-full lg:w-auto shrink-0 min-h-0`}>
+      <div className={`${selectedChat ? "hidden lg:flex" : "flex list-back-in"} w-full lg:w-auto shrink-0 min-h-0`}>
         <Sidebar />
       </div>
-      <div className={`${selectedChat ? "flex" : "hidden lg:flex"} flex-1 min-w-0 min-h-0`}>
+      <div className={`${selectedChat ? "flex chat-slide-in" : "hidden lg:flex"} flex-1 min-w-0 min-h-0`}>
         {selectedChat ? <ChatContainer /> : <NoChatSelected />}
       </div>
     </div>

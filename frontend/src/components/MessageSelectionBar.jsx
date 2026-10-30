@@ -54,7 +54,7 @@ const MessageSelectionBar = () => {
 
   return (
     <>
-      <div className="relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5">
+      <div className="sel-bar-in relative z-20 flex items-center gap-1 pl-1 pr-1 lg:pl-3 py-2 bg-wa-bg lg:bg-wa-panel border-b border-white/5">
         <button onClick={clear} className={btn} aria-label="Cancel selection">
           <WaBack size={24} />
         </button>
