@@ -224,7 +224,7 @@ const AccessPage = () => {
                 <span className="block text-[15px] truncate">{u.fullName}</span>
                 <span className="block text-[12px] text-wa-muted truncate">{isOwnerUser(u) ? "Owner · sees everyone" : u.email}</span>
               </span>
-              <span className="text-[12px] text-wa-muted shrink-0">{countFor(u._id)} allowed</span>
+              <span className="text-[12px] text-wa-muted shrink-0">{isOwnerUser(u) ? "Everyone" : `${countFor(u._id)} allowed`}</span>
             </button>
           ))}
         {who &&
