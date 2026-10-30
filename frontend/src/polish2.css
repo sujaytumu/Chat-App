@@ -76,7 +76,6 @@ textarea.wa-input-field:focus-visible, textarea.wa-input-field:focus { box-shado
 .msg-row .bg-wa-out, .msg-row .bg-wa-surface { border-radius: 18px; }
 .msg-row .bubble-tail-out.rounded-tr-none, .msg-row .bubble-tail-out { border-top-right-radius: 4px; }
 .msg-row .bubble-tail-in.rounded-tl-none, .msg-row .bubble-tail-in { border-top-left-radius: 4px; }
-.msg-row { padding-top: 1px; padding-bottom: 1px; }
 .wa-input-field { caret-color: #21C063; }
 @media (max-width: 1023px) {
   .wa-input-field { background: rgb(var(--wa-surface)); border-radius: 22px; padding: 10px 14px; min-height: 44px; box-shadow: var(--sh-1); }
@@ -104,3 +103,8 @@ textarea.wa-input-field:focus-visible, textarea.wa-input-field:focus { box-shado
 @media (max-width: 639px) {
   .msg-row.msg-sel { margin-left: -12px; margin-right: -12px; padding-left: 12px; padding-right: 12px; border-radius: 0; }
 }
+
+/* Selected message: clear, continuous band (rows touch each other, no gaps) */
+.msg-row.msg-sel { background-color: rgba(0, 168, 132, .34); }
+@media (min-width: 640px) { .msg-row.msg-sel { border-radius: 10px; } }
+.msg-row.msg-sel .bg-wa-out, .msg-row.msg-sel .bg-wa-surface { box-shadow: 0 0 0 1px rgba(255,255,255,.10), var(--sh-1); }
