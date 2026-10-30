@@ -29,9 +29,7 @@ export const createGroup = async (req, res) => {
     }
 
     let groupPicUrl = "";
-    if (removeGroupPic === true) {
-      group.groupPic = "";
-    } else if (groupPic) {
+    if (groupPic) {
       const uploadResponse = await cloudinary.uploader.upload(groupPic, {
         folder: "chat-app/groups",
       });
@@ -261,7 +259,6 @@ export const sendGroupMessage = async (req, res) => {
           body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
           icon: group.groupPic || "/icon-v2-192.png",
           tag: `group-${groupId}`,
-        actions: [{ action: "reply", type: "text", title: "Reply", placeholder: "Type a reply…" }],
           actions: [{ action: "reply", type: "text", title: "Reply", placeholder: "Type a reply…" }],
           data: { url: "/", chatType: "group", chatId: groupId.toString(), messageId: newMessage._id.toString() },
         },
