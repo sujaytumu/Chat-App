@@ -1,128 +1,85 @@
-import { ChevronUp, Timer, Bell, ShieldCheck } from "lucide-react";
-import { createPortal } from "react-dom";
+import { ChevronUp, Check } from "lucide-react";
 import { useEffect } from "react";
 
-// Instagram-style Vanish mode visuals for a 1:1 chat.
-//  - <VanishPullIndicator>: shown while you drag up past the last message. A ring fills with the
-//    pull (the "loading" symbol), the arrow inside rotates a half-turn, and once it is switching the
-//    ring spins until the server confirms.
-//  - <VanishBottomHint>: the small "Swipe up to turn on/off Vanish mode" line under the last message.
+// Pull-up indicator for disappearing messages in a 1:1 chat. It only exists while you drag (and for a moment
+// after you let go); nothing about disappearing messages is left in the chat itself.
+//
+// It sits in the space the chat leaves behind as it is pulled up. Everything is driven by transforms, so it
+// follows the finger without layout jank:
+//  - the ring fills exactly as far as you have pulled (no easing lag),
+//  - at the threshold the circle fills solid and gives one short buzz: "let go now",
+//  - after you let go a tick pops in and the whole thing slides away. No endless spinner.
 
-const R = 15;
+const SIZE = 46;
+const STROKE = 3;
+const R = (SIZE - STROKE) / 2;
 const C = 2 * Math.PI * R;
+const REACH = 132; // tallest the indicator ever gets (px)
 
-// Sits in the space the chat leaves behind as it is pulled up: the circle grows and fills with the pull; once the
-// pull is far enough the arrow flips and the circle spins freely — let go and Vanish mode switches.
 export const VanishPullIndicator = ({ px, pull, busy, turningOn }) => {
-  const ready = busy || pull >= 1;
+  const ready = pull >= 1;
   const p = Math.min(pull, 1);
-  const label = busy
-    ? `Turning ${turningOn ? "on" : "off"} disappearing messages…`
-    : ready
-      ? `Release to turn ${turningOn ? "on" : "off"}`
-      : `Swipe up to turn ${turningOn ? "on" : "off"} disappearing messages`;
-  // a short buzz the moment the pull is far enough (like Instagram)
+
+  // one short buzz the moment the pull is far enough
   useEffect(() => {
-    if (ready && !busy) {
-      try { navigator.vibrate?.(18); } catch { /* not available */ }
-    }
+    if (!ready || busy) return;
+    try { navigator.vibrate?.(14); } catch { /* not available */ }
   }, [ready, busy]);
-  const scale = busy ? 1 : 0.5 + p * 0.5;
+
+  const filled = ready || busy;
+  const verb = turningOn ? "on" : "off";
+
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center justify-center gap-3 overflow-hidden"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex flex-col items-center"
       style={{
-        height: px,
-        background: `linear-gradient(to top, rgba(0,0,0,${0.35 + p * 0.45}), rgba(0,0,0,${p * 0.12}))`,
-        opacity: busy ? 1 : Math.min(1, pull * 1.8),
-        transition: busy ? "height 200ms ease" : undefined,
+        height: REACH,
+        // the top edge of this box rises with the pull; the chat area clips whatever is still below the bottom
+        transform: `translateY(${Math.max(REACH - px, 0)}px)`,
+        transition: busy ? "transform 260ms cubic-bezier(.2,.8,.2,1)" : "none",
+        willChange: "transform",
       }}
       aria-live="polite"
+      aria-label={busy ? `Disappearing messages ${verb}` : `Release to turn ${verb} disappearing messages`}
     >
-      <div className="relative size-[60px] flex items-center justify-center" style={{ transform: `scale(${scale})` }}>
-        {ready && <span className="absolute inset-0 rounded-full border-2 border-white/60 animate-ping" />}
-        <span className="absolute inset-[5px] rounded-full" style={{ background: ready ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)", transition: "background 200ms" }} />
-        <svg viewBox="0 0 36 36" className={`absolute inset-0 size-full ${busy ? "animate-spin" : ""}`} style={{ transform: busy ? undefined : "rotate(-90deg)", animationDuration: "0.8s" }}>
-          <circle cx="18" cy="18" r={R} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="2" />
+      <div
+        className="mt-3.5 relative flex items-center justify-center rounded-full"
+        style={{
+          width: SIZE,
+          height: SIZE,
+          opacity: busy ? 1 : Math.min(1, p * 2.2),
+          transform: `scale(${busy ? 1 : 0.7 + p * 0.3})`,
+          background: filled ? "#fff" : "rgba(255,255,255,0.14)",
+          backdropFilter: "blur(6px)",
+          transition: "background 160ms ease, transform 160ms ease",
+        }}
+      >
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0 size-full" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx={SIZE / 2} cy={SIZE / 2} r={R} fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth={STROKE} />
           <circle
-            cx="18"
-            cy="18"
+            cx={SIZE / 2}
+            cy={SIZE / 2}
             r={R}
             fill="none"
-            stroke="#fff"
-            strokeWidth="2.6"
+            stroke={filled ? "#fff" : "rgba(255,255,255,0.95)"}
+            strokeWidth={STROKE}
             strokeLinecap="round"
             strokeDasharray={C}
-            strokeDashoffset={busy ? C * 0.7 : C * (1 - p)}
-            style={{ transition: busy ? undefined : "stroke-dashoffset 40ms linear" }}
+            strokeDashoffset={C * (1 - (filled ? 1 : p))}
           />
         </svg>
-        <ChevronUp
-          size={26}
-          className="text-white"
-          style={{
-            transform: `translateY(${ready ? -2 : (1 - p) * 4}px) rotate(${ready ? 180 : 0}deg)`,
-            transition: "transform 260ms cubic-bezier(.2,1.4,.4,1)",
-          }}
-        />
+        {busy ? (
+          <Check size={24} strokeWidth={3} className="relative text-[#0B141A] vanish-pop" />
+        ) : (
+          <ChevronUp size={24} strokeWidth={2.6} className="relative" style={{ color: ready ? "#0B141A" : "#fff", transition: "color 160ms" }} />
+        )}
       </div>
-      <span className="text-white text-[12.5px] font-medium leading-none">{label}</span>
-    </div>
-  );
-};
-
-export const VanishBottomHint = ({ on }) => (
-  <div className={`flex flex-col items-center pt-3 pb-1 select-none ${on ? "text-white/85" : "text-wa-muted/70"}`}>
-    <ChevronUp size={16} className={on ? "text-white/85" : "text-wa-muted/70"} />
-    <span className="text-[11.5px] leading-tight mt-0.5">
-      {on ? "Swipe up to turn off disappearing messages" : "Swipe up to turn on disappearing messages"}
-    </span>
-  </div>
-);
-
-// The centred line in the chat: "You turned on disappearing messages. … Change" / "Name turned off … Turn on".
-export const VanishNotice = ({ message, mine, name, onToggle }) => {
-  const on = message.system === "vanish_on";
-  const who = mine ? "You" : name || "Someone in the chat";
-  return (
-    <div className="flex justify-center px-6 py-2.5" title={`${who} turned ${on ? "on" : "off"} disappearing messages`}>
-      <span className="inline-flex items-center gap-2 rounded-full bg-wa-surface/90 px-3.5 py-1.5 text-[12px] text-wa-text/85 shadow-sm">
-        <Timer size={13} className={on ? "text-[#25D366]" : "text-wa-muted"} />
-        Disappearing messages {on ? "on" : "off"}
-        <button type="button" onClick={onToggle} className="font-medium text-[#6aa7ff] active:opacity-70">
-          {on ? "Turn off" : "Turn on"}
-        </button>
+      <span
+        className="mt-2 text-white text-[12px] font-medium leading-none drop-shadow"
+        style={{ opacity: ready && !busy ? 1 : 0, transition: "opacity 140ms" }}
+      >
+        Release to turn {verb}
       </span>
     </div>
   );
 };
-
-// First time only (like Instagram): what disappearing messages mean, then OK turns it on.
-export const VanishIntro = ({ onOk, onClose }) =>
-  createPortal(
-    <div className="fixed inset-0 z-[90] bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
-      <div className="w-full sm:max-w-sm bg-[#12171c] text-white rounded-t-3xl sm:rounded-3xl px-6 pt-8 pb-6" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto size-14 rounded-full border-2 border-dashed border-[#a78bfa] flex items-center justify-center mb-4">
-          <Timer size={26} className="text-white" />
-        </div>
-        <h2 className="text-center text-[24px] font-bold leading-tight mb-6">Not all messages need to stick around</h2>
-        {[
-          [Timer, "Swipe up for disappearing messages", "New messages will disappear for everyone in the chat after they have been seen."],
-          [Bell, "You'll get screenshot notifications", "If a screenshot is detected, a notice will appear in the chat."],
-          [ShieldCheck, "Conversations can still be reported", "Disappearing messages can be reported for a while after they disappear."],
-        ].map(([Icon, title, body]) => (
-          <div key={title} className="flex gap-4 mb-5">
-            <Icon size={24} className="shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-[15.5px] leading-snug">{title}</p>
-              <p className="text-[14px] text-white/65 leading-snug mt-0.5">{body}</p>
-            </div>
-          </div>
-        ))}
-        <button onClick={onOk} className="w-full h-12 rounded-xl bg-[#2f6bff] text-white font-semibold text-[16px] mt-2">
-          OK
-        </button>
-      </div>
-    </div>,
-    document.body
-  );

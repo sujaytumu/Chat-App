@@ -22,7 +22,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
 import { Pin, X, ChevronDown } from "lucide-react";
-import { VanishPullIndicator, VanishBottomHint, VanishNotice, VanishIntro } from "./VanishPull";
+import { VanishPullIndicator } from "./VanishPull";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
 import { renderFormatted } from "../lib/richText";
@@ -241,19 +241,12 @@ const ChatContainer = () => {
     const dy = pullStart.current - e.touches[0].clientY;
     setVanishPx(dy > 8 ? Math.min((dy - 8) * 0.8, 130) : 0); // the chat follows the finger, with a little resistance
   };
-  const [showVanishIntro, setShowVanishIntro] = useState(false);
   const [vanishBusy, setVanishBusy] = useState(null); // "on" | "off" while the switch is being made
   const onPullEnd = async () => {
     const done = vanishPull >= 1;
     pullStart.current = null;
     setVanishPx(0);
     if (done && vanishPeer && !vanishBusy) {
-      let seenIntro = true;
-      try { seenIntro = localStorage.getItem("talkies-vanish-intro") === "1"; } catch { /* ignore */ }
-      if (!seenIntro && !vanishOn) {
-        setShowVanishIntro(true); // first time: explain, and OK turns it on
-        return;
-      }
       try {
         navigator.vibrate?.(20);
       } catch {
@@ -262,8 +255,8 @@ const ChatContainer = () => {
       const started = Date.now();
       setVanishBusy(vanishOn ? "off" : "on");
       await useChatStore.getState().setDirectVanish(vanishPeer, !vanishOn);
-      // keep the spinner up long enough to be seen, like Instagram's
-      setTimeout(() => setVanishBusy(null), Math.max(0, 650 - (Date.now() - started)));
+      // keep the tick up just long enough to be seen
+      setTimeout(() => setVanishBusy(null), Math.max(0, 500 - (Date.now() - started)));
     }
   };
   const nearBottomRef = useRef(true); // is the reader at (or close to) the latest message?
@@ -284,13 +277,6 @@ const ChatContainer = () => {
 
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
-  let lastSystemIndex = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].system) {
-      lastSystemIndex = i;
-      break;
-    }
-  }
 
   const membersById = isGroup
     ? Object.fromEntries(data.members.map((m) => [m._id, m]))
@@ -467,23 +453,9 @@ const ChatContainer = () => {
         // Vanish mode turns the chat dark, like Instagram
         <div className={`pointer-events-none absolute inset-0 bg-black transition-opacity duration-500 ${vanishOn ? "opacity-75" : "opacity-0"}`} />
       )}
-      {showVanishIntro && (
-        <VanishIntro
-          onClose={() => setShowVanishIntro(false)}
-          onOk={async () => {
-            try { localStorage.setItem("talkies-vanish-intro", "1"); } catch { /* ignore */ }
-            setShowVanishIntro(false);
-            if (vanishPeer) {
-              setVanishBusy("on");
-              await useChatStore.getState().setDirectVanish(vanishPeer, true);
-              setTimeout(() => setVanishBusy(null), 650);
-            }
-          }}
-        />
-      )}
       {vanishPeer && (vanishPx > 0 || vanishBusy) && (
         <VanishPullIndicator
-          px={vanishBusy ? 92 : vanishPx}
+          px={vanishBusy ? 84 : vanishPx}
           pull={vanishPull}
           busy={!!vanishBusy}
           turningOn={vanishBusy ? vanishBusy === "on" : !vanishOn}
@@ -498,7 +470,7 @@ const ChatContainer = () => {
         onTouchCancel={onPullEnd}
         style={{
           overflowAnchor: "none",
-          transform: vanishPeer && (vanishPx > 0 || vanishBusy) ? `translateY(${-(vanishBusy ? 92 : vanishPx)}px)` : undefined,
+          transform: vanishPeer && (vanishPx > 0 || vanishBusy) ? `translateY(${-(vanishBusy ? 84 : vanishPx)}px)` : undefined,
           transition: vanishPx > 0 && !vanishBusy ? undefined : "transform 280ms cubic-bezier(.2,.8,.2,1)",
         }}
         className="relative flex-1 overflow-y-auto overscroll-contain px-3 sm:px-[5%] lg:px-8 py-3 lg:py-5 lg:[&>*]:w-full lg:[&>*]:max-w-[880px] lg:[&>*]:mx-auto"
@@ -516,19 +488,7 @@ const ChatContainer = () => {
         )}
         {messages.map((message, index) => {
           const isMe = message.senderId === authUser._id;
-          if (message.system) {
-            // Only the CURRENT state is shown (one small line); older on/off lines are hidden so the chat stays clean.
-            if (index !== lastSystemIndex) return null;
-            return (
-              <VanishNotice
-                key={message._id}
-                message={message}
-                mine={isMe}
-                name={data?.fullName}
-                onToggle={() => vanishPeer && useChatStore.getState().setDirectVanish(vanishPeer, message.system !== "vanish_on")}
-              />
-            );
-          }
+          if (message.system) return null; // old on/off notes stay hidden: the chat shows only real messages
           const sender = isGroup ? membersById[message.senderId] : isMe ? authUser : data;
           const location = message.text ? parseLocationMessage(message.text) : null;
           const reelShare = !location && message.text ? parseReelMessage(message.text) : null;
@@ -907,7 +867,6 @@ const ChatContainer = () => {
             <span className="size-2 rounded-full bg-wa-muted animate-bounce" />
           </div>
         )}
-        {vanishPeer && vanishPx === 0 && !vanishBusy && <VanishBottomHint on={vanishOn} />}
         <div ref={messageEndRef} />
       </div>
 
