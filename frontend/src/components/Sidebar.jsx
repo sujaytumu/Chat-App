@@ -24,7 +24,7 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -238,6 +238,34 @@ const Sidebar = () => {
   const favList = lists.find((l) => l.id === "favourites");
   const customLists = lists.filter((l) => l.id !== "favourites");
   const [listModal, setListModal] = useState(null); // null | { id } (id "new" = create)
+  // Order of the filter tabs (All / Unread / Favourites ...) - chosen by the person, remembered per account on this device.
+  const tabOrderKey = `tabOrder:${authUser?._id || "x"}`;
+  const [tabOrder, setTabOrder] = useState([]);
+  const [tabSheet, setTabSheet] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(tabOrderKey) || "[]");
+      setTabOrder(Array.isArray(saved) ? saved : []);
+    } catch {
+      setTabOrder([]);
+    }
+  }, [tabOrderKey]);
+  const baseTabs = [...FILTERS, ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name }))];
+  const orderedTabs = [
+    ...tabOrder.map((id) => baseTabs.find((t) => t.id === id)).filter(Boolean),
+    ...baseTabs.filter((t) => !tabOrder.includes(t.id)),
+  ];
+  const saveTabOrder = (ids) => {
+    setTabOrder(ids);
+    try { localStorage.setItem(tabOrderKey, JSON.stringify(ids)); } catch { /* ignore */ }
+  };
+  const moveTab = (i, dir) => {
+    const ids = orderedTabs.map((t) => t.id);
+    const j = i + dir;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    saveTabOrder(ids);
+  };
   const activeList = filter.startsWith("list:") ? customLists.find((l) => `list:${l.id}` === filter) : null;
   const activeKeys = useMemo(() => {
     if (filter === "fav") return new Set(favList?.chats || []);
@@ -671,10 +699,21 @@ const Sidebar = () => {
       {!folderOpen && (
       <div className={`flex gap-2 lg:gap-1.5 overflow-x-auto no-scrollbar px-4 lg:px-3 pb-3 lg:pb-2.5 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
         {[
-          ...FILTERS,
-          ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name })),
+          ...orderedTabs,
           { id: "__new" },
+          { id: "__order" },
         ].map(({ id, label }) => {
+          if (id === "__order") return (
+        <button key="__order"
+          onClick={() => setTabSheet(true)}
+          className="h-10 lg:h-8 px-3.5 lg:px-3 rounded-full text-[13.5px] lg:text-[12px] shrink-0 whitespace-nowrap border border-wa-field text-wa-icon hover:bg-white/5 flex items-center gap-1.5"
+          title="Change order of tabs"
+          aria-label="Change order of tabs"
+        >
+          <ArrowUpDown size={15} />
+          <span className="lg:hidden">Order</span>
+        </button>
+          );
           if (id === "__new") return (
         <button key="__new"
           onClick={() => setListModal({ id: "new" })}
@@ -703,6 +742,30 @@ const Sidebar = () => {
           );
         })}
       </div>
+      )}
+
+      {tabSheet && (
+        <div className="fixed inset-0 z-[70] flex items-end lg:items-center justify-center bg-black/50" onClick={() => setTabSheet(false)}>
+          <div className="w-full max-w-md rounded-t-3xl lg:rounded-3xl bg-wa-pop text-wa-text pb-5 pt-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 pb-2 flex items-center justify-between">
+              <h3 className="text-[18px] font-semibold">Order of tabs</h3>
+              <button onClick={() => saveTabOrder([])} className="text-[13.5px] text-[#25D366] font-medium px-2 py-1">Reset</button>
+            </div>
+            <p className="px-5 pb-2 text-[12.5px] text-wa-muted">Use the arrows to move a tab. The top one shows first.</p>
+            <div className="max-h-[55vh] overflow-y-auto">
+              {orderedTabs.map((t, i) => (
+                <div key={t.id} className="flex items-center gap-2 px-5 py-2.5">
+                  <span className="flex-1 text-[15.5px] truncate">{t.label}</span>
+                  <button onClick={() => moveTab(i, -1)} disabled={i === 0} className="size-10 rounded-full bg-wa-field flex items-center justify-center disabled:opacity-30 active:scale-95" aria-label={`Move ${t.label} up`}><ArrowUp size={18} /></button>
+                  <button onClick={() => moveTab(i, 1)} disabled={i === orderedTabs.length - 1} className="size-10 rounded-full bg-wa-field flex items-center justify-center disabled:opacity-30 active:scale-95" aria-label={`Move ${t.label} down`}><ArrowDown size={18} /></button>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 pt-3">
+              <button onClick={() => setTabSheet(false)} className="w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[15.5px] active:scale-[.98]">Done</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Chat list */}
