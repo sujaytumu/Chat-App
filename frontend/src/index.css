@@ -362,3 +362,7 @@ video { transform: translateZ(0); }
 /* switching tabs: a quick fade instead of a hard cut */
 @keyframes routeIn { from { opacity: 0; } to { opacity: 1; } }
 main > * { animation: routeIn .16s ease-out both; }
+
+/* tick that pops in when disappearing messages switch */
+@keyframes vanish-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.vanish-pop { animation: vanish-pop 220ms cubic-bezier(.2,1.4,.4,1) both; }
