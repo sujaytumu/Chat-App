@@ -235,7 +235,6 @@ export const useChatStore = create((set, get) => ({
     try {
       await axiosInstance.put(`/messages/vanish/${userId}`, { on });
       set((state) => ({ directVanish: { ...state.directVanish, [userId]: on } }));
-      toast(on ? "Vanish mode on" : "Vanish mode off", { icon: "👻" });
     } catch (error) {
       toast.error(error.response?.data?.error || "Couldn't change Vanish mode");
     }
