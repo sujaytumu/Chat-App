@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CHAT_THEMES, CHAT_FONTS, themeStyle, getTheme, getFont, loadChatFont } from "../lib/chatThemes";
+import { CHAT_THEMES, themeStyle, getTheme } from "../lib/chatThemes";
 import { useChatThemeStore } from "../store/useChatThemeStore";
 import { useBackToClose } from "../lib/useBackToClose";
 
-// Instagram-style "Customise" sheet for ONE chat: a Theme tab (wallpaper + bubble colours)
-// and a Font tab, with Preview (try it on the real chat) and Apply.
+// Instagram-style "Customise" sheet for ONE chat: wallpaper + bubble colours, with Preview (try it on the real
+// chat) and Apply. There is no separate font here: the app has ONE font (Settings > Appearance > Font style)
+// and it is used everywhere, inside chats too.
 const RING = "#4f5bff";
 const W = 360; // thumbnails are drawn at phone size, then scaled down to the card
 
@@ -37,9 +38,7 @@ const ChatThemeSheet = ({ scope = "default", chatName, onClose }) => {
   const applyStore = useChatThemeStore((s) => s.apply);
   const setPreview = useChatThemeStore((s) => s.setPreview);
 
-  const [tab, setTab] = useState("theme");
   const [theme, setTheme] = useState(saved?.theme || null);
-  const [font, setFont] = useState(saved?.font || null);
   const [previewing, setPreviewing] = useState(false);
   const gridRef = useRef(null);
   const [scale, setScale] = useState(0.27);
@@ -52,23 +51,18 @@ const ChatThemeSheet = ({ scope = "default", chatName, onClose }) => {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [tab]);
+  }, []);
 
-  // fonts show their own name, so fetch them once the Font tab opens
-  useEffect(() => {
-    if (tab === "font") CHAT_FONTS.forEach(loadChatFont);
-  }, [tab]);
   useEffect(() => () => setPreview(null), [setPreview]);
 
-  const changed = (theme || null) !== (saved?.theme || null) || (font || null) !== (saved?.font || null);
+  const changed = (theme || null) !== (saved?.theme || null);
 
   const doPreview = () => {
-    loadChatFont(getFont(font));
-    setPreview({ scope, theme, font });
+    setPreview({ scope, theme, font: null });
     setPreviewing(true);
   };
   const doApply = () => {
-    applyStore(scope, theme, font);
+    applyStore(scope, theme, null);
     onClose();
   };
   const stopPreview = () => {
@@ -93,17 +87,7 @@ const ChatThemeSheet = ({ scope = "default", chatName, onClose }) => {
       <div className="wa-dark w-full max-w-md lg:max-w-lg h-[88vh] lg:h-[84vh] bg-wa-panel text-wa-text rounded-t-[28px] lg:rounded-[28px] lg:shadow-2xl flex flex-col pb-[env(safe-area-inset-bottom)]" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-white/30" />
         <h3 className="text-center text-[17px] font-semibold pt-5 pb-3">{isDefault ? "Theme for all chats" : "Customise"}</h3>
-        <div className="flex border-b border-white/10">
-          {[["theme", "Theme"], ["font", "Font"]].map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} className={`flex-1 pb-3 text-[16px] font-medium relative ${tab === id ? "text-wa-text" : "text-wa-muted"}`}>
-              {label}
-              {tab === id && <span className="absolute left-1/2 -translate-x-1/2 bottom-0 h-[3px] w-24 rounded-full bg-white" />}
-            </button>
-          ))}
-        </div>
-
         <div className="flex-1 overflow-y-auto px-4 pt-4 pb-3 no-scrollbar">
-          {tab === "theme" ? (
             <div ref={gridRef} className="grid grid-cols-3 gap-x-3 gap-y-4">
               <ThemeCard theme={null} scale={scale} selected={!theme} onPick={() => setTheme(null)} label={isDefault ? "Plain" : "Same as all chats"} sub={isDefault ? "Plain" : "All chats"} />
               {!isDefault && <ThemeCard theme={null} scale={scale} selected={theme === "none"} onPick={() => setTheme("none")} label="Plain" sub="Plain" />}
@@ -111,32 +95,6 @@ const ChatThemeSheet = ({ scope = "default", chatName, onClose }) => {
                 <ThemeCard key={t.id} theme={t} scale={scale} selected={theme === t.id} onPick={() => setTheme(t.id)} />
               ))}
             </div>
-          ) : (
-            <>
-              <p className="text-center text-[14px] text-wa-muted mb-4">{isDefault ? "Pick a font for messages in all chats." : `Pick a font for messages in ${chatName}.`}</p>
-              <div className="grid grid-cols-2 gap-3">
-                {!isDefault && (
-                  <button onClick={() => setFont(null)} className="h-[104px] rounded-3xl bg-wa-surface flex items-center justify-center text-[17px] text-center px-3" style={{ outline: !font ? `2.5px solid ${RING}` : "none" }} aria-pressed={!font}>
-                    Same as all chats
-                  </button>
-                )}
-                {CHAT_FONTS.map((f) => {
-                  const on = isDefault ? (font || "default") === f.id : f.id === "default" ? font === "none" : font === f.id;
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => setFont(f.id === "default" ? (isDefault ? null : "none") : f.id)}
-                      className="h-[104px] rounded-3xl bg-wa-surface flex items-center justify-center text-[30px]"
-                      style={{ fontFamily: f.css || "inherit", fontWeight: f.weight || 400, outline: on ? `2.5px solid ${RING}` : "none" }}
-                      aria-pressed={on}
-                    >
-                      {f.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
         </div>
 
         <div className="flex gap-3 px-4 pt-2 pb-4">
