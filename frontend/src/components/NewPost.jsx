@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight, ImagePlus, Camera, Plus, Music, Loader2, SlidersHorizontal, Crop, Palette } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ImagePlus, Camera, Plus, Music, Loader2, SlidersHorizontal, Crop, Palette, Type } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { readFileAsBase64 } from "../lib/fileUtils";
@@ -24,6 +24,10 @@ const RATIOS = [
   { id: "sq", label: "1:1", ar: 1 },
   { id: "port", label: "4:5", ar: 0.8 },
 ];
+const TEXT_COLORS = ["#ffffff", "#111111", "#ffd43b", "#21C063", "#ff6b9d", "#4dabf7"];
+const TEXT_POS = [["top", "Top", 0.12], ["mid", "Middle", 0.5], ["bot", "Bottom", 0.88]];
+const TEXT_SIZES = [["S", 0.7], ["M", 1], ["L", 1.5]];
+const textFont = (w, k) => Math.max(10, w * 0.055 * k); // text size follows the photo width, so preview and final picture match
 const canBake = typeof CanvasRenderingContext2D !== "undefined" && "filter" in CanvasRenderingContext2D.prototype;
 
 const cssFilter = (it) => {
@@ -31,7 +35,7 @@ const cssFilter = (it) => {
   const extra = it.b !== 1 || it.c !== 1 ? `brightness(${it.b}) contrast(${it.c})` : "";
   return `${f} ${extra}`.trim() || "none";
 };
-const isPlain = (it) => it.filter === "none" && it.b === 1 && it.c === 1 && it.ratio === "orig";
+const isPlain = (it) => it.filter === "none" && it.b === 1 && it.c === 1 && it.ratio === "orig" && !it.text;
 const nextFrame = () => new Promise((r) => setTimeout(r, 30));
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -86,6 +90,35 @@ const bake = (it) =>
         const ctx = c.getContext("2d");
         if (canBake) ctx.filter = cssFilter(it);
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        if (it.text) {
+          ctx.filter = "none";
+          const fs = textFont(sw, it.tsize);
+          ctx.font = `700 ${fs}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.lineJoin = "round";
+          const maxW = sw * 0.88;
+          const out = [];
+          for (const para of it.text.split("\n")) {
+            let line = "";
+            for (const word of para.split(" ")) {
+              const test = line ? `${line} ${word}` : word;
+              if (line && ctx.measureText(test).width > maxW) { out.push(line); line = word; } else line = test;
+            }
+            out.push(line);
+          }
+          const lh = fs * 1.25;
+          const cy = (TEXT_POS.find((t) => t[0] === it.tpos)?.[2] ?? 0.88) * sh;
+          let y = Math.min(Math.max(cy - ((out.length - 1) * lh) / 2, lh / 2 + 4), sh - lh / 2 - 4 - (out.length - 1) * lh);
+          for (const l of out) {
+            ctx.strokeStyle = "rgba(0,0,0,0.55)";
+            ctx.lineWidth = fs * 0.14;
+            ctx.strokeText(l, sw / 2, y);
+            ctx.fillStyle = it.tcolor;
+            ctx.fillText(l, sw / 2, y);
+            y += lh;
+          }
+        }
         const out = c.toDataURL("image/jpeg", 0.85);
         c.width = c.height = 0;
         res(out);
@@ -107,7 +140,12 @@ const Shot = ({ it, box }) => {
   else h = w / ar;
   return (
     <div className="overflow-hidden" style={{ width: Math.floor(w), height: Math.floor(h) }}>
-      <img src={it.src} alt="" draggable={false} style={{ filter: cssFilter(it) }} className="w-full h-full object-cover" />
+      <div className="relative w-full h-full">
+        <img src={it.src} alt="" draggable={false} style={{ filter: cssFilter(it) }} className="w-full h-full object-cover" />
+        {it.text && (
+          <div className="absolute inset-x-0 text-center font-bold leading-[1.25] whitespace-pre-wrap break-words pointer-events-none" style={{ top: `${(TEXT_POS.find((t) => t[0] === it.tpos)?.[2] ?? 0.88) * 100}%`, transform: "translateY(-50%)", padding: "0 6%", fontSize: textFont(Math.floor(w), it.tsize), color: it.tcolor, textShadow: "0 0 3px rgba(0,0,0,.7), 0 1px 4px rgba(0,0,0,.6), 1px 1px 0 rgba(0,0,0,.35), -1px -1px 0 rgba(0,0,0,.35)" }}>{it.text}</div>
+        )}
+      </div>
     </div>
   );
 };
@@ -147,7 +185,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
     for (const f of files) {
       try {
         const p = await prepare(f);
-        setItems((l) => (l.length < MAX ? [...l, { id: uid(), ...p, filter: "none", b: 1, c: 1, ratio: "orig" }] : l));
+        setItems((l) => (l.length < MAX ? [...l, { id: uid(), ...p, filter: "none", b: 1, c: 1, ratio: "orig", text: "", tcolor: "#ffffff", tpos: "bot", tsize: 1 }] : l));
       } catch {
         failed++;
       }
@@ -315,6 +353,19 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
               <button onClick={() => patch(safeCur, { b: 1, c: 1 })} className="text-[13px] text-[#21C063] font-medium">Reset</button>
             </div>
           )}
+          {tool === "text" && (
+            <div className="px-4 pb-3 shrink-0 space-y-2.5">
+              <input value={it.text} onChange={(e) => patch(safeCur, { text: e.target.value.slice(0, 120) })} placeholder="Type text for this photo…" className="w-full h-11 rounded-xl bg-wa-field px-3.5 text-[15px] outline-none placeholder:text-wa-muted" />
+              <div className="flex items-center gap-2.5">
+                {TEXT_COLORS.map((c) => <button key={c} onClick={() => patch(safeCur, { tcolor: c })} aria-label={`Colour ${c}`} style={{ background: c }} className={`size-8 rounded-full border border-white/30 ${it.tcolor === c ? "ring-2 ring-offset-2 ring-offset-wa-bg ring-[#21C063]" : ""}`} />)}
+              </div>
+              <div className="flex items-center gap-2">
+                {TEXT_POS.map(([id, label]) => <button key={id} onClick={() => patch(safeCur, { tpos: id })} className={`h-9 px-3.5 rounded-full text-[13px] ${it.tpos === id ? "bg-[#21C063] text-black font-semibold" : "bg-wa-field"}`}>{label}</button>)}
+                <span className="w-2" />
+                {TEXT_SIZES.map(([label, k]) => <button key={label} onClick={() => patch(safeCur, { tsize: k })} className={`size-9 rounded-full text-[13px] ${it.tsize === k ? "bg-[#21C063] text-black font-semibold" : "bg-wa-field"}`}>{label}</button>)}
+              </div>
+            </div>
+          )}
           {tool === "ratio" && (
             <div className="flex justify-center gap-2.5 px-4 pb-3 shrink-0">
               {RATIOS.map((r) => (
@@ -326,6 +377,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
           <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-3 pb-2.5 shrink-0">
             {[
               { id: "audio", icon: Music, label: "Audio", run: () => setShowMusic(true) },
+              { id: "text", icon: Type, label: "Text" },
               ...(canBake ? [{ id: "filter", icon: Palette, label: "Filter" }, { id: "edit", icon: SlidersHorizontal, label: "Edit" }] : []),
               { id: "ratio", icon: Crop, label: "Ratio" },
             ].map((t) => (
