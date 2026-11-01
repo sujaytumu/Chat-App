@@ -85,11 +85,28 @@ const AccessNotifier = () => {
       const list = (people || []).length ? people.slice(0, 5).join(", ") + (people.length > 5 ? ` and ${people.length - 5} more` : "") : "";
       toast.success(list ? `${by || "The owner"} approved you to see ${list}` : `${by || "The owner"} approved your request`, { duration: 7000 });
     };
+    // Someone new became visible to me: say who, so a new contact never appears unexplained.
+    const onGranted = ({ fullName, profilePic }) =>
+      toast.custom(
+        (t) => (
+          <div className={`${t.visible ? "animate-enter" : "opacity-0"} w-[min(92vw,380px)] flex items-center gap-3 rounded-2xl bg-wa-pop text-wa-text px-3.5 py-3 shadow-xl border border-white/10`}>
+            <Avatar src={profilePic} name={fullName} size="size-11" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14.5px] font-medium truncate">{fullName || "A new contact"}</span>
+              <span className="block text-[12.5px] text-wa-muted leading-snug">You can now chat with them</span>
+            </span>
+          </div>
+        ),
+        { duration: 6000 }
+      );
+    const onRemoved = () => toast("Your access to other people was removed. You can ask again.", { icon: "ℹ️", duration: 7000 });
     const onVisible = () => document.visibilityState === "visible" && sync();
 
     socket.on("accessRequest", onRequest);
     socket.on("accessRequestResolved", onResolved);
     socket.on("accessDecision", onDecision);
+    socket.on("accessGranted", onGranted);
+    socket.on("accessRemoved", onRemoved);
     socket.on("connect", sync);
     document.addEventListener("visibilitychange", onVisible);
     if (socket.connected) sync();
@@ -97,6 +114,8 @@ const AccessNotifier = () => {
       socket.off("accessRequest", onRequest);
       socket.off("accessRequestResolved", onResolved);
       socket.off("accessDecision", onDecision);
+      socket.off("accessGranted", onGranted);
+      socket.off("accessRemoved", onRemoved);
       socket.off("connect", sync);
       document.removeEventListener("visibilitychange", onVisible);
     };
