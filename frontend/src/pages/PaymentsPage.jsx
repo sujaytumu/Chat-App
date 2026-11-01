@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazyDialog } from "../lib/lazyDialog";
 import { createPortal } from "react-dom";
 import { Loader2, ArrowUpRight, ArrowDownLeft, IndianRupee, Search, X, ShieldCheck, Smartphone } from "lucide-react";
 import toast from "react-hot-toast";
 import SettingsShell from "../components/SettingsShell";
 import Avatar from "../components/Avatar";
-import PaymentModal from "../components/PaymentModal";
 import { axiosInstance } from "../lib/axios";
 import { inr } from "../lib/razorpay";
 import { useChatStore } from "../store/useChatStore";
 import { useBackToClose } from "../lib/useBackToClose";
+const PaymentModal = lazyDialog(() => import("../components/PaymentModal"));
 
 const when = (iso) => new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const sectionHead = "px-5 pt-5 pb-2 text-[14px] text-wa-muted";

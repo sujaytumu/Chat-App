@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { lazyDialog } from "../lib/lazyDialog";
 import toast from "react-hot-toast";
 import { useChatStore } from "../store/useChatStore";
 import { isPinned } from "../lib/pin";
@@ -7,9 +8,9 @@ import { useBackToClose } from "../lib/useBackToClose";
 import { translateAndToast } from "../lib/translate";
 import { WaBack } from "./icons/WaIcons";
 import { Reply, Star, StarOutline, Trash2, Forward, MoreVertical } from "./icons/WaGlyphs";
-import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
 import SecurityCodeModal from "./SecurityCodeModal";
+const ForwardMessageModal = lazyDialog(() => import("./ForwardMessageModal"));
 
 const btn = "size-11 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
 const item = "w-full flex items-center px-5 py-3.5 text-[16px] text-wa-text hover:bg-white/5 active:bg-white/10 text-left whitespace-nowrap";

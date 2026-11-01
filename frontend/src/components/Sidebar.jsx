@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
+import { lazyDialog } from "../lib/lazyDialog";
 import { UpdateButton } from "../lib/versionCheck";
 import { useBackToClose } from "../lib/useBackToClose";
 import { Link } from "react-router-dom";
@@ -21,7 +22,6 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
-import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
 import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
@@ -44,6 +44,7 @@ import {
   WaCheck,
   WaNewChat,
 } from "./icons/WaIcons";
+const SearchScreen = lazyDialog(() => import("./SearchScreen"));
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 const BroadcastModal = lazy(() => import("./BroadcastModal"));

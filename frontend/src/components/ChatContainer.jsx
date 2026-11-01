@@ -1,4 +1,5 @@
 import { useChatStore } from "../store/useChatStore";
+import { lazyDialog } from "../lib/lazyDialog";
 import { useChatWallpaperStyle } from "../lib/wallpaper";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -10,7 +11,6 @@ import ViewOnceViewer from "./ViewOnceViewer";
 import MessageTicks, { GroupMessageTicks } from "./MessageTicks";
 import AttachmentContent from "./AttachmentContent";
 import LocationCard from "./LocationCard";
-import ForwardMessageModal from "./ForwardMessageModal";
 import MessageInfoModal from "./MessageInfoModal";
 import MessageContextMenu from "./MessageContextMenu";
 import PinDurationSheet from "./PinDurationSheet";
@@ -37,7 +37,6 @@ import PollCard from "./PollCard";
 import EventCard from "./EventCard";
 import PaymentCard from "./PaymentCard";
 import LiveLocationCard from "./LiveLocationCard";
-import ReminderSheet from "./ReminderSheet";
 import { stopLiveShare } from "./LiveLocationManager";
 import { replyWithPhoto } from "../lib/replyWithPhoto";
 import ContactCard from "./ContactCard";
@@ -46,6 +45,8 @@ import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
 import { optimizeImage } from "../lib/cdn";
 import ChatPhoto from "./ChatPhoto";
+const ReminderSheet = lazyDialog(() => import("./ReminderSheet"));
+const ForwardMessageModal = lazyDialog(() => import("./ForwardMessageModal"));
 
 // WhatsApp tints each person's name in a group differently.
 const SENDER_COLORS = ["#25D366", "#53BDEB", "#E8A33D", "#B794F6", "#F472B6", "#A3E635"];
