@@ -108,6 +108,18 @@ export const getSaved = async (req, res) => {
   }
 };
 
+// Who liked a post - only the person who posted it can see the list (others only see the number)
+export const getLikers = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user._id }).select("likes").populate({ path: "likes", select: "fullName profilePic", options: { limit: 200 } }).lean();
+    if (!post) return res.status(404).json({ error: "Not found" });
+    res.json({ users: (post.likes || []).map((u) => ({ _id: u._id, fullName: u.fullName, profilePic: u.profilePic })), total: (post.likes || []).length });
+  } catch (e) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const savePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });

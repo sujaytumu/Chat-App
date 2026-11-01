@@ -70,6 +70,37 @@ const EditPostSheet = ({ post, onClose, onSaved }) => {
   );
 };
 
+// Who liked your post
+const LikersSheet = ({ post, onClose }) => {
+  const [users, setUsers] = useState(null);
+  useEffect(() => {
+    let dead = false;
+    axiosInstance.get(`/posts/${post._id}/likes`).then((r) => !dead && setUsers(r.data.users)).catch(() => { if (!dead) { setUsers([]); toast.error("Couldn't load likes"); } });
+    return () => { dead = true; };
+  }, [post._id]);
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end bg-black/60" onClick={onClose}>
+      <div className="w-full max-h-[70vh] flex flex-col rounded-t-3xl bg-wa-pop text-wa-text pb-[env(safe-area-inset-bottom)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
+          <h3 className="text-[18px] font-semibold">Likes</h3>
+          <button onClick={onClose} aria-label="Close" className="size-9 flex items-center justify-center"><X size={22} /></button>
+        </div>
+        <div className="overflow-y-auto overscroll-contain pb-4">
+          {users === null ? <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-wa-muted" /></div>
+            : !users.length ? <p className="py-10 text-center text-wa-muted text-[14px]">No likes yet</p>
+            : users.map((u) => (
+              <div key={u._id} className="flex items-center gap-3 px-5 py-2.5">
+                <img src={optimizeImage(u.profilePic || "/avatar.png", 80)} alt="" className="size-11 rounded-full object-cover" />
+                <span className="flex-1 text-[16px] truncate">{u.fullName}</span>
+                <Heart size={16} className="text-red-500" fill="currentColor" strokeWidth={0} />
+              </div>
+            ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // The song kept with a post: tap to play / pause (only one song plays at a time)
 let playingPostSong = null;
 const PostSong = ({ song }) => {
@@ -134,6 +165,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
   const [commentsFor, setCommentsFor] = useState(null);
   const [pop, setPop] = useState(null);
   const [tab, setTab] = useState("all"); // all | saved
+  const [likersFor, setLikersFor] = useState(null);
   const [editing, setEditing] = useState(null);
   const [viewer, setViewer] = useState(null); // { images, src } - photo open full screen
   const next = useRef(null);
@@ -268,8 +300,9 @@ const FeedView = ({ onCreate, refreshKey }) => {
                 <div className="flex items-center gap-5">
                   <button onClick={() => like(p)} className="flex items-center gap-1.5 active:scale-90 transition-transform" aria-label="Like">
                     <Heart size={26} className={p.liked ? "text-red-500" : ""} fill={p.liked ? "currentColor" : "none"} strokeWidth={1.8} />
-                    <span className="text-[13.5px] tabular-nums">{p.likeCount > 0 ? p.likeCount : ""}</span>
+                    {!p.mine && <span className="text-[13.5px] tabular-nums">{p.likeCount > 0 ? p.likeCount : ""}</span>}
                   </button>
+                  {p.mine && p.likeCount > 0 && <button onClick={() => setLikersFor(p)} className="-ml-3.5 text-[13.5px] tabular-nums underline-offset-2 active:opacity-60" aria-label="See who liked">{p.likeCount}</button>}
                   <button onClick={() => setCommentsFor(p)} className="flex items-center gap-1.5 active:scale-90 transition-transform" aria-label="Comments">
                     <MessageCircle size={25} strokeWidth={1.8} />
                     <span className="text-[13.5px] tabular-nums">{p.comments > 0 ? p.comments : ""}</span>
@@ -286,6 +319,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
           {more && <MoreSentinel key={posts.length} onVisible={() => load(false)} />}
         </>
       )}
+      {likersFor && <LikersSheet post={likersFor} onClose={() => setLikersFor(null)} />}
       {editing && <EditPostSheet post={editing} onClose={() => setEditing(null)} onSaved={(d) => { setPosts((l) => l.map((x) => (x._id === editing._id ? { ...x, ...d } : x))); setEditing(null); toast.success("Saved"); }} />}
       {viewer && <ImageLightbox src={viewer.src} gallery={viewer.images} onClose={() => setViewer(null)} />}
       {commentsFor && (
