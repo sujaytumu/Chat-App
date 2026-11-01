@@ -38,7 +38,7 @@ const ActivityPage = () => {
     return () => { alive = false; };
   }, []);
 
-  const open = (a) => navigate(a.kind === "reel" ? `/reels?r=${a.targetId}` : "/reels?feed=1");
+  const open = (a) => navigate(a.kind === "reel" ? `/reels?r=${a.targetId}` : "/post");
 
   return (
     <div className="fixed inset-0 z-[60] bg-black text-white flex flex-col">

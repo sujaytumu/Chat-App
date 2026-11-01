@@ -32,7 +32,7 @@ const resolveTarget = async (targetId, viewerId) => {
   const post = await Post.findById(targetId).select("userId image").lean();
   if (post) {
     const own = String(post.userId) === String(viewerId);
-    return own || (await canSee({ _id: viewerId }, post.userId)) ? { ownerId: String(post.userId), kind: "post", thumb: post.image, url: "/reels?feed=1" } : null;
+    return own || (await canSee({ _id: viewerId }, post.userId)) ? { ownerId: String(post.userId), kind: "post", thumb: post.image, url: "/post" } : null;
   }
   const h = await Highlight.findOne({ "items._id": targetId }).select("userId items._id items.audience").lean();
   const item = h?.items?.find((i) => String(i._id) === String(targetId));

@@ -1,10 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { optimizeImage } from "../lib/cdn";
 import { Loader2, Pencil, Camera, Lock, BellOff, Bell, Bookmark, Eye } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import StatusCard from "../components/StatusCard";
 import MyStatusScreen from "../components/MyStatusScreen";
-import Avatar from "../components/Avatar";
 import { createPortal } from "react-dom";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
@@ -16,14 +14,6 @@ import PlaylistsCard from "../components/PlaylistsCard";
 import { HL_GRADIENT } from "../lib/highlightTheme";
 import { useScrollMemory } from "../lib/useScrollMemory";
 import toast from "react-hot-toast";
-
-// "Today, 09:16" / "Yesterday, 21:40" like WhatsApp
-const statusTime = (iso) => {
-  const d = new Date(iso);
-  const t = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
-  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86400000);
-  return `${days <= 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString([], { day: "numeric", month: "short" })}, ${t}`;
-};
 
 // WhatsApp-style bottom sheet for one person's updates: opened by holding (or right-clicking) their row.
 const StatusRowSheet = ({ entry, muted, onClose, onView, onMute }) => {
@@ -123,8 +113,6 @@ const StatusPage = () => {
   const [otherHighlights, setOtherHighlights] = useState([]); // [{ user, highlights }]
   const [highlightSheet, setHighlightSheet] = useState(null); // { preselect?, editing? }
   const [myScreen, setMyScreen] = useState(false); // the "My status" page (your updates with views and hearts)
-  const [channels, setChannels] = useState([]); // channels you follow, shown under Status
-  const navigate = useNavigate();
 
   const loadHighlights = useCallback(() => {
     if (!authUser?._id) return;
@@ -150,7 +138,6 @@ const StatusPage = () => {
   useEffect(() => {
     loadFeed();
     loadHighlights();
-    axiosInstance.get("/channels").then((r) => setChannels((r.data?.mine || []).slice(0, 6))).catch(() => {});
   }, [loadFeed, loadHighlights]);
 
   return (
@@ -205,28 +192,6 @@ const StatusPage = () => {
                 />
               ))}
             </div>
-
-            {/* Channels you follow */}
-            <div className="flex items-center justify-between px-5 pb-2">
-              <h2 className="text-[26px] font-normal text-wa-text">Channels</h2>
-              <button onClick={() => navigate("/channels")} className="h-10 px-5 rounded-full bg-wa-field text-[15px] text-wa-text active:scale-95">Explore</button>
-            </div>
-            {channels.length === 0 ? (
-              <p className="px-5 pb-5 text-[14px] text-wa-muted">Follow channels to see their updates here.</p>
-            ) : (
-              <div className="pb-2">
-                {channels.map((c) => (
-                  <button key={c._id} onClick={() => navigate("/channels", { state: { openId: c._id } })} className="w-full flex items-center gap-4 px-5 py-3 text-left active:bg-white/5">
-                    <Avatar src={c.icon} name={c.name} size="size-[56px]" textSize="text-xl" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[18px] leading-6 text-wa-text truncate">{c.name}</p>
-                      <p className="text-[14.5px] text-wa-muted truncate">{c.lastPost?.text || c.description || `${c.followerCount || 0} follower${c.followerCount === 1 ? "" : "s"}`}</p>
-                    </div>
-                    {c.lastPost?.createdAt && <span className="text-[13px] text-wa-muted shrink-0 self-start pt-1">{statusTime(c.lastPost.createdAt)}</span>}
-                  </button>
-                ))}
-              </div>
-            )}
 
             {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
             <div className="mt-3 pb-1 border-t border-white/5 pt-3">
