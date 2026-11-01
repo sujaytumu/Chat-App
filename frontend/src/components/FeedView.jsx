@@ -1,22 +1,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Heart, MessageCircle, Send, Loader2, Trash2, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
 import StatusComments from "./StatusComments";
+import ImageLightbox from "./ImageLightbox";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 
-// One photo, or a swipeable set with a 1/3 counter and dots
-const PostImages = ({ images }) => {
+// One photo, or a swipeable set with a 1/3 counter and dots.
+// One tap opens the photo full screen (zoom, swipe); a quick double tap likes it.
+const PostImages = ({ images, onOpen, onDouble }) => {
   const [i, setI] = useState(0);
-  if (images.length < 2) return <img src={optimizeImage(images[0], 1080)} alt="" loading="lazy" decoding="async" className="w-full h-auto max-h-[80vh] object-contain bg-black/40" />;
+  const tap = useRef({ t: 0, timer: null });
+  useEffect(() => () => clearTimeout(tap.current.timer), []);
+  const onTap = (k) => {
+    const now = Date.now();
+    if (now - tap.current.t < 300) {
+      clearTimeout(tap.current.timer);
+      tap.current.t = 0;
+      onDouble?.();
+      return;
+    }
+    tap.current.t = now;
+    clearTimeout(tap.current.timer);
+    tap.current.timer = setTimeout(() => onOpen?.(k), 300);
+  };
+  if (images.length < 2) return <img src={optimizeImage(images[0], 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(0)} className="w-full h-auto max-h-[80vh] object-contain bg-black/40" />;
   return (
     <div className="relative">
       <div className="flex items-center bg-black/40 overflow-x-auto snap-x snap-mandatory no-scrollbar" onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
         {images.map((src, k) => (
-          <img key={k} src={optimizeImage(src, 1080)} alt="" loading="lazy" decoding="async" className="w-full h-auto shrink-0 snap-center self-center max-h-[80vh] object-contain bg-black/40" />
+          <img key={k} src={optimizeImage(src, 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(k)} className="w-full h-auto shrink-0 snap-center self-center max-h-[80vh] object-contain bg-black/40" />
         ))}
       </div>
-      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white">{i + 1}/{images.length}</span>
+      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white pointer-events-none">{i + 1}/{images.length}</span>
       <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
         {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
       </div>
@@ -87,6 +103,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
   const [failed, setFailed] = useState(false);
   const [commentsFor, setCommentsFor] = useState(null);
   const [pop, setPop] = useState(null);
+  const [viewer, setViewer] = useState(null); // { images, src } - photo open full screen
   const next = useRef(null);
   const busy = useRef(false);
 
@@ -188,8 +205,8 @@ const FeedView = ({ onCreate, refreshKey }) => {
                 <span className="text-[12px] text-white/50">{ago(p.createdAt)}</span>
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
-              <div className="relative" onDoubleClick={() => doubleTap(p)}>
-                <PostImages images={p.images?.length ? p.images : [p.image]} />
+              <div className="relative">
+                <PostImages images={p.images?.length ? p.images : [p.image]} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, src: list[k] }); }} />
                 {pop === p._id && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <Heart size={96} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />
@@ -217,6 +234,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
           {more && <MoreSentinel key={posts.length} onVisible={() => load(false)} />}
         </>
       )}
+      {viewer && <ImageLightbox src={viewer.src} gallery={viewer.images} onClose={() => setViewer(null)} />}
       {commentsFor && (
         <StatusComments
           targetId={commentsFor._id}
