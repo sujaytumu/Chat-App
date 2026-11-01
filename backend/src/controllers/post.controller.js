@@ -53,8 +53,13 @@ export const createPost = async (req, res) => {
     if (!list.every((s) => typeof s === "string" && s.startsWith("data:image/"))) return res.status(400).json({ error: "Pick a photo" });
     if (list.length > 10) return res.status(400).json({ error: "Up to 10 photos per post" });
     if (list.some((s) => s.length > MAX_IMG) || list.reduce((n, s) => n + s.length, 0) > 16 * 1024 * 1024) return res.status(413).json({ error: "Those photos are too large" });
-    const urls = [];
-    for (const s of list) urls.push((await cloudinary.uploader.upload(s, { folder: "chat-app/posts", resource_type: "image" })).secure_url);
+    // up to 4 photos upload at the same time (10 one after another could run past the server's time limit); order is kept
+    const urls = new Array(list.length);
+    for (let i = 0; i < list.length; i += 4) {
+      const part = list.slice(i, i + 4);
+      const got = await Promise.all(part.map((s) => cloudinary.uploader.upload(s, { folder: "chat-app/posts", resource_type: "image" })));
+      got.forEach((r, k) => { urls[i + k] = r.secure_url; });
+    }
     const post = await Post.create({ userId: req.user._id, image: urls[0], images: urls, caption: String(caption || "").trim().slice(0, 500) });
     await post.populate("userId", "fullName profilePic");
     res.status(201).json(shape(post.toObject(), req.user._id));
