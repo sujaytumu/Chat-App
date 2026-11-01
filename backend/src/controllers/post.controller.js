@@ -8,6 +8,7 @@ import { logActivity } from "../lib/activity.js";
 
 const PAGE = 16;
 const MAX_IMG = 13 * 1024 * 1024;
+const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 
 const shape = (p, me, comments = 0) => ({
   comments,
@@ -16,6 +17,8 @@ const shape = (p, me, comments = 0) => ({
   image: p.image,
   images: p.images?.length ? p.images : [p.image],
   caption: p.caption,
+  lines: p.lines || "",
+  song: p.song?.url ? { url: p.song.url, name: p.song.name, start: p.song.start || 0 } : null,
   createdAt: p.createdAt,
   likeCount: (p.likes || []).length,
   liked: (p.likes || []).some((l) => String(l) === String(me)),
@@ -48,7 +51,7 @@ export const getFeed = async (req, res) => {
 
 export const createPost = async (req, res) => {
   try {
-    const { image, images, caption } = req.body || {};
+    const { image, images, caption, lines, song } = req.body || {};
     const list = Array.isArray(images) && images.length ? images : [image];
     if (!list.every((s) => typeof s === "string" && s.startsWith("data:image/"))) return res.status(400).json({ error: "Pick a photo" });
     if (list.length > 10) return res.status(400).json({ error: "Up to 10 photos per post" });
@@ -60,7 +63,22 @@ export const createPost = async (req, res) => {
       const got = await Promise.all(part.map((s) => cloudinary.uploader.upload(s, { folder: "chat-app/posts", resource_type: "image" })));
       got.forEach((r, k) => { urls[i + k] = r.secure_url; });
     }
-    const post = await Post.create({ userId: req.user._id, image: urls[0], images: urls, caption: String(caption || "").trim().slice(0, 500) });
+    // optional song (picked in the composer) - kept with the post
+    let cleanSong = null;
+    if (song?.data && typeof song.data === "string" && song.data.startsWith("data:audio/")) {
+      if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
+      const up = await cloudinary.uploader.upload(song.data, { folder: "chat-app/post-music", resource_type: "video" });
+      const st = Number(song.start);
+      cleanSong = { url: up.secure_url, name: String(song.name || "Song").slice(0, 80), start: Number.isFinite(st) ? Math.min(Math.max(st, 0), 3600) : 0 };
+    }
+    const post = await Post.create({
+      userId: req.user._id,
+      image: urls[0],
+      images: urls,
+      caption: String(caption || "").trim().slice(0, 500),
+      lines: String(lines || "").trim().slice(0, 300),
+      ...(cleanSong ? { song: cleanSong } : {}),
+    });
     await post.populate("userId", "fullName profilePic");
     res.status(201).json(shape(post.toObject(), req.user._id));
   } catch (e) {
@@ -96,6 +114,10 @@ export const deletePost = async (req, res) => {
     for (const url of post.images?.length ? post.images : [post.image]) {
       const m = url.match(/\/upload\/(?:v\d+\/)?(chat-app\/posts\/[^.]+)/);
       if (m) cloudinary.uploader.destroy(m[1]).catch(() => {});
+    }
+    if (post.song?.url) {
+      const sm = post.song.url.match(/\/upload\/(?:v\d+\/)?(chat-app\/post-music\/[^.]+)/);
+      if (sm) cloudinary.uploader.destroy(sm[1], { resource_type: "video" }).catch(() => {});
     }
     await post.deleteOne();
     res.json({ ok: true });
