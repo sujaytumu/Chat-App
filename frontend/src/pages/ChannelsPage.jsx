@@ -1,3 +1,4 @@
+import { useLocation } from "react-router-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
@@ -236,10 +237,11 @@ const ChannelView = ({ channelId, onClose, onChanged }) => {
 
 /* ------------ the page ------------ */
 const ChannelsPage = () => {
+  const loc = useLocation();
   const [data, setData] = useState({ mine: [], discover: [] });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [openId, setOpenId] = useState(null);
+  const [openId, setOpenId] = useState(() => loc.state?.openId || null); // opened from the Updates page
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(async (query = "") => {
