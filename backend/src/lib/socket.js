@@ -47,6 +47,12 @@ const io = new Server(server, {
 // (each socket joins room === userId) so all their devices get it.
 const userSockets = new Map(); // userId -> Set<socketId>
 const isOnline = (id) => (userSockets.get(id)?.size || 0) > 0;
+// "Online" as other people see it means the app is OPEN on screen, like WhatsApp. A phone keeps its connection
+// for a while after the app is minimised, so being connected is not enough: each device says whether it is in the
+// foreground ("appActive"), and a person shows as online only while at least one of their devices is.
+// (Delivery and calls still use isOnline above: a connected-but-minimised phone can still receive.)
+const activeSockets = new Map(); // userId -> Set<socketId> that are in the foreground
+const isPresent = (id) => (activeSockets.get(id)?.size || 0) > 0;
 // Per-user privacy kept in memory for connected users: { typing, online, blocked:Set }
 const privacyCache = new Map();
 // Other modules add their own per-connection handlers here (kept out of this file to avoid import cycles).
@@ -62,7 +68,7 @@ export function setPrivacyCache(userId, user) {
 }
 export const refreshOnline = () => io.emit("getOnlineUsers", onlineIds());
 // People who hid their online status are left out of the list others receive.
-const onlineIds = () => [...userSockets.keys()].filter((id) => privacyCache.get(id)?.online !== false);
+const onlineIds = () => [...userSockets.keys()].filter((id) => isPresent(id) && privacyCache.get(id)?.online !== false);
 const canSignal = (from, to) => !privacyCache.get(to)?.blocked.has(from) && !privacyCache.get(from)?.blocked.has(to);
 const roomFor = (id) => (isOnline(id) ? id : undefined);
 const DISCONNECT_CALL_GRACE_MS = 8000;
@@ -241,6 +247,9 @@ io.on("connection", (socket) => {
   if (userId) {
     if (!userSockets.has(userId)) userSockets.set(userId, new Set());
     userSockets.get(userId).add(socket.id);
+    // a fresh connection counts as in the foreground until the app says otherwise (older apps never say)
+    if (!activeSockets.has(userId)) activeSockets.set(userId, new Set());
+    activeSockets.get(userId).add(socket.id);
     socket.join(userId); // personal room — all of this user's devices
   }
 
@@ -254,9 +263,39 @@ io.on("connection", (socket) => {
     if (held) socket.emit("incomingCall", { fromUser: held.fromUser, offer: held.offer, callType: held.callType, callId: held.callId });
   }
 
+  // The app moved to the foreground / background on this device.
+  socket.on("appActive", async ({ active } = {}) => {
+    if (!userId) return;
+    const was = isPresent(userId);
+    const set = activeSockets.get(userId) || new Set();
+    if (active === false) set.delete(socket.id);
+    else set.add(socket.id);
+    if (set.size) activeSockets.set(userId, set);
+    else activeSockets.delete(userId);
+    const now = isPresent(userId);
+    if (was === now) return;
+    io.emit("getOnlineUsers", onlineIds());
+    // they just left the screen: that is their "last seen"
+    if (!now) User.findByIdAndUpdate(userId, { lastSeen: new Date() }).catch(() => {});
+  });
+
+  // Someone typing to you has your chat open, so what you sent them is read. WhatsApp shows the blue ticks the
+  // same way; the app's own "markSeen" only fires when a message arrives, so a message sent just before they
+  // opened the chat could stay grey while they were already typing a reply.
+  const seenByTyping = new Map(); // peer -> last time we checked, so a burst of keystrokes is one database call
+  const markReadByTyping = (peerId) => {
+    const peer = String(peerId || "");
+    const last = seenByTyping.get(peer) || 0;
+    if (Date.now() - last < 4000) return;
+    seenByTyping.set(peer, Date.now());
+    markSeenFrom(peer);
+  };
+
   // ---- Typing indicators (1:1) ----
   socket.on("typing", ({ toUserId }) => {
-    if (privacyCache.get(userId)?.typing === false || !canSignal(userId, String(toUserId))) return;
+    if (!canSignal(userId, String(toUserId))) return;
+    markReadByTyping(toUserId);
+    if (privacyCache.get(userId)?.typing === false) return;
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("typing", { fromUserId: userId });
@@ -272,7 +311,9 @@ io.on("connection", (socket) => {
 
   // ---- "recording audio…" (1:1) — same rules as typing ----
   socket.on("recording", ({ toUserId }) => {
-    if (privacyCache.get(userId)?.typing === false || !canSignal(userId, String(toUserId))) return;
+    if (!canSignal(userId, String(toUserId))) return;
+    markReadByTyping(toUserId);
+    if (privacyCache.get(userId)?.typing === false) return;
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) io.to(receiverSocketId).emit("recording", { fromUserId: userId });
   });
@@ -322,7 +363,7 @@ io.on("connection", (socket) => {
 
   // The person opened the chat / a message arrived while it is open: blue ticks for the sender. Sent over
   // the live connection and relayed at once; the database catches up right after.
-  socket.on("markSeen", async ({ from } = {}) => {
+  async function markSeenFrom(from) {
     try {
       const sender = String(from || "");
       if (!/^[a-f0-9]{24}$/.test(sender) || sender === userId) return;
@@ -336,7 +377,8 @@ io.on("connection", (socket) => {
     } catch (e) {
       console.log("Error in markSeen:", e.message);
     }
-  });
+  }
+  socket.on("markSeen", ({ from } = {}) => markSeenFrom(from));
 
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
   socket.on("callUser", async (payload, ack) => {
@@ -911,6 +953,8 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     if (!userId) return;
 
+    activeSockets.get(userId)?.delete(socket.id);
+    if (!activeSockets.get(userId)?.size) activeSockets.delete(userId);
     const sockets = userSockets.get(userId);
     sockets?.delete(socket.id);
     if (!sockets || sockets.size === 0) {

@@ -198,6 +198,8 @@ export const useAuthStore = create((set, get) => ({
     // via socket, so silently resync the sidebar and the open conversation —
     // otherwise they'd only show up once the user manually switches chats.
     socket.on("connect", () => {
+      // tell the server whether the app is on screen right now (others see "online" only while it is)
+      socket.emit("appActive", { active: document.visibilityState === "visible" });
       useChatStore.getState().getUsers();
       useChatStore.getState().getGroups();
       const selectedChat = useChatStore.getState().selectedChat;
@@ -227,6 +229,8 @@ export const useAuthStore = create((set, get) => ({
     let hiddenAt = 0;
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") hiddenAt = Date.now();
+      // on screen = online, minimised = not online (last seen starts now)
+      if (socket.connected) socket.emit("appActive", { active: document.visibilityState === "visible" });
     });
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible" || !socket) return;
