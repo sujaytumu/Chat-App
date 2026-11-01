@@ -29,6 +29,36 @@ export const getHaptics = () => !read(KEYS.hapticsOff);
 export const getEnterSends = () => !read(KEYS.enterNewline);
 export const setEnterSends = (on) => write(KEYS.enterNewline, !on);
 
+// Photos from other people: "always" (default) | "wifi" (only on Wi-Fi) | "never" (tap to download).
+export const PHOTO_DOWNLOAD = [
+  ["always", "Always", "Photos open on their own, on any connection"],
+  ["wifi", "Wi-Fi only", "On mobile data, tap a photo to download it"],
+  ["never", "Never", "Tap each photo to download it"],
+];
+export const getPhotoDownload = () => {
+  try {
+    const v = localStorage.getItem("talkies-photo-download");
+    return PHOTO_DOWNLOAD.some(([k]) => k === v) ? v : "always";
+  } catch {
+    return "always";
+  }
+};
+export const setPhotoDownload = (v) => {
+  try {
+    if (v === "always") localStorage.removeItem("talkies-photo-download");
+    else localStorage.setItem("talkies-photo-download", v);
+  } catch {
+    /* storage unavailable */
+  }
+};
+// Best guess whether this connection is Wi-Fi / wired. Browsers that cannot tell count as "yes", unless Data Saver is on.
+export const onUnmeteredConnection = () => {
+  const c = typeof navigator !== "undefined" ? navigator.connection : null;
+  if (!c) return true;
+  if (c.type) return c.type === "wifi" || c.type === "ethernet";
+  return !c.saveData;
+};
+
 // Message text size: "small" | "default" | "large" | "huge"
 export const FONT_SIZES = [
   ["small", "Small"],
