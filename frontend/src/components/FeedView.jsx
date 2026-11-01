@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, ImagePlus, Loader2, Trash2, X, Image as ImageIcon } from "lucide-react";
+import { Heart, MessageCircle, Send, ImagePlus, Loader2, Trash2, X, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
+import StatusMusicSheet from "./StatusMusicSheet";
+import { readFileAsBase64 } from "../lib/fileUtils";
 import StatusComments from "./StatusComments";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -21,6 +23,37 @@ const PostImages = ({ images }) => {
         {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
       </div>
     </div>
+  );
+};
+
+// The song kept with a post: tap to play / pause (only one song plays at a time)
+let playingPostSong = null;
+const PostSong = ({ song }) => {
+  const el = useRef(null);
+  const [on, setOn] = useState(false);
+  useEffect(() => () => { el.current?.pause(); }, []);
+  const toggle = () => {
+    if (!el.current) {
+      const a = new Audio(song.url);
+      a.loop = true;
+      a.onplay = () => setOn(true);
+      a.onpause = () => setOn(false);
+      el.current = a;
+    }
+    const a = el.current;
+    if (a.paused) {
+      if (playingPostSong && playingPostSong !== a) playingPostSong.pause();
+      playingPostSong = a;
+      if (!a.currentTime && song.start) a.currentTime = song.start;
+      a.play().catch(() => toast.error("Couldn't play the song"));
+    } else a.pause();
+  };
+  return (
+    <button onClick={toggle} className="mt-2 inline-flex items-center gap-2 max-w-full pl-2.5 pr-3.5 h-8 rounded-full bg-white/10 active:bg-white/20 text-[13px]" aria-label={on ? "Pause song" : "Play song"}>
+      {on ? <Pause size={14} /> : <Play size={14} />}
+      <Music size={13} className="text-[#25D366] shrink-0" />
+      <span className="truncate">{song.name}</span>
+    </button>
   );
 };
 
@@ -80,6 +113,10 @@ export const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const [imgs, setImgs] = useState([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
+  const [song, setSong] = useState(null); // { data, name, size, mime } - chosen after the photos
+  const [lines, setLines] = useState("");
+  const [showMusic, setShowMusic] = useState(false);
+  const songInput = useRef(null);
   const [prep, setPrep] = useState(null); // { done, total } while the chosen photos are being prepared
   const pick = async (e) => {
     const chosen = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/") || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name || ""));
@@ -108,7 +145,7 @@ export const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const post = async () => {
     setBusy(true);
     try {
-      const { data } = await axiosInstance.post("/posts", { images: imgs, caption }, { timeout: 120000 });
+      const { data } = await axiosInstance.post("/posts", { images: imgs, caption, lines, ...(song ? { song: { data: song.data, name: song.name } } : {}) }, { timeout: 120000 });
       onPosted(data);
     } catch (e) {
       toast.error(e.response?.data?.error || "Couldn't post");
@@ -150,7 +187,47 @@ export const NewPost = ({ onClose, onPosted, embedded = false }) => {
           </label>
         )}
         <textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} rows={3} placeholder="Write a caption…" className="mt-3 w-full rounded-xl bg-white/10 px-3.5 py-3 text-[14.5px] placeholder:text-white/50 outline-none resize-none" />
+        {imgs.length > 0 && (
+          <div className="mt-3 pb-6">
+            <p className="text-[12.5px] text-white/55 mb-2">Add a song and lines - you can do this now or skip it</p>
+            {song ? (
+              <div className="flex items-center gap-2.5 rounded-xl bg-white/10 pl-3 pr-1.5 h-12">
+                <Music size={18} className="text-[#25D366] shrink-0" />
+                <span className="flex-1 truncate text-[14px]">{song.name}</span>
+                <button onClick={() => setShowMusic(true)} className="px-2.5 h-9 text-[13px] text-[#25D366] font-medium">Change</button>
+                <button onClick={() => setSong(null)} aria-label="Remove song" className="size-9 flex items-center justify-center text-white/70"><X size={18} /></button>
+              </div>
+            ) : (
+              <button onClick={() => setShowMusic(true)} className="w-full h-12 rounded-xl bg-white/10 active:bg-white/15 flex items-center gap-2.5 px-3.5 text-[14.5px]"><Music size={18} className="text-[#25D366]" /> Add song</button>
+            )}
+            <textarea value={lines} onChange={(e) => setLines(e.target.value)} maxLength={300} rows={3} placeholder="Lines to show with the song (lyrics, a quote…)" className="mt-2 w-full rounded-xl bg-white/10 px-3.5 py-3 text-[14.5px] placeholder:text-white/50 outline-none resize-none" />
+          </div>
+        )}
       </div>
+      <input
+        ref={songInput}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          if (file.size > 4 * 1024 * 1024) return toast.error("Pick a song under 4 MB");
+          setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, ""), size: file.size, mime: file.type });
+          setShowMusic(false);
+        }}
+      />
+      {showMusic && (
+        <StatusMusicSheet
+          onClose={() => setShowMusic(false)}
+          onPick={(sg) => {
+            setSong(sg);
+            setShowMusic(false);
+          }}
+          onFiles={() => songInput.current?.click()}
+        />
+      )}
     </div>
   );
 };
@@ -285,6 +362,8 @@ const FeedView = ({ onCreate, refreshKey }) => {
                   <button onClick={() => share(p)} className="active:scale-90 transition-transform" aria-label="Share"><Send size={24} strokeWidth={1.8} /></button>
                 </div>
                 {p.caption && <p className="mt-1 text-[14px] break-words"><b className="mr-1.5">{p.user?.fullName}</b>{p.caption}</p>}
+                {p.song?.url && <PostSong song={p.song} />}
+                {p.lines && <p className="mt-2 text-[14px] italic text-white/80 whitespace-pre-line break-words border-l-2 border-[#25D366]/70 pl-2.5">{p.lines}</p>}
               </div>
             </article>
           ))}
