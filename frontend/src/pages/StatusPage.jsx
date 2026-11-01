@@ -6,6 +6,8 @@ import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import CreateStatusModal from "../components/CreateStatusModal";
 import StatusViewer from "../components/StatusViewer";
+import StatusThumb from "../components/StatusThumb";
+import MyStatusSheet from "../components/MyStatusSheet";
 import HighlightsRow from "../components/HighlightsRow";
 import HighlightSheet from "../components/HighlightSheet";
 import PlaylistsCard from "../components/PlaylistsCard";
@@ -61,6 +63,7 @@ const StatusPage = () => {
   const { authUser } = useAuthStore();
   const [feed, setFeed] = useState({ myStatuses: [], others: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [mySheet, setMySheet] = useState(false); // the "My status" list (my updates, kept apart from adding a new one)
   // People whose updates you muted: they move to "Muted updates" at the bottom (kept on this device).
   // "always" mutes are a list of ids; timed ones (8 hours / 1 week) are id -> end time and fade out by themselves.
   const readLS = (key, fallback) => {
@@ -158,34 +161,43 @@ const StatusPage = () => {
           </div>
         ) : (
           <>
-            {/* One slim row you swipe sideways (like WhatsApp's status bar): my status first, then everyone else's */}
-            <div className="flex gap-[18px] overflow-x-auto no-scrollbar px-5 pt-2 pb-4 border-b border-white/5">
-              <button
-                onClick={() =>
-                  feed.myStatuses.length > 0
-                    ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
-                    : setShowCreate("image")
-                }
-                className="shrink-0 w-[72px] flex flex-col items-center gap-2 active:scale-95 transition-transform"
-              >
-                <div className="relative">
-                  <img
-                    src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                    alt="My status"
-                    className={`size-[64px] rounded-full object-cover ${feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""}`}
-                  />
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowCreate("image");
-                    }}
-                    className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#00A884] border-2 border-wa-bg flex items-center justify-center text-white"
-                  >
-                    <Plus size={14} strokeWidth={3} />
+            {/* Status cards you swipe sideways, like WhatsApp: mine first (showing my latest update), then everyone else's */}
+            <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-5 pt-2 pb-4 border-b border-white/5">
+              <div className="relative shrink-0 w-[104px] h-[158px]">
+                <button
+                  onClick={() => (feed.myStatuses.length > 0 ? setMySheet(true) : setShowCreate("image"))}
+                  className="absolute inset-0 rounded-2xl overflow-hidden bg-wa-surface text-left active:scale-[0.97] transition-transform"
+                >
+                  {feed.myStatuses.length > 0 ? (
+                    <StatusThumb s={feed.myStatuses[feed.myStatuses.length - 1]} />
+                  ) : (
+                    <img src={optimizeImage(authUser.profilePic, 240) || "/avatar.png"} alt="" className="size-full object-cover opacity-45" draggable={false} />
+                  )}
+                  <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/25" />
+                  <span className="absolute left-2.5 right-2 bottom-2 text-white text-[13px] font-medium leading-tight drop-shadow">
+                    My status
+                    <span className="block text-[11px] font-normal text-white/75">
+                      {feed.myStatuses.length > 0 ? `${feed.myStatuses.length} update${feed.myStatuses.length === 1 ? "" : "s"}` : "Tap to add"}
+                    </span>
                   </span>
-                </div>
-                <span className="text-[12.5px] font-medium text-wa-text truncate w-full text-center">My status</span>
-              </button>
+                </button>
+                {/* my picture: green ring when I have an update, and a separate + that always adds a NEW one */}
+                <span className="absolute left-2.5 top-2.5 size-[42px] pointer-events-none">
+                  <img
+                    src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"}
+                    alt="My status"
+                    className={`size-full rounded-full object-cover ring-2 ${feed.myStatuses.length > 0 ? "ring-[#25D366]" : "ring-white/70"}`}
+                    draggable={false}
+                  />
+                  <button
+                    onClick={() => setShowCreate("image")}
+                    aria-label="Add new status"
+                    className="pointer-events-auto absolute -bottom-1 -right-1 size-[20px] rounded-full bg-[#00A884] border-2 border-wa-bg flex items-center justify-center text-white active:scale-90"
+                  >
+                    <Plus size={12} strokeWidth={3.2} />
+                  </button>
+                </span>
+              </div>
 
               {[
                 ...feed.others.filter((o) => o.hasUnseen && !isMuted(o.user._id)).map((o) => ({ ...o, tone: "new" })),
@@ -206,15 +218,19 @@ const StatusPage = () => {
                     e.preventDefault();
                     setRowSheet({ user, statuses });
                   }}
-                  className={`shrink-0 w-[72px] flex flex-col items-center gap-2 select-none active:scale-95 transition-transform ${tone === "muted" ? "opacity-60" : ""}`}
+                  className={`relative shrink-0 w-[104px] h-[158px] rounded-2xl overflow-hidden bg-wa-surface text-left select-none active:scale-[0.97] transition-transform ${tone === "muted" ? "opacity-60" : ""}`}
                 >
+                  <StatusThumb s={statuses[statuses.length - 1]} className={tone === "seen" ? "opacity-80" : ""} />
+                  <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-black/25" />
                   <img
                     src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                    alt={user.fullName}
-                    className={`size-[64px] rounded-full object-cover ring-2 ${hasUnseen && tone !== "muted" ? "ring-[#00A884]" : "ring-wa-muted/40"} ring-offset-2 ring-offset-wa-bg`}
+                    alt=""
+                    className={`absolute left-2.5 top-2.5 size-[42px] rounded-full object-cover ring-2 ${hasUnseen && tone !== "muted" ? "ring-[#25D366]" : "ring-white/40"}`}
                     draggable={false}
                   />
-                  <span className={`text-[12.5px] truncate w-full text-center ${tone === "new" ? "text-wa-text font-medium" : "text-wa-muted"}`}>{(user.fullName || "").split(" ")[0]}</span>
+                  <span className={`absolute left-2.5 right-2 bottom-2 text-[12.5px] leading-tight truncate drop-shadow ${tone === "new" ? "text-white font-medium" : "text-white/80"}`}>
+                    {(user.fullName || "").split(" ")[0]}
+                  </span>
                 </button>
               ))}
             </div>
@@ -279,6 +295,14 @@ const StatusPage = () => {
         </button>
       </div>
 
+      {mySheet && feed.myStatuses.length > 0 && (
+        <MyStatusSheet
+          statuses={feed.myStatuses}
+          onClose={() => setMySheet(false)}
+          onOpen={(list) => setViewing({ user: authUser, statuses: list, isOwn: true })}
+          onAdd={(mode) => setShowCreate(mode)}
+        />
+      )}
       {showCreate && (
         <CreateStatusModal startWith={showCreate} onClose={() => setShowCreate(false)} onCreated={loadFeed} />
       )}
