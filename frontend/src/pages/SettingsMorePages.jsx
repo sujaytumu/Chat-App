@@ -13,7 +13,7 @@ import { axiosInstance } from "../lib/axios";
 import { compressImage } from "../lib/imageUtils";
 import { clearChatCache } from "../lib/chatCache";
 import { checkForUpdateNow, currentBuildId } from "../lib/versionCheck";
-import { getReduceMotion, setReduceMotion, getHaptics, setHaptics, getEnterSends, setEnterSends, getFontSize, setFontSize, FONT_SIZES } from "../lib/uiSettings";
+import { getReduceMotion, setReduceMotion, getHaptics, setHaptics, getEnterSends, setEnterSends, getFontSize, setFontSize, FONT_SIZES, PHOTO_DOWNLOAD, getPhotoDownload, setPhotoDownload } from "../lib/uiSettings";
 import { formatChatListTime } from "../lib/utils";
 
 const card = "rounded-xl bg-wa-surface p-4";
@@ -742,6 +742,12 @@ export const StoragePage = () => {
   const { users, groups } = useChatStore();
   const [usage, setUsage] = useState(null);
   const [clearing, setClearing] = useState(false);
+  const [photoMode, setPhotoModeState] = useState(getPhotoDownload());
+  const setPhotoMode = (k) => {
+    setPhotoDownload(k);
+    setPhotoModeState(k);
+    toast.success(k === "always" ? "Photos download automatically" : k === "wifi" ? "Photos download on Wi-Fi only" : "Photos download when you tap them");
+  };
   const [rows, setRows] = useState(null);
 
   const measure = async () => {
@@ -822,6 +828,22 @@ export const StoragePage = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className={card}>
+        <p className="text-[13.5px] text-wa-text mb-1">Auto-download photos</p>
+        <p className="text-[11.5px] text-wa-muted mb-2">Choose when photos people send you download by themselves. Photos you send always show.</p>
+        {PHOTO_DOWNLOAD.map(([k, name, hint]) => (
+          <button key={k} type="button" onClick={() => setPhotoMode(k)} className="w-full flex items-center gap-3 py-2.5 text-left">
+            <span className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${photoMode === k ? "border-[#25D366]" : "border-wa-muted"}`}>
+              {photoMode === k && <span className="size-2.5 rounded-full bg-[#25D366]" />}
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[14px] text-wa-text">{name}</span>
+              <span className="block text-[11.5px] text-wa-muted">{hint}</span>
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className={card}>
