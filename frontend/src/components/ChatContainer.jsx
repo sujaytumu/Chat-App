@@ -29,7 +29,7 @@ import { renderFormatted } from "../lib/richText";
 import { useChatColorStore } from "../store/useChatColorStore";
 import { useShallow } from "zustand/react/shallow";
 import { useChatThemeStore, resolveLook } from "../store/useChatThemeStore";
-import { getTheme, getFont, themeStyle, themeBarHex, loadChatFont } from "../lib/chatThemes";
+import { getTheme, themeStyle, themeBarHex } from "../lib/chatThemes";
 import { useStatusBarColor } from "../lib/useStatusBarColor";
 import { Forward } from "./icons/WaGlyphs";
 import LinkPreview, { firstLink } from "./LinkPreview";
@@ -89,14 +89,12 @@ const ChatContainer = () => {
   } = useChatStore();
   const { authUser } = useAuthStore();
   const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
-  // Instagram-style theme + font for this chat (a live "Preview" wins over the saved choice)
+  // Instagram-style theme for this chat (a live "Preview" wins over the saved choice). The font is the app's one font.
   const themeKey = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "";
   const look = useChatThemeStore(useShallow((s) => resolveLook(s, themeKey)));
   const activeTheme = getTheme(look.theme);
-  const activeFont = getFont(look.font);
-  useEffect(() => loadChatFont(activeFont), [activeFont]);
-  const chatThemeStyle = activeTheme || activeFont ? themeStyle(activeTheme, activeFont) : null;
-  const chatLook = { ...(activeTheme ? {} : wallpaperStyle), ...(chatThemeStyle || {}), ...(activeFont ? { fontFamily: activeFont.css } : {}) };
+  const chatThemeStyle = activeTheme ? themeStyle(activeTheme) : null;
+  const chatLook = { ...(activeTheme ? {} : wallpaperStyle), ...(chatThemeStyle || {}) };
   const chatDarkClass = activeTheme ? " wa-dark chat-themed" : "";
 
   // Disappearing messages: hide each one the moment it expires (the server
