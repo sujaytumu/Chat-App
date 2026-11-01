@@ -24,7 +24,7 @@ import SearchSnippet from "./SearchSnippet";
 import SearchScreen from "./SearchScreen";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2 } from "lucide-react";
+import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2, ArrowUpDown } from "lucide-react";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -47,6 +47,7 @@ import {
 
 const CreateGroupModal = lazy(() => import("./CreateGroupModal"));
 const BroadcastModal = lazy(() => import("./BroadcastModal"));
+const ArrangeTabsSheet = lazy(() => import("./ArrangeTabsSheet"));
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -55,6 +56,26 @@ const FILTERS = [
   { id: "groups", label: "Groups" },
   { id: "online", label: "Online" },
 ];
+
+// The order of the tabs under the search bar is the person's own choice, remembered on this device.
+// Tabs that are new (a new list) go to the end; tabs that no longer exist are ignored.
+const TAB_ORDER_KEY = "talkies-tab-order";
+const readTabOrder = () => {
+  try {
+    const v = JSON.parse(localStorage.getItem(TAB_ORDER_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const saveTabOrder = (ids) => {
+  try {
+    if (ids?.length) localStorage.setItem(TAB_ORDER_KEY, JSON.stringify(ids));
+    else localStorage.removeItem(TAB_ORDER_KEY);
+  } catch {
+    /* storage not available: the order lasts until the app is closed */
+  }
+};
 
 const lastMessagePreview = (lastMessage) => {
   if (!lastMessage) return "No messages yet";
@@ -238,6 +259,44 @@ const Sidebar = () => {
   const favList = lists.find((l) => l.id === "favourites");
   const customLists = lists.filter((l) => l.id !== "favourites");
   const [listModal, setListModal] = useState(null); // null | { id } (id "new" = create)
+
+  // Tab row: default order, then the person's own order on top of it.
+  const [tabOrder, setTabOrder] = useState(readTabOrder);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
+  const tabs = useMemo(() => {
+    const all = [...FILTERS, ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name }))];
+    const rank = new Map(tabOrder.map((id, i) => [id, i]));
+    return all
+      .map((t, i) => ({ t, i }))
+      .sort((a, b) => (rank.has(a.t.id) ? rank.get(a.t.id) : 1000 + a.i) - (rank.has(b.t.id) ? rank.get(b.t.id) : 1000 + b.i))
+      .map((x) => x.t);
+  }, [customLists, tabOrder]);
+  const moveTab = (id, dir) => {
+    const ids = tabs.map((t) => t.id);
+    const at = ids.indexOf(id);
+    const to = at + dir;
+    if (at < 0 || to < 0 || to >= ids.length) return;
+    [ids[at], ids[to]] = [ids[to], ids[at]];
+    setTabOrder(ids);
+    saveTabOrder(ids);
+  };
+  const resetTabs = () => {
+    setTabOrder([]);
+    saveTabOrder([]);
+  };
+  // press and hold any tab to arrange them
+  const holdTimer = useRef(null);
+  const heldRef = useRef(false);
+  const startHold = () => {
+    heldRef.current = false;
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      heldRef.current = true;
+      try { navigator.vibrate?.(12); } catch { /* no haptics */ }
+      setArrangeOpen(true);
+    }, 550);
+  };
+  const stopHold = () => clearTimeout(holdTimer.current);
   const activeList = filter.startsWith("list:") ? customLists.find((l) => `list:${l.id}` === filter) : null;
   const activeKeys = useMemo(() => {
     if (filter === "fav") return new Set(favList?.chats || []);
@@ -670,11 +729,17 @@ const Sidebar = () => {
       {/* Filter chips — not shown inside the Archived folder (WhatsApp shows just the archived chats) */}
       {!folderOpen && (
       <div className={`flex gap-2 lg:gap-1.5 overflow-x-auto no-scrollbar px-4 lg:px-3 pb-3 lg:pb-2.5 ${selecting ? "opacity-50 pointer-events-none" : ""}`}>
-        {[
-          ...FILTERS,
-          ...customLists.map((l) => ({ id: `list:${l.id}`, label: l.name })),
-          { id: "__new" },
-        ].map(({ id, label }) => {
+        {[...tabs, { id: "__new" }, { id: "__arrange" }].map(({ id, label }) => {
+          if (id === "__arrange") return (
+        <button key="__arrange"
+          onClick={() => setArrangeOpen(true)}
+          className="h-10 lg:h-8 w-10 lg:w-8 rounded-full shrink-0 border border-wa-field text-wa-icon hover:bg-white/5 flex items-center justify-center"
+          title="Arrange tabs"
+          aria-label="Arrange tabs"
+        >
+          <ArrowUpDown size={16} />
+        </button>
+          );
           if (id === "__new") return (
         <button key="__new"
           onClick={() => setListModal({ id: "new" })}
@@ -690,7 +755,15 @@ const Sidebar = () => {
           return (
             <button
               key={id}
-              onClick={() => setFilter(id)}
+              onClick={() => {
+                if (heldRef.current) { heldRef.current = false; return; } // the press-and-hold already opened Arrange
+                setFilter(id);
+              }}
+              onTouchStart={startHold}
+              onTouchEnd={stopHold}
+              onTouchMove={stopHold}
+              onTouchCancel={stopHold}
+              onContextMenu={(e) => e.preventDefault()}
               className={`h-10 lg:h-8 px-4 lg:px-3 rounded-full text-[13.5px] lg:text-[11.5px] shrink-0 whitespace-nowrap border transition-colors ${
                 active
                   ? "bg-wa-tint border-transparent text-wa-tinttext font-medium"
@@ -948,6 +1021,12 @@ const Sidebar = () => {
       >
         <WaNewChat size={28} />
       </button>
+
+      {arrangeOpen && (
+        <Suspense fallback={null}>
+          <ArrangeTabsSheet tabs={tabs} onMove={moveTab} onReset={resetTabs} onClose={() => setArrangeOpen(false)} />
+        </Suspense>
+      )}
 
       {listModal && (() => {
         const isNew = listModal.id === "new";
