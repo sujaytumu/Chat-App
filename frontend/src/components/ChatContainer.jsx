@@ -45,6 +45,7 @@ import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
 import { optimizeImage } from "../lib/cdn";
+import ChatPhoto from "./ChatPhoto";
 
 // WhatsApp tints each person's name in a group differently.
 const SENDER_COLORS = ["#25D366", "#53BDEB", "#E8A33D", "#B794F6", "#F472B6", "#A3E635"];
@@ -779,15 +780,7 @@ const ChatContainer = () => {
                     </button>
                   )}
                   {message.image && (
-                    <img
-                      src={optimizeImage(message.image, 260)}
-                      alt="Attachment"
-                      loading="lazy"
-                      decoding="async"
-                      onLoad={handleMediaLoaded}
-                      onClick={() => setLightboxSrc(message.image)}
-                      className="max-w-full w-[260px] max-h-[320px] h-auto object-cover rounded-lg mb-1 cursor-pointer hover:opacity-90 transition-opacity"
-                    />
+                    <ChatPhoto src={message.image} mine={isMe} onLoad={handleMediaLoaded} onOpen={() => setLightboxSrc(message.image)} />
                   )}
                   {message.file && <AttachmentContent file={message.file} incoming={!isMe} onMediaLoaded={handleMediaLoaded} messageId={message._id} transcript={message.transcript?.text} />}
                   {message.payment ? (
