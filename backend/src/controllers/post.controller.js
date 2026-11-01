@@ -142,7 +142,7 @@ export const likePost = async (req, res) => {
     if (want) {
       const r = await Post.updateOne({ _id: post._id, likes: { $ne: req.user._id } }, { $push: { likes: req.user._id } });
       if (r.modifiedCount && !post.userId.equals(req.user._id)) {
-        sendPushToUser(String(post.userId), { title: "Talkies", body: `❤️ ${req.user.fullName} liked your post`, icon: req.user.profilePic || "/icon-v2-192.png", tag: `post-like-${post._id}`, data: { url: "/reels?feed=1" } });
+        sendPushToUser(String(post.userId), { title: "Talkies", body: `❤️ ${req.user.fullName} liked your post`, icon: req.user.profilePic || "/icon-v2-192.png", tag: `post-like-${post._id}`, data: { url: "/post" } });
         logActivity({ to: post.userId, actor: req.user, type: "like", kind: "post", targetId: post._id, thumb: post.image });
       }
     } else await Post.updateOne({ _id: post._id }, { $pull: { likes: req.user._id } });

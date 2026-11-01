@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ShieldCheck, Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode, Megaphone, IndianRupee } from "lucide-react";
+import { ShieldCheck, Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode, IndianRupee } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
@@ -61,7 +61,6 @@ const ProfilePage = () => {
     { icon: QrCode, title: "Username and QR code", sub: authUser?.username ? `@${authUser.username} · share your profile` : "Pick a username so people can find you", onClick: () => setShowUsername(true) },
     ...(isOwner ? [{ icon: ShieldCheck, title: "Who can see whom", sub: waiting ? `${waiting} request${waiting === 1 ? "" : "s"} waiting for you` : "Owner controls: allow people to see each other", to: "/settings/access" }] : []),
     { icon: IndianRupee, title: "Payments", sub: "Money sent and received in chats", to: "/settings/payments" },
-    { icon: Megaphone, title: "Channels", sub: "Follow one-way feeds or start your own", to: "/channels" },
     { icon: KeyRound, title: "Account", sub: "Name, about, password, two-step verification", to: "/settings/account" },
     { icon: Smartphone, title: "Linked devices", sub: "Phones and browsers signed in to your account", to: "/settings/devices" },
     { icon: Lock, title: "Privacy", sub: "Read receipts, typing, blocked contacts", to: "/settings/privacy" },

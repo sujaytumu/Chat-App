@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import FeedView, { NewPost } from "../components/FeedView";
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -10,7 +9,6 @@ import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
 import { useTabSwipe } from "../lib/useTabSwipe";
 import { useAuthStore } from "../store/useAuthStore";
-import { useReelsModeStore } from "../store/useReelsModeStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
 import StatusMusicSheet from "../components/StatusMusicSheet";
@@ -760,18 +758,13 @@ const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const me = useAuthStore((s) => s.authUser);
-  const mode = useReelsModeStore((s) => s.mode); // feed | reels (the bottom bar switches it too)
-  const setMode = useReelsModeStore((s) => s.setMode);
-  const feedTick = useReelsModeStore((s) => s.feedTick);
   const swipeRoot = useRef(null);
   useTabSwipe(swipeRoot); // swipe left/right = next / previous tab
+  // Photo posts live in the Post tab only. An old link or notification that asked for the feed goes there.
   useEffect(() => {
-    if (params.get("feed")) setMode("feed");
-    else if (params.get("r")) setMode("reels");
+    if (params.get("feed")) navigate("/post", { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [newPost, setNewPost] = useState(false);
-  const [feedKey, setFeedKey] = useState(0);
   const [tab, setTab] = useState(() => (params.get("r") ? "foryou" : readReelsMemo()?.tab || "foryou")); // foryou | friends | saved
   const [reels, setReels] = useState([]);
   const [more, setMore] = useState(true);
@@ -1049,7 +1042,7 @@ const ReelsPage = () => {
   };
 
   const tabBtn = (id, label) => (
-    <button onClick={() => { setTab(id); setMode("reels"); }} className={`text-[17px] font-bold drop-shadow ${mode === "reels" && tab === id ? "text-white" : "text-white/55"}`}>
+    <button onClick={() => setTab(id)} className={`text-[17px] font-bold drop-shadow ${tab === id ? "text-white" : "text-white/55"}`}>
       {label}
     </button>
   );
@@ -1061,7 +1054,7 @@ const ReelsPage = () => {
         {view ? (
           <button onClick={() => setView(null)} className="pointer-events-auto text-white drop-shadow" aria-label="Back"><ChevronLeft size={34} strokeWidth={1.8} /></button>
         ) : (
-          <button onClick={() => (mode === "feed" ? setNewPost(true) : setCreating(true))} className="pointer-events-auto text-white drop-shadow" aria-label={mode === "feed" ? "New post" : "New reel"}>
+          <button onClick={() => setCreating(true)} className="pointer-events-auto text-white drop-shadow" aria-label="New reel">
             <Plus size={30} strokeWidth={1.8} />
           </button>
         )}
@@ -1069,7 +1062,6 @@ const ReelsPage = () => {
           <h2 className="pointer-events-auto text-white text-[19px] font-bold drop-shadow truncate max-w-[60vw]">{view.label}</h2>
         ) : (
         <div className="pointer-events-auto flex items-center gap-3 relative min-w-0">
-          <button onClick={() => setMode("feed")} className={`text-[17px] font-bold drop-shadow ${mode === "feed" ? "text-white" : "text-white/55"}`}>Feed</button>
           <div className="flex items-center gap-1">
             {tabBtn(tab === "saved" ? "saved" : "foryou", tab === "saved" ? "Saved" : "Reels")}
             <button onClick={() => setPickTab((v) => !v)} className="text-white drop-shadow" aria-label="Choose feed"><ChevronDown size={20} /></button>
@@ -1100,9 +1092,7 @@ const ReelsPage = () => {
       </div>
 
       <div className="absolute inset-x-0 top-0 bottom-[calc(72px+env(safe-area-inset-bottom))]">
-        {mode === "feed" ? (
-          <FeedView onCreate={() => setNewPost(true)} refreshKey={feedKey + feedTick} />
-        ) : loading && !reels.length ? (
+        {loading && !reels.length ? (
           <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
         ) : !reels.length && failed ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
@@ -1176,7 +1166,6 @@ const ReelsPage = () => {
 
       <MainNav bottomOnly />
 
-      {newPost && <NewPost onClose={() => setNewPost(false)} onPosted={() => { setNewPost(false); setFeedKey((k) => k + 1); }} />}
       {reviewing && <ReportsReview onClose={() => setReviewing(false)} onRemoved={(id) => setReels((l) => l.filter((r) => r._id !== id))} />}
       {searching && (
         <SearchReels

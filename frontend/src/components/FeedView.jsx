@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Play, Pause, Plus } from "lucide-react";
 import StatusComments from "./StatusComments";
 import ImageLightbox from "./ImageLightbox";
 import toast from "react-hot-toast";
@@ -157,7 +157,7 @@ const ago = (d) => {
 export { default as NewPost } from "./NewPost";
 
 // The Feed: photo posts from people you can see, 16 at a time
-const FeedView = ({ onCreate, refreshKey }) => {
+const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
   const [posts, setPosts] = useState([]);
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -249,7 +249,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
   };
 
   return (
-    <div className="h-full overflow-y-auto pt-[calc(60px+env(safe-area-inset-top))] pb-6 bg-black text-white overscroll-contain">
+    <div className="h-full overflow-y-auto pb-6 bg-black text-white overscroll-contain" style={{ paddingTop: topPad }}>
       <div className="flex gap-2 px-3 pb-3">
         {[["all", "All posts"], ["saved", "Saved"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className={`h-9 px-4 rounded-full text-[14px] ${tab === id ? "bg-white text-black font-semibold" : "bg-white/10 text-white/80"}`}>{label}</button>
@@ -317,6 +317,13 @@ const FeedView = ({ onCreate, refreshKey }) => {
             </article>
           ))}
           {more && <MoreSentinel key={posts.length} onVisible={() => load(false)} />}
+          {/* the end of the feed: a plus to add your own post */}
+          {onCreate && tab === "all" && !more && (
+            <button onClick={onCreate} aria-label="Add a post" className="mx-3 mb-24 w-[calc(100%-1.5rem)] py-8 rounded-2xl border border-dashed border-white/20 flex flex-col items-center gap-2 text-white/80 active:bg-white/5">
+              <span className="size-14 rounded-full bg-[#25D366] text-black flex items-center justify-center"><Plus size={30} strokeWidth={2.2} /></span>
+              <span className="text-[14px]">Add a post</span>
+            </button>
+          )}
         </>
       )}
       {likersFor && <LikersSheet post={likersFor} onClose={() => setLikersFor(null)} />}
