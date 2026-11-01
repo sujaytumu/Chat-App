@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, lazy, Suspense } from "react";
+import { lazyDialog } from "../lib/lazyDialog";
 import { useChatStore } from "../store/useChatStore";
 import {
   Paperclip,
@@ -23,14 +24,9 @@ import { isDesktopNow } from "./ContextMenu";
 import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import toast from "react-hot-toast";
 import Avatar from "./Avatar";
-import PollModal from "./PollModal";
 const PhotoSendPreview = lazy(() => import("./PhotoSendPreview"));
-import LocationSheet from "./LocationSheet";
 import { liveShares } from "../lib/liveShare";
 import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
-import EventModal from "./EventModal";
-import PaymentModal from "./PaymentModal";
-import ContactPicker from "./ContactPicker";
 import { useAuthStore } from "../store/useAuthStore";
 import { createPortal } from "react-dom";
 import { compressImage } from "../lib/imageUtils";
@@ -40,6 +36,11 @@ import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileU
 import { useDraftStore, draftKey } from "../store/useDraftStore";
 import ScheduleSheet, { fmtWhen } from "./ScheduleSheet";
 import { axiosInstance } from "../lib/axios";
+const ContactPicker = lazyDialog(() => import("./ContactPicker"));
+const EventModal = lazyDialog(() => import("./EventModal"));
+const PollModal = lazyDialog(() => import("./PollModal"));
+const LocationSheet = lazyDialog(() => import("./LocationSheet"));
+const PaymentModal = lazyDialog(() => import("./PaymentModal"));
 
 const EmojiStickerPicker = lazy(() => import("./EmojiStickerPicker"));
 const VideoNoteRecorder = lazy(() => import("./VideoNoteRecorder"));

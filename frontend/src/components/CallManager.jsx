@@ -1,4 +1,5 @@
 import CallReturnBar from "./CallReturnBar";
+import { lazyDialog } from "../lib/lazyDialog";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useEffect, useRef, useState } from "react";
 import { optimizeImage } from "../lib/cdn";
@@ -11,7 +12,6 @@ import {
   SwitchCamera,
   UserPlus,
 } from "lucide-react";
-import AddParticipantModal from "./AddParticipantModal";
 import AudioRoutePicker, { routeLabel } from "./AudioRoutePicker";
 import { useGroupCallStore } from "../store/useGroupCallStore";
 import { isPhoneLike } from "../lib/device";
@@ -19,6 +19,7 @@ import { signalCallConnected } from "../lib/notificationSound";
 import { Phone, PhoneEnd, Video, VideoOff, Mic, MicOff, Volume2 } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { TRANSPARENT_POSTER } from "../lib/utils";
+const AddParticipantModal = lazyDialog(() => import("./AddParticipantModal"));
 
 const AVATAR_COLORS = ["#00695C", "#4527A0", "#AD1457", "#2E7D32", "#1565C0", "#EF6C00"];
 const colorForName = (name = "") => {
