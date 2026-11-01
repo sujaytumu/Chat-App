@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
 import StatusComments from "./StatusComments";
 import ImageLightbox from "./ImageLightbox";
 import toast from "react-hot-toast";
@@ -133,6 +133,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
   const [failed, setFailed] = useState(false);
   const [commentsFor, setCommentsFor] = useState(null);
   const [pop, setPop] = useState(null);
+  const [tab, setTab] = useState("all"); // all | saved
   const [editing, setEditing] = useState(null);
   const [viewer, setViewer] = useState(null); // { images, src } - photo open full screen
   const next = useRef(null);
@@ -142,7 +143,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
     if (busy.current) return;
     busy.current = true;
     try {
-      const { data } = await axiosInstance.get("/posts", { params: reset || !next.current ? {} : { before: next.current }, timeout: 20000 });
+      const { data } = await axiosInstance.get(tab === "saved" ? "/posts/saved" : "/posts", { params: tab === "saved" || reset || !next.current ? {} : { before: next.current }, timeout: 20000 });
       next.current = data.next;
       setPosts((cur) => {
         const base = reset ? [] : cur;
@@ -157,13 +158,26 @@ const FeedView = ({ onCreate, refreshKey }) => {
       busy.current = false;
       setLoading(false);
     }
-  }, []);
+  }, [tab]);
 
   useEffect(() => {
     next.current = null;
+    setPosts([]);
     setLoading(true);
     load(true);
   }, [load, refreshKey]);
+
+  const save = async (p) => {
+    const saved = !p.saved;
+    setPosts((l) => (tab === "saved" && !saved ? l.filter((x) => x._id !== p._id) : l.map((x) => (x._id === p._id ? { ...x, saved } : x))));
+    try {
+      await axiosInstance.put(`/posts/${p._id}/save`, { saved });
+      toast(saved ? "Saved" : "Removed from saved", { icon: saved ? "🔖" : "✖️" });
+    } catch {
+      setPosts((l) => l.map((x) => (x._id === p._id ? { ...x, saved: !saved } : x)));
+      toast.error("Couldn't save");
+    }
+  };
 
   const like = async (p) => {
     const liked = !p.liked;
@@ -204,6 +218,11 @@ const FeedView = ({ onCreate, refreshKey }) => {
 
   return (
     <div className="h-full overflow-y-auto pt-[calc(60px+env(safe-area-inset-top))] pb-6 bg-black text-white overscroll-contain">
+      <div className="flex gap-2 px-3 pb-3">
+        {[["all", "All posts"], ["saved", "Saved"]].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} className={`h-9 px-4 rounded-full text-[14px] ${tab === id ? "bg-white text-black font-semibold" : "bg-white/10 text-white/80"}`}>{label}</button>
+        ))}
+      </div>
       {loading && !posts.length ? (
         <div className="px-3 space-y-6">
           {[0, 1].map((i) => (
@@ -222,9 +241,9 @@ const FeedView = ({ onCreate, refreshKey }) => {
       ) : !posts.length ? (
         <div className="py-20 flex flex-col items-center gap-3 px-8 text-center">
           <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><ImageIcon size={34} /></span>
-          <p className="text-lg font-semibold">No posts yet</p>
-          <p className="text-white/60 text-[14px]">Photos shared by people you can see appear here.</p>
-          <button onClick={onCreate} className="px-6 py-3 rounded-full bg-[#25D366] text-black font-semibold">Share a photo</button>
+          <p className="text-lg font-semibold">{tab === "saved" ? "Nothing saved yet" : "No posts yet"}</p>
+          <p className="text-white/60 text-[14px]">{tab === "saved" ? "Tap the bookmark under a post to keep it here." : "Photos shared by people you can see appear here."}</p>
+          {tab !== "saved" && <button onClick={onCreate} className="px-6 py-3 rounded-full bg-[#25D366] text-black font-semibold">Share a photo</button>}
         </div>
       ) : (
         <>
@@ -256,6 +275,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
                     <span className="text-[13.5px] tabular-nums">{p.comments > 0 ? p.comments : ""}</span>
                   </button>
                   <button onClick={() => share(p)} className="active:scale-90 transition-transform" aria-label="Share"><Send size={24} strokeWidth={1.8} /></button>
+                  <button onClick={() => save(p)} className="ml-auto active:scale-90 transition-transform" aria-label={p.saved ? "Remove from saved" : "Save"}><Bookmark size={25} strokeWidth={1.8} fill={p.saved ? "currentColor" : "none"} /></button>
                 </div>
                 {p.caption && <p className="mt-1 text-[14px] break-words"><b className="mr-1.5">{p.user?.fullName}</b>{p.caption}</p>}
                 {p.song?.url && <PostSong song={p.song} />}
