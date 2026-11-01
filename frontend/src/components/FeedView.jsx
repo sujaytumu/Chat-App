@@ -46,35 +46,64 @@ const ago = (d) => {
   return `${Math.floor(s / 86400)}d`;
 };
 
-const readFile = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-
-// Downscale big photos so the upload stays small
-const shrink = (dataUrl, max = 1600) =>
-  new Promise((res) => {
+// Downscale a picked photo straight from the file (10 big camera photos at once would otherwise
+// fill the phone's memory), so the upload stays small.
+const shrinkFile = (file, max = 1440) =>
+  new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const k = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(img.width * k);
-      c.height = Math.round(img.height * k);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-      res(c.toDataURL("image/jpeg", 0.85));
+      try {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.width * k));
+        c.height = Math.max(1, Math.round(img.height * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const out = c.toDataURL("image/jpeg", 0.82);
+        c.width = c.height = 0; // free the canvas memory right away
+        URL.revokeObjectURL(url);
+        res(out);
+      } catch (e) {
+        URL.revokeObjectURL(url);
+        rej(e);
+      }
     };
-    img.onerror = () => res(dataUrl);
-    img.src = dataUrl;
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      rej(new Error("bad image"));
+    };
+    img.src = url;
   });
+const nextFrame = () => new Promise((r) => setTimeout(r, 30));
 
 export const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const [imgs, setImgs] = useState([]);
   const [caption, setCaption] = useState("");
   const [busy, setBusy] = useState(false);
+  const [prep, setPrep] = useState(null); // { done, total } while the chosen photos are being prepared
   const pick = async (e) => {
-    const files = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/")).slice(0, 10 - imgs.length);
+    const chosen = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/") || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name || ""));
     e.target.value = "";
+    const room = 10 - imgs.length;
+    if (chosen.length > room) toast(`Only ${room} more photo${room === 1 ? "" : "s"} fit (max 10) - the first ${room} were taken`);
+    const files = chosen.slice(0, Math.max(0, room));
     if (!files.length) return;
-    const out = [];
-    for (const f of files) out.push(await shrink(await readFile(f)));
-    setImgs((cur) => [...cur, ...out].slice(0, 10));
+    let done = 0;
+    let failed = 0;
+    setPrep({ done: 0, total: files.length });
+    for (const f of files) {
+      try {
+        const one = await shrinkFile(f);
+        setImgs((cur) => (cur.length < 10 ? [...cur, one] : cur)); // each photo shows up as soon as it is ready
+      } catch {
+        failed++;
+      }
+      done++;
+      setPrep({ done, total: files.length });
+      await nextFrame();
+    }
+    setPrep(null);
+    if (failed) toast.error(`${failed} photo${failed === 1 ? "" : "s"} couldn't be opened`);
   };
   const post = async () => {
     setBusy(true);
@@ -91,9 +120,13 @@ export const NewPost = ({ onClose, onPosted, embedded = false }) => {
       <div className="flex items-center gap-3 px-4 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
         <button onClick={onClose} aria-label="Close"><X size={26} /></button>
         <h3 className="flex-1 text-[17px] font-semibold">New post</h3>
-        <button disabled={!imgs.length || busy} onClick={post} className="text-[#25D366] font-semibold disabled:opacity-40">{busy ? "Posting…" : "Share"}</button>
+        <button disabled={!imgs.length || busy || !!prep} onClick={post} className="text-[#25D366] font-semibold disabled:opacity-40">{busy ? "Posting…" : "Share"}</button>
       </div>
       <div className="flex-1 overflow-y-auto px-4">
+        {prep && (
+          <div className="mb-2 flex items-center gap-2 text-[13px] text-white/70"><Loader2 size={15} className="animate-spin" /> Getting photos ready… {prep.done}/{prep.total}</div>
+        )}
+        {busy && <div className="mb-2 flex items-center gap-2 text-[13px] text-white/70"><Loader2 size={15} className="animate-spin" /> Uploading {imgs.length} photo{imgs.length === 1 ? "" : "s"} - keep this screen open</div>}
         {imgs.length ? (
           <div className="flex gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
             {imgs.map((src, i) => (
@@ -103,7 +136,7 @@ export const NewPost = ({ onClose, onPosted, embedded = false }) => {
                 <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-[12px]">{i + 1}/{imgs.length}</span>
               </div>
             ))}
-            {imgs.length < 10 && (
+            {imgs.length < 10 && !prep && (
               <label className="shrink-0 w-[34%] h-[48vh] rounded-xl bg-white/10 flex flex-col items-center justify-center gap-2 text-white/70 cursor-pointer text-[13px] text-center">
                 <ImagePlus size={28} /> Add more
                 <input type="file" accept="image/*" multiple className="hidden" onChange={pick} />
