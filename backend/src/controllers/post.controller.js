@@ -107,6 +107,21 @@ export const likePost = async (req, res) => {
   }
 };
 
+// The owner can fix the caption and the lines after posting
+export const updatePost = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const post = await Post.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!post) return res.status(404).json({ error: "Not found" });
+    if (typeof req.body?.caption === "string") post.caption = req.body.caption.trim().slice(0, 500);
+    if (typeof req.body?.lines === "string") post.lines = req.body.lines.trim().slice(0, 300);
+    await post.save();
+    res.json({ caption: post.caption, lines: post.lines || "" });
+  } catch (e) {
+    res.status(500).json({ error: "Couldn't save" });
+  }
+};
+
 export const deletePost = async (req, res) => {
   try {
     const post = await Post.findOne({ _id: req.params.id, userId: req.user._id });
