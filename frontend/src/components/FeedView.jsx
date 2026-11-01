@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Image as ImageIcon, Music, Play, Pause } from "lucide-react";
 import StatusComments from "./StatusComments";
 import ImageLightbox from "./ImageLightbox";
 import toast from "react-hot-toast";
@@ -35,6 +35,36 @@ const PostImages = ({ images, onOpen, onDouble }) => {
       <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white pointer-events-none">{i + 1}/{images.length}</span>
       <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
         {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
+      </div>
+    </div>
+  );
+};
+
+// Edit the caption and lines of your own post
+const EditPostSheet = ({ post, onClose, onSaved }) => {
+  const [caption, setCaption] = useState(post.caption || "");
+  const [lines, setLines] = useState(post.lines || "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.put(`/posts/${post._id}`, { caption, lines });
+      onSaved(data);
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Couldn't save");
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end bg-black/60" onClick={onClose}>
+      <div className="w-full rounded-t-3xl bg-wa-pop text-wa-text px-5 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between pb-3">
+          <h3 className="text-[18px] font-semibold">Edit post</h3>
+          <button onClick={onClose} aria-label="Close" className="size-9 flex items-center justify-center"><X size={22} /></button>
+        </div>
+        <textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} rows={3} placeholder="Caption" className="w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
+        <textarea value={lines} onChange={(e) => setLines(e.target.value)} maxLength={300} rows={3} placeholder="Lines (lyrics, a quote…)" className="mt-2 w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
+        <button onClick={save} disabled={busy} className="mt-4 w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98]">{busy ? "Saving…" : "Save"}</button>
       </div>
     </div>
   );
@@ -103,6 +133,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
   const [failed, setFailed] = useState(false);
   const [commentsFor, setCommentsFor] = useState(null);
   const [pop, setPop] = useState(null);
+  const [editing, setEditing] = useState(null);
   const [viewer, setViewer] = useState(null); // { images, src } - photo open full screen
   const next = useRef(null);
   const busy = useRef(false);
@@ -203,6 +234,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
                 <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
                 <span className="flex-1 text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                 <span className="text-[12px] text-white/50">{ago(p.createdAt)}</span>
+                {p.mine && <button onClick={() => setEditing(p)} className="text-white/60" aria-label="Edit post"><Pencil size={17} /></button>}
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
@@ -234,6 +266,7 @@ const FeedView = ({ onCreate, refreshKey }) => {
           {more && <MoreSentinel key={posts.length} onVisible={() => load(false)} />}
         </>
       )}
+      {editing && <EditPostSheet post={editing} onClose={() => setEditing(null)} onSaved={(d) => { setPosts((l) => l.map((x) => (x._id === editing._id ? { ...x, ...d } : x))); setEditing(null); toast.success("Saved"); }} />}
       {viewer && <ImageLightbox src={viewer.src} gallery={viewer.images} onClose={() => setViewer(null)} />}
       {commentsFor && (
         <StatusComments
