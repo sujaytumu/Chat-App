@@ -104,7 +104,7 @@ const AccessPage = () => {
     try {
       await Promise.all([...staged].map(([k, allowed]) => {
         const [a, b] = k.split("|");
-        return axiosInstance.put("/admin/access", { a, b, allowed });
+        return axiosInstance.put("/admin/access", { a, b, allowed, skip: pendingForWho ? who._id : undefined }); // the approval message tells them
       }));
       setPairs((p) => {
         const n = new Set(p);
@@ -126,6 +126,19 @@ const AccessPage = () => {
       toast.error(e.response?.data?.error || "Couldn't save that");
     } finally {
       setSaving(false);
+    }
+  };
+  const removeAll = async () => {
+    if (!who || !window.confirm(`Remove everything ${who.fullName} can see? Only you will stay visible to them. They can ask again.`)) return;
+    try {
+      await axiosInstance.put("/admin/access/clear", { userId: who._id });
+      setPairs((p) => new Set([...p].filter((k) => !k.split("|").includes(who._id))));
+      setStaged(new Map());
+      toast.success("Access removed");
+      setWho(null);
+      setQ("");
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Couldn't remove access");
     }
   };
   const back = () => {
@@ -242,6 +255,9 @@ const AccessPage = () => {
       </div>
       {who && (
         <div className="absolute inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-0 p-4 pt-8 bg-gradient-to-t from-wa-bg via-wa-bg/95 to-transparent z-20 flex gap-2">
+          {!pendingForWho && !isOwnerUser(who) && chosenCount > 0 && (
+            <button onClick={removeAll} className="h-12 px-5 rounded-full bg-wa-surface text-[#F15C6D] font-medium active:scale-[0.99]">Remove all</button>
+          )}
           {pendingForWho && (
             <button onClick={() => decline(pendingForWho).then((done) => { if (done) { setStaged(new Map()); setWho(null); } })} className="h-12 px-5 rounded-full bg-wa-surface font-medium active:scale-[0.99]">Decline</button>
           )}

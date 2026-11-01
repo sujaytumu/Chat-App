@@ -1237,7 +1237,15 @@ export const useChatStore = create((set, get) => ({
       set((st) => ({ messages: st.messages.filter((m) => !gone.has(m._id)) }));
     });
 
-    socket.on("visibilityChanged", () => get().getUsers());
+    socket.on("visibilityChanged", async () => {
+      await get().getUsers();
+      // If the person I'm chatting with was just taken out of my list, leave that chat instead of sitting in a dead one.
+      const open = get().selectedChat;
+      const me = useAuthStore.getState().authUser;
+      if (open?.type === "direct" && !open.data?.isSelf && open.data?._id !== me?._id && !get().users.some((u) => u._id === open.data?._id)) {
+        get().setSelectedChat(null);
+      }
+    });
     // Owner: someone asked to see more people. Person: the owner answered.
     // (the popups for access requests / decisions live in components/AccessNotifier.jsx)
 
