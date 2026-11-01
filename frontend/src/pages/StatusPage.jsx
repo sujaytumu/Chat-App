@@ -1,6 +1,10 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { optimizeImage } from "../lib/cdn";
-import { Plus, Loader2, Pencil, Camera, Lock, BellOff, Bell, Bookmark, Eye } from "lucide-react";
+import { Loader2, Pencil, Camera, Lock, BellOff, Bell, Bookmark, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import StatusCard from "../components/StatusCard";
+import MyStatusScreen from "../components/MyStatusScreen";
+import Avatar from "../components/Avatar";
 import { createPortal } from "react-dom";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
@@ -118,6 +122,9 @@ const StatusPage = () => {
   const [myHighlights, setMyHighlights] = useState([]);
   const [otherHighlights, setOtherHighlights] = useState([]); // [{ user, highlights }]
   const [highlightSheet, setHighlightSheet] = useState(null); // { preselect?, editing? }
+  const [myScreen, setMyScreen] = useState(false); // the "My status" page (your updates with views and hearts)
+  const [channels, setChannels] = useState([]); // channels you follow, shown under Status
+  const navigate = useNavigate();
 
   const loadHighlights = useCallback(() => {
     if (!authUser?._id) return;
@@ -143,12 +150,13 @@ const StatusPage = () => {
   useEffect(() => {
     loadFeed();
     loadHighlights();
+    axiosInstance.get("/channels").then((r) => setChannels((r.data?.mine || []).slice(0, 6))).catch(() => {});
   }, [loadFeed, loadHighlights]);
 
   return (
     <div className="relative flex-1 flex flex-col bg-wa-bg overflow-hidden pb-[calc(76px+env(safe-area-inset-bottom))] lg:pb-0">
       <div className="flex items-center justify-between px-5 pt-5 pb-4">
-        <h1 className="text-[28px] leading-none font-bold tracking-tight text-wa-text">Updates</h1>
+        <h1 className="text-[28px] leading-none font-normal text-wa-text">Updates</h1>
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -158,42 +166,30 @@ const StatusPage = () => {
           </div>
         ) : (
           <>
-            {/* One slim row you swipe sideways (like WhatsApp's status bar): my status first, then everyone else's */}
-            <div className="flex gap-[18px] overflow-x-auto no-scrollbar px-5 pt-2 pb-4 border-b border-white/5">
-              <button
-                onClick={() =>
-                  feed.myStatuses.length > 0
-                    ? setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true })
-                    : setShowCreate("image")
-                }
-                className="shrink-0 w-[72px] flex flex-col items-center gap-2 active:scale-95 transition-transform"
-              >
-                <div className="relative">
-                  <img
-                    src={optimizeImage(authUser.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                    alt="My status"
-                    className={`size-[64px] rounded-full object-cover ${feed.myStatuses.length > 0 ? "ring-2 ring-[#00A884] ring-offset-2 ring-offset-wa-bg" : ""}`}
-                  />
-                  <span
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowCreate("image");
-                    }}
-                    className="absolute -bottom-0.5 -right-0.5 size-6 rounded-full bg-[#00A884] border-2 border-wa-bg flex items-center justify-center text-white"
-                  >
-                    <Plus size={14} strokeWidth={3} />
-                  </span>
-                </div>
-                <span className="text-[12.5px] font-medium text-wa-text truncate w-full text-center">My status</span>
-              </button>
-
+            {/* Status: portrait cards you swipe sideways, like WhatsApp - my status first, then everyone else's (new ones first) */}
+            <h2 className="px-5 pt-1 pb-3 text-[26px] font-normal text-wa-text">Status</h2>
+            <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-4 pb-5">
+              <StatusCard
+                user={authUser}
+                status={feed.myStatuses[feed.myStatuses.length - 1]}
+                name="My status"
+                ring={feed.myStatuses.length > 0 ? "new" : "none"}
+                plus
+                onPlus={() => setShowCreate("image")}
+                onClick={() => (feed.myStatuses.length > 0 ? setMyScreen(true) : setShowCreate("image"))}
+              />
               {[
                 ...feed.others.filter((o) => o.hasUnseen && !isMuted(o.user._id)).map((o) => ({ ...o, tone: "new" })),
                 ...feed.others.filter((o) => !o.hasUnseen && !isMuted(o.user._id)).map((o) => ({ ...o, tone: "seen" })),
                 ...feed.others.filter((o) => isMuted(o.user._id)).map((o) => ({ ...o, tone: "muted" })),
               ].map(({ user, statuses, hasUnseen, tone }) => (
-                <button
+                <StatusCard
                   key={user._id}
+                  user={user}
+                  status={(hasUnseen ? statuses.find((st) => !st.viewedBy?.includes?.(authUser._id)) : null) || statuses[statuses.length - 1]}
+                  name={user.fullName}
+                  ring={hasUnseen && tone !== "muted" ? "new" : "seen"}
+                  muted={tone === "muted"}
                   onClick={() => {
                     if (rowLongPressed.current) return; // the long-press already opened the options
                     setViewing({ user, statuses, isOwn: false });
@@ -206,18 +202,31 @@ const StatusPage = () => {
                     e.preventDefault();
                     setRowSheet({ user, statuses });
                   }}
-                  className={`shrink-0 w-[72px] flex flex-col items-center gap-2 select-none active:scale-95 transition-transform ${tone === "muted" ? "opacity-60" : ""}`}
-                >
-                  <img
-                    src={optimizeImage(user.profilePic, 120) || "/avatar.png"} loading="lazy" decoding="async"
-                    alt={user.fullName}
-                    className={`size-[64px] rounded-full object-cover ring-2 ${hasUnseen && tone !== "muted" ? "ring-[#00A884]" : "ring-wa-muted/40"} ring-offset-2 ring-offset-wa-bg`}
-                    draggable={false}
-                  />
-                  <span className={`text-[12.5px] truncate w-full text-center ${tone === "new" ? "text-wa-text font-medium" : "text-wa-muted"}`}>{(user.fullName || "").split(" ")[0]}</span>
-                </button>
+                />
               ))}
             </div>
+
+            {/* Channels you follow */}
+            <div className="flex items-center justify-between px-5 pb-2">
+              <h2 className="text-[26px] font-normal text-wa-text">Channels</h2>
+              <button onClick={() => navigate("/channels")} className="h-10 px-5 rounded-full bg-wa-field text-[15px] text-wa-text active:scale-95">Explore</button>
+            </div>
+            {channels.length === 0 ? (
+              <p className="px-5 pb-5 text-[14px] text-wa-muted">Follow channels to see their updates here.</p>
+            ) : (
+              <div className="pb-2">
+                {channels.map((c) => (
+                  <button key={c._id} onClick={() => navigate("/channels", { state: { openId: c._id } })} className="w-full flex items-center gap-4 px-5 py-3 text-left active:bg-white/5">
+                    <Avatar src={c.icon} name={c.name} size="size-[56px]" textSize="text-xl" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[18px] leading-6 text-wa-text truncate">{c.name}</p>
+                      <p className="text-[14.5px] text-wa-muted truncate">{c.lastPost?.text || c.description || `${c.followerCount || 0} follower${c.followerCount === 1 ? "" : "s"}`}</p>
+                    </div>
+                    {c.lastPost?.createdAt && <span className="text-[13px] text-wa-muted shrink-0 self-start pt-1">{statusTime(c.lastPost.createdAt)}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* Highlights: updates kept past the 24 hours (like Instagram highlights), in their own colours */}
             <div className="mt-3 pb-1 border-t border-white/5 pt-3">
@@ -279,6 +288,21 @@ const StatusPage = () => {
         </button>
       </div>
 
+      {myScreen && (
+        <MyStatusScreen
+          statuses={feed.myStatuses}
+          onClose={() => setMyScreen(false)}
+          onOpen={(i) => setViewing({ user: authUser, statuses: feed.myStatuses, isOwn: true, startIndex: i })}
+          onHighlight={(st) => setHighlightSheet({ preselect: st._id })}
+          onDeleted={(id) => {
+            setFeed((f) => ({ ...f, myStatuses: f.myStatuses.filter((x) => x._id !== id) }));
+            loadFeed();
+            if (feed.myStatuses.length <= 1) setMyScreen(false);
+          }}
+          onText={() => setShowCreate("text")}
+          onPhoto={() => setShowCreate("image")}
+        />
+      )}
       {showCreate && (
         <CreateStatusModal startWith={showCreate} onClose={() => setShowCreate(false)} onCreated={loadFeed} />
       )}
@@ -288,6 +312,7 @@ const StatusPage = () => {
           statuses={viewing.statuses}
           isOwn={viewing.isOwn}
           highlight={viewing.highlight || null}
+          startIndex={viewing.startIndex || 0}
           hold={!!highlightSheet}
           onAddToHighlight={(st) => setHighlightSheet({ preselect: st._id })}
           onEditHighlight={(h) => setHighlightSheet({ editing: h })}

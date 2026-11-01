@@ -54,9 +54,9 @@ const warmSong = (url) => {
   }
 };
 
-const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = null, onAddToHighlight, onEditHighlight, hold = false }) => {
+const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = null, onAddToHighlight, onEditHighlight, hold = false, startIndex = 0 }) => {
   const [list, setList] = useState(initial);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => Math.min(Math.max(0, startIndex), Math.max(0, initial.length - 1)));
   const [progress, setProgress] = useState(0); // 0..1 of the current update
   const [paused, setPaused] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
