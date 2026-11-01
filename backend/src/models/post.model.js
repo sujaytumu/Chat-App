@@ -10,6 +10,7 @@ const postSchema = new mongoose.Schema(
     lines: { type: String, default: "", maxlength: 300 }, // lyric / quote lines shown with the photos
     song: { url: String, name: String, start: { type: Number, default: 0 } },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    saves: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // people who bookmarked it
   },
   { timestamps: true }
 );

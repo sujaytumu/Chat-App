@@ -23,6 +23,7 @@ const shape = (p, me, comments = 0) => ({
   likeCount: (p.likes || []).length,
   liked: (p.likes || []).some((l) => String(l) === String(me)),
   mine: String(p.userId?._id) === String(me),
+  saved: (p.saves || []).some((l) => String(l) === String(me)),
 });
 
 // Newest first, 16 at a time. `before` = createdAt of the last post received.
@@ -84,6 +85,39 @@ export const createPost = async (req, res) => {
   } catch (e) {
     console.log("createPost:", e.message);
     res.status(500).json({ error: "Couldn't post" });
+  }
+};
+
+// Posts the person bookmarked (only ones they are still allowed to see), newest post first
+export const getSaved = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    const me = req.user;
+    const ids = await visibleUserIds(me);
+    const q = { saves: me._id };
+    if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
+    const blocked = new Set((me.blockedUsers || []).map(String));
+    const rows = await Post.find(q).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
+    const page = rows.filter((p) => p.userId && !blocked.has(String(p.userId._id)));
+    const agg = await StatusComment.aggregate([{ $match: { targetId: { $in: page.map((p) => p._id) } } }, { $group: { _id: "$targetId", n: { $sum: 1 } } }]);
+    const cm = new Map(agg.map((a) => [String(a._id), a.n]));
+    res.json({ posts: page.map((p) => shape(p, me._id, cm.get(String(p._id)) || 0)), more: false, next: null });
+  } catch (e) {
+    console.log("getSaved:", e.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export const savePost = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const post = await Post.findById(req.params.id).select("userId");
+    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId)))) return res.status(404).json({ error: "Not found" });
+    const want = req.body?.saved !== false;
+    await Post.updateOne({ _id: post._id }, want ? { $addToSet: { saves: req.user._id } } : { $pull: { saves: req.user._id } });
+    res.json({ saved: want });
+  } catch (e) {
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
