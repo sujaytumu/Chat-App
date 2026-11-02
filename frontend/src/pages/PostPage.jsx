@@ -29,17 +29,18 @@ const PostPage = () => {
           />
         ) : (
           <>
-            <div className="absolute top-0 inset-x-0 z-20 px-4 pt-[calc(14px+env(safe-area-inset-top))] pb-2 pointer-events-none bg-gradient-to-b from-black via-black/80 to-transparent">
-              <h1 className="text-white text-[22px] font-bold drop-shadow">Posts</h1>
+            <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black via-black/85 to-transparent">
+              <h1 className="text-white text-[24px] font-bold drop-shadow">Posts</h1>
+              <button
+                onClick={() => setComposing(true)}
+                aria-label="New post"
+                className="size-11 rounded-full bg-white/12 border border-white/20 text-white flex items-center justify-center active:scale-90 transition-transform"
+                style={{ background: "rgba(255,255,255,.12)" }}
+              >
+                <Plus size={26} strokeWidth={2.2} />
+              </button>
             </div>
-            <FeedView onCreate={() => setComposing(true)} refreshKey={feedKey} topPad="calc(56px + env(safe-area-inset-top))" />
-            <button
-              onClick={() => setComposing(true)}
-              aria-label="New post"
-              className="absolute z-30 right-4 bottom-4 size-14 rounded-full bg-[#25D366] text-black shadow-xl flex items-center justify-center active:scale-95 transition-transform"
-            >
-              <Plus size={30} strokeWidth={2.2} />
-            </button>
+            <FeedView onCreate={() => setComposing(true)} refreshKey={feedKey} topPad="calc(60px + env(safe-area-inset-top))" />
           </>
         )}
       </div>

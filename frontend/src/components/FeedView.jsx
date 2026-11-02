@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Play, Pause, Plus } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Play, VolumeX } from "lucide-react";
 import StatusComments from "./StatusComments";
 import ImageLightbox from "./ImageLightbox";
 import toast from "react-hot-toast";
@@ -101,33 +101,98 @@ const LikersSheet = ({ post, onClose }) => {
   );
 };
 
-// The song kept with a post: tap to play / pause (only one song plays at a time)
-let playingPostSong = null;
-const PostSong = ({ song }) => {
-  const el = useRef(null);
-  const [on, setOn] = useState(false);
-  useEffect(() => () => { el.current?.pause(); }, []);
-  const toggle = () => {
-    if (!el.current) {
-      const a = new Audio(song.url);
-      a.loop = true;
-      a.onplay = () => setOn(true);
-      a.onpause = () => setOn(false);
-      el.current = a;
+// The song kept with a post. It starts by itself while that post is on screen (the one most in view),
+// stops when you scroll past, and only one song plays at a time. Tap the pill to mute / unmute all songs.
+const songs = new Map(); // id -> { ratio, play(), pause() }
+let activeSong = null;
+let songsMuted = (() => { try { return localStorage.getItem("postSongMuted") === "1"; } catch { return false; } })();
+const muteListeners = new Set();
+const pickSong = () => {
+  let best = null;
+  let bestRatio = 0.55; // a post must be at least ~half on screen
+  for (const [id, sg] of songs) if (sg.ratio >= bestRatio) { best = id; bestRatio = sg.ratio; }
+  if (document.hidden) best = null;
+  if (best === activeSong) return;
+  if (activeSong && songs.get(activeSong)) songs.get(activeSong).pause();
+  activeSong = best;
+  if (best) songs.get(best).play();
+};
+if (typeof document !== "undefined") document.addEventListener("visibilitychange", pickSong);
+const setSongsMuted = (m) => {
+  songsMuted = m;
+  try { localStorage.setItem("postSongMuted", m ? "1" : "0"); } catch { /* ignore */ }
+  muteListeners.forEach((fn) => fn(m));
+};
+
+const PostSong = ({ song, id }) => {
+  const btn = useRef(null);
+  const audio = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(songsMuted);
+  const [blocked, setBlocked] = useState(false); // the phone refused to start it by itself - tap to start
+
+  useEffect(() => {
+    const fn = (m) => { setMuted(m); if (audio.current) audio.current.muted = m; };
+    muteListeners.add(fn);
+    return () => muteListeners.delete(fn);
+  }, []);
+
+  useEffect(() => {
+    const getAudio = () => {
+      if (!audio.current) {
+        const a = new Audio(song.url);
+        a.loop = true;
+        a.preload = "auto";
+        a.muted = songsMuted;
+        a.onplaying = () => setPlaying(true);
+        a.onpause = () => setPlaying(false);
+        audio.current = a;
+      }
+      return audio.current;
+    };
+    const entry = {
+      ratio: 0,
+      play: () => {
+        const a = getAudio();
+        if (!a.currentTime && song.start) a.currentTime = song.start;
+        a.muted = songsMuted;
+        a.play().then(() => setBlocked(false)).catch(() => setBlocked(true));
+      },
+      pause: () => audio.current?.pause(),
+    };
+    songs.set(id, entry);
+    const card = btn.current?.closest("article");
+    let io;
+    if (card && typeof IntersectionObserver !== "undefined") {
+      io = new IntersectionObserver((es) => { entry.ratio = es[es.length - 1].intersectionRatio; pickSong(); }, { threshold: [0, 0.25, 0.4, 0.55, 0.7, 0.85, 1] });
+      io.observe(card);
     }
-    const a = el.current;
-    if (a.paused) {
-      if (playingPostSong && playingPostSong !== a) playingPostSong.pause();
-      playingPostSong = a;
-      if (!a.currentTime && song.start) a.currentTime = song.start;
-      a.play().catch(() => toast.error("Couldn't play the song"));
-    } else a.pause();
+    return () => {
+      io?.disconnect();
+      songs.delete(id);
+      if (activeSong === id) activeSong = null;
+      audio.current?.pause();
+      audio.current = null;
+    };
+  }, [id, song.url, song.start]);
+
+  const tap = () => {
+    const a = audio.current;
+    if (blocked || !a || a.paused) {
+      // it was not playing (blocked by the phone, or paused): start it with sound
+      setSongsMuted(false);
+      songs.get(id)?.play();
+      activeSong = id;
+      return;
+    }
+    setSongsMuted(!songsMuted);
   };
   return (
-    <button onClick={toggle} className="mt-2 inline-flex items-center gap-2 max-w-full pl-2.5 pr-3.5 h-8 rounded-full bg-white/10 active:bg-white/20 text-[13px]" aria-label={on ? "Pause song" : "Play song"}>
-      {on ? <Pause size={14} /> : <Play size={14} />}
+    <button ref={btn} onClick={tap} className="mt-2 inline-flex items-center gap-2 max-w-full pl-3 pr-3.5 h-9 rounded-full bg-white/10 active:bg-white/20 text-[13.5px]" aria-label={playing && !muted ? "Mute song" : "Play song"}>
+      {playing ? (muted ? <VolumeX size={15} className="shrink-0" /> : <span className="eq shrink-0" aria-hidden="true"><i /><i /><i /></span>) : <Play size={14} className="shrink-0" />}
       <Music size={13} className="text-[#25D366] shrink-0" />
       <span className="truncate">{song.name}</span>
+      {blocked && <span className="text-[11.5px] text-[#25D366] shrink-0">Tap to play</span>}
     </button>
   );
 };
@@ -311,19 +376,13 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
                   <button onClick={() => save(p)} className="ml-auto active:scale-90 transition-transform" aria-label={p.saved ? "Remove from saved" : "Save"}><Bookmark size={25} strokeWidth={1.8} fill={p.saved ? "currentColor" : "none"} /></button>
                 </div>
                 {p.caption && <p className="mt-1 text-[14px] break-words"><b className="mr-1.5">{p.user?.fullName}</b>{p.caption}</p>}
-                {p.song?.url && <PostSong song={p.song} />}
+                {p.song?.url && <PostSong id={p._id} song={p.song} />}
                 {p.lines && <p className="mt-2 text-[14px] italic text-white/80 whitespace-pre-line break-words border-l-2 border-[#25D366]/70 pl-2.5">{p.lines}</p>}
               </div>
             </article>
           ))}
           {more && <MoreSentinel key={posts.length} onVisible={() => load(false)} />}
           {/* the end of the feed: a plus to add your own post */}
-          {onCreate && tab === "all" && !more && (
-            <button onClick={onCreate} aria-label="Add a post" className="mx-3 mb-24 w-[calc(100%-1.5rem)] py-8 rounded-2xl border border-dashed border-white/20 flex flex-col items-center gap-2 text-white/80 active:bg-white/5">
-              <span className="size-14 rounded-full bg-[#25D366] text-black flex items-center justify-center"><Plus size={30} strokeWidth={2.2} /></span>
-              <span className="text-[14px]">Add a post</span>
-            </button>
-          )}
         </>
       )}
       {likersFor && <LikersSheet post={likersFor} onClose={() => setLikersFor(null)} />}
