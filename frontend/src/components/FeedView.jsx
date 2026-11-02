@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Play, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Volume2, VolumeX } from "lucide-react";
 import StatusComments from "./StatusComments";
 import ImageLightbox from "./ImageLightbox";
 import toast from "react-hot-toast";
@@ -129,7 +129,6 @@ const PostSong = ({ song, id }) => {
   const audio = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(songsMuted);
-  const [blocked, setBlocked] = useState(false); // the phone refused to start it by itself - tap to start
 
   useEffect(() => {
     const fn = (m) => { setMuted(m); if (audio.current) audio.current.muted = m; };
@@ -156,7 +155,7 @@ const PostSong = ({ song, id }) => {
         const a = getAudio();
         if (!a.currentTime && song.start) a.currentTime = song.start;
         a.muted = songsMuted;
-        a.play().then(() => setBlocked(false)).catch(() => setBlocked(true));
+        a.play().catch(() => {}); // if the phone refuses to start it by itself, the volume button starts it
       },
       pause: () => audio.current?.pause(),
     };
@@ -176,23 +175,21 @@ const PostSong = ({ song, id }) => {
     };
   }, [id, song.url, song.start]);
 
-  const tap = () => {
-    const a = audio.current;
-    if (blocked || !a || a.paused) {
-      // it was not playing (blocked by the phone, or paused): start it with sound
-      setSongsMuted(false);
+  // Tapping only turns the volume on / off for all post songs (like Instagram). If the phone had blocked the
+  // automatic start, turning the sound on also starts it.
+  const tap = (e) => {
+    e.stopPropagation();
+    const next = !songsMuted;
+    setSongsMuted(next);
+    if (!next && (!audio.current || audio.current.paused)) {
       songs.get(id)?.play();
       activeSong = id;
-      return;
     }
-    setSongsMuted(!songsMuted);
   };
+  const off = muted || !playing;
   return (
-    <button ref={btn} onClick={tap} className="mt-2 inline-flex items-center gap-2 max-w-full pl-3 pr-3.5 h-9 rounded-full bg-white/10 active:bg-white/20 text-[13.5px]" aria-label={playing && !muted ? "Mute song" : "Play song"}>
-      {playing ? (muted ? <VolumeX size={15} className="shrink-0" /> : <span className="eq shrink-0" aria-hidden="true"><i /><i /><i /></span>) : <Play size={14} className="shrink-0" />}
-      <Music size={13} className="text-[#25D366] shrink-0" />
-      <span className="truncate">{song.name}</span>
-      {blocked && <span className="text-[11.5px] text-[#25D366] shrink-0">Tap to play</span>}
+    <button ref={btn} onClick={tap} className="absolute z-10 right-3 bottom-3 size-9 rounded-full bg-black/60 backdrop-blur-sm text-white flex items-center justify-center active:scale-90 transition-transform" aria-label={off ? "Sound on" : "Sound off"}>
+      {off ? <VolumeX size={18} /> : <Volume2 size={18} />}
     </button>
   );
 };
@@ -348,13 +345,17 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
             <article key={p._id} className="mb-5 pb-4 border-b border-white/[0.06]" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
-                <span className="flex-1 text-[14px] font-semibold truncate">{p.user?.fullName}</span>
+                <span className="flex-1 min-w-0 flex flex-col leading-tight">
+                  <span className="text-[14px] font-semibold truncate">{p.user?.fullName}</span>
+                  {p.song?.url && <span className="flex items-center gap-1 text-[12px] text-white/70 truncate"><Music size={11} className="text-[#25D366] shrink-0" /><span className="truncate">{p.song.name}</span></span>}
+                </span>
                 <span className="text-[12px] text-white/50">{ago(p.createdAt)}</span>
                 {p.mine && <button onClick={() => setEditing(p)} className="text-white/60" aria-label="Edit post"><Pencil size={17} /></button>}
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
                 <PostImages images={p.images?.length ? p.images : [p.image]} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, src: list[k] }); }} />
+                {p.song?.url && <PostSong id={p._id} song={p.song} />}
                 {pop === p._id && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <Heart size={96} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />
@@ -376,7 +377,6 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
                   <button onClick={() => save(p)} className="ml-auto active:scale-90 transition-transform" aria-label={p.saved ? "Remove from saved" : "Save"}><Bookmark size={25} strokeWidth={1.8} fill={p.saved ? "currentColor" : "none"} /></button>
                 </div>
                 {p.caption && <p className="mt-1 text-[14px] break-words"><b className="mr-1.5">{p.user?.fullName}</b>{p.caption}</p>}
-                {p.song?.url && <PostSong id={p._id} song={p.song} />}
                 {p.lines && <p className="mt-2 text-[14px] italic text-white/80 whitespace-pre-line break-words border-l-2 border-[#25D366]/70 pl-2.5">{p.lines}</p>}
               </div>
             </article>
