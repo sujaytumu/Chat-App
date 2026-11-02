@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight, ImagePlus, Camera, Plus, Music, Loader2, SlidersHorizontal, Crop, Palette, Type } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ImagePlus, Camera, Plus, Music, Loader2, SlidersHorizontal, Crop, Palette, Type, Eye } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { readFileAsBase64 } from "../lib/fileUtils";
 import StatusMusicSheet from "./StatusMusicSheet";
+import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 
 // New post, in three calm steps (like Instagram):  1 pick photos  ->  2 edit (audio, filter, edit, ratio)  ->  3 details + Share.
 // Performance: every photo is shrunk ONCE from the file (full copy for upload, tiny copy for the grid), the
@@ -159,6 +160,11 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const [lines, setLines] = useState("");
   const [song, setSong] = useState(null);
   const [showMusic, setShowMusic] = useState(false);
+  const [audience, setAudience] = useState(null); // null = my default for posts
+  const [showAudience, setShowAudience] = useState(false);
+  useEffect(() => {
+    axiosInstance.get("/privacy").then((r) => setAudience((cur) => cur || r.data.posts)).catch(() => {});
+  }, []);
   const [prep, setPrep] = useState(null);
   const [stage, setStage] = useState(null); // text while sharing
   const gallery = useRef(null);
@@ -243,7 +249,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
         await nextFrame();
       }
       setStage(`Uploading ${out.length} photo${out.length === 1 ? "" : "s"} - keep this screen open`);
-      const { data } = await axiosInstance.post("/posts", { images: out, caption, lines, ...(song ? { song: { data: song.data, name: song.name } } : {}) }, { timeout: 180000 });
+      const { data } = await axiosInstance.post("/posts", { images: out, caption, lines, ...(song ? { song: { data: song.data, name: song.name } } : {}), ...(audience ? { audience } : {}) }, { timeout: 180000 });
       onPosted(data);
     } catch (e) {
       toast.error(e.response?.data?.error || "Couldn't post - check your connection and try again");
@@ -421,6 +427,12 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
               {song && <X size={18} className="text-wa-muted" onClick={(e) => { e.stopPropagation(); setSong(null); }} />}
               <ChevronRight size={22} className="text-wa-muted" />
             </button>
+            <button onClick={() => setShowAudience(true)} className="mt-1 w-full flex items-center gap-4 h-14 text-left active:opacity-70">
+              <Eye size={26} />
+              <span className="flex-1 text-[18px]">Who can see this</span>
+              <span className="text-[14px] text-wa-muted">{audienceLabel(audience || { mode: "all", users: [] })}</span>
+              <ChevronRight size={22} className="text-wa-muted" />
+            </button>
             <textarea value={lines} onChange={(e) => setLines(e.target.value)} maxLength={300} rows={3} placeholder="Lines to show with the song (lyrics, a quote…)" className="mt-2 w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] placeholder:text-wa-muted outline-none resize-none" />
             {busy && <div className="mt-4 flex items-center gap-2 text-[13.5px] text-wa-muted"><Loader2 size={15} className="animate-spin" /> {stage}</div>}
           </div>
@@ -446,6 +458,11 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
           setShowMusic(false);
         }}
       />
+      {showAudience && (
+        <div className="fixed inset-0 z-[95]">
+          <StatusAudienceSheet noun="post" value={audience || { mode: "all", users: [] }} onClose={() => setShowAudience(false)} onSave={(a) => { setAudience(a); setShowAudience(false); }} />
+        </div>
+      )}
       {showMusic && (
         <StatusMusicSheet
           onClose={() => setShowMusic(false)}

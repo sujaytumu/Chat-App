@@ -66,6 +66,7 @@ const ChatsSettingsPage = more("ChatsSettingsPage");
 const StoragePage = more("StoragePage");
 const AccessibilityPage = more("AccessibilityPage");
 const HelpPage = more("HelpPage");
+const ContentPrivacyPage = lazy(() => import("./pages/ContentPrivacyPage"));
 const ProfilePage = lazy(loaders.ProfilePage);
 const CallsPage = lazy(loaders.CallsPage);
 const CallJoinPage = lazy(() => import("./pages/CallJoinPage"));
@@ -336,6 +337,10 @@ const App = () => {
           <Route
             path="/settings/accessibility"
             element={authUser ? <MainLayout><AccessibilityPage /></MainLayout> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/settings/content-privacy"
+            element={authUser ? <MainLayout><ContentPrivacyPage /></MainLayout> : <Navigate to="/login" />}
           />
           <Route
             path="/settings/help"

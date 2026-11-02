@@ -7,6 +7,7 @@ import { sendPushToUser } from "../lib/webPush.js";
 import { logActivity } from "../lib/activity.js";
 
 const PAGE = 16;
+import { audienceAllows, audienceFilter, cleanAudience, defaultAudienceFor } from "../lib/audience.js";
 const MAX_IMG = 13 * 1024 * 1024;
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 
@@ -24,6 +25,7 @@ const shape = (p, me, comments = 0) => ({
   liked: (p.likes || []).some((l) => String(l) === String(me)),
   mine: String(p.userId?._id) === String(me),
   saved: (p.saves || []).some((l) => String(l) === String(me)),
+  ...(String(p.userId?._id) === String(me) ? { audience: { mode: p.audience?.mode || "all", users: (p.audience?.users || []).map(String) } } : {}),
 });
 
 // Newest first, 16 at a time. `before` = createdAt of the last post received.
@@ -32,7 +34,7 @@ export const getFeed = async (req, res) => {
     res.set("Cache-Control", "no-store");
     const me = req.user;
     const ids = await visibleUserIds(me);
-    const q = {};
+    const q = { $and: [audienceFilter(me._id)] };
     if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
     const before = req.query.before ? new Date(req.query.before) : null;
     if (before && !isNaN(before)) q.createdAt = { $lt: before };
@@ -64,6 +66,8 @@ export const createPost = async (req, res) => {
       const got = await Promise.all(part.map((s) => cloudinary.uploader.upload(s, { folder: "chat-app/posts", resource_type: "image" })));
       got.forEach((r, k) => { urls[i + k] = r.secure_url; });
     }
+    // who can see it: what the person picked for this post, else their default for posts
+    const postAudience = cleanAudience(req.body?.audience, req.user._id) || (await defaultAudienceFor(req.user._id, "posts"));
     // optional song (picked in the composer) - kept with the post
     let cleanSong = null;
     if (song?.data && typeof song.data === "string" && song.data.startsWith("data:audio/")) {
@@ -78,6 +82,7 @@ export const createPost = async (req, res) => {
       images: urls,
       caption: String(caption || "").trim().slice(0, 500),
       lines: String(lines || "").trim().slice(0, 300),
+      ...(postAudience ? { audience: postAudience } : {}),
       ...(cleanSong ? { song: cleanSong } : {}),
     });
     await post.populate("userId", "fullName profilePic");
@@ -94,7 +99,7 @@ export const getSaved = async (req, res) => {
     res.set("Cache-Control", "no-store");
     const me = req.user;
     const ids = await visibleUserIds(me);
-    const q = { saves: me._id };
+    const q = { saves: me._id, $and: [audienceFilter(me._id)] };
     if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
     const blocked = new Set((me.blockedUsers || []).map(String));
     const rows = await Post.find(q).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
@@ -123,8 +128,8 @@ export const getLikers = async (req, res) => {
 export const savePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    const post = await Post.findById(req.params.id).select("userId");
-    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId)))) return res.status(404).json({ error: "Not found" });
+    const post = await Post.findById(req.params.id).select("userId audience");
+    if (!post || (!post.userId.equals(req.user._id) && (!audienceAllows(post.audience, req.user._id) || !(await canSee(req.user, post.userId))))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.saved !== false;
     await Post.updateOne({ _id: post._id }, want ? { $addToSet: { saves: req.user._id } } : { $pull: { saves: req.user._id } });
     res.json({ saved: want });
@@ -136,8 +141,8 @@ export const savePost = async (req, res) => {
 export const likePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    const post = await Post.findById(req.params.id).select("userId likes image");
-    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId)))) return res.status(404).json({ error: "Not found" });
+    const post = await Post.findById(req.params.id).select("userId likes image audience");
+    if (!post || (!post.userId.equals(req.user._id) && (!audienceAllows(post.audience, req.user._id) || !(await canSee(req.user, post.userId))))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.liked !== false;
     if (want) {
       const r = await Post.updateOne({ _id: post._id, likes: { $ne: req.user._id } }, { $push: { likes: req.user._id } });

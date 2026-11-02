@@ -11,6 +11,7 @@ const postSchema = new mongoose.Schema(
     song: { url: String, name: String, start: { type: Number, default: 0 } },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     saves: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // people who bookmarked it
+    audience: { mode: { type: String, enum: ["all", "except", "only"], default: "all" }, users: [{ type: mongoose.Schema.Types.ObjectId }] }, // who can see this post (on top of the owner's access rules)
   },
   { timestamps: true }
 );

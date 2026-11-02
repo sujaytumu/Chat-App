@@ -71,6 +71,14 @@ const userSchema = new mongoose.Schema(
       typing: { type: Boolean, default: true },
       online: { type: Boolean, default: true },
     },
+    // Default "who can see" for what I share: each kind is everyone / everyone except… / only…
+    contentPrivacy: {
+      type: new mongoose.Schema(
+        Object.fromEntries(["status", "highlights", "reels", "posts"].map((k) => [k, { type: new mongoose.Schema({ mode: { type: String, enum: ["all", "except", "only"], default: "all" }, users: { type: [mongoose.Schema.Types.ObjectId], default: [] } }, { _id: false }), default: undefined }])),
+        { _id: false }
+      ),
+      default: undefined,
+    },
     // People I have blocked (they can't message or call me; I can't message them).
     blockedUsers: { type: [mongoose.Schema.Types.ObjectId], default: [] },
     // Signed-in devices ("Linked devices"): one entry per login, matched by the sid inside the login cookie

@@ -122,8 +122,8 @@ const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
   return (
     <div className="absolute inset-0 z-[70] flex flex-col justify-end bg-black/60" onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()} className="rounded-t-[22px] bg-[#1D1F1F] text-white pb-[calc(12px+env(safe-area-inset-bottom))]">
-        <p className="px-5 pt-5 pb-1 text-[18px]">{noun === "status" ? "Status privacy" : "Highlight privacy"}</p>
-        <p className="px-5 pb-2 text-[12.5px] text-[#8E9AA2]">{noun === "status" ? "Who can see my status updates" : "Who can see this highlight"}</p>
+        <p className="px-5 pt-5 pb-1 text-[18px]">{noun.charAt(0).toUpperCase() + noun.slice(1)} privacy</p>
+        <p className="px-5 pb-2 text-[12.5px] text-[#8E9AA2]">{noun === "status" ? "Who can see my status updates" : `Who can see ${noun === "highlight" ? "this highlight" : noun === "reel" ? "my reels" : noun === "post" ? "my posts" : `this ${noun}`}`}</p>
         {rows.map(([m, label]) => (
           <button key={m} onClick={() => choose(m)} className="w-full flex items-center gap-4 px-5 py-3.5 text-left active:bg-white/5">
             <Radio on={m === "close" ? !!value.close : m === "only" ? value.mode === "only" && !value.close : value.mode === m} />

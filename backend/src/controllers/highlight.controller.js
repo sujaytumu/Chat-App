@@ -1,4 +1,5 @@
 import { visibleUserIds } from "../lib/visibility.js";
+import { defaultAudienceFor } from "../lib/audience.js";
 import mongoose from "mongoose";
 import Highlight from "../models/highlight.model.js";
 import Status from "../models/status.model.js";
@@ -135,7 +136,7 @@ export const createHighlight = async (req, res) => {
     }
     const found = await Status.find({ _id: { $in: statusIds }, userId: myId }).sort({ createdAt: 1 });
     if (!found.length) return res.status(404).json({ error: "Those statuses are no longer available" });
-    const audience = cleanAudience(req.body?.audience, myId);
+    const audience = cleanAudience(req.body?.audience, myId) || (await defaultAudienceFor(myId, "highlights"));
     const h = await Highlight.create({ userId: myId, title, items: found.map(toItem), ...(audience ? { audience } : {}) });
     res.status(201).json(present(h, myId));
   } catch (error) {
