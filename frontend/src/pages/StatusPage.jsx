@@ -154,13 +154,13 @@ const StatusPage = () => {
         ) : (
           <>
             {/* Status: portrait cards you swipe sideways, like WhatsApp - my status first, then everyone else's (new ones first) */}
-            <h2 className="px-5 pt-1 pb-3 text-[26px] font-normal text-wa-text">Status</h2>
-            <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-4 pb-5">
+            <h2 className="px-[4.4vw] pt-1 pb-3 text-[22px] font-normal text-wa-text" style={{ paddingLeft: "clamp(14px, 4.4vw, 20px)" }}>Status</h2>
+            <div className="flex overflow-x-auto no-scrollbar pb-5" style={{ gap: "clamp(6px, 1.67vw, 10px)", paddingLeft: "clamp(14px, 4.4vw, 20px)", paddingRight: "clamp(14px, 4.4vw, 20px)" }}>
               <StatusCard
                 user={authUser}
                 status={feed.myStatuses[feed.myStatuses.length - 1]}
                 name="My status"
-                ring={feed.myStatuses.length > 0 ? "new" : "none"}
+                ring={feed.myStatuses.length > 0 ? "seen" : "none"}
                 plus
                 onPlus={() => setShowCreate("image")}
                 onClick={() => (feed.myStatuses.length > 0 ? setMyScreen(true) : setShowCreate("image"))}
