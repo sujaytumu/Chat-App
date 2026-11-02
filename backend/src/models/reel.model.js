@@ -13,6 +13,7 @@ const reelSchema = new mongoose.Schema(
     filter: { type: String, default: "none" },
     trim: { start: { type: Number, default: 0 }, end: { type: Number, default: 0 } }, // end 0 = whole video
     song: { url: String, name: String, start: { type: Number, default: 0 } },
+    audience: { mode: { type: String, enum: ["all", "except", "only"], default: "all" }, users: [{ type: mongoose.Schema.Types.ObjectId }] }, // who can see this reel
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     views: { type: Number, default: 0 },
     saves: { type: Number, default: 0 },

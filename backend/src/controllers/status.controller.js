@@ -1,4 +1,5 @@
 import { visibleUserIds } from "../lib/visibility.js";
+import { defaultAudienceFor } from "../lib/audience.js";
 import mongoose from "mongoose";
 import Status from "../models/status.model.js";
 import cloudinary from "../lib/cloudinary.js";
@@ -130,11 +131,13 @@ export const createStatus = async (req, res) => {
       };
     }
 
-    if (audience && ["except", "only"].includes(audience.mode) && Array.isArray(audience.users)) {
-      const ids = [...new Set(audience.users.map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(myId)).slice(0, 1000);
-      if (audience.mode === "only" && !ids.length) return res.status(400).json({ error: "Pick at least one person to share with" });
-      doc.audience = { mode: audience.mode, users: ids };
-      if (audience.mode === "only" && audience.close === true) doc.closeFriends = true;
+    // no audience sent = use what I set under "Who can see my content"; an explicit "all" really means everyone
+    const effAudience = audience && typeof audience === "object" ? audience : await defaultAudienceFor(myId, "status");
+    if (effAudience && ["except", "only"].includes(effAudience.mode) && Array.isArray(effAudience.users)) {
+      const ids = [...new Set(effAudience.users.map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(myId)).slice(0, 1000);
+      if (effAudience.mode === "only" && !ids.length) return res.status(400).json({ error: "Pick at least one person to share with" });
+      doc.audience = { mode: effAudience.mode, users: ids };
+      if (effAudience.mode === "only" && effAudience.close === true) doc.closeFriends = true;
     }
 
     const status = await Status.create(doc);

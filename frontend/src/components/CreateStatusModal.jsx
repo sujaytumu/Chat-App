@@ -6,7 +6,7 @@ import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 import StatusMusicSheet from "./StatusMusicSheet";
 import StatusSongEditor from "./StatusSongEditor";
-import StatusAudienceSheet, { readAudience, audienceLabel, AUDIENCE_KEY } from "./StatusAudienceSheet";
+import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import StatusVideoPreview, { MAX_STATUS_VIDEO_SECONDS } from "./StatusVideoPreview";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -196,7 +196,10 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [showPlaces, setShowPlaces] = useState(false);
   const [showMusic, setShowMusic] = useState(false);
   const [editSong, setEditSong] = useState(false); // WhatsApp's "choose the part of the song" screen
-  const [audience, setAudience] = useState(readAudience);
+  const [audience, setAudience] = useState(null); // null = my default under "Who can see my content" (the server applies it)
+  useEffect(() => {
+    axiosInstance.get("/privacy").then((r) => setAudience((cur) => cur || r.data.status)).catch(() => {});
+  }, []);
   const [showAudience, setShowAudience] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [editorMode, setEditorMode] = useState(null); // null | draw | text | sticker (photo editor)
@@ -276,7 +279,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         ...(song ? { song: { data: song.data, name: song.name, size: song.size, mime: song.mime, start: song.start, length: song.length } } : {}),
         ...(place ? { location: place } : {}),
         ...(poll ? { poll } : {}),
-        ...(audience.mode !== "all" ? { audience } : {}),
+        ...(audience ? { audience } : {}),
       };
       await axiosInstance.post("/status", body, { timeout: 180000 });
       toast.success("Status posted");
@@ -485,7 +488,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
               <BarChart3 size={16} /> Poll
             </button>
             <button className="h-9 pl-3 pr-3.5 rounded-full bg-[#101418] text-white/90 text-[13px] flex items-center gap-1.5" onClick={() => setShowAudience(true)}>
-              <StatusRing size={18} /> Status ({audienceLabel(audience)})
+              <StatusRing size={18} /> Status ({audienceLabel(audience || { mode: "all", users: [] })})
             </button>
             <div className="flex-1" />
             <button
@@ -578,15 +581,10 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
 
       {showAudience && (
         <StatusAudienceSheet
-          value={audience}
+          value={audience || { mode: "all", users: [] }}
           onClose={() => setShowAudience(false)}
           onSave={(a) => {
             setAudience(a);
-            try {
-              localStorage.setItem(AUDIENCE_KEY, JSON.stringify(a));
-            } catch {
-              /* private mode */
-            }
             setShowAudience(false);
           }}
         />

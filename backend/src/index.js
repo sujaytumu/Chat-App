@@ -22,6 +22,7 @@ import statusCommentRoutes from "./routes/statusComment.route.js";
 import activityRoutes from "./routes/activity.route.js";
 import reelRoutes from "./routes/reel.route.js";
 import postRoutes from "./routes/post.route.js";
+import privacyRoutes from "./routes/privacy.route.js";
 import scheduledRoutes from "./routes/scheduled.route.js";
 import broadcastRoutes from "./routes/broadcast.route.js";
 import mediaRoutes from "./routes/media.route.js";
@@ -119,6 +120,7 @@ app.use("/api/status-comments", statusCommentRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/reels", reelRoutes);
 app.use("/api/posts", postRoutes);
+app.use("/api/privacy", privacyRoutes);
 app.use("/api/scheduled", scheduledRoutes);
 app.use("/api/broadcasts", broadcastRoutes);
 
