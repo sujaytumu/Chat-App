@@ -44,14 +44,14 @@ const PostImages = ({ images, onOpen, onDouble }) => {
 };
 
 // Edit your own post: caption, lines, song (add later / change / remove) and who can see it
-const EditPostSheet = ({ post, onClose, onSaved }) => {
+const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
   const [caption, setCaption] = useState(post.caption || "");
   const [lines, setLines] = useState(post.lines || "");
   const [song, setSong] = useState(post.song || null); // existing { url, name } or a new { data, name }
   const [songChanged, setSongChanged] = useState(false);
   const [audience, setAudience] = useState(post.audience || { mode: "all", users: [] });
   const [audChanged, setAudChanged] = useState(false);
-  const [showMusic, setShowMusic] = useState(false);
+  const [showMusic, setShowMusic] = useState(autoSong);
   const [showAud, setShowAud] = useState(false);
   const [busy, setBusy] = useState(false);
   const songInput = useRef(null);
@@ -447,12 +447,15 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
                   <span className="text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                   {p.song?.url && <span className="flex items-center gap-1 text-[12px] text-white/70 truncate"><Music size={11} className="text-[#25D366] shrink-0" /><span className="truncate">{p.song.name}</span></span>}
                 </span>
-                {p.mine && <button onClick={() => setEditing(p)} className="text-white/60" aria-label="Edit post"><Pencil size={17} /></button>}
-                {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
+                {p.mine && <button onClick={() => setEditing({ post: p })} className="h-8 pl-2.5 pr-3 rounded-full bg-white/12 active:bg-white/20 text-[13px] font-medium flex items-center gap-1.5" style={{ background: "rgba(255,255,255,.12)" }} aria-label="Edit post"><Pencil size={14} /> Edit</button>}
+                {p.mine && <button onClick={() => remove(p)} className="size-8 flex items-center justify-center text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
                 <PostImages images={p.images?.length ? p.images : [p.image]} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k }); }} />
                 {p.song?.url && <PostSong id={p._id} song={p.song} />}
+                {p.mine && !p.song?.url && (
+                  <button onClick={() => setEditing({ post: p, autoSong: true })} className="absolute z-10 left-3 bottom-3 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-white text-[12.5px] flex items-center gap-1.5 active:scale-95"><Music size={14} className="text-[#25D366]" /> Add song</button>
+                )}
                 {pop === p._id && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <Heart size={96} className="text-white drop-shadow-lg" fill="#ff3040" strokeWidth={0} style={{ animation: "reelHeart .8s ease-out forwards" }} />
@@ -485,7 +488,7 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
         </>
       )}
       {likersFor && <LikersSheet post={likersFor} onClose={() => setLikersFor(null)} />}
-      {editing && <EditPostSheet post={editing} onClose={() => setEditing(null)} onSaved={(d) => { setPosts((l) => l.map((x) => (x._id === editing._id ? { ...x, ...d } : x))); setEditing(null); toast.success("Saved"); }} />}
+      {editing && <EditPostSheet post={editing.post} autoSong={!!editing.autoSong} onClose={() => setEditing(null)} onSaved={(d) => { setPosts((l) => l.map((x) => (x._id === editing.post._id ? { ...x, ...d } : x))); setEditing(null); toast.success("Saved"); }} />}
       {viewer && <PhotoViewer images={viewer.images} index={viewer.index} onClose={() => setViewer(null)} />}
       {commentsFor && (
         <StatusComments
