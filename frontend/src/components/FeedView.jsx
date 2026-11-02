@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Image as ImageIcon, Music, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Eye, ChevronRight, Image as ImageIcon, Music, Volume2, VolumeX } from "lucide-react";
 import StatusComments from "./StatusComments";
-import ImageLightbox from "./ImageLightbox";
+import PhotoViewer from "./PhotoViewer";
+import StatusMusicSheet from "./StatusMusicSheet";
+import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
+import { readFileAsBase64 } from "../lib/fileUtils";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -40,15 +43,29 @@ const PostImages = ({ images, onOpen, onDouble }) => {
   );
 };
 
-// Edit the caption and lines of your own post
+// Edit your own post: caption, lines, song (add later / change / remove) and who can see it
 const EditPostSheet = ({ post, onClose, onSaved }) => {
   const [caption, setCaption] = useState(post.caption || "");
   const [lines, setLines] = useState(post.lines || "");
+  const [song, setSong] = useState(post.song || null); // existing { url, name } or a new { data, name }
+  const [songChanged, setSongChanged] = useState(false);
+  const [audience, setAudience] = useState(post.audience || { mode: "all", users: [] });
+  const [audChanged, setAudChanged] = useState(false);
+  const [showMusic, setShowMusic] = useState(false);
+  const [showAud, setShowAud] = useState(false);
   const [busy, setBusy] = useState(false);
+  const songInput = useRef(null);
+
   const save = async () => {
     setBusy(true);
     try {
-      const { data } = await axiosInstance.put(`/posts/${post._id}`, { caption, lines });
+      const body = { caption, lines };
+      if (songChanged) {
+        if (!song) body.removeSong = true;
+        else if (song.data) body.song = { data: song.data, name: song.name };
+      }
+      if (audChanged) body.audience = audience;
+      const { data } = await axiosInstance.put(`/posts/${post._id}`, body, { timeout: 90000 });
       onSaved(data);
     } catch (e) {
       toast.error(e.response?.data?.error || "Couldn't save");
@@ -56,16 +73,73 @@ const EditPostSheet = ({ post, onClose, onSaved }) => {
     }
   };
   return (
-    <div className="fixed inset-0 z-[90] flex items-end bg-black/60" onClick={onClose}>
-      <div className="w-full rounded-t-3xl bg-wa-pop text-wa-text px-5 pt-4 pb-[calc(16px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between pb-3">
+    <div className="fixed inset-0 z-[90] flex items-end bg-black/60" onClick={busy ? undefined : onClose}>
+      <div className="w-full max-h-[92vh] flex flex-col rounded-t-3xl bg-wa-pop text-wa-text" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 shrink-0">
           <h3 className="text-[18px] font-semibold">Edit post</h3>
-          <button onClick={onClose} aria-label="Close" className="size-9 flex items-center justify-center"><X size={22} /></button>
+          <button onClick={onClose} disabled={busy} aria-label="Close" className="size-9 flex items-center justify-center"><X size={22} /></button>
         </div>
-        <textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} rows={3} placeholder="Caption" className="w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
-        <textarea value={lines} onChange={(e) => setLines(e.target.value)} maxLength={300} rows={3} placeholder="Lines (lyrics, a quote…)" className="mt-2 w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
-        <button onClick={save} disabled={busy} className="mt-4 w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98]">{busy ? "Saving…" : "Save"}</button>
+        <div className="overflow-y-auto overscroll-contain px-5 pb-3">
+          <label className="text-[12.5px] text-wa-muted">Caption</label>
+          <textarea value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={500} rows={3} placeholder="Write a caption…" className="mt-1 w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
+
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Song</label>
+          {song ? (
+            <div className="mt-1 flex items-center gap-2.5 rounded-2xl bg-wa-field pl-4 pr-1.5 h-12">
+              <Music size={18} className="text-[#25D366] shrink-0" />
+              <span className="flex-1 truncate text-[14.5px]">{song.name}</span>
+              <button onClick={() => setShowMusic(true)} className="px-2.5 h-9 text-[13px] text-[#25D366] font-medium">Change</button>
+              <button onClick={() => { setSong(null); setSongChanged(true); }} aria-label="Remove song" className="size-9 flex items-center justify-center text-wa-muted"><X size={18} /></button>
+            </div>
+          ) : (
+            <button onClick={() => setShowMusic(true)} className="mt-1 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-2.5 px-4 text-[15px] active:opacity-80"><Music size={18} className="text-[#25D366]" /> Add a song</button>
+          )}
+
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Lines</label>
+          <textarea value={lines} onChange={(e) => setLines(e.target.value)} maxLength={300} rows={3} placeholder="Lyrics, a quote…" className="mt-1 w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
+
+          <button onClick={() => setShowAud(true)} className="mt-3 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-3 px-4 text-left active:opacity-80">
+            <Eye size={19} className="text-wa-icon" />
+            <span className="flex-1 text-[15px]">Who can see this</span>
+            <span className="text-[13.5px] text-wa-muted">{audienceLabel(audience)}</span>
+            <ChevronRight size={18} className="text-wa-muted" />
+          </button>
+        </div>
+        <div className="px-5 pt-2 pb-[calc(16px+env(safe-area-inset-bottom))] shrink-0">
+          <button onClick={save} disabled={busy} className="w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98] flex items-center justify-center gap-2">{busy ? <><Loader2 size={18} className="animate-spin" /> Saving…</> : "Save"}</button>
+        </div>
       </div>
+
+      <input
+        ref={songInput}
+        type="file"
+        accept="audio/*"
+        className="hidden"
+        onClick={(e) => e.stopPropagation()}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (!file) return;
+          if (file.size > 4 * 1024 * 1024) return toast.error("Pick a song under 4 MB");
+          setSong({ data: await readFileAsBase64(file), name: file.name.replace(/\.[^.]+$/, "") });
+          setSongChanged(true);
+          setShowMusic(false);
+        }}
+      />
+      {showMusic && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <StatusMusicSheet
+            onClose={() => setShowMusic(false)}
+            onPick={(sg) => { setSong(sg); setSongChanged(true); setShowMusic(false); }}
+            onFiles={() => songInput.current?.click()}
+          />
+        </div>
+      )}
+      {showAud && (
+        <div className="fixed inset-0 z-[95]" onClick={(e) => e.stopPropagation()}>
+          <StatusAudienceSheet noun="post" value={audience} onClose={() => setShowAud(false)} onSave={(a) => { setAudience(a); setAudChanged(true); setShowAud(false); }} />
+        </div>
+      )}
     </div>
   );
 };
@@ -377,7 +451,7 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
-                <PostImages images={p.images?.length ? p.images : [p.image]} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, src: list[k] }); }} />
+                <PostImages images={p.images?.length ? p.images : [p.image]} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k }); }} />
                 {p.song?.url && <PostSong id={p._id} song={p.song} />}
                 {pop === p._id && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -412,7 +486,7 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
       )}
       {likersFor && <LikersSheet post={likersFor} onClose={() => setLikersFor(null)} />}
       {editing && <EditPostSheet post={editing} onClose={() => setEditing(null)} onSaved={(d) => { setPosts((l) => l.map((x) => (x._id === editing._id ? { ...x, ...d } : x))); setEditing(null); toast.success("Saved"); }} />}
-      {viewer && <ImageLightbox src={viewer.src} gallery={viewer.images} onClose={() => setViewer(null)} />}
+      {viewer && <PhotoViewer images={viewer.images} index={viewer.index} onClose={() => setViewer(null)} />}
       {commentsFor && (
         <StatusComments
           targetId={commentsFor._id}

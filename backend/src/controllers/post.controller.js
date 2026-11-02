@@ -158,17 +158,45 @@ export const likePost = async (req, res) => {
   }
 };
 
-// The owner can fix the caption and the lines after posting
+// The owner can change everything about a post after posting: caption, lines, song (add / change / remove) and who can see it
+const songFilePath = (url) => (url || "").match(/\/upload\/(?:v\d+\/)?(chat-app\/post-music\/[^.]+)/)?.[1];
 export const updatePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const post = await Post.findOne({ _id: req.params.id, userId: req.user._id });
     if (!post) return res.status(404).json({ error: "Not found" });
-    if (typeof req.body?.caption === "string") post.caption = req.body.caption.trim().slice(0, 500);
-    if (typeof req.body?.lines === "string") post.lines = req.body.lines.trim().slice(0, 300);
+    const { caption, lines, song, removeSong, audience } = req.body || {};
+    if (typeof caption === "string") post.caption = caption.trim().slice(0, 500);
+    if (typeof lines === "string") post.lines = lines.trim().slice(0, 300);
+    if (audience) {
+      if (audience.mode === "only" && !(Array.isArray(audience.users) && audience.users.length)) return res.status(400).json({ error: "Pick at least one person" });
+      const a = cleanAudience(audience, req.user._id);
+      if (!a) return res.status(400).json({ error: "Bad audience" });
+      post.audience = a;
+    }
+    const oldSong = post.song?.url;
+    if (song?.data && typeof song.data === "string" && song.data.startsWith("data:audio/")) {
+      if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
+      const up = await cloudinary.uploader.upload(song.data, { folder: "chat-app/post-music", resource_type: "video" });
+      const st = Number(song.start);
+      post.song = { url: up.secure_url, name: String(song.name || "Song").slice(0, 80), start: Number.isFinite(st) ? Math.min(Math.max(st, 0), 3600) : 0 };
+    } else if (removeSong === true) {
+      post.song = undefined;
+    }
     await post.save();
-    res.json({ caption: post.caption, lines: post.lines || "" });
+    // the replaced / removed song file is no longer needed
+    if (oldSong && oldSong !== post.song?.url) {
+      const pid = songFilePath(oldSong);
+      if (pid) cloudinary.uploader.destroy(pid, { resource_type: "video" }).catch(() => {});
+    }
+    res.json({
+      caption: post.caption,
+      lines: post.lines || "",
+      song: post.song?.url ? { url: post.song.url, name: post.song.name, start: post.song.start || 0 } : null,
+      audience: { mode: post.audience?.mode || "all", users: (post.audience?.users || []).map(String) },
+    });
   } catch (e) {
+    console.log("updatePost:", e.message);
     res.status(500).json({ error: "Couldn't save" });
   }
 };
