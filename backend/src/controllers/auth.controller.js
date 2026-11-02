@@ -71,14 +71,22 @@ export const login = async (req, res) => {
     if (typeof email !== "string" || typeof password !== "string") {
       return res.status(400).json({ message: "Invalid credentials" });
     }
-    const user = await User.findOne({ email });
+    // Phone keyboards often add a trailing space or a capital letter to the email - that must not lock anyone out.
+    const emailIn = email.trim();
+    const mask = (e) => `${e.slice(0, 3)}***@${e.split("@")[1] || "?"}`; // safe to show in logs
+    let user = await User.findOne({ email: emailIn });
+    if (!user && emailIn) user = await User.findOne({ email: { $regex: `^${emailIn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } });
 
     if (!user) {
+      console.log(`login failed: no account for ${mask(emailIn)}`);
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    let isPasswordCorrect = await bcrypt.compare(password, user.password);
+    // a keyboard suggestion can also leave a space after the password
+    if (!isPasswordCorrect && password !== password.trim()) isPasswordCorrect = await bcrypt.compare(password.trim(), user.password);
     if (!isPasswordCorrect) {
+      console.log(`login failed: wrong password for ${mask(user.email)} (typed ${password.length} characters)`);
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
