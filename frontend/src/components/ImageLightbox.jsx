@@ -13,6 +13,7 @@ const ImageLightbox = ({ src, gallery, onClose }) => {
   const [zoom, setZoom] = useState(false);
   const [dx, setDx] = useState(0);
   const touch = useRef(null);
+  const dxRef = useRef(0); // the live drag distance (state can lag behind a fast flick)
   const lastTap = useRef(0);
 
   useEffect(() => {
@@ -43,7 +44,8 @@ const ImageLightbox = ({ src, gallery, onClose }) => {
 
   const onTouchStart = (e) => {
     if (e.touches.length !== 1) return (touch.current = null);
-    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false };
+    touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false, at: Date.now() };
+    dxRef.current = 0;
   };
   const onTouchMove = (e) => {
     const t = touch.current;
@@ -53,6 +55,7 @@ const ImageLightbox = ({ src, gallery, onClose }) => {
       t.moved = true;
       // a little resistance at the first / last picture
       const edge = (d > 0 && i === 0) || (d < 0 && i === list.length - 1);
+      dxRef.current = d;
       setDx(edge ? d * 0.25 : d);
     }
   };
@@ -60,8 +63,13 @@ const ImageLightbox = ({ src, gallery, onClose }) => {
     const t = touch.current;
     touch.current = null;
     if (t?.moved) {
-      if (dx < -70) go(i + 1);
-      else if (dx > 70) go(i - 1);
+      // a long drag, or a short quick flick, moves exactly one picture
+      const d = dxRef.current;
+      const quick = Date.now() - t.at < 280;
+      const need = quick ? 30 : 70;
+      if (d < -need) go(i + 1);
+      else if (d > need) go(i - 1);
+      dxRef.current = 0;
       setDx(0);
     } else {
       const now = Date.now();

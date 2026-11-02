@@ -27,9 +27,9 @@ const PostImages = ({ images, onOpen, onDouble }) => {
   if (images.length < 2) return <img src={optimizeImage(images[0], 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(0)} className="w-full h-auto max-h-[80vh] object-contain bg-black/40" />;
   return (
     <div className="relative">
-      <div className="flex items-center bg-black/40 overflow-x-auto snap-x snap-mandatory no-scrollbar" onScroll={(e) => setI(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}>
+      <div className="flex items-center bg-black/40 overflow-x-auto snap-x snap-mandatory no-scrollbar overscroll-x-contain" style={{ scrollSnapStop: "always", WebkitOverflowScrolling: "touch" }} onScroll={(e) => { const n = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); setI((cur) => (cur === n ? cur : n)); }}>
         {images.map((src, k) => (
-          <img key={k} src={optimizeImage(src, 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(k)} className="w-full h-auto shrink-0 snap-center self-center max-h-[80vh] object-contain bg-black/40" />
+          <img key={k} src={optimizeImage(src, 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(k)} className="w-full h-auto shrink-0 snap-center snap-always self-center max-h-[80vh] object-contain bg-black/40" />
         ))}
       </div>
       <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white pointer-events-none">{i + 1}/{images.length}</span>
@@ -216,6 +216,30 @@ const ago = (d) => {
   return `${Math.floor(s / 86400)}d`;
 };
 
+// "2 hours ago", like Instagram (the short form above stays for the compact places)
+const agoLong = (d) => {
+  const s = Math.max(1, Math.floor((Date.now() - new Date(d)) / 1000));
+  if (s < 60) return "Just now";
+  const unit = (n, w) => `${n} ${w}${n === 1 ? "" : "s"} ago`;
+  if (s < 3600) return unit(Math.floor(s / 60), "minute");
+  if (s < 86400) return unit(Math.floor(s / 3600), "hour");
+  if (s < 7 * 86400) return unit(Math.floor(s / 86400), "day");
+  return new Date(d).toLocaleDateString([], { day: "numeric", month: "long", year: new Date(d).getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
+};
+
+// The caption: the name in bold, two lines at most, then "… more" to read the rest.
+const Caption = ({ name, text }) => {
+  const [open, setOpen] = useState(false);
+  const long = text.length > 110 || text.split("\n").length > 2;
+  return (
+    <p className="mt-1.5 text-[14px] break-words whitespace-pre-line">
+      <b className="mr-1.5">{name}</b>
+      {open || !long ? text : text.slice(0, 100).split("\n").slice(0, 2).join("\n").trimEnd() + "… "}
+      {!open && long && <button onClick={() => setOpen(true)} className="text-white/55">more</button>}
+    </p>
+  );
+};
+
 export { default as NewPost } from "./NewPost";
 
 // The Feed: photo posts from people you can see, 16 at a time
@@ -349,7 +373,6 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
                   <span className="text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                   {p.song?.url && <span className="flex items-center gap-1 text-[12px] text-white/70 truncate"><Music size={11} className="text-[#25D366] shrink-0" /><span className="truncate">{p.song.name}</span></span>}
                 </span>
-                <span className="text-[12px] text-white/50">{ago(p.createdAt)}</span>
                 {p.mine && <button onClick={() => setEditing(p)} className="text-white/60" aria-label="Edit post"><Pencil size={17} /></button>}
                 {p.mine && <button onClick={() => remove(p)} className="text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
@@ -376,7 +399,9 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
                   <button onClick={() => share(p)} className="active:scale-90 transition-transform" aria-label="Share"><Send size={24} strokeWidth={1.8} /></button>
                   <button onClick={() => save(p)} className="ml-auto active:scale-90 transition-transform" aria-label={p.saved ? "Remove from saved" : "Save"}><Bookmark size={25} strokeWidth={1.8} fill={p.saved ? "currentColor" : "none"} /></button>
                 </div>
-                {p.caption && <p className="mt-1 text-[14px] break-words"><b className="mr-1.5">{p.user?.fullName}</b>{p.caption}</p>}
+                {p.caption && <Caption name={p.user?.fullName} text={p.caption} />}
+                {p.comments > 0 && <button onClick={() => setCommentsFor(p)} className="mt-1 text-[14px] text-white/55 active:opacity-60">View all {p.comments} comment{p.comments === 1 ? "" : "s"}</button>}
+                <p className="mt-1 text-[11.5px] text-white/45">{agoLong(p.createdAt)}</p>
                 {p.lines && <p className="mt-2 text-[14px] italic text-white/80 whitespace-pre-line break-words border-l-2 border-[#25D366]/70 pl-2.5">{p.lines}</p>}
               </div>
             </article>
