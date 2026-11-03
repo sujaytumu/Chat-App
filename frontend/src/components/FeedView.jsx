@@ -9,10 +9,16 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 
-// One photo, or a swipeable set with a 1/3 counter and dots.
+// One photo, or a swipeable set with a 1/3 counter, dots and (on laptops) arrows.
 // One tap opens the photo full screen (zoom, swipe); a quick double tap likes it.
+// Every photo of a post sits in ONE fixed frame whose shape comes from the first photo (kept between
+// 4:5 and 1.91:1, like Instagram) - so swiping to a taller or wider photo never resizes or stretches the others.
+const ratioCache = new Map(); // photo address -> frame shape, so a post doesn't jump when it scrolls back into view
+const frameShape = (w, h) => Math.min(1.91, Math.max(0.8, w / h));
 const PostImages = ({ images, onOpen, onDouble }) => {
   const [i, setI] = useState(0);
+  const [ar, setAr] = useState(() => ratioCache.get(images[0]) || 0.8);
+  const rail = useRef(null);
   const tap = useRef({ t: 0, timer: null });
   useEffect(() => () => clearTimeout(tap.current.timer), []);
   const onTap = (k) => {
@@ -27,18 +33,50 @@ const PostImages = ({ images, onOpen, onDouble }) => {
     clearTimeout(tap.current.timer);
     tap.current.timer = setTimeout(() => onOpen?.(k), 300);
   };
-  if (images.length < 2) return <img src={optimizeImage(images[0], 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(0)} className="w-full h-auto max-h-[80vh] object-contain bg-black/40" />;
+  const first = (e) => {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+    if (!w || !h) return;
+    const shape = frameShape(w, h);
+    ratioCache.set(images[0], shape);
+    setAr(shape);
+  };
+  const go = (k) => {
+    const el = rail.current;
+    if (el) el.scrollTo({ left: k * el.clientWidth, behavior: "smooth" });
+  };
+  const many = images.length > 1;
   return (
-    <div className="relative">
-      <div className="flex items-center bg-black/40 overflow-x-auto snap-x snap-mandatory no-scrollbar overscroll-x-contain" style={{ scrollSnapStop: "always", WebkitOverflowScrolling: "touch" }} onScroll={(e) => { const n = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); setI((cur) => (cur === n ? cur : n)); }}>
+    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "80vh" }}>
+      <div
+        ref={rail}
+        className="absolute inset-0 flex overflow-x-auto snap-x snap-mandatory no-scrollbar overscroll-x-contain"
+        style={{ scrollSnapStop: "always", WebkitOverflowScrolling: "touch" }}
+        onScroll={many ? (e) => { const n = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); setI((cur) => (cur === n ? cur : n)); } : undefined}
+      >
         {images.map((src, k) => (
-          <img key={k} src={optimizeImage(src, 1080)} alt="" loading="lazy" decoding="async" onClick={() => onTap(k)} className="w-full h-auto shrink-0 snap-center snap-always self-center max-h-[80vh] object-contain bg-black/40" />
+          <img
+            key={k}
+            src={optimizeImage(src, 1080)}
+            alt=""
+            loading={k === 0 ? "eager" : "lazy"}
+            decoding="async"
+            draggable={false}
+            onLoad={k === 0 ? first : undefined}
+            onClick={() => onTap(k)}
+            className="w-full h-full shrink-0 snap-center snap-always object-contain"
+          />
         ))}
       </div>
-      <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white pointer-events-none">{i + 1}/{images.length}</span>
-      <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
-        {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
-      </div>
+      {many && (
+        <>
+          <span className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-full bg-black/60 text-[12px] text-white pointer-events-none">{i + 1}/{images.length}</span>
+          {i > 0 && <button type="button" onClick={() => go(i - 1)} className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/55 items-center justify-center text-white active:scale-90" aria-label="Previous photo"><ChevronRight size={18} className="rotate-180" /></button>}
+          {i < images.length - 1 && <button type="button" onClick={() => go(i + 1)} className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/55 items-center justify-center text-white active:scale-90" aria-label="Next photo"><ChevronRight size={18} /></button>}
+          <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
+            {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
+          </div>
+        </>
+      )}
     </div>
   );
 };
