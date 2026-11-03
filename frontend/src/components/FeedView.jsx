@@ -7,6 +7,8 @@ import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { readFileAsBase64 } from "../lib/fileUtils";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
+import { useNavigate } from "react-router-dom";
+import { useChatStore } from "../store/useChatStore";
 import { optimizeImage } from "../lib/cdn";
 
 // One photo, or a swipeable set with a 1/3 counter, dots and (on laptops) arrows.
@@ -355,7 +357,9 @@ const Caption = ({ name, text }) => {
 export { default as NewPost } from "./NewPost";
 
 // The Feed: photo posts from people you can see, 16 at a time
-const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
+const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
+  const navigate = useNavigate();
+  const focusPost = useRef(null); // a post opened from a shared link: kept at the top of the feed
   const [posts, setPosts] = useState([]);
   const [more, setMore] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -376,7 +380,7 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
       const { data } = await axiosInstance.get(tab === "saved" ? "/posts/saved" : "/posts", { params: tab === "saved" || reset || !next.current ? {} : { before: next.current }, timeout: 20000 });
       next.current = data.next;
       setPosts((cur) => {
-        const base = reset ? [] : cur;
+        const base = reset ? (focusPost.current ? [focusPost.current] : []) : cur;
         const seen = new Set(base.map((p) => p._id));
         return [...base, ...data.posts.filter((p) => !seen.has(p._id))];
       });
@@ -389,6 +393,24 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
       setLoading(false);
     }
   }, [tab]);
+
+  // Opened from a shared post link (…/post?p=<id>): show that post first
+  useEffect(() => {
+    focusPost.current = null;
+    if (!focusId) return;
+    let live = true;
+    axiosInstance
+      .get(`/posts/${focusId}`)
+      .then(({ data }) => {
+        if (!live) return;
+        focusPost.current = data;
+        setPosts((cur) => [data, ...cur.filter((x) => x._id !== data._id)]);
+      })
+      .catch(() => live && toast.error("That post isn't available"));
+    return () => {
+      live = false;
+    };
+  }, [focusId]);
 
   useEffect(() => {
     next.current = null;
@@ -419,7 +441,7 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
     }
   };
   const share = async (p) => {
-    const url = p.image;
+    const url = `${window.location.origin}/post?p=${p._id}`; // opens this post
     const text = `${p.user?.fullName || "Talkies"}${p.caption ? ": " + p.caption : ""}`;
     try {
       if (navigator.share) await navigator.share({ title: "Talkies", text, url });
@@ -430,6 +452,14 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
     } catch {
       /* cancelled */
     }
+  };
+  // Tap a name or picture: your own profile, or a chat with that person
+  const openProfile = (p) => {
+    if (!p.user?._id) return;
+    if (p.mine) return navigate("/profile");
+    const known = useChatStore.getState().users.find((u) => String(u._id) === String(p.user._id));
+    useChatStore.getState().setSelectedChat({ type: "direct", data: known || p.user });
+    navigate("/");
   };
   const doubleTap = (p) => {
     setPop(p._id);
@@ -480,11 +510,13 @@ const FeedView = ({ onCreate, refreshKey, topPad = "calc(60px + env(safe-area-in
           {posts.map((p) => (
             <article key={p._id} className="mb-5 pb-4 border-b border-white/[0.06]" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
               <div className="flex items-center gap-2.5 px-3 py-2">
+                <button type="button" onClick={() => openProfile(p)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-70" aria-label={`Open ${p.user?.fullName || "profile"}`}>
                 <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
                 <span className="flex-1 min-w-0 flex flex-col leading-tight">
                   <span className="text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                   {p.song?.url && <span className="flex items-center gap-1 text-[12px] text-white/70 truncate"><Music size={11} className="text-[#25D366] shrink-0" /><span className="truncate">{p.song.name}</span></span>}
                 </span>
+                </button>
                 {p.mine && <button onClick={() => setEditing({ post: p })} className="h-8 pl-2.5 pr-3 rounded-full bg-white/12 active:bg-white/20 text-[13px] font-medium flex items-center gap-1.5" style={{ background: "rgba(255,255,255,.12)" }} aria-label="Edit post"><Pencil size={14} /> Edit</button>}
                 {p.mine && <button onClick={() => remove(p)} className="size-8 flex items-center justify-center text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import MainNav from "../components/MainNav";
@@ -13,6 +14,8 @@ const PostPage = () => {
   useTabSwipe(root);
   const [composing, setComposing] = useState(false);
   const [feedKey, setFeedKey] = useState(0);
+  const [params] = useSearchParams();
+  const focusId = params.get("p") || undefined; // opened from a shared post link
 
   return (
     <div ref={root} className="fixed inset-0 z-[60] bg-black">
@@ -40,7 +43,7 @@ const PostPage = () => {
                 <Plus size={26} strokeWidth={2.2} />
               </button>
             </div>
-            <FeedView onCreate={() => setComposing(true)} refreshKey={feedKey} topPad="calc(60px + env(safe-area-inset-top))" />
+            <FeedView onCreate={() => setComposing(true)} refreshKey={feedKey} focusId={focusId} topPad="calc(60px + env(safe-area-inset-top))" />
           </>
         )}
       </div>

@@ -113,6 +113,27 @@ export const getSaved = async (req, res) => {
   }
 };
 
+// One post by id (for shared post links). Same rules as the feed: the owner, or someone the owner's audience and access rules allow.
+export const getPost = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const me = req.user;
+    const p = await Post.findById(req.params.id).populate("userId", "fullName profilePic").lean();
+    if (!p || !p.userId) return res.status(404).json({ error: "Not found" });
+    const mine = String(p.userId._id) === String(me._id);
+    if (!mine) {
+      const blocked = new Set((me.blockedUsers || []).map(String));
+      if (blocked.has(String(p.userId._id)) || !audienceAllows(p.audience, me._id) || !(await canSee(me, p.userId._id))) return res.status(404).json({ error: "Not found" });
+    }
+    const n = await StatusComment.countDocuments({ targetId: p._id });
+    res.json(shape(p, me._id, n));
+  } catch (e) {
+    console.log("getPost:", e.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Who liked a post - only the person who posted it can see the list (others only see the number)
 export const getLikers = async (req, res) => {
   try {

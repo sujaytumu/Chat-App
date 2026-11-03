@@ -14,7 +14,7 @@ try {
 import GroupCallManager from "./components/GroupCallManager";
 import CallKeepAlive from "./components/CallKeepAlive";
 import LiveLocationManager from "./components/LiveLocationManager";
-import ProfileLinkHandler, { rememberProfileLink } from "./components/ProfileLinkHandler";
+import ProfileLinkHandler, { rememberProfileLink, rememberPostLink } from "./components/ProfileLinkHandler";
 import ReminderListener from "./components/ReminderListener";
 import BackgroundCallSetup from "./components/BackgroundCallSetup";
 import AccessNotifier from "./components/AccessNotifier";
@@ -97,6 +97,7 @@ const App = () => {
   const { theme } = useThemeStore();
   const location = useLocation();
   const navigate = useNavigate();
+  rememberPostLink(); // post link …/post?p=<id> (remembered through sign-in)
   rememberProfileLink(); // profile link …/?u=username (remembered through sign-in)
   // Invite link: …/?join=CODE (remembered through sign-in)
   const [joinCode, setJoinCode] = useState(() => {
