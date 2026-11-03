@@ -48,6 +48,7 @@ const loaders = {
 };
 const SignUpPage = lazy(loaders.SignUpPage);
 const LoginPage = lazy(loaders.LoginPage);
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const NotificationsPage = lazy(loaders.NotificationsPage);
 const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.AppearancePage })));
 const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
@@ -296,6 +297,10 @@ const App = () => {
           <Route
             path="/login"
             element={!authUser ? <LoginPage /> : <Navigate to="/" />}
+          />
+          <Route
+            path="/forgot-password"
+            element={!authUser ? <ForgotPasswordPage /> : <Navigate to="/" />}
           />
           <Route path="/settings" element={<Navigate to="/profile" replace />} />
           <Route

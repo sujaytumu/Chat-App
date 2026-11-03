@@ -78,14 +78,16 @@ export const useAuthStore = create((set, get) => ({
       if (res.data?.twoFactorRequired) {
         // Password was right — now ask for the authenticator code.
         set({ pendingTwoFactor: { ticket: res.data.ticket } });
-        return;
+        return true;
       }
       set({ authUser: res.data });
       toast.success("Logged in successfully");
 
       get().connectSocket();
+      return true;
     } catch (error) {
       toast.error(error.response?.data?.message || "Couldn't sign in");
+      return false;
     } finally {
       set({ isLoggingIn: false });
     }
