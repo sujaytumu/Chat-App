@@ -21,9 +21,12 @@ const LoginPage = () => {
     if (!ok) setCode("");
   };
 
+  const [loginFailed, setLoginFailed] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    login(formData);
+    const ok = await login(formData);
+    setLoginFailed(ok === false);
   };
 
   return (
@@ -127,6 +130,23 @@ const LoginPage = () => {
                 </button>
               </div>
             </div>
+
+            <div className="text-right -mt-3">
+              <Link to="/forgot-password" state={{ email: formData.email }} className="link link-primary text-sm">
+                Forgot password?
+              </Link>
+            </div>
+
+            {loginFailed && (
+              <div className="alert alert-warning text-sm py-2">
+                <span>
+                  Can't sign in?{" "}
+                  <Link to="/forgot-password" state={{ email: formData.email }} className="link font-semibold">
+                    Get a code by email and set a new password
+                  </Link>
+                </span>
+              </div>
+            )}
 
             <button type="submit" className="btn btn-primary w-full" disabled={isLoggingIn}>
               {isLoggingIn ? (

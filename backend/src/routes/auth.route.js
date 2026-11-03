@@ -10,12 +10,16 @@ import {
   regenerateBackupCodes,
   twoFactorStatus,
 } from "../controllers/twofactor.controller.js";
+import { forgotPassword, verifyResetCode, resetPassword } from "../controllers/passwordReset.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 router.post("/signup", signup);
 router.post("/login", login);
+router.post("/forgot-password", forgotPassword);
+router.post("/forgot-password/verify", verifyResetCode);
+router.post("/forgot-password/reset", resetPassword);
 router.post("/logout", logout);
 router.post("/login/2fa", loginWithTwoFactor);
 router.post("/qr/new", qrNew);

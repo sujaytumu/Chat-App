@@ -63,6 +63,14 @@ const userSchema = new mongoose.Schema(
       backupCodes: { type: [String], select: false, default: undefined }, // sha256 hashes
       lastStep: { type: Number, select: false, default: 0 },
     },
+    // Forgot password: a one-time 6-digit code emailed to the account. Only a hash of the code is stored,
+    // and it is never returned by default queries.
+    passwordReset: {
+      otpHash: { type: String, select: false },
+      expiresAt: { type: Date, select: false },
+      attempts: { type: Number, default: 0, select: false },
+      sentAt: { type: Date, select: false },
+    },
     // When this person was last connected (shown as "last seen" unless they hide it).
     lastSeen: { type: Date, default: null },
     // Privacy: what other people can see about me. Defaults are all on.

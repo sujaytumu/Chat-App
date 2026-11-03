@@ -102,6 +102,15 @@ app.use("/api/messages/lock", lockLimiter);
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/signup", authLimiter);
 app.use("/api/auth/change-password", authLimiter);
+// Forgot password: every request counts (not only failures) so nobody can use it to flood an inbox.
+const resetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  handler: json429("Too many attempts. Try again in a few minutes."),
+});
+app.use("/api/auth/forgot-password", resetLimiter);
 
 app.use("/api/media", mediaRoutes); // private chat files (checks you are in the chat, then redirects)
 app.use("/api", maskJsonMiddleware); // from here on, chat file addresses never leave the server as-is

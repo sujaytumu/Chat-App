@@ -260,7 +260,7 @@ export const updatePreferences = async (req, res) => {
 // Drop every live connection of this account. Each device then re-checks its
 // login: the one that just acted holds the new token and reconnects, the rest
 // are signed out.
-async function endOtherSessions(userId) {
+export async function endOtherSessions(userId) {
   try {
     const room = String(userId);
     io.to(room).emit("forceLogout");
