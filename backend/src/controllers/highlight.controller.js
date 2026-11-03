@@ -81,6 +81,32 @@ const present = (h, viewerId) => {
   };
 };
 
+// One highlight by id (for shared highlight links). The owner sees it all; others only if the owner lets them see this person,
+// and then only the items meant for them.
+export const getHighlight = async (req, res) => {
+  try {
+    res.set("Cache-Control", "no-store");
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const h = await Highlight.findById(req.params.id).populate("userId", "fullName profilePic");
+    if (!h || !h.userId) return res.status(404).json({ error: "Not found" });
+    const ownerId = String(h.userId._id);
+    const mine = ownerId === String(req.user._id);
+    if (!mine) {
+      if ((req.user.blockedUsers || []).some((b) => String(b) === ownerId)) return res.status(404).json({ error: "Not found" });
+      const visible = await visibleUserIds(req.user);
+      if (visible && !visible.has(ownerId)) return res.status(404).json({ error: "Not found" });
+    } else {
+      await h.populate("items.views.user items.likes.user", "fullName profilePic");
+    }
+    const out = present(h, req.user._id);
+    if (!mine && !out.items.length) return res.status(404).json({ error: "Not found" });
+    res.status(200).json(out);
+  } catch (error) {
+    console.log("Error in getHighlight controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Highlights of one person
 export const getUserHighlights = async (req, res) => {
   try {

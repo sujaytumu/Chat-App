@@ -12,9 +12,9 @@ const POST_KEY = "talkies-post-link";
 // Post link: …/post?p=<id>. Kept through sign-in so the shared post opens right after logging in.
 export const rememberPostLink = () => {
   try {
-    if (window.location.pathname !== "/post") return;
-    const p = new URLSearchParams(window.location.search).get("p");
-    if (p) sessionStorage.setItem(POST_KEY, p.slice(0, 40));
+    const q = new URLSearchParams(window.location.search);
+    if (window.location.pathname === "/post" && q.get("p")) sessionStorage.setItem(POST_KEY, `/post?p=${q.get("p").slice(0, 40)}`);
+    if (window.location.pathname === "/highlight" && q.get("h")) sessionStorage.setItem(POST_KEY, `/highlight?h=${q.get("h").slice(0, 40)}`);
   } catch {
     /* ignore */
   }
@@ -35,10 +35,10 @@ const ProfileLinkHandler = () => {
   useEffect(() => {
     if (!me) return;
     try {
-      const post = sessionStorage.getItem(POST_KEY);
-      if (post) {
+      const link = sessionStorage.getItem(POST_KEY); // "/post?p=<id>" or "/highlight?h=<id>"
+      if (link) {
         sessionStorage.removeItem(POST_KEY);
-        if (window.location.pathname !== "/post") navigate(`/post?p=${encodeURIComponent(post)}`, { replace: true });
+        if (/^\/(post\?p|highlight\?h)=[\w-]+$/.test(link) && window.location.pathname !== link.split("?")[0]) navigate(link, { replace: true });
       }
     } catch {
       /* ignore */

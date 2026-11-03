@@ -10,6 +10,7 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useAuthStore } from "../store/useAuthStore";
+import { copyLink, highlightLink } from "../lib/links";
 
 const DURATION_MS = 15000; // how long a picture / text stays up, like WhatsApp
 
@@ -367,6 +368,11 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </a>
           )}
         </div>
+        {!isOwn && highlight && (
+          <button onClick={() => copyLink(highlightLink(highlight._id), highlight.title)} className="h-10 px-3 flex items-center text-white text-[13px] font-medium" aria-label="Copy link">
+            Copy link
+          </button>
+        )}
         {isOwn && (
           <div className="relative">
             <button onClick={() => setMenuOpen((o) => !o)} className="size-10 flex items-center justify-center text-white" aria-label="More options">
@@ -380,6 +386,11 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
                   {!highlight && onAddToHighlight && (
                     <button onClick={() => { setMenuOpen(false); onAddToHighlight(current); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
                       Add to highlights
+                    </button>
+                  )}
+                  {highlight && (
+                    <button onClick={() => { setMenuOpen(false); copyLink(highlightLink(highlight._id), highlight.title); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
+                      Copy link
                     </button>
                   )}
                   {highlight && onEditHighlight && (
