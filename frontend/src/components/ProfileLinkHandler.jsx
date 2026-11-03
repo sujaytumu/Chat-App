@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
@@ -6,6 +7,18 @@ import { useChatStore } from "../store/useChatStore";
 
 // Profile link: …/?u=username (kept through sign-in) opens a chat with that person.
 const KEY = "talkies-user-link";
+const POST_KEY = "talkies-post-link";
+
+// Post link: …/post?p=<id>. Kept through sign-in so the shared post opens right after logging in.
+export const rememberPostLink = () => {
+  try {
+    if (window.location.pathname !== "/post") return;
+    const p = new URLSearchParams(window.location.search).get("p");
+    if (p) sessionStorage.setItem(POST_KEY, p.slice(0, 40));
+  } catch {
+    /* ignore */
+  }
+};
 
 export const rememberProfileLink = () => {
   try {
@@ -18,8 +31,18 @@ export const rememberProfileLink = () => {
 
 const ProfileLinkHandler = () => {
   const me = useAuthStore((s) => s.authUser?._id);
+  const navigate = useNavigate();
   useEffect(() => {
     if (!me) return;
+    try {
+      const post = sessionStorage.getItem(POST_KEY);
+      if (post) {
+        sessionStorage.removeItem(POST_KEY);
+        if (window.location.pathname !== "/post") navigate(`/post?p=${encodeURIComponent(post)}`, { replace: true });
+      }
+    } catch {
+      /* ignore */
+    }
     let name = null;
     try {
       name = sessionStorage.getItem(KEY);
@@ -53,7 +76,7 @@ const ProfileLinkHandler = () => {
         }
         toast.error(`No one found with @${handle}`);
       });
-  }, [me]);
+  }, [me, navigate]);
   return null;
 };
 
