@@ -49,6 +49,7 @@ const loaders = {
 const SignUpPage = lazy(loaders.SignUpPage);
 const LoginPage = lazy(loaders.LoginPage);
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const HighlightLinkPage = lazy(() => import("./pages/HighlightLinkPage"));
 const NotificationsPage = lazy(loaders.NotificationsPage);
 const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.AppearancePage })));
 const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
@@ -276,6 +277,7 @@ const App = () => {
             }
           />
           <Route path="/reels" element={authUser ? <ReelsPage /> : <Navigate to="/login" />} />
+          <Route path="/highlight" element={authUser ? <HighlightLinkPage /> : <Navigate to="/login" />} />
           <Route path="/post" element={authUser ? <PostPage /> : <Navigate to="/login" />} />
           <Route path="/activity" element={authUser ? <ActivityPage /> : <Navigate to="/login" />} />
           <Route path="/explore" element={authUser ? <ExplorePage /> : <Navigate to="/login" />} />
