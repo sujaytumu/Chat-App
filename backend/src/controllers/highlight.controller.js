@@ -1,4 +1,4 @@
-import { visibleUserIds } from "../lib/visibility.js";
+import { visibleUserIds, canSee as canSeePerson } from "../lib/visibility.js";
 import { defaultAudienceFor } from "../lib/audience.js";
 import mongoose from "mongoose";
 import Highlight from "../models/highlight.model.js";
