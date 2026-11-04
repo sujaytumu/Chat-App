@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import User from "../models/user.model.js";
 import AccessRequest from "../models/accessRequest.model.js";
 import { sendPushToUser } from "../lib/webPush.js";
-import { Visibility, pairKey, isOwner, forgetVisibility, ownerId } from "../lib/visibility.js";
+import { Visibility, pairKey, isOwner, forgetVisibility, ownerId, VISIBILITY_KINDS } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
 
 // Owner only: see everyone, and choose who can see whom.
@@ -12,10 +12,13 @@ export const listAccess = async (req, res) => {
   try {
     const [users, pairs] = await Promise.all([
       User.find({ deleted: { $ne: true } }).select("fullName email profilePic").sort({ fullName: 1 }).lean(),
-      Visibility.find({}).select("a b").lean(),
+      Visibility.find({}).select("a b hide").lean(),
     ]);
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ users, pairs: pairs.map((p) => [String(p.a), String(p.b)]), ownerId: await ownerId() });
+    // hides: "idA|idB" (sorted) -> the kinds of content (status / highlights / reels / posts) those two do NOT see of each other
+    const hides = {};
+    for (const p of pairs) if (p.hide?.length) hides[[String(p.a), String(p.b)].sort().join("|")] = p.hide;
+    res.status(200).json({ users, pairs: pairs.map((p) => [String(p.a), String(p.b)]), hides, kinds: VISIBILITY_KINDS, ownerId: await ownerId() });
   } catch (e) {
     console.log("Error in listAccess:", e.message);
     res.status(500).json({ error: "Internal server error" });
@@ -58,6 +61,30 @@ export const setAccess = async (req, res) => {
     res.status(200).json({ ok: true });
   } catch (e) {
     console.log("Error in setAccess:", e.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Owner: for two people who can see each other, switch one kind of content (status / highlights / reels / posts) on or off.
+// Strict and two-way: when it is off, neither of them sees the other's status / highlights / reels / posts.
+// The owner's own content can never be switched off for anyone.
+export const setAccessKind = async (req, res) => {
+  try {
+    const { a, b, kind, hidden } = req.body || {};
+    if (!mongoose.isValidObjectId(a) || !mongoose.isValidObjectId(b) || String(a) === String(b)) return res.status(400).json({ error: "Pick two different people" });
+    if (!VISIBILITY_KINDS.includes(kind)) return res.status(400).json({ error: "Unknown kind" });
+    const owner = await ownerId();
+    if (owner && (String(a) === owner || String(b) === owner)) return res.status(400).json({ error: "The owner is always visible to everyone" });
+    const upd = await Visibility.updateOne({ key: pairKey(a, b) }, hidden === true ? { $addToSet: { hide: kind } } : { $pull: { hide: kind } });
+    if (!upd.matchedCount) return res.status(404).json({ error: "These two can't see each other yet" });
+    forgetVisibility();
+    for (const uid of [String(a), String(b)]) {
+      const sid = getReceiverSocketId(uid);
+      if (sid) io.to(sid).emit("visibilityChanged");
+    }
+    res.status(200).json({ ok: true });
+  } catch (e) {
+    console.log("Error in setAccessKind:", e.message);
     res.status(500).json({ error: "Internal server error" });
   }
 };

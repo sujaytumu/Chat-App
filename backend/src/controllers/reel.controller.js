@@ -99,7 +99,7 @@ async function decorate(items, me) {
 
 // Reels from people this person may see (and not hidden / blocked), for lists that are not the main feed.
 async function visibleReels(me, extraQuery, limit = 40) {
-  const ids = await visibleUserIds(me);
+  const ids = await visibleUserIds(me, "reels");
   const q = { ...extraQuery };
   if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
   const hidden = (await ReelHide.find({ userId: me._id }).select("reelId").lean()).map((h) => h.reelId);
@@ -268,7 +268,7 @@ export const getReelFeed = async (req, res) => {
     const me = req.user;
     const myId = String(me._id);
     const friendsTab = req.query.tab === "friends";
-    const ids = await visibleUserIds(me);
+    const ids = await visibleUserIds(me, "reels");
     const follows = new Set((await Follow.find({ follower: me._id }).select("following").lean()).map((f) => String(f.following)));
     const blocked = new Set((me.blockedUsers || []).map(String));
     const hiddenIds = (await ReelHide.find({ userId: me._id }).select("reelId").lean()).map((h) => String(h.reelId));
@@ -315,7 +315,7 @@ export const getReelFeed = async (req, res) => {
       const base = byId.get(String(x.reelId._id));
       if (!base) continue;
       if (x.reelId.userId && allowed && !allowed.has(String(x.reelId.userId._id || x.reelId.userId)) && String(x.reelId.userId._id || x.reelId.userId) !== myId) {
-        if (!(await canSee(me, x.reelId.userId._id || x.reelId.userId))) continue;
+        if (!(await canSee(me, x.reelId.userId._id || x.reelId.userId, "reels"))) continue;
       }
       repostItems.push({ ...base, source: "reel", createdAt: x.createdAt, repostedBy: { _id: x.userId._id, fullName: x.userId.fullName }, following: follows.has(String(base.user?._id)), saved: savedKeys.has(`reel:${base._id}`), reposted: mineReposted.has(String(base._id)) });
     }
@@ -416,14 +416,14 @@ export const toggleSave = async (req, res) => {
     let snap = snapshot;
     if (key.startsWith("reel:")) {
       const r = await Reel.findById(key.slice(5)).populate("userId", "fullName profilePic").lean();
-      if (!r || (r.userId && (!(await canSee(req.user, r.userId._id)) || (String(r.userId._id) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
+      if (!r || (r.userId && (!(await canSee(req.user, r.userId._id, "reels")) || (String(r.userId._id) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
       snap = (await withCounts([r], req.user._id))[0];
       if (!snap) return res.status(404).json({ error: "Not found" });
       delete snap.audience;
     } else if (key.startsWith("status:")) {
       const st = await Status.findOne({ _id: key.slice(7), type: "video", expiresAt: { $gt: new Date() } }).populate("userId", "fullName profilePic").lean();
       if (!st || !st.userId || (String(st.userId._id) !== String(req.user._id) && !audienceAllows(st.audience, req.user._id) )) return res.status(404).json({ error: "Not found" });
-      if (String(st.userId._id) !== String(req.user._id) && !(await canSee(req.user, st.userId._id))) return res.status(404).json({ error: "Not found" });
+      if (String(st.userId._id) !== String(req.user._id) && !(await canSee(req.user, st.userId._id, "status"))) return res.status(404).json({ error: "Not found" });
       snap = { _id: st._id, source: "status", videoUrl: st.content, poster: "", caption: st.caption || "", filter: "none", trim: st.trim?.end > 0 ? { start: st.trim.start || 0, end: st.trim.end } : null, song: st.song?.url ? { url: st.song.url, name: st.song.name, start: st.song.start || 0 } : null, createdAt: st.createdAt, user: { _id: st.userId._id, fullName: st.userId.fullName, profilePic: st.userId.profilePic }, likeCount: 0, liked: false, views: 0, comments: 0, saves: 0, reposts: 0, mine: false, following: false };
     } else {
       snap = { ...snapshot, source: "discover" };
@@ -459,7 +459,7 @@ export const getUserReels = async (req, res) => {
   try {
     const { userId } = req.params;
     if (!mongoose.isValidObjectId(userId)) return res.status(404).json({ error: "Not found" });
-    if (String(userId) !== String(req.user._id) && !(await canSee(req.user, userId))) return res.status(200).json({ reels: [] });
+    if (String(userId) !== String(req.user._id) && !(await canSee(req.user, userId, "reels"))) return res.status(200).json({ reels: [] });
     const rows = await Reel.find({ userId }).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
     const shaped = await withCounts(rows, req.user._id);
     res.set("Cache-Control", "no-store");
@@ -474,7 +474,7 @@ export const getReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const r = await Reel.findById(req.params.id).populate("userId", "fullName profilePic").lean();
-    if (!r || (r.userId && (!(await canSee(req.user, r.userId._id)) || (String(r.userId._id) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "This reel isn't available" });
+    if (!r || (r.userId && (!(await canSee(req.user, r.userId._id, "reels")) || (String(r.userId._id) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "This reel isn't available" });
     res.status(200).json((await withCounts([r], req.user._id))[0]);
   } catch (error) {
     console.log("Error in getReel:", error.message);
@@ -552,7 +552,7 @@ export const likeReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const r = await Reel.findById(req.params.id).select("userId likes poster audience").lean();
-    if (!r || (r.userId && (!(await canSee(req.user, r.userId)) || (String(r.userId) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
+    if (!r || (r.userId && (!(await canSee(req.user, r.userId, "reels")) || (String(r.userId) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.liked !== false;
     const already = (r.likes || []).some((l) => String(l) === String(req.user._id));
     const upd = await Reel.findByIdAndUpdate(req.params.id, want ? { $addToSet: { likes: req.user._id } } : { $pull: { likes: req.user._id } }, { new: true }).select("likes");
@@ -659,7 +659,7 @@ export const importStatus = async (req, res) => {
       return res.status(404).json({ error: "That update is gone" });
     }
     const mine = String(st.userId._id) === String(req.user._id);
-    if (!mine && (!audienceAllows(st.audience, req.user._id) || !(await canSee(req.user, st.userId._id)))) return res.status(404).json({ error: "Not available" });
+    if (!mine && (!audienceAllows(st.audience, req.user._id) || !(await canSee(req.user, st.userId._id, "status")))) return res.status(404).json({ error: "Not available" });
     if (st.audience?.mode && st.audience.mode !== "all") return res.status(403).json({ error: "This update is private, so it can't be shared" });
     if (existing) return res.status(200).json((await withCounts([existing], req.user._id))[0]);
     const up = await cloudinary.uploader.upload(deliveryUrl(st.content), { folder: "chat-app/reels", resource_type: "video" });
@@ -684,7 +684,7 @@ export const repostReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const r = await Reel.findById(req.params.id).select("userId audience").lean();
-    if (!r || (r.userId && (!(await canSee(req.user, r.userId)) || (String(r.userId) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
+    if (!r || (r.userId && (!(await canSee(req.user, r.userId, "reels")) || (String(r.userId) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.reposted !== false;
     if (want) {
       const u = await Repost.updateOne({ userId: req.user._id, reelId: r._id }, { $setOnInsert: { userId: req.user._id, reelId: r._id } }, { upsert: true });
@@ -722,7 +722,7 @@ export const reelsByTag = async (req, res) => {
 export const reelsByUser = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    if (String(req.params.id) !== String(req.user._id) && !(await canSee(req.user, req.params.id))) return res.status(404).json({ error: "Not found" });
+    if (String(req.params.id) !== String(req.user._id) && !(await canSee(req.user, req.params.id, "reels"))) return res.status(404).json({ error: "Not found" });
     res.set("Cache-Control", "no-store");
     res.status(200).json({ reels: await visibleReels(req.user, { userId: new mongoose.Types.ObjectId(req.params.id) }), more: false });
   } catch (error) {
@@ -768,7 +768,7 @@ export const searchReels = async (req, res) => {
 // Popular hashtags among reels this person may see (last 14 days).
 export const trendingTags = async (req, res) => {
   try {
-    const ids = await visibleUserIds(req.user);
+    const ids = await visibleUserIds(req.user, "reels");
     const match = { createdAt: { $gt: new Date(Date.now() - 14 * 86400 * 1000) }, hashtags: { $exists: true, $ne: [] } };
     if (ids !== null) match.userId = { $in: [req.user._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
     match.$and = [audienceFilter(req.user._id)];

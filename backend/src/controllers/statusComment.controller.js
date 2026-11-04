@@ -28,12 +28,12 @@ const resolveTarget = async (targetId, viewerId) => {
   const reel = await Reel.findById(targetId).select("userId poster audience").lean();
   if (reel) {
     if (!reel.userId) return { ownerId: null }; // an imported Discover clip: open to everyone
-    return (String(reel.userId) === String(viewerId) || (audienceAllows(reel.audience, viewerId) && (await canSee({ _id: viewerId }, reel.userId)))) ? { ownerId: String(reel.userId), kind: "reel", thumb: reel.poster || "", url: `/reels?r=${targetId}` } : null;
+    return (String(reel.userId) === String(viewerId) || (audienceAllows(reel.audience, viewerId) && (await canSee({ _id: viewerId }, reel.userId, "reels")))) ? { ownerId: String(reel.userId), kind: "reel", thumb: reel.poster || "", url: `/reels?r=${targetId}` } : null;
   }
   const post = await Post.findById(targetId).select("userId image audience").lean();
   if (post) {
     const own = String(post.userId) === String(viewerId);
-    return own || (audienceAllows(post.audience, viewerId) && (await canSee({ _id: viewerId }, post.userId))) ? { ownerId: String(post.userId), kind: "post", thumb: post.image, url: "/post" } : null;
+    return own || (audienceAllows(post.audience, viewerId) && (await canSee({ _id: viewerId }, post.userId, "posts"))) ? { ownerId: String(post.userId), kind: "post", thumb: post.image, url: "/post" } : null;
   }
   const h = await Highlight.findOne({ "items._id": targetId }).select("userId items._id items.audience").lean();
   const item = h?.items?.find((i) => String(i._id) === String(targetId));

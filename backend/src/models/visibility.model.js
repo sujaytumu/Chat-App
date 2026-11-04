@@ -6,6 +6,9 @@ const schema = new mongoose.Schema(
     key: { type: String, required: true, unique: true },
     a: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     b: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    // Kinds of content these two do NOT see of each other, even though they can see each other (chat, calls).
+    // Empty = everything. Kinds: see VISIBILITY_KINDS in lib/visibility.js. The owner is never affected.
+    hide: { type: [String], default: [] },
   },
   { timestamps: true }
 );
