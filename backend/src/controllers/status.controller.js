@@ -152,7 +152,7 @@ export const getStatusFeed = async (req, res) => {
     const myId = req.user._id;
     res.set("Cache-Control", "no-store");
 
-    const visible = await visibleUserIds(req.user);
+    const visible = await visibleUserIds(req.user, "status"); // people the owner has not hidden my view of their status from
     const statuses = await Status.find({ expiresAt: { $gt: new Date() }, ...(visible ? { userId: { $in: [...visible, String(myId)] } } : {}) })
       .populate("userId", "fullName profilePic")
       .sort({ createdAt: 1 })

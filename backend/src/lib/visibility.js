@@ -17,42 +17,63 @@ export async function ownerId() {
   return ownerIdCache.id;
 }
 
-// null = everybody (the owner); otherwise the set of user ids this person may see.
-const listCache = new Map(); // userId -> { ids, at }  (a few seconds, so the chat list opens fast)
+// What the owner can switch on / off for each pair, on top of "they can see each other":
+export const VISIBILITY_KINDS = ["status", "highlights", "reels", "posts"];
+
+// null = everybody (the owner); otherwise { ids: people this person may see, hide: id -> kinds hidden from them }.
+const listCache = new Map(); // userId -> { ids, hide, at }  (a few seconds, so the chat list opens fast)
 export const forgetPair = (a, b) => { listCache.delete(String(a)); listCache.delete(String(b)); };
 export const forgetVisibility = () => { listCache.clear(); seenCache.clear(); };
-export async function visibleUserIds(me) {
-  if (me.email !== undefined && isOwner(me)) return null;
+async function visibleEntry(me) {
   const k = String(me._id || me);
   const c = listCache.get(k);
-  if (c && Date.now() - c.at < 8000) return c.ids;
-  const ids = await computeVisible(me);
+  if (c && Date.now() - c.at < 8000) return c;
+  const entry = await computeVisible(me);
+  if (entry === null) return null;
   if (listCache.size > 2000) listCache.clear();
-  listCache.set(k, { ids, at: Date.now() });
-  return ids;
+  const stored = { ...entry, at: Date.now() };
+  listCache.set(k, stored);
+  return stored;
+}
+// `kind` (optional): "status" | "highlights" | "reels" | "posts" - also leaves out people whose pair with me hides that kind.
+// The owner's own content is never hidden from anyone.
+export async function visibleUserIds(me, kind) {
+  if (me.email !== undefined && isOwner(me)) return null;
+  const entry = await visibleEntry(me);
+  if (entry === null) return null;
+  if (!kind) return entry.ids;
+  const out = new Set(entry.ids);
+  for (const [id, kinds] of entry.hide) if (kinds.has(kind) && id !== entry.owner) out.delete(id);
+  return out;
 }
 async function computeVisible(me) {
   const myId = new mongoose.Types.ObjectId(String(me._id || me));
   if (me.email !== undefined && isOwner(me)) return null;
-  const [pairs, owner] = await Promise.all([Visibility.find({ $or: [{ a: myId }, { b: myId }] }).select("a b").lean(), ownerId()]);
+  const [pairs, owner] = await Promise.all([Visibility.find({ $or: [{ a: myId }, { b: myId }] }).select("a b hide").lean(), ownerId()]);
   if (owner && owner === String(myId)) return null; // the owner sees everybody
   const ids = new Set();
-  for (const p of pairs) ids.add(String(String(p.a) === String(myId) ? p.b : p.a));
+  const hide = new Map();
+  for (const p of pairs) {
+    const other = String(String(p.a) === String(myId) ? p.b : p.a);
+    ids.add(other);
+    if (p.hide?.length) hide.set(other, new Set(p.hide));
+  }
   if (owner) ids.add(owner);
   ids.delete(String(myId));
-  return ids;
+  return { ids, hide, owner };
 }
 
-const seenCache = new Map(); // "me:other" -> expires
-export async function canSee(me, otherId) {
+const seenCache = new Map(); // "me:other:kind" -> expires
+export async function canSee(me, otherId, kind) {
   const myId = String(me._id || me);
   const other = String(otherId);
   if (me.email !== undefined && isOwner(me)) return true;
-  const ck = `${myId}:${other}`;
+  const ck = `${myId}:${other}:${kind || ""}`;
   const hit = seenCache.get(ck);
   if (hit && hit > Date.now()) return true;
-  const [owner, allowed] = await Promise.all([ownerId(), Visibility.exists({ key: pairKey(myId, other) })]);
-  const ok = other === myId || other === owner || myId === owner || !!allowed;
+  const [owner, row] = await Promise.all([ownerId(), Visibility.findOne({ key: pairKey(myId, other) }).select("hide").lean()]);
+  const withOwner = other === owner || myId === owner;
+  const ok = other === myId || withOwner || (!!row && !(kind && (row.hide || []).includes(kind)));
   if (ok) {
     if (seenCache.size > 5000) seenCache.clear();
     seenCache.set(ck, Date.now() + 10 * 60_000);

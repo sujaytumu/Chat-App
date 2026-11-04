@@ -31,7 +31,7 @@ export const getFeed = async (req, res) => {
   try {
     res.set("Cache-Control", "no-store");
     const me = req.user;
-    const ids = await visibleUserIds(me);
+    const ids = await visibleUserIds(me, "posts");
     const q = {};
     if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
     const before = req.query.before ? new Date(req.query.before) : null;
@@ -93,7 +93,7 @@ export const getSaved = async (req, res) => {
   try {
     res.set("Cache-Control", "no-store");
     const me = req.user;
-    const ids = await visibleUserIds(me);
+    const ids = await visibleUserIds(me, "posts");
     const q = { saves: me._id };
     if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
     const blocked = new Set((me.blockedUsers || []).map(String));
@@ -124,7 +124,7 @@ export const savePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const post = await Post.findById(req.params.id).select("userId");
-    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId)))) return res.status(404).json({ error: "Not found" });
+    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId, "posts")))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.saved !== false;
     await Post.updateOne({ _id: post._id }, want ? { $addToSet: { saves: req.user._id } } : { $pull: { saves: req.user._id } });
     res.json({ saved: want });
@@ -137,7 +137,7 @@ export const likePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const post = await Post.findById(req.params.id).select("userId likes image");
-    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId)))) return res.status(404).json({ error: "Not found" });
+    if (!post || (!post.userId.equals(req.user._id) && !(await canSee(req.user, post.userId, "posts")))) return res.status(404).json({ error: "Not found" });
     const want = req.body?.liked !== false;
     if (want) {
       const r = await Post.updateOne({ _id: post._id, likes: { $ne: req.user._id } }, { $push: { likes: req.user._id } });
