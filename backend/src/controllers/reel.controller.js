@@ -11,7 +11,7 @@ import ReelHide from "../models/reelHide.model.js";
 import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee, isOwner, ownerId as getOwnerId } from "../lib/visibility.js";
-import { audienceAllows as reelAudienceAllows, cleanAudience as cleanReelAudience, defaultAudienceFor } from "../lib/audience.js";
+import { audienceAllows as reelAudienceAllows, audienceFilter, cleanAudience as cleanReelAudience, defaultAudienceFor } from "../lib/audience.js";
 import { MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUser, sendPushToUsers } from "../lib/webPush.js";
 
@@ -42,6 +42,7 @@ const shape = (r, meId, commentCounts) => ({
   mine: String(r.userId?._id || r.userId) === String(meId),
   saves: r.saves || 0,
   reposts: r.reposts || 0,
+  ...(String(r.userId?._id || r.userId) === String(meId) ? { audience: { mode: r.audience?.mode || "all", users: (r.audience?.users || []).map(String) } } : {}),
 });
 
 const withCounts = async (rows, meId) => {
@@ -53,7 +54,8 @@ const withCounts = async (rows, meId) => {
     ]);
     for (const a of agg) counts.set(String(a._id), a.n);
   }
-  return rows.filter((r) => r.userId || r.externalId).map((r) => shape(r, meId, counts));
+  // the audience the owner picked is enforced here, for every list built from this (feed, tags, search, explore, profile, reposts)
+  return rows.filter((r) => (r.userId || r.externalId) && (String(r.userId?._id || r.userId || "") === String(meId) || reelAudienceAllows(r.audience, meId))).map((r) => shape(r, meId, counts));
 };
 
 // "…/video/upload/v123/chat-app/reels/abc.mp4" -> "chat-app/reels/abc" (so the file can be removed when its reel is)
@@ -285,7 +287,7 @@ export const getReelFeed = async (req, res) => {
     const ownerOid = req.query.tab === "friends" || rawTagForOwner(req) ? null : await getOwnerId();
     const ownerQ = ownerOid ? { userId: { $ne: new mongoose.Types.ObjectId(ownerOid) } } : {};
     const [reelRows, statusRows, saved] = await Promise.all([
-      Reel.find({ ...userQ, ...dateQ, ...(ownerOid ? { $and: [ownerQ] } : {}) }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
+      Reel.find({ ...userQ, ...dateQ, $and: [...(ownerOid ? [ownerQ] : []), audienceFilter(me._id)] }).sort({ createdAt: -1 }).limit(PAGE + 1).populate("userId", "fullName profilePic").lean(),
       Promise.resolve([]), // video statuses are NOT shown as reels
       SavedReel.find({ userId: me._id }).select("key").lean(),
     ]);
@@ -367,7 +369,7 @@ export const getReelFeed = async (req, res) => {
       more = px <= 30;
     }
     if (ownerOid && !before) {
-      const ownRows = await Reel.find({ userId: ownerOid }).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
+      const ownRows = await Reel.find({ userId: ownerOid, ...audienceFilter(me._id) }).sort({ createdAt: -1 }).limit(60).populate("userId", "fullName profilePic").lean();
       const ownItems = (await withCounts(ownRows, me._id))
         .filter((r) => !hiddenSet.has(String(r._id)))
         .map((r) => ({ ...r, source: "reel", following: follows.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`), reposted: mineReposted.has(String(r._id)) }));
@@ -414,8 +416,10 @@ export const toggleSave = async (req, res) => {
     let snap = snapshot;
     if (key.startsWith("reel:")) {
       const r = await Reel.findById(key.slice(5)).populate("userId", "fullName profilePic").lean();
-      if (!r || (r.userId && !(await canSee(req.user, r.userId._id)))) return res.status(404).json({ error: "Not found" });
+      if (!r || (r.userId && (!(await canSee(req.user, r.userId._id)) || (String(r.userId._id) !== String(req.user._id) && !reelAudienceAllows(r.audience, req.user._id))))) return res.status(404).json({ error: "Not found" });
       snap = (await withCounts([r], req.user._id))[0];
+      if (!snap) return res.status(404).json({ error: "Not found" });
+      delete snap.audience;
     } else if (key.startsWith("status:")) {
       const st = await Status.findOne({ _id: key.slice(7), type: "video", expiresAt: { $gt: new Date() } }).populate("userId", "fullName profilePic").lean();
       if (!st || !st.userId || (String(st.userId._id) !== String(req.user._id) && !audienceAllows(st.audience, req.user._id) )) return res.status(404).json({ error: "Not found" });
@@ -436,9 +440,14 @@ export const toggleSave = async (req, res) => {
 
 export const getSaved = async (req, res) => {
   try {
+    const me = String(req.user._id);
     const rows = await SavedReel.find({ userId: req.user._id }).sort({ createdAt: -1 }).limit(100).lean();
+    // a reel saved earlier disappears from Saved once its owner hides it from me (the saved copy is only a snapshot)
+    const reelIds = rows.filter((r) => String(r.key).startsWith("reel:")).map((r) => r.key.slice(5));
+    const live = reelIds.length ? await Reel.find({ _id: { $in: reelIds } }).select("userId audience").lean() : [];
+    const okIds = new Set(live.filter((l) => !l.userId || String(l.userId) === me || reelAudienceAllows(l.audience, me)).map((l) => String(l._id)));
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ reels: rows.map((r) => ({ ...r.snapshot, saved: true, liked: false })), more: false });
+    res.status(200).json({ reels: rows.filter((r) => !String(r.key).startsWith("reel:") || okIds.has(r.key.slice(5))).map((r) => ({ ...r.snapshot, audience: undefined, saved: true, liked: false })), more: false });
   } catch (error) {
     console.log("Error in getSaved:", error.message);
     res.status(500).json({ error: "Internal server error" });
@@ -528,7 +537,7 @@ export const createReel = async (req, res) => {
     (async () => {
       const followers = await Follow.find({ following: req.user._id }).select("follower").limit(150).lean();
       const ok = [];
-      for (const f of followers) if (await canSee({ _id: f.follower }, req.user._id)) ok.push(f.follower);
+      for (const f of followers) if (reelAudienceAllows(reel.audience, f.follower) && (await canSee({ _id: f.follower }, req.user._id))) ok.push(f.follower);
       if (ok.length) {
         await sendPushToUsers(ok, { title: "Talkies", body: `🎬 ${req.user.fullName} posted a new reel`, icon: req.user.profilePic || "/icon-v2-192.png", tag: `reel-new-${reel._id}`, data: { url: `/reels?r=${reel._id}` } }, { urgency: "normal", TTL: 3600 });
       }
@@ -566,7 +575,7 @@ export const likeReel = async (req, res) => {
 
 export const viewReel = async (req, res) => {
   try {
-    if (mongoose.isValidObjectId(req.params.id)) await Reel.updateOne({ _id: req.params.id, userId: { $ne: req.user._id } }, { $inc: { views: 1 } });
+    if (mongoose.isValidObjectId(req.params.id)) await Reel.updateOne({ _id: req.params.id, $and: [{ userId: { $ne: req.user._id } }, audienceFilter(req.user._id)] }, { $inc: { views: 1 } });
     res.status(200).json({ ok: true });
   } catch {
     res.status(200).json({ ok: false });
@@ -762,6 +771,7 @@ export const trendingTags = async (req, res) => {
     const ids = await visibleUserIds(req.user);
     const match = { createdAt: { $gt: new Date(Date.now() - 14 * 86400 * 1000) }, hashtags: { $exists: true, $ne: [] } };
     if (ids !== null) match.userId = { $in: [req.user._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
+    match.$and = [audienceFilter(req.user._id)];
     const agg = await Reel.aggregate([{ $match: match }, { $unwind: "$hashtags" }, { $group: { _id: "$hashtags", n: { $sum: 1 } } }, { $sort: { n: -1 } }, { $limit: 12 }]);
     res.status(200).json({ tags: agg.map((a) => ({ tag: a._id, count: a.n })) });
   } catch (error) {

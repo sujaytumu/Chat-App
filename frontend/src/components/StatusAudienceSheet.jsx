@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Check, ArrowRight } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import Avatar from "./Avatar";
@@ -37,6 +37,10 @@ const Radio = ({ on }) => (
 const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
   useBackToClose(true, onClose);
   const users = useChatStore((s) => s.users);
+  useEffect(() => {
+    const st = useChatStore.getState();
+    if (!st.users.length) st.getUsers();
+  }, []);
   const [mode, setMode] = useState(value.mode);
   const [picked, setPicked] = useState(() => new Set(value.users));
   const [picking, setPicking] = useState(false);
