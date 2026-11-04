@@ -93,7 +93,7 @@ export const getHighlight = async (req, res) => {
     const mine = ownerId === String(req.user._id);
     if (!mine) {
       if ((req.user.blockedUsers || []).some((b) => String(b) === ownerId)) return res.status(404).json({ error: "Not found" });
-      const visible = await visibleUserIds(req.user);
+      const visible = await visibleUserIds(req.user, "highlights");
       if (visible && !visible.has(ownerId)) return res.status(404).json({ error: "Not found" });
     } else {
       await h.populate("items.views.user items.likes.user", "fullName profilePic");
@@ -114,6 +114,8 @@ export const getUserHighlights = async (req, res) => {
     if (!mongoose.isValidObjectId(userId)) return res.status(400).json({ error: "Invalid user" });
     res.set("Cache-Control", "no-store");
     const mine = String(userId) === String(req.user._id);
+    // strict: someone else's highlights open only when the owner allows this pair (the owner's are open to everyone)
+    if (!mine && !(await canSeePerson(req.user, userId, "highlights"))) return res.status(200).json([]);
     let q = Highlight.find({ userId }).sort({ createdAt: 1 });
     if (mine) q = q.populate("items.views.user items.likes.user", "fullName profilePic"); // the owner sees who viewed / hearted
     const list = await q;
@@ -130,7 +132,7 @@ export const getHighlightsFeed = async (req, res) => {
   try {
     const myId = req.user._id;
     res.set("Cache-Control", "no-store");
-    const visible = await visibleUserIds(req.user);
+    const visible = await visibleUserIds(req.user, "highlights");
     const list = await Highlight.find({ userId: visible ? { $in: [...visible], $ne: myId } : { $ne: myId } })
       .sort({ updatedAt: -1 })
       .limit(150)

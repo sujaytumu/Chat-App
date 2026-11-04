@@ -18,12 +18,21 @@ const timeAgo = (iso) => {
   return h < 24 ? `${h} hour${h === 1 ? "" : "s"} ago` : `${Math.round(h / 24)} day${Math.round(h / 24) === 1 ? "" : "s"} ago`;
 };
 
+// What the owner can switch on / off for each pair that can see each other (chat is always on while they are ticked).
+const KINDS = [
+  ["status", "Status"],
+  ["highlights", "Highlights"],
+  ["reels", "Reels"],
+  ["posts", "Posts"],
+];
+
 const AccessPage = () => {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [requests, setRequests] = useState([]); // people waiting for the owner's answer
   const [users, setUsers] = useState([]);
   const [pairs, setPairs] = useState(new Set()); // "idA|idB" sorted
+  const [hides, setHides] = useState({}); // "idA|idB" -> kinds these two do NOT see of each other
   const [loading, setLoading] = useState(true);
   const [denied, setDenied] = useState(false);
   const [who, setWho] = useState(null); // the person whose list I'm editing
@@ -43,6 +52,7 @@ const AccessPage = () => {
       .then((r) => {
         setUsers(r.data.users);
         setPairs(new Set(r.data.pairs.map(([a, b]) => key(a, b))));
+        setHides(r.data.hides || {});
         setOwnerIdSrv(r.data.ownerId || null);
       })
       .catch((e) => setDenied(e.response?.status === 403))
@@ -148,6 +158,25 @@ const AccessPage = () => {
     setQ("");
   };
 
+  // One kind of content (status / highlights / reels / posts) between `who` and `other`: saved as soon as it is tapped.
+  const toggleKind = async (other, kind) => {
+    const k = key(who._id, other._id);
+    const nowHidden = (hides[k] || []).includes(kind);
+    const set = (hidden) =>
+      setHides((h) => {
+        const cur = new Set(h[k] || []);
+        hidden ? cur.add(kind) : cur.delete(kind);
+        return { ...h, [k]: [...cur] };
+      });
+    set(!nowHidden);
+    try {
+      await axiosInstance.put("/admin/access/kind", { a: who._id, b: other._id, kind, hidden: !nowHidden });
+    } catch (e) {
+      set(nowHidden);
+      toast.error(e.response?.data?.error || "Couldn't save that change");
+    }
+  };
+
   const toggle = async (other) => {
     if (isOwnerUser(who)) return toast("The owner always sees everyone", { icon: "✅" });
     if (isOwnerUser(other)) return toast(`${other.fullName?.split(" ")[0] || "The owner"} is always allowed`, { icon: "✅" });
@@ -243,15 +272,38 @@ const AccessPage = () => {
         {who &&
           list.map((u) => {
             const on = isOwnerUser(who) || isOwnerUser(u) || isOn(u._id); // the owner is ticked for everybody, and sees everybody
+            const k = key(who._id, u._id);
+            // switches for status / highlights / reels / posts: only for two ordinary people who can already see each other
+            const showKinds = !pendingForWho && !isOwnerUser(who) && !isOwnerUser(u) && pairs.has(k) && !staged.has(k);
             return (
-              <button key={u._id} onClick={() => toggle(u)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-wa-surface/70">
-                <Avatar src={u.profilePic} name={u.fullName} size="size-12" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] truncate">{u.fullName}</span>
-                  <span className="block text-[12px] text-wa-muted truncate">{isOwnerUser(u) ? "Owner · always allowed" : u.email}</span>
-                </span>
-                <span className={`size-6 rounded-md border-2 flex items-center justify-center ${on ? "bg-[#21C063] border-[#21C063] text-[#0B141A]" : "border-wa-muted"}`}>{on && <Check size={15} strokeWidth={3.5} />}</span>
-              </button>
+              <div key={u._id}>
+                <button onClick={() => toggle(u)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-wa-surface/70">
+                  <Avatar src={u.profilePic} name={u.fullName} size="size-12" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] truncate">{u.fullName}</span>
+                    <span className="block text-[12px] text-wa-muted truncate">{isOwnerUser(u) ? "Owner · always allowed" : u.email}</span>
+                  </span>
+                  <span className={`size-6 rounded-md border-2 flex items-center justify-center ${on ? "bg-[#21C063] border-[#21C063] text-[#0B141A]" : "border-wa-muted"}`}>{on && <Check size={15} strokeWidth={3.5} />}</span>
+                </button>
+                {showKinds && (
+                  <div className="flex flex-wrap gap-1.5 pl-[76px] pr-4 pb-2.5 -mt-0.5">
+                    {KINDS.map(([id, label]) => {
+                      const shown = !(hides[k] || []).includes(id);
+                      return (
+                        <button
+                          key={id}
+                          onClick={() => toggleKind(u, id)}
+                          aria-pressed={shown}
+                          title={shown ? `${label}: they see each other's ${label.toLowerCase()}` : `${label}: hidden from each other`}
+                          className={`h-7 px-3 rounded-full text-[11.5px] border transition-colors ${shown ? "bg-[#21C063]/15 border-[#21C063]/60 text-[#21C063]" : "border-wa-muted/50 text-wa-muted line-through"}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
       </div>
