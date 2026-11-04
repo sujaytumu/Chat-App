@@ -573,6 +573,31 @@ export const viewReel = async (req, res) => {
   }
 };
 
+// The owner can change a reel after posting: caption (hashtags follow it) and who can see it.
+export const updateReel = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
+    const r = await Reel.findOne({ _id: req.params.id, userId: req.user._id });
+    if (!r) return res.status(404).json({ error: "Not found" });
+    const { caption, audience } = req.body || {};
+    if (typeof caption === "string") {
+      r.caption = caption.trim().slice(0, 300);
+      r.hashtags = extractTags(r.caption);
+    }
+    if (audience !== undefined) {
+      if (audience?.mode === "only" && !(Array.isArray(audience.users) && audience.users.length)) return res.status(400).json({ error: "Pick at least one person" });
+      const a = cleanReelAudience(audience, req.user._id);
+      if (!a) return res.status(400).json({ error: "Bad audience" });
+      r.audience = a;
+    }
+    await r.save();
+    res.status(200).json({ caption: r.caption, hashtags: r.hashtags, audience: { mode: r.audience?.mode || "all", users: (r.audience?.users || []).map(String) } });
+  } catch (error) {
+    console.log("Error in updateReel:", error.message);
+    res.status(500).json({ error: "Couldn't save" });
+  }
+};
+
 export const deleteReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });

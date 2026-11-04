@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye } from "lucide-react";
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye, Pencil, ChevronRight } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -12,6 +12,7 @@ import { useAuthStore } from "../store/useAuthStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
 import StatusMusicSheet from "../components/StatusMusicSheet";
+import StatusAudienceSheet, { audienceLabel } from "../components/StatusAudienceSheet";
 import { SongBars } from "../components/StatusSong";
 import { ReelHeart, ReelComment, ReelRepost, ReelSend, ReelSave, ReelMenu } from "../components/icons/ReelIcons";
 import { readFileAsBase64 } from "../lib/fileUtils";
@@ -390,6 +391,8 @@ const NewReel = ({ onClose, onPosted }) => {
   const [showMusic, setShowMusic] = useState(false);
   const [extras, setExtras] = useState([]); // more videos picked in the same go: posted one after another after this one
   const [progress, setProgress] = useState(""); // "Posting 2 of 4"
+  const [audience, setAudience] = useState(null); // null = my default for reels
+  const [showAudience, setShowAudience] = useState(false);
   const pick = useRef(null);
   const prev = useRef(null);
   const songInput = useRef(null);
@@ -398,6 +401,9 @@ const NewReel = ({ onClose, onPosted }) => {
   const effLen = Math.max(0, effEnd - range[0]);
 
   useEffect(() => () => url && URL.revokeObjectURL(url), [url]);
+  useEffect(() => {
+    axiosInstance.get("/privacy").then((r) => setAudience((cur) => cur || r.data.reels)).catch(() => {});
+  }, []);
 
   const chooseMany = (list) => {
     const files = Array.from(list || []);
@@ -452,7 +458,7 @@ const NewReel = ({ onClose, onPosted }) => {
         r.onerror = bad;
         r.readAsDataURL(file);
       });
-      const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+      const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}), ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
       const posted = [res.data];
       for (let i = 0; i < extras.length; i++) {
         setProgress(`Posting ${i + 2} of ${extras.length + 1}`);
@@ -461,7 +467,7 @@ const NewReel = ({ onClose, onPosted }) => {
           const f = extras[i];
           const d = await probeDuration(f);
           if (d > MAX_SECONDS + 0.5) { toast.error(`${f.name} is longer than ${MAX_SECONDS}s — skipped`); continue; }
-          const r2 = await axiosInstance.post("/reels", { video: await toDataUrl(f), caption: "", duration: d, filter: "none" }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+          const r2 = await axiosInstance.post("/reels", { video: await toDataUrl(f), caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
           posted.push(r2.data);
         } catch (e2) {
           toast.error(e2.response?.data?.error || `Couldn't post video ${i + 2}`);
@@ -553,6 +559,12 @@ const NewReel = ({ onClose, onPosted }) => {
           placeholder="Write a caption…"
           className="w-full rounded-full bg-white/10 px-4 py-3 text-[15px] outline-none placeholder:text-white/50"
         />
+        <button type="button" onClick={() => setShowAudience(true)} disabled={busy} className="w-full flex items-center gap-3 rounded-full bg-white/10 px-4 py-3 text-left text-[15px] disabled:opacity-60 active:bg-white/15">
+          <Eye size={18} className="shrink-0" />
+          <span className="flex-1">Who can see this</span>
+          <span className="text-[13.5px] text-white/60">{audienceLabel(audience || { mode: "all", users: [] })}</span>
+          <ChevronRight size={17} className="text-white/50" />
+        </button>
         {file && !busy && <button onClick={() => pick.current?.click()} className="text-sm text-white/70 underline">Choose another video</button>}
       </div>
       <input
@@ -579,6 +591,49 @@ const NewReel = ({ onClose, onPosted }) => {
           onFiles={() => songInput.current?.click()}
         />
       )}
+      {showAudience && <StatusAudienceSheet noun="reel" value={audience || { mode: "all", users: [] }} onClose={() => setShowAudience(false)} onSave={(a) => { setAudience(a); setShowAudience(false); }} />}
+    </div>
+  );
+};
+
+// Edit your own reel after posting: caption and who can see it
+const EditReel = ({ reel, onClose, onSaved }) => {
+  const [caption, setCaption] = useState(reel.caption || "");
+  const [audience, setAudience] = useState(reel.audience || { mode: "all", users: [] });
+  const [showAudience, setShowAudience] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try {
+      const { data } = await axiosInstance.put(`/reels/${reel._id}`, { caption, audience });
+      onSaved(data);
+    } catch (e) {
+      toast.error(e.response?.data?.error || "Couldn't save");
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="absolute inset-0 z-[70] bg-black/60 flex items-end" onClick={busy ? undefined : onClose}>
+      <div className="w-full bg-neutral-900 rounded-t-3xl text-white wa-pop-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 pt-4 pb-2">
+          <h3 className="text-[18px] font-semibold">Edit reel</h3>
+          <button onClick={onClose} disabled={busy} aria-label="Close" className="size-9 flex items-center justify-center"><X size={22} /></button>
+        </div>
+        <div className="px-5 pb-3">
+          <label className="text-[12.5px] text-white/60">Caption</label>
+          <textarea value={caption} onChange={(e) => setCaption(e.target.value.slice(0, 300))} rows={3} placeholder="Write a caption…" className="mt-1 w-full rounded-2xl bg-white/10 px-4 py-3 text-[15px] outline-none resize-none placeholder:text-white/50" />
+          <button onClick={() => setShowAudience(true)} className="mt-3 w-full h-12 rounded-2xl bg-white/10 flex items-center gap-3 px-4 text-left active:bg-white/15">
+            <Eye size={19} />
+            <span className="flex-1 text-[15px]">Who can see this</span>
+            <span className="text-[13.5px] text-white/60">{audienceLabel(audience)}</span>
+            <ChevronRight size={18} className="text-white/50" />
+          </button>
+        </div>
+        <div className="px-5 pt-2 pb-[calc(16px+env(safe-area-inset-bottom))]">
+          <button onClick={save} disabled={busy} className="w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98] flex items-center justify-center gap-2">{busy ? <><Loader2 size={18} className="animate-spin" /> Saving…</> : "Save"}</button>
+        </div>
+      </div>
+      {showAudience && <StatusAudienceSheet noun="reel" value={audience} onClose={() => setShowAudience(false)} onSave={(a) => { setAudience(a); setShowAudience(false); }} />}
     </div>
   );
 };
@@ -1022,6 +1077,8 @@ const ReelsPage = () => {
     }
   };
 
+  const [editFor, setEditFor] = useState(null);
+
   const remove = async (reel) => {
     if (!window.confirm("Delete this reel?")) return;
     try {
@@ -1140,6 +1197,13 @@ const ReelsPage = () => {
           </div>
         )}
         {sendFor && <SendReelModal reel={sendFor} onClose={() => setSendFor(null)} />}
+        {editFor && (
+          <EditReel
+            reel={editFor}
+            onClose={() => setEditFor(null)}
+            onSaved={(d) => { setReels((l) => l.map((x) => (x._id === editFor._id ? { ...x, ...d } : x))); setEditFor(null); toast.success("Saved"); }}
+          />
+        )}
         {menuFor && (
           <div className="absolute inset-0 z-50 bg-black/60 flex items-end" onClick={() => setMenuFor(null)}>
             <div className="w-full bg-neutral-900 rounded-t-3xl pb-4 text-white wa-pop-in" onClick={(e) => e.stopPropagation()}>
@@ -1149,7 +1213,7 @@ const ReelsPage = () => {
                 { icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) },
                 { icon: Link2, label: "Copy link", run: async () => { const r = await asReel(menuFor); if (r) copyLink(r); } },
                 { icon: Bookmark, label: "Saved reels", run: () => setTab("saved") },
-                ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: BarChart3, label: "Insights", run: () => setInsightsFor(menuFor) }] : []),
+                ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Pencil, label: "Edit reel", run: () => setEditFor(menuFor) }, { icon: BarChart3, label: "Insights", run: () => setInsightsFor(menuFor) }] : []),
                 ...(!menuFor.mine ? [{ icon: EyeOff, label: "Not interested", run: () => hide(menuFor) }, { icon: Flag, label: "Report", run: () => setReportFor(menuFor), danger: true }] : []),
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Delete reel", run: () => remove(menuFor), danger: true }] : []),
                 ...(isOwner ? [{ icon: Flag, label: "Review reported reels", run: () => setReviewing(true) }] : []),
