@@ -12,6 +12,7 @@ import { sanitizeLiveLocation } from "../lib/liveLocation.js";
 import { visibleUserIds } from "../lib/visibility.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupSeen } from "../lib/groupReceipts.js";
+import { reelShareProblem } from "../lib/reelShare.js";
 
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
 
@@ -197,6 +198,9 @@ export const sendGroupMessage = async (req, res) => {
     if (group.permissions?.sendMessages === "admins" && !group.admins.some((a) => a.equals(senderId))) {
       return res.status(403).json({ error: "Only admins can send messages in this group" });
     }
+    // A reel link goes only if EVERY member may see that reel
+    const reelProblem = await reelShareProblem(text, senderId, group.members);
+    if (reelProblem) return res.status(403).json({ error: reelProblem });
 
     // @mentions: only real members of this group, at most 20
     const mentionIds = [

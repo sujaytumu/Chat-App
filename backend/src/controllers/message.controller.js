@@ -23,6 +23,7 @@ import Reminder from "../models/reminder.model.js";
 import { summarizeTranscript } from "../lib/chatSummary.js";
 import { sendFcmClearChat } from "../lib/fcm.js";
 import { visibleUserIds, canSee, forgetPair, isOwner } from "../lib/visibility.js";
+import { reelShareProblem } from "../lib/reelShare.js";
 
 // Max base64 image payload accepted (~6.5MB decodes to ~5MB image)
 const MAX_IMAGE_BASE64_LENGTH = 6.5 * 1024 * 1024;
@@ -349,6 +350,9 @@ const sendMessageCore = async (req, res) => {
     if ((req.user.blockedUsers || []).some((b) => String(b) === String(receiverId))) {
       return res.status(403).json({ error: "You blocked this contact. Unblock them to send messages." });
     }
+    // A reel link goes only to people the reel is shared with (checked here, not just in the app)
+    const reelProblem = await reelShareProblem(text, senderId, isSelf ? [] : [receiverId]);
+    if (reelProblem) return res.status(403).json({ error: reelProblem });
     // They blocked me: the message is kept on my side (one tick) but never reaches them.
     const blockedByThem = !!receiver?.blockedUsers?.some((b) => String(b) === String(senderId));
     const receiverSocketId = blockedByThem ? undefined : getReceiverSocketId(receiverId);
@@ -1165,6 +1169,13 @@ export const editMessage = async (req, res) => {
     if (Date.now() - new Date(message.createdAt).getTime() > EDIT_WINDOW_MS)
       return res.status(400).json({ error: "You can only edit a message within 15 minutes" });
     if (message.text === text) return res.status(200).json({ _id: message._id, text, editedAt: message.editedAt });
+    {
+      let to = [];
+      if (message.groupId) to = ((await Group.findById(message.groupId).select("members").lean())?.members) || [];
+      else if (message.receiverId) to = [message.receiverId];
+      const reelProblem = await reelShareProblem(text, req.user._id, to);
+      if (reelProblem) return res.status(403).json({ error: reelProblem });
+    }
     message.text = text;
     message.editedAt = new Date();
     await message.save();

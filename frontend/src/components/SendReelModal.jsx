@@ -40,7 +40,11 @@ const SendReelModal = ({ reel, onClose }) => {
     );
     const ok = results.filter((r) => r.status === "fulfilled").length;
     if (ok) toast.success(ok === 1 ? "Reel sent" : `Reel sent to ${ok} chats`);
-    if (ok < targets.length) toast.error("Some chats didn't get it");
+    if (ok < targets.length) {
+      // say why (for example the reel isn't shared with that person) instead of a vague failure
+      const why = results.find((r) => r.status === "rejected")?.reason?.response?.data?.error;
+      toast.error(why ? `${why}${targets.length > 1 ? " (some chats didn't get it)" : ""}` : "Some chats didn't get it");
+    }
     setSending(false);
     if (ok) onClose();
   };
