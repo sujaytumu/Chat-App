@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import ScheduledMessage from "../models/scheduledMessage.model.js";
 import Group from "../models/group.model.js";
-import { reelShareProblem } from "../lib/reelShare.js";
 
 const MIN_AHEAD_MS = 30 * 1000;
 const MAX_AHEAD_MS = 366 * 24 * 3600 * 1000;
@@ -26,12 +25,6 @@ export const scheduleMessage = async (req, res) => {
     if (ahead > MAX_AHEAD_MS) return res.status(400).json({ error: "That's too far ahead (1 year max)" });
     if (chatType === "group" && !(await Group.exists({ _id: chatId, members: myId }))) {
       return res.status(403).json({ error: "You are not a member of this group" });
-    }
-    {
-      // same rule as sending now (it is checked again when the message goes out)
-      const to = chatType === "group" ? ((await Group.findById(chatId).select("members").lean())?.members) || [] : [chatId];
-      const reelProblem = await reelShareProblem(text, myId, to);
-      if (reelProblem) return res.status(403).json({ error: reelProblem });
     }
     if ((await ScheduledMessage.countDocuments({ senderId: myId })) >= MAX_PENDING) {
       return res.status(400).json({ error: "You have too many scheduled messages" });
