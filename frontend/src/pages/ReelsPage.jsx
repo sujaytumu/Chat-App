@@ -600,12 +600,19 @@ const NewReel = ({ onClose, onPosted }) => {
 const EditReel = ({ reel, onClose, onSaved }) => {
   const [caption, setCaption] = useState(reel.caption || "");
   const [audience, setAudience] = useState(reel.audience || { mode: "all", users: [] });
+  const [audChanged, setAudChanged] = useState(false);
   const [showAudience, setShowAudience] = useState(false);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (reel.audience) return undefined;
+    let live = true; // an older cached copy of the reel: ask the server what it is set to now
+    axiosInstance.get(`/reels/${reel._id}`).then((r) => live && r.data?.audience && setAudience((cur) => (cur.mode === "all" && !cur.users.length ? r.data.audience : cur))).catch(() => {});
+    return () => { live = false; };
+  }, [reel._id, reel.audience]);
   const save = async () => {
     setBusy(true);
     try {
-      const { data } = await axiosInstance.put(`/reels/${reel._id}`, { caption, audience });
+      const { data } = await axiosInstance.put(`/reels/${reel._id}`, { caption, ...(audChanged ? { audience } : {}) });
       onSaved(data);
     } catch (e) {
       toast.error(e.response?.data?.error || "Couldn't save");
@@ -633,7 +640,11 @@ const EditReel = ({ reel, onClose, onSaved }) => {
           <button onClick={save} disabled={busy} className="w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98] flex items-center justify-center gap-2">{busy ? <><Loader2 size={18} className="animate-spin" /> Saving…</> : "Save"}</button>
         </div>
       </div>
-      {showAudience && <StatusAudienceSheet noun="reel" value={audience} onClose={() => setShowAudience(false)} onSave={(a) => { setAudience(a); setShowAudience(false); }} />}
+      {showAudience && (
+        <div className="fixed inset-0 z-[95]" onClick={(e) => e.stopPropagation()}>
+          <StatusAudienceSheet noun="reel" value={audience} onClose={() => setShowAudience(false)} onSave={(a) => { setAudience(a); setAudChanged(true); setShowAudience(false); }} />
+        </div>
+      )}
     </div>
   );
 };
