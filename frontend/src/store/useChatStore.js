@@ -11,6 +11,7 @@ import {
 } from "../lib/notificationSound";
 import { vibrationPattern } from "../lib/soundSettings";
 import { useChatLockStore, isChatLocked } from "./useChatLockStore";
+import { swapSent, settleByClientId, dropStalePending, settlePreview } from "../lib/sendState";
 
 function notifyIncoming(senderName, message, isGroup = false) {
   // Muted chats stay silent (the unread badge still counts).
@@ -43,6 +44,8 @@ const emitSeen = (senderId) => {
 };
 // Messages that couldn't reach the server (offline). Resent automatically when the connection returns.
 const outbox = new Map(); // tmpId -> { to, body }
+const sending = new Set(); // clock copies whose send is going on right now
+const isLiveSend = (id) => sending.has(id) || outbox.has(id);
 
 // The chat list shows a message you send EXACTLY when the chat itself does: the same message (with its clock) at once,
 // then the confirmed one. Both places read the same data, so they can never look different or lag behind each other.
@@ -63,6 +66,25 @@ const patchListMessage = (tmpId, patch) =>
     users: st.users.map((u) => (u.lastMessage?._id === tmpId ? { ...u, lastMessage: { ...u.lastMessage, ...patch } } : u)),
     groups: st.groups.map((g) => (g.lastMessage?._id === tmpId ? { ...g, lastMessage: { ...g.lastMessage, ...patch } } : g)),
   }));
+// The server confirmed a message: swap its clock copy for the real one EVERYWHERE it is held — the open chat, the saved
+// copy used when the chat is reopened (memory + phone storage) and the chat list — so no place can keep showing a clock.
+const settleSent = (chat, tmpId, real) => {
+  const key = chatKeyOf(chat);
+  const saved = swapSent(msgCache.get(key), tmpId, real);
+  if (saved) {
+    msgCache.set(key, saved);
+    const me = useAuthStore.getState().authUser?._id;
+    setTimeout(() => writeChatCache(me, `msgs-${key}`, saved.slice(-40)), 0);
+  }
+  useChatStore.setState((st) => {
+    const open = swapSent(st.messages, tmpId, real);
+    return {
+      ...(open ? { messages: open } : {}),
+      users: st.users.map((u) => (u.lastMessage?._id === tmpId ? { ...u, lastMessage: real } : u)),
+      groups: st.groups.map((g) => (g.lastMessage?._id === tmpId ? { ...g, lastMessage: real } : g)),
+    };
+  });
+};
 let flushing = false;
 const flushOutbox = async () => {
   if (flushing || !outbox.size) return;
@@ -79,10 +101,11 @@ const flushOutbox = async () => {
           res = await sendOverSocket(live, job.to, job.body);
         } catch (e) {
           if (!e?.transport) throw e;
-          res = await axiosInstance.post(`/messages/send/${job.to}`, job.body);
+          res = await axiosInstance.post(`/messages/send/${job.to}`, job.body, { timeout: 20000 });
         }
         outbox.delete(tmpId);
         const real = res.data;
+        settleSent({ type: "direct", data: { _id: job.to } }, tmpId, real);
         useChatStore.setState((st) => {
           const active = st.selectedChat?.type === "direct" && st.selectedChat.data._id === job.to;
           let used = false;
@@ -456,7 +479,7 @@ export const useChatStore = create((set, get) => ({
       return;
     }
     const userId = useAuthStore.getState().authUser?._id;
-    const cached = msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [];
+    const cached = dropStalePending(msgCache.get(key) || readChatCache(userId, `msgs-${key}`) || [], isLiveSend);
     set({ selectedChat: chat, messages: cached, hasMoreMessages: false, chatSearchOpen: false });
     if (useAuthStore.getState().authUser?.markedUnread?.includes(key)) get().setChatMarkedUnread(chat, false, { silent: true });
     if (chat.type === "direct" && !chat.data?.isSelf) emitSeen(chat.data._id);
@@ -514,6 +537,7 @@ export const useChatStore = create((set, get) => ({
       const inFlight = get().messages.filter(
         (m) =>
           (m.pending || m.failed) &&
+          !(m.pending && String(m._id).startsWith("tmp-") && !isLiveSend(m._id)) && // a clock copy nobody is sending any more
           !seenIds.has(m._id) &&
           !clientIds.has(m._id) &&
           // same text from me, sent at about the same time = the real copy is already in the list
@@ -528,13 +552,8 @@ export const useChatStore = create((set, get) => ({
       // The chat list shows the latest message's ticks: bring it up to date with what we just loaded, so a
       // read receipt seen inside the chat is never missing from the list.
       if (chat.type === "direct" && fresh.length) {
-        const last = fresh[fresh.length - 1];
         set((state) => ({
-          users: state.users.map((u) =>
-            u._id === chat.data._id && u.lastMessage && (u.lastMessage._id === last._id || new Date(last.createdAt) > new Date(u.lastMessage.createdAt))
-              ? { ...u, lastMessage: { ...u.lastMessage, ...last } }
-              : u
-          ),
+          users: state.users.map((u) => (u._id === chat.data._id && u.lastMessage ? { ...u, lastMessage: settlePreview(u.lastMessage, fresh) } : u)),
         }));
       }
       const key = chatKeyOf(chat);
@@ -613,6 +632,7 @@ export const useChatStore = create((set, get) => ({
           delivered: false,
           seen: false,
         };
+        sending.add(tmpId);
         set({ messages: [...messages, temp], replyingTo: null });
         // ...and in the chat list too, in the same instant: this chat jumps to the top showing the same message and clock
         setListPreview(selectedChat, temp);
@@ -630,20 +650,22 @@ export const useChatStore = create((set, get) => ({
             res = await sendOverSocket(live, selectedChat.data._id, body);
           } catch (e) {
             if (!e?.transport) throw e;
-            res = await axiosInstance.post(url, body);
+            res = await axiosInstance.post(url, body, { timeout: 20000 }); // no answer: it waits for a retry instead of "sending" for ever
           }
         } else {
-          res = await axiosInstance.post(url, payload);
+          res = await axiosInstance.post(url, payload, simple ? { timeout: 30000 } : undefined);
         }
       } catch (err) {
         // No answer at all (offline / bad signal): keep the message on screen with a "tap to retry" mark and
         // send it by itself the moment the connection is back — never lose what was typed.
         if (simple && me && selectedChat.type === "direct" && !selectedChat.data?.isSelf && !err?.response) {
           outbox.set(tmpId, { to: selectedChat.data._id, body: { ...payload, clientId: tmpId } });
+          sending.delete(tmpId);
           set((state) => ({ messages: state.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
           patchListMessage(tmpId, { pending: false, failed: true });
           return;
         }
+        sending.delete(tmpId);
         if (simple) {
           set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
           // the message never went: the list goes back to what it showed before
@@ -660,19 +682,9 @@ export const useChatStore = create((set, get) => ({
         emitSeen(selectedChat.data._id);
       }
       if (simple && me) {
-        set((state) => {
-          // swap the clock copy for the real message — and drop any copy a refresh already brought in
-          let used = false;
-          const out = [];
-          for (const m of state.messages) {
-            if (m._id === tmpId || m._id === res.data._id) {
-              if (used) continue;
-              used = true;
-              out.push(res.data);
-            } else out.push(m);
-          }
-          return { messages: out };
-        });
+        // swap the clock copy for the real message in the open chat, in the saved copy of this chat and in the list
+        sending.delete(tmpId);
+        settleSent(selectedChat, tmpId, res.data);
       } else {
         set((state) =>
           state.selectedChat?.data?._id === selectedChat.data._id
@@ -1049,6 +1061,11 @@ export const useChatStore = create((set, get) => ({
 
       if (isActiveChat) {
         if (messages.some((m) => m._id === message._id)) return;
+        const settled = settleByClientId(messages, message);
+        if (settled) {
+          set({ messages: settled });
+          return;
+        }
         set({ messages: [...messages, message] });
         if (document.visibilityState === "visible") emitSeen(message.senderId);
       } else {
