@@ -371,6 +371,11 @@ export const useCallStore = create((set, get) => ({
     // valid and must not carry on creating a connection / ringing the callee.
     const isStale = () => get().callStatus !== "calling" || callClaimedAt !== claimedAt;
 
+    // The soft "calling" tone starts the instant Call is tapped (not after the microphone is ready), so the caller
+    // gets sound and feedback at once. Any failure below ends the call, which also stops the tone.
+    primeAudio();
+    startCallingTone();
+
     const icePromise = getIceConfig(); // fetched while the microphone starts, not after it
     let stream;
     try {
@@ -400,9 +405,7 @@ export const useCallStore = create((set, get) => ({
 
       // "Ringing…" is only shown once their device confirms it is ringing (callRingingAck).
       // Being "online" is not proof: a phone with a stale connection looks online but never rings.
-      // Until then the caller hears the single "calling" tap.
-      primeAudio();
-      startCallingTone();
+      // Until then the caller hears the single "calling" tap (already started above).
 
       // Never let a slow / sleeping server hold the call back: use the cached relay list, or fall
       // back to the built-in one after 1.5 s (the list is fetched in the background at app start).
@@ -483,20 +486,16 @@ export const useCallStore = create((set, get) => ({
     set({ isAnswering: true });
 
     try {
-      const media = await acquireCallMedia(AUDIO_CONSTRAINTS, callType);
-      const stream = media.stream;
-      if (media.videoDropped) {
-        callType = "audio";
-        set({ callType: "audio" });
-      }
-      set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now(), isAnswering: false });
-
+      // Answer is instant: the microphone starts at the same moment as the connection setup (relay list, peer
+      // connection, their offer), instead of one after the other. Only the mic waits for the person's permission.
+      const mediaPromise = acquireCallMedia(AUDIO_CONSTRAINTS, callType);
+      mediaPromise.catch(() => {}); // handled where it is awaited below
       const ice = await Promise.race([getIceConfig(), new Promise((r) => setTimeout(() => r(ICE_SERVERS), 1500))]);
-      pc = new RTCPeerConnection({ ...ice, iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
-      attachConnectionWatchdog(pc, get);
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      const peer = new RTCPeerConnection({ ...ice, iceCandidatePoolSize: 4, bundlePolicy: "max-bundle" });
+      pc = peer;
+      attachConnectionWatchdog(peer, get);
 
-      pc.ontrack = (event) => {
+      peer.ontrack = (event) => {
         set({ remoteStream: remoteStreamFor(event, get) });
         // If the other side upgraded to video mid-call, a video track
         // arrives after the call started as audio-only — switch our UI too.
@@ -504,28 +503,45 @@ export const useCallStore = create((set, get) => ({
           set({ callType: "video" });
         }
       };
-      pc.onicecandidate = (event) => {
+      peer.onicecandidate = (event) => {
         if (event.candidate) {
           socket.emit("iceCandidate", { toUserId: remoteUser._id, candidate: event.candidate });
         }
       };
-      pc.onnegotiationneeded = async () => {
+      peer.onnegotiationneeded = async () => {
         if (!initialNegotiationDone) return;
         try {
-          const renegotiationOffer = await pc.createOffer();
-          await pc.setLocalDescription(renegotiationOffer);
+          const renegotiationOffer = await peer.createOffer();
+          await peer.setLocalDescription(renegotiationOffer);
           socket.emit("webrtcRenegotiate", { toUserId: remoteUser._id, offer: renegotiationOffer });
         } catch {
           // ignore — best-effort renegotiation
         }
       };
 
-      await pc.setRemoteDescription(new RTCSessionDescription(incomingOffer));
-      pendingCandidates.forEach((c) => pc.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
+      const remoteSet = peer.setRemoteDescription(new RTCSessionDescription(incomingOffer)); // runs while the mic starts
+      remoteSet.catch(() => {});
+
+      const media = await mediaPromise;
+      const stream = media.stream;
+      if (media.videoDropped) {
+        callType = "audio";
+        set({ callType: "audio" });
+      }
+      // The call ended (they hung up / it was cancelled) while the mic was starting: let go of it and stop.
+      if (pc !== peer || get().callStatus === "idle") {
+        stopLocalTracks(stream);
+        set({ isAnswering: false });
+        return;
+      }
+      set({ localStream: stream, callStatus: "in-call", callStartedAt: Date.now(), isAnswering: false });
+      await remoteSet;
+      stream.getTracks().forEach((track) => peer.addTrack(track, stream)); // joins the transceivers their offer created
+      pendingCandidates.forEach((c) => peer.addIceCandidate(new RTCIceCandidate(c)).catch(() => {}));
       pendingCandidates = [];
 
-      const answer = tuneOpus(await pc.createAnswer());
-      await pc.setLocalDescription(answer);
+      const answer = tuneOpus(await peer.createAnswer());
+      await peer.setLocalDescription(answer);
       initialNegotiationDone = true;
 
       const result = await emitWithRetry(socket, "answerCall", { toUserId: remoteUser._id, answer, callId: currentCallId || undefined }, {
