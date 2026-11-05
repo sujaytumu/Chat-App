@@ -7,6 +7,7 @@ import CallLink from "../models/callLink.model.js";
 import { sendPushToUsers, sendPushToUser } from "./webPush.js";
 import Reminder from "../models/reminder.model.js";
 import Message from "../models/message.model.js";
+import { purgeExpiredAccounts } from "../controllers/auth.controller.js";
 import { destroyPrivateAsset, VIEW_ONCE_TTL_MS } from "./privateMedia.js";
 
 // Every few seconds: send whatever has come due, through the normal send code
@@ -103,6 +104,7 @@ async function tick() {
   await purgeExpiredViewOnce().catch((e) => console.log("View-once purge error:", e.message));
   await messageReminders().catch((e) => console.log("Message reminder error:", e.message));
   await callReminders().catch((e) => console.log("Call reminder error:", e.message));
+  await purgeExpiredAccounts().catch((e) => console.log("Account purge error:", e.message));
   await endExpiredMutes().catch((e) => console.log("Mute expiry error:", e.message));
   const due = await ScheduledMessage.find({ sendAt: { $lte: new Date() } }).sort({ sendAt: 1 }).limit(30).lean();
   for (const item of due) {

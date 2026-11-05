@@ -86,7 +86,25 @@ export const useAuthStore = create((set, get) => ({
       get().connectSocket();
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.message || "Couldn't sign in");
+      const d = error.response?.data;
+      // Deleted less than 30 days ago: offer to bring everything back.
+      if (d?.restorable && d.restoreToken) {
+        const yes = window.confirm(`${d.message}\n\nRestore this account with all your chats, groups and media?`);
+        if (yes) {
+          try {
+            const r = await axiosInstance.post("/auth/restore", { restoreToken: d.restoreToken });
+            set({ authUser: r.data });
+            toast.success("Welcome back - your account is restored");
+            get().connectSocket();
+            return true;
+          } catch (err) {
+            toast.error(err.response?.data?.message || "Couldn't restore the account");
+            return false;
+          }
+        }
+        return false;
+      }
+      toast.error(d?.message || "Couldn't sign in");
       return false;
     } finally {
       set({ isLoggingIn: false });

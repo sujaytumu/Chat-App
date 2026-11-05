@@ -51,15 +51,15 @@ export const AccountPage = () => {
     }
   };
 
-  const deleteAccount = async (e) => {
-    e.preventDefault();
+  const deleteAccount = async (e, permanent = false) => {
+    e?.preventDefault?.();
     setDeleting(true);
     try {
-      await axiosInstance.delete("/auth/account", { data: { password: delPw } });
+      await axiosInstance.delete("/auth/account", { data: { password: delPw, permanent } });
       useAuthStore.getState().disconnectSocket();
       clearChatCache();
       useAuthStore.setState({ authUser: null });
-      toast.success("Your account was deleted");
+      toast.success(permanent ? "Your account was deleted" : "Account deleted. Log in within 30 days to restore it.");
     } catch (err) {
       toast.error(err?.response?.data?.message || "Could not delete the account");
       setDeleting(false);
@@ -181,8 +181,9 @@ export const AccountPage = () => {
       <div className={card}>
         <p className="text-[13.5px] text-red-500 font-medium">Delete account</p>
         <p className="text-[11.5px] text-wa-muted mt-0.5">
-          Permanently removes your profile, statuses and group memberships. Messages you already sent stay in other
-          people&apos;s chats. This can&apos;t be undone.
+          Your account is hidden right away and erased after 30 days. Until then, logging in again with the same
+          email and password restores your chats, groups and media. Messages you already sent stay in other
+          people&apos;s chats.
         </p>
         {showDelete ? (
           <form onSubmit={deleteAccount} className="mt-3">
@@ -202,6 +203,14 @@ export const AccountPage = () => {
                 {deleting ? <Loader2 className="animate-spin" size={18} /> : "Delete my account"}
               </button>
             </div>
+            <button
+              type="button"
+              disabled={!delPw || deleting}
+              className="mt-2 w-full text-[12px] text-red-500/80 underline disabled:opacity-40"
+              onClick={() => { if (window.confirm("Erase everything now? You will NOT be able to restore this account.")) deleteAccount(null, true); }}
+            >
+              Delete permanently now (can&apos;t be restored)
+            </button>
           </form>
         ) : (
           <div className="flex justify-end mt-3">

@@ -7,7 +7,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 import { sendMail, mailEnabled } from "../lib/mailer.js";
-import { endOtherSessions } from "./auth.controller.js";
+import { endOtherSessions, restoreDaysLeft } from "./auth.controller.js";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
 const RESEND_AFTER_MS = 60 * 1000;
@@ -30,7 +30,8 @@ async function findByEmail(raw, select = "") {
   if (!user) {
     user = await User.findOne({ email: { $regex: `^${email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" } }).select(select);
   }
-  return user && !user.deleted ? user : null;
+  // an account deleted less than 30 days ago can still reset its password (then log in to restore it)
+  return user && (!user.deleted || restoreDaysLeft(user) > 0) ? user : null;
 }
 
 export const forgotPassword = async (req, res) => {
@@ -127,7 +128,7 @@ export const resetPassword = async (req, res) => {
 
     const user = await User.findById(payload.userId).select("+passwordReset.otpHash");
     // The token only works while the code it was issued for is still pending, so it can be used once.
-    if (!user || user.deleted || !user.passwordReset?.otpHash || user.passwordReset.otpHash.slice(0, 16) !== payload.rv) {
+    if (!user || (user.deleted && restoreDaysLeft(user) <= 0) || !user.passwordReset?.otpHash || user.passwordReset.otpHash.slice(0, 16) !== payload.rv) {
       return res.status(400).json({ message: "This reset timed out. Start again." });
     }
 

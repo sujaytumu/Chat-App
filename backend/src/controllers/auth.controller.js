@@ -26,6 +26,9 @@ export const signup = async (req, res) => {
 
     const user = await User.findOne({ email });
 
+    if (user?.deleted) {
+      return res.status(400).json({ message: "This email belongs to a deleted account that can still be restored. Log in with it to get everything back." });
+    }
     if (user) return res.status(400).json({ message: "Email already exists" });
 
     const salt = await bcrypt.genSalt(10);
@@ -88,6 +91,14 @@ export const login = async (req, res) => {
     if (!isPasswordCorrect) {
       console.log(`login failed: wrong password for ${mask(user.email)} (typed ${password.length} characters)`);
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    // Deleted account, password right: inside the 30-day window it can be restored (the person confirms first).
+    if (user.deleted) {
+      const left = restoreDaysLeft(user);
+      if (left <= 0) return res.status(400).json({ message: "Invalid credentials" });
+      const restoreToken = jwt.sign({ userId: user._id, purpose: "restore" }, process.env.JWT_SECRET, { expiresIn: "10m" });
+      return res.status(403).json({ restorable: true, daysLeft: left, restoreToken, message: `This account was deleted. You can restore it for ${left} more day${left === 1 ? "" : "s"}.` });
     }
 
     // Two-step verification: password was right, now ask for the 6-digit code.
@@ -284,44 +295,111 @@ export const logoutAllDevices = async (req, res) => {
   }
 };
 
-// Permanently close the account (password required). Removes the person from
-// groups and deletes their statuses; their profile is wiped and they vanish
-// from everyone's contact list. Messages already sent stay in other people's chats.
+// ---- Account deletion: kept 30 days so it can be undone, then erased for good ----
+export const RESTORE_DAYS = 30;
+export const restoreDaysLeft = (user) => {
+  if (!user?.deleted || !user.deletedAt) return 0;
+  return Math.max(0, Math.ceil((user.deletedAt.getTime() + RESTORE_DAYS * 86400000 - Date.now()) / 86400000));
+};
+
+// The final erase (used after the 30 days, or at once when the person asks for it): profile wiped, out of every
+// group, statuses gone. Messages already sent stay in other people's chats.
+export async function wipeAccount(user) {
+  const uid = user._id;
+  await Status.deleteMany({ userId: uid });
+  await Group.updateMany({ members: uid }, { $pull: { members: uid, admins: uid } });
+  await Group.deleteMany({ members: { $size: 0 } });
+  const salt = await bcrypt.genSalt(10);
+  user.fullName = "Deleted account";
+  user.email = `deleted-${uid}@deleted.invalid`;
+  user.password = await bcrypt.hash(`${uid}-${Date.now()}-${Math.random()}`, salt);
+  user.profilePic = "";
+  user.about = "";
+  user.pushSubscriptions = [];
+  user.uiPrefs = {};
+  user.archivedChats = [];
+  user.pinnedChats = [];
+  user.mutedChats = [];
+  user.deletedGroups = [];
+  user.deleted = true;
+  user.deletedAt = user.deletedAt || new Date();
+  user.tokenVersion = (user.tokenVersion || 0) + 1;
+  await user.save();
+}
+
+// Erase accounts whose 30 days are up (called from the scheduler).
+export async function purgeExpiredAccounts() {
+  const cutoff = new Date(Date.now() - RESTORE_DAYS * 86400000);
+  const due = await User.find({ deleted: true, deletedAt: { $lte: cutoff }, email: { $not: /@deleted\.invalid$/ } }).limit(20);
+  for (const u of due) {
+    await wipeAccount(u);
+    console.log(`Account ${u._id} erased after ${RESTORE_DAYS} days`);
+  }
+}
+
+// Delete the account (password required). By default it is hidden at once and can be restored for 30 days
+// (log in with the same email and password). { permanent: true } erases it immediately.
 export const deleteAccount = async (req, res) => {
   try {
-    const { password } = req.body || {};
+    const { password, permanent } = req.body || {};
     if (typeof password !== "string" || !password) return res.status(400).json({ message: "Enter your password" });
 
-    const user = await User.findById(req.user._id);
+    const user = await User.findById(req.user._id).select("+deletedGroups");
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(400).json({ message: "That password isn't right" });
     }
 
     const uid = user._id;
-    await Status.deleteMany({ userId: uid });
-    await Group.updateMany({ members: uid }, { $pull: { members: uid, admins: uid } });
-    await Group.deleteMany({ members: { $size: 0 } });
-
-    const salt = await bcrypt.genSalt(10);
-    user.fullName = "Deleted account";
-    user.email = `deleted-${uid}@deleted.invalid`;
-    user.password = await bcrypt.hash(`${uid}-${Date.now()}-${Math.random()}`, salt);
-    user.profilePic = "";
-    user.about = "";
-    user.pushSubscriptions = [];
-    user.uiPrefs = {};
-    user.archivedChats = [];
-    user.pinnedChats = [];
-    user.mutedChats = [];
-    user.deleted = true;
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
-    await user.save();
+    if (permanent === true) {
+      await wipeAccount(user);
+    } else {
+      // Hidden now, but nothing is lost: groups are remembered so they come back with the account.
+      const groups = await Group.find({ members: uid }).select("admins").lean();
+      user.deletedGroups = groups.map((g) => ({ group: g._id, admin: (g.admins || []).some((a) => String(a) === String(uid)) }));
+      await Status.deleteMany({ userId: uid });
+      await Group.updateMany({ members: uid }, { $pull: { members: uid, admins: uid } });
+      user.pushSubscriptions = [];
+      user.deleted = true;
+      user.deletedAt = new Date();
+      user.tokenVersion = (user.tokenVersion || 0) + 1;
+      await user.save();
+    }
 
     await endOtherSessions(uid);
     res.cookie("jwt", "", { maxAge: 0 });
-    res.status(200).json({ message: "Account deleted" });
+    res.status(200).json({ message: permanent === true ? "Account deleted" : `Account deleted. You can restore it within ${RESTORE_DAYS} days by logging in again.` });
   } catch (error) {
     console.log("Error in deleteAccount controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// Bring a deleted account back (the 10-minute restoreToken comes from a correct-password login).
+export const restoreAccount = async (req, res) => {
+  try {
+    const { restoreToken } = req.body || {};
+    if (typeof restoreToken !== "string") return res.status(400).json({ message: "Invalid input" });
+    let payload;
+    try { payload = jwt.verify(restoreToken, process.env.JWT_SECRET); } catch { return res.status(400).json({ message: "That took too long. Log in again." }); }
+    if (payload?.purpose !== "restore") return res.status(400).json({ message: "That took too long. Log in again." });
+
+    const user = await User.findById(payload.userId).select("+deletedGroups");
+    if (!user || !user.deleted || restoreDaysLeft(user) <= 0) return res.status(400).json({ message: "This account can't be restored any more." });
+
+    for (const g of user.deletedGroups || []) {
+      const update = { $addToSet: { members: user._id, ...(g.admin ? { admins: user._id } : {}) } };
+      await Group.updateOne({ _id: g.group }, update); // a group that no longer exists is simply skipped
+    }
+    user.deleted = false;
+    user.deletedAt = null;
+    user.deletedGroups = [];
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    await user.save();
+
+    generateToken(user._id, res, user.tokenVersion || 0, req);
+    res.status(200).json(accountPayload(user));
+  } catch (error) {
+    console.log("Error in restoreAccount controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 };
