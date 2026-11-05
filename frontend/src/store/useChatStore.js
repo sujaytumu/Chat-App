@@ -43,6 +43,26 @@ const emitSeen = (senderId) => {
 };
 // Messages that couldn't reach the server (offline). Resent automatically when the connection returns.
 const outbox = new Map(); // tmpId -> { to, body }
+
+// The chat list shows a message you send EXACTLY when the chat itself does: the same message (with its clock) at once,
+// then the confirmed one. Both places read the same data, so they can never look different or lag behind each other.
+const newestFirst = (a, b) => {
+  const at = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : new Date(a.createdAt || 0).getTime();
+  const bt = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : new Date(b.createdAt || 0).getTime();
+  return bt - at;
+};
+const setListPreview = (chat, message) =>
+  useChatStore.setState((st) =>
+    chat.type === "direct"
+      ? { users: st.users.map((u) => (u._id === chat.data._id ? { ...u, lastMessage: message } : u)).sort(newestFirst) }
+      : { groups: st.groups.map((g) => (g._id === chat.data._id ? { ...g, lastMessage: message } : g)).sort(newestFirst) }
+  );
+// A waiting / failed message changes state (clock -> "Tap to retry"): the list preview follows.
+const patchListMessage = (tmpId, patch) =>
+  useChatStore.setState((st) => ({
+    users: st.users.map((u) => (u.lastMessage?._id === tmpId ? { ...u, lastMessage: { ...u.lastMessage, ...patch } } : u)),
+    groups: st.groups.map((g) => (g.lastMessage?._id === tmpId ? { ...g, lastMessage: { ...g.lastMessage, ...patch } } : g)),
+  }));
 let flushing = false;
 const flushOutbox = async () => {
   if (flushing || !outbox.size) return;
@@ -50,6 +70,7 @@ const flushOutbox = async () => {
   try {
     for (const [tmpId, job] of [...outbox]) {
       useChatStore.setState((st) => ({ messages: st.messages.map((m) => (m._id === tmpId ? { ...m, pending: true, failed: false } : m)) }));
+      patchListMessage(tmpId, { pending: true, failed: false });
       try {
         const live = useAuthStore.getState().socket;
         let res;
@@ -84,9 +105,11 @@ const flushOutbox = async () => {
           // the server refused it (blocked, not allowed…): stop trying
           outbox.delete(tmpId);
           useChatStore.setState((st) => ({ messages: st.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
+          patchListMessage(tmpId, { pending: false, failed: true });
           toast.error(err.response?.data?.error || "Message not sent");
         } else {
           useChatStore.setState((st) => ({ messages: st.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
+          patchListMessage(tmpId, { pending: false, failed: true });
           break; // still offline — try again later
         }
       }
@@ -565,6 +588,7 @@ export const useChatStore = create((set, get) => ({
   sendMessage: async (messageData) => {
     const { selectedChat, messages, replyingTo } = get();
     if (!selectedChat) return;
+    const prevPreview = selectedChat.type === "direct" ? get().users.find((u) => u._id === selectedChat.data._id)?.lastMessage : get().groups.find((g) => g._id === selectedChat.data._id)?.lastMessage;
     try {
       const url =
         selectedChat.type === "direct"
@@ -590,6 +614,9 @@ export const useChatStore = create((set, get) => ({
           seen: false,
         };
         set({ messages: [...messages, temp], replyingTo: null });
+        // ...and in the chat list too, in the same instant: this chat jumps to the top showing the same message and clock
+        setListPreview(selectedChat, temp);
+        if (selectedChat.type === "direct") set((state) => ({ users: state.users.map((u) => (u._id === selectedChat.data._id && u.unreadCount ? { ...u, unreadCount: 0 } : u)) })); // replying = I've read it
       }
       let res;
       try {
@@ -614,9 +641,17 @@ export const useChatStore = create((set, get) => ({
         if (simple && me && selectedChat.type === "direct" && !selectedChat.data?.isSelf && !err?.response) {
           outbox.set(tmpId, { to: selectedChat.data._id, body: { ...payload, clientId: tmpId } });
           set((state) => ({ messages: state.messages.map((m) => (m._id === tmpId ? { ...m, pending: false, failed: true } : m)) }));
+          patchListMessage(tmpId, { pending: false, failed: true });
           return;
         }
-        if (simple) set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
+        if (simple) {
+          set((state) => ({ messages: state.messages.filter((m) => m._id !== tmpId) }));
+          // the message never went: the list goes back to what it showed before
+          useChatStore.setState((st) => ({
+            users: st.users.map((u) => (u.lastMessage?._id === tmpId ? { ...u, lastMessage: prevPreview || null } : u)),
+            groups: st.groups.map((g) => (g.lastMessage?._id === tmpId ? { ...g, lastMessage: prevPreview || null } : g)),
+          }));
+        }
         throw err;
       }
       // Replying means I've read their messages: clear the unread badge right away (the server does the same).
