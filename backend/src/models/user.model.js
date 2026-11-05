@@ -42,6 +42,9 @@ const userSchema = new mongoose.Schema(
     tokenVersion: { type: Number, default: 0 },
     // Set when the person deletes their account (the record stays only so old messages still resolve).
     deleted: { type: Boolean, default: false },
+    // Deleted accounts stay recoverable for 30 days: when it was deleted, and which groups to rejoin on restore.
+    deletedAt: { type: Date, default: null },
+    deletedGroups: { type: [{ _id: false, group: mongoose.Schema.Types.ObjectId, admin: Boolean }], default: [], select: false },
     // Same key format: chats pinned to the top (max 3) and chats whose
     // notifications are muted.
     pinnedChats: { type: [String], default: [] },

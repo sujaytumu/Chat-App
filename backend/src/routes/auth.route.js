@@ -1,7 +1,7 @@
 import express from "express";
 import { changePassword, checkAuth, login, logout, signup, updateProfile, getPreferences, updatePreferences, logoutAllDevices,
   listSessions,
-  endSession, deleteAccount, qrNew, qrPoll, qrLookup, qrApprove, checkUsername, setUsername, findByUsername } from "../controllers/auth.controller.js";
+  endSession, deleteAccount, restoreAccount, qrNew, qrPoll, qrLookup, qrApprove, checkUsername, setUsername, findByUsername } from "../controllers/auth.controller.js";
 import {
   loginWithTwoFactor,
   setupTwoFactor,
@@ -21,6 +21,7 @@ router.post("/forgot-password", forgotPassword);
 router.post("/forgot-password/verify", verifyResetCode);
 router.post("/forgot-password/reset", resetPassword);
 router.post("/logout", logout);
+router.post("/restore", restoreAccount);
 router.post("/login/2fa", loginWithTwoFactor);
 router.post("/qr/new", qrNew);
 router.post("/qr/poll", qrPoll);
