@@ -44,6 +44,8 @@ const emitSeen = (senderId) => {
 };
 // Messages that couldn't reach the server (offline). Resent automatically when the connection returns.
 const outbox = new Map(); // tmpId -> { to, body }
+let usersRetried = false;
+let groupsRetried = false;
 const sending = new Set(); // clock copies whose send is going on right now
 const isLiveSend = (id) => sending.has(id) || outbox.has(id);
 
@@ -237,11 +239,14 @@ export const useChatStore = create((set, get) => ({
     set({ isUsersLoading: get().users.length === 0 });
     try {
       const res = await axiosInstance.get("/messages/users");
+      usersRetried = false;
       set({ users: res.data });
       writeChatCache(userId, "users", res.data);
       setTimeout(() => prefetchTopChats(res.data), 400);
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to load users");
+      // No popup: the saved list stays on screen and the next refresh (or one quiet retry) fills it in.
+      console.warn("Couldn't refresh users:", error?.message);
+      if (!usersRetried) { usersRetried = true; setTimeout(() => get().getUsers?.(), 5000); }
     } finally {
       set({ isUsersLoading: false });
     }
@@ -262,10 +267,12 @@ export const useChatStore = create((set, get) => ({
     set({ isGroupsLoading: get().groups.length === 0 });
     try {
       const res = await axiosInstance.get("/groups");
+      groupsRetried = false;
       set({ groups: res.data });
       writeChatCache(userId, "groups", res.data);
     } catch (error) {
-      toast.error(error.response?.data?.error || "Failed to load groups");
+      console.warn("Couldn't refresh groups:", error?.message);
+      if (!groupsRetried) { groupsRetried = true; setTimeout(() => get().getGroups?.(), 5000); }
     } finally {
       set({ isGroupsLoading: false });
     }
