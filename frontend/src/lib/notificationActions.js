@@ -21,11 +21,16 @@ function openChat(type, id, goHome) {
   };
   if (tryOpen()) return;
   let timer = null;
+  // Opening the chat changes the store, which calls this listener again - so it must be switched off BEFORE
+  // opening, or it re-enters itself until "Maximum call stack size exceeded".
+  let opening = false;
   const unsubscribe = useChatStore.subscribe(() => {
+    if (opening) return;
+    opening = true;
     if (tryOpen()) {
       unsubscribe();
       clearTimeout(timer);
-    }
+    } else opening = false;
   });
   timer = setTimeout(unsubscribe, 10_000);
 }

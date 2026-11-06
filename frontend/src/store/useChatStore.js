@@ -1111,17 +1111,17 @@ export const useChatStore = create((set, get) => ({
       const { selectedChat, messages } = get();
       const isActiveChat = selectedChat?.type === "group" && selectedChat.data._id === message.groupId;
 
+      const mine = message.senderId === useAuthStore.getState().authUser?._id;
       if (isActiveChat) {
         // My own message comes back through the group broadcast AND as the send's answer: show it once.
         if (messages.some((m) => m._id === message._id)) return;
-        const mine = message.senderId === useAuthStore.getState().authUser?._id;
         if (mine && sending.size && messages.some((m) => m.pending && isTmp(m) && sending.has(m._id) && m.groupId === message.groupId && m.text === message.text)) return; // the send's answer replaces the clock copy
         set({ messages: [...messages, message] });
       } else {
         set((state) => ({
           groups: state.groups.map((g) =>
             g._id === message.groupId
-              ? { ...g, unreadCount: (g.unreadCount || 0) + 1, lastMessage: message }
+              ? { ...g, unreadCount: mine ? g.unreadCount || 0 : (g.unreadCount || 0) + 1, lastMessage: message }
               : g
           ),
         }));
