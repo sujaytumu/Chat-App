@@ -574,13 +574,13 @@ export const createReelRaw = async (req, res) => {
     if (today >= 200) return fail(429, "You can post up to 200 reels a day - try again tomorrow");
     const type = String(req.headers["content-type"] || "");
     if (!/^video\//i.test(type) && !/octet-stream/i.test(type)) return fail(400, "That file isn't a video", `type=${type}`);
-    if (bytes > 52 * 1024 * 1024) return fail(413, "That video is too large (max about 50 MB)");
+    if (bytes > 202 * 1024 * 1024) return fail(413, "That video is too large (max 200 MB)");
     let meta = {};
     try { meta = JSON.parse(decodeURIComponent(String(req.headers["x-reel-meta"] || "{}"))) || {}; } catch { meta = {}; }
     const secs = Number(meta.duration) || 0;
     if (secs > MAX_SECONDS + 0.5) return fail(400, `Reels can be at most ${MAX_SECONDS} seconds`, `secs=${secs}`);
     const up = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream({ folder: "chat-app/reels", resource_type: "video" }, (err, r) => (err ? reject(err) : resolve(r)));
+      const stream = cloudinary.uploader.upload_chunked_stream({ folder: "chat-app/reels", resource_type: "video", chunk_size: 20 * 1000 * 1000 }, (err, r) => (err ? reject(err) : resolve(r)));
       req.on("error", reject);
       req.on("aborted", () => reject(new Error("upload cancelled by the phone")));
       req.pipe(stream);
