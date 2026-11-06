@@ -487,7 +487,7 @@ export const createReel = async (req, res) => {
     const { video, caption, duration, filter, trim, song } = req.body || {};
     const secs = Number(duration) || 0;
     const today = await Reel.countDocuments({ userId: req.user._id, createdAt: { $gt: new Date(Date.now() - 24 * 3600 * 1000) } });
-    if (today >= 20) return res.status(429).json({ error: "You can post up to 20 reels a day — try again tomorrow" });
+    if (today >= 200) return res.status(429).json({ error: "You can post up to 200 reels a day — try again tomorrow" });
     if (typeof video !== "string" || !video.startsWith("data:video/")) return res.status(400).json({ error: "Pick a video" });
     if (video.length > MAX_REEL_BASE64) return res.status(413).json({ error: "That video is too large (max about 50 MB)" });
     if (secs > MAX_SECONDS + 0.5) return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
