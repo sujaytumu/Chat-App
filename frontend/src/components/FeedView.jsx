@@ -17,7 +17,22 @@ import { optimizeImage } from "../lib/cdn";
 // 4:5 and 1.91:1, like Instagram) - so swiping to a taller or wider photo never resizes or stretches the others.
 const ratioCache = new Map(); // photo address -> frame shape, so a post doesn't jump when it scrolls back into view
 const frameShape = (w, h) => Math.min(1.91, Math.max(0.8, w / h));
-const PostImages = ({ images, onOpen, onDouble }) => {
+const PT_POS = { top: "12%", mid: "50%", bot: "88%" };
+const PT_SIZES = [["S", 0.7], ["M", 1], ["L", 1.5]];
+const PT_COLORS = ["#ffffff", "#111111", "#ffd43b", "#21C063", "#ff6b9d", "#4dabf7"];
+
+// The line written on a photo, drawn over it (so it can be edited after posting)
+const PhotoLine = ({ t }) =>
+  t?.text ? (
+    <div
+      className="absolute inset-x-0 text-center font-bold leading-[1.25] whitespace-pre-wrap break-words pointer-events-none px-[6%]"
+      style={{ top: PT_POS[t.pos] || PT_POS.bot, transform: "translateY(-50%)", color: t.color || "#fff", fontSize: `${5.5 * (t.size || 1)}cqw`, textShadow: "0 0 3px rgba(0,0,0,.75), 0 1px 4px rgba(0,0,0,.6)" }}
+    >
+      {t.text}
+    </div>
+  ) : null;
+
+const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   const [i, setI] = useState(0);
   const [ar, setAr] = useState(() => ratioCache.get(images[0]) || 0.8);
   const rail = useRef(null);
@@ -56,17 +71,19 @@ const PostImages = ({ images, onOpen, onDouble }) => {
         onScroll={many ? (e) => { const n = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); setI((cur) => (cur === n ? cur : n)); } : undefined}
       >
         {images.map((src, k) => (
-          <img
-            key={k}
-            src={optimizeImage(src, 1080)}
-            alt=""
-            loading={k === 0 ? "eager" : "lazy"}
-            decoding="async"
-            draggable={false}
-            onLoad={k === 0 ? first : undefined}
-            onClick={() => onTap(k)}
-            className="w-full h-full shrink-0 snap-center snap-always object-contain"
-          />
+          <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always" style={{ containerType: "inline-size" }}>
+            <img
+              src={optimizeImage(src, 1080)}
+              alt=""
+              loading={k === 0 ? "eager" : "lazy"}
+              decoding="async"
+              draggable={false}
+              onLoad={k === 0 ? first : undefined}
+              onClick={() => onTap(k)}
+              className="w-full h-full object-contain"
+            />
+            <PhotoLine t={texts[k]} />
+          </div>
         ))}
       </div>
       {many && (
@@ -95,11 +112,15 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
   const [showAud, setShowAud] = useState(false);
   const [busy, setBusy] = useState(false);
   const songInput = useRef(null);
+  const imgs = post.images?.length ? post.images : [post.image];
+  const [ptexts, setPtexts] = useState(() => imgs.map((_, k) => ({ text: "", color: "#ffffff", pos: "bot", size: 1, ...(post.photoText?.[k] || {}) })));
+  const [ptChanged, setPtChanged] = useState(false);
+  const setPt = (k, patch) => { setPtexts((l) => l.map((x, j) => (j === k ? { ...x, ...patch } : x))); setPtChanged(true); };
 
   const save = async () => {
     setBusy(true);
     try {
-      const body = { caption, lines };
+      const body = { caption, lines, ...(ptChanged ? { photoText: ptexts } : {}) };
       if (songChanged) {
         if (!song) body.removeSong = true;
         else if (song.data) body.song = { data: song.data, name: song.name };
@@ -135,7 +156,38 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
             <button onClick={() => setShowMusic(true)} className="mt-1 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-2.5 px-4 text-[15px] active:opacity-80"><Music size={18} className="text-[#25D366]" /> Add a song</button>
           )}
 
-          <label className="block mt-3 text-[12.5px] text-wa-muted">Lines</label>
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Line on each photo</label>
+          <div className="mt-1 space-y-2.5">
+            {imgs.map((src, k) => (
+              <div key={k} className="rounded-2xl bg-wa-field p-2.5">
+                <div className="flex items-center gap-2.5">
+                  <img src={optimizeImage(src, 160)} alt="" className="size-12 rounded-lg object-cover shrink-0" />
+                  <input
+                    value={ptexts[k]?.text || ""}
+                    onChange={(e) => setPt(k, { text: e.target.value })}
+                    maxLength={120}
+                    placeholder={imgs.length > 1 ? `Line for photo ${k + 1}` : "Line on the photo"}
+                    className="flex-1 min-w-0 h-11 rounded-xl bg-transparent text-[15px] outline-none"
+                  />
+                </div>
+                {ptexts[k]?.text ? (
+                  <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                    {[["top", "Top"], ["mid", "Middle"], ["bot", "Bottom"]].map(([id, label]) => (
+                      <button key={id} type="button" onClick={() => setPt(k, { pos: id })} className={`px-2.5 h-7 rounded-full text-[12px] ${ptexts[k].pos === id ? "bg-[#21C063] text-black font-semibold" : "bg-white/10"}`}>{label}</button>
+                    ))}
+                    {PT_SIZES.map(([label, v]) => (
+                      <button key={label} type="button" onClick={() => setPt(k, { size: v })} className={`size-7 rounded-full text-[12px] ${ptexts[k].size === v ? "bg-[#21C063] text-black font-semibold" : "bg-white/10"}`}>{label}</button>
+                    ))}
+                    {PT_COLORS.map((c) => (
+                      <button key={c} type="button" aria-label="Colour" onClick={() => setPt(k, { color: c })} className={`size-6 rounded-full border-2 ${ptexts[k].color === c ? "border-white" : "border-transparent"}`} style={{ background: c }} />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Quote / lines for the whole post</label>
           <textarea value={lines} onChange={(e) => setLines(e.target.value)} maxLength={300} rows={3} placeholder="Lyrics, a quote…" className="mt-1 w-full rounded-2xl bg-wa-field px-4 py-3 text-[15px] outline-none resize-none placeholder:text-wa-muted" />
 
           <button onClick={() => setShowAud(true)} className="mt-3 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-3 px-4 text-left active:opacity-80">
@@ -521,7 +573,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
                 {p.mine && <button onClick={() => remove(p)} className="size-8 flex items-center justify-center text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
-                <PostImages images={p.images?.length ? p.images : [p.image]} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k }); }} />
+                <PostImages images={p.images?.length ? p.images : [p.image]} texts={p.photoText || []} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k }); }} />
                 {p.song?.url && <PostSong id={p._id} song={p.song} />}
                 {p.mine && !p.song?.url && (
                   <button onClick={() => setEditing({ post: p, autoSong: true })} className="absolute z-10 left-3 bottom-3 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-white text-[12.5px] flex items-center gap-1.5 active:scale-95"><Music size={14} className="text-[#25D366]" /> Add song</button>

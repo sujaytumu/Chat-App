@@ -11,6 +11,21 @@ import { audienceAllows, audienceFilter, cleanAudience, defaultAudienceFor } fro
 const MAX_IMG = 13 * 1024 * 1024;
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 
+// The line written on each photo: one entry per photo, cleaned (it comes from the client).
+const cleanPhotoText = (arr, n) => {
+  const list = Array.isArray(arr) ? arr : [];
+  return Array.from({ length: n }, (_, i) => {
+    const t = list[i] || {};
+    const size = Number(t.size);
+    return {
+      text: String(t.text || "").trim().slice(0, 120),
+      color: /^#[0-9a-f]{6}$/i.test(t.color || "") ? t.color : "#ffffff",
+      pos: ["top", "mid", "bot"].includes(t.pos) ? t.pos : "bot",
+      size: [0.7, 1, 1.5].includes(size) ? size : 1,
+    };
+  });
+};
+
 const shape = (p, me, comments = 0) => ({
   comments,
   _id: p._id,
@@ -19,6 +34,7 @@ const shape = (p, me, comments = 0) => ({
   images: p.images?.length ? p.images : [p.image],
   caption: p.caption,
   lines: p.lines || "",
+  photoText: (p.photoText || []).map((t) => ({ text: t.text || "", color: t.color || "#ffffff", pos: t.pos || "bot", size: t.size || 1 })),
   song: p.song?.url ? { url: p.song.url, name: p.song.name, start: p.song.start || 0 } : null,
   createdAt: p.createdAt,
   likeCount: (p.likes || []).length,
@@ -54,7 +70,7 @@ export const getFeed = async (req, res) => {
 
 export const createPost = async (req, res) => {
   try {
-    const { image, images, caption, lines, song } = req.body || {};
+    const { image, images, caption, lines, song, photoText } = req.body || {};
     const list = Array.isArray(images) && images.length ? images : [image];
     if (!list.every((s) => typeof s === "string" && s.startsWith("data:image/"))) return res.status(400).json({ error: "Pick a photo" });
     if (list.length > 10) return res.status(400).json({ error: "Up to 10 photos per post" });
@@ -82,6 +98,7 @@ export const createPost = async (req, res) => {
       images: urls,
       caption: String(caption || "").trim().slice(0, 500),
       lines: String(lines || "").trim().slice(0, 300),
+      photoText: cleanPhotoText(photoText, urls.length),
       ...(postAudience ? { audience: postAudience } : {}),
       ...(cleanSong ? { song: cleanSong } : {}),
     });
@@ -186,9 +203,10 @@ export const updatePost = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const post = await Post.findOne({ _id: req.params.id, userId: req.user._id });
     if (!post) return res.status(404).json({ error: "Not found" });
-    const { caption, lines, song, removeSong, audience } = req.body || {};
+    const { caption, lines, song, removeSong, audience, photoText } = req.body || {};
     if (typeof caption === "string") post.caption = caption.trim().slice(0, 500);
     if (typeof lines === "string") post.lines = lines.trim().slice(0, 300);
+    if (Array.isArray(photoText)) post.photoText = cleanPhotoText(photoText, post.images?.length || 1);
     if (audience) {
       if (audience.mode === "only" && !(Array.isArray(audience.users) && audience.users.length)) return res.status(400).json({ error: "Pick at least one person" });
       const a = cleanAudience(audience, req.user._id);
@@ -213,6 +231,7 @@ export const updatePost = async (req, res) => {
     res.json({
       caption: post.caption,
       lines: post.lines || "",
+      photoText: (post.photoText || []).map((t) => ({ text: t.text || "", color: t.color || "#ffffff", pos: t.pos || "bot", size: t.size || 1 })),
       song: post.song?.url ? { url: post.song.url, name: post.song.name, start: post.song.start || 0 } : null,
       audience: { mode: post.audience?.mode || "all", users: (post.audience?.users || []).map(String) },
     });
