@@ -26,7 +26,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { syncPreferences } from "./lib/prefsSync";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
-import { startVersionWatcher, GlobalUpdatePill } from "./lib/versionCheck";
+import { startVersionWatcher, GlobalUpdatePill, UpdatePopup } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
 
 import { Loader } from "lucide-react";
@@ -221,6 +221,7 @@ const App = () => {
       )}
       {authUser && <NotificationManager />}
       {authUser && <GlobalUpdatePill />}
+      {authUser && <UpdatePopup />}
       {authUser && <CallKeepAlive />}
       {authUser && <ProfileLinkHandler />}
       {authUser && <ReminderListener />}
