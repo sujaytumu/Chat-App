@@ -75,36 +75,60 @@ export async function applyUpdate() {
   window.location.reload();
 }
 
+// Quiet automatic update: when the app is opened (or comes back after being away) and a newer build waits,
+// switch to it by itself - but never during a call or while something is being typed, and at most once every
+// 10 minutes so a failing update can never loop.
+const AUTO_KEY = "talkies-auto-applied-at";
+function typingNow() {
+  const el = document.activeElement;
+  if (!el) return false;
+  const editable = el.isContentEditable || el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !["checkbox", "radio", "button", "submit", "range"].includes(el.type));
+  return !!editable && String(el.value ?? el.textContent ?? "").trim().length > 0;
+}
+function autoApply() {
+  if (!updateReady || inCall() || typingNow()) return false;
+  try {
+    const last = Number(sessionStorage.getItem(AUTO_KEY) || 0);
+    if (Date.now() - last < 10 * 60 * 1000) return false;
+    sessionStorage.setItem(AUTO_KEY, String(Date.now()));
+  } catch { /* no storage: the popup still asks */ }
+  applyUpdate();
+  return true;
+}
+
 async function check() {
   const mine = currentEntry();
-  if (!mine) return; // dev server — nothing hashed to compare
+  if (!mine) return false; // dev server — nothing hashed to compare
   let latest;
   try {
     latest = await latestEntry();
   } catch {
-    return; // offline
+    return false; // offline
   }
-  if (!latest) return;
+  if (!latest) return false;
   if (latest === mine) {
     // really on the newest build now
     writePending("");
     setReady(false);
-    return;
+    return false;
   }
   navigator.serviceWorker?.getRegistration().then((reg) => reg?.update()).catch(() => {});
   writePending(latest);
   setReady(true);
+  return true;
 }
 
 export function startVersionWatcher() {
-  check();
+  check().then((found) => found && autoApply()); // just opened: take the new version straight away
   let hiddenAt = 0;
   const onVisible = () => {
     if (document.visibilityState === "hidden") {
       hiddenAt = Date.now();
       return;
     }
-    check();
+    const awayFor = hiddenAt ? Date.now() - hiddenAt : 0;
+    hiddenAt = 0;
+    check().then((found) => found && awayFor > 20000 && autoApply()); // back after a while
   };
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("online", check);
@@ -180,3 +204,36 @@ export async function checkForUpdateNow() {
 }
 
 export const currentBuildId = () => currentEntry()?.match(/index-([A-Za-z0-9_-]+)\.js/)?.[1] || "dev";
+
+// The update popup: shown once when a newer build is ready (never during a call). "Later" hides it for this
+// build; the Update button/pill stays available.
+let dismissedFor = "";
+export function UpdatePopup() {
+  const ready = useSyncExternalStore((cb) => (listeners.add(cb), () => listeners.delete(cb)), () => updateReady);
+  const busyCall = useCallStore((s) => s.callStatus !== "idle");
+  const [updating, setUpdating] = useState(false);
+  const [, bump] = useState(0);
+  const pending = readPending();
+  if (!ready || busyCall || !pending || dismissedFor === pending) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-6" role="dialog" aria-modal="true" aria-label="Update available">
+      <div className="w-full max-w-sm rounded-2xl bg-wa-panel p-6 text-center shadow-2xl">
+        <div className="mx-auto mb-3 flex size-14 items-center justify-center rounded-full bg-[#25D366]/15">
+          <RefreshCw size={26} className={`text-[#25D366] ${updating ? "animate-spin" : ""}`} />
+        </div>
+        <h2 className="text-lg font-semibold text-wa-text">New version available</h2>
+        <p className="mt-1 text-[13.5px] text-wa-muted">Update Talkies to get the latest features and fixes. It only takes a moment.</p>
+        <button
+          disabled={updating}
+          onClick={() => { setUpdating(true); applyUpdate(); }}
+          className="mt-5 h-11 w-full rounded-full bg-[#25D366] font-semibold text-[#0b141a] disabled:opacity-70 active:scale-95 transition-transform"
+        >
+          {updating ? "Updating…" : "Update now"}
+        </button>
+        <button disabled={updating} onClick={() => { dismissedFor = pending; bump((n) => n + 1); }} className="mt-2 h-10 w-full rounded-full text-[13.5px] text-wa-muted hover:bg-wa-pop">
+          Later
+        </button>
+      </div>
+    </div>
+  );
+}
