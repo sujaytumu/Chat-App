@@ -34,7 +34,7 @@ export const FILTERS = [
 ];
 const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css || "none";
 
-const MAX_MB = 50;
+const MAX_MB = 200;
 const MAX_TOTAL_MB = 54; // video + song together (they travel in one request)
 const MAX_SECONDS = 180;
 const MAX_REELS = 100; // videos that can wait in one go
@@ -411,7 +411,7 @@ const reasonOf = (err) => {
   const st = err?.response?.status;
   const msg = err?.response?.data?.error || err?.response?.data?.message;
   if (msg) return String(msg);
-  if (st === 413) return "too big for the server (max about 50 MB)";
+  if (st === 413) return "too big for the server (max 200 MB)";
   if (st === 429) return "too many requests - wait a minute and retry";
   if (st >= 500) return `server error ${st} (it may have been restarting)`;
   if (err?.code === "ECONNABORTED") return "the upload took too long (slow connection)";
@@ -526,10 +526,10 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
   const post = async () => {
     if (!file || busy) return;
     if ((trimmed ? effLen : duration) > MAX_SECONDS + 0.5) return toast.error(`Reels can be at most ${MAX_SECONDS} seconds — trim it shorter`);
-    if (song && (file.size + song.size) / 1048576 > MAX_TOTAL_MB) return toast.error("Video + song are too big together — pick a shorter video or another song");
+    if (song && (file.size + song.size) / 1048576 > MAX_TOTAL_MB) return toast.error("With a song added, the video can be up to about 50 MB - remove the song to post a bigger video");
     setBusy(true);
     setFailed([]);
-    const cfg = { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) };
+    const cfg = { timeout: 1800000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) };
     const posted = [];
     const bad = []; // { file, reason }
     const keep = (files) => (files.length ? draftPut(draftKey, { files, caption: "", filter: "none", range: [0, 0] }) : draftDel(draftKey));
