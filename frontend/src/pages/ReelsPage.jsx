@@ -9,6 +9,7 @@ import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
 import { useTabSwipe } from "../lib/useTabSwipe";
 import { useAuthStore } from "../store/useAuthStore";
+import { draftPut, draftGet, draftDel } from "../lib/draftStore";
 import StatusComments from "../components/StatusComments";
 import SendReelModal from "../components/SendReelModal";
 import StatusMusicSheet from "../components/StatusMusicSheet";
@@ -36,6 +37,7 @@ const filterCss = (id) => FILTERS.find((f) => f.id === id)?.css || "none";
 const MAX_MB = 50;
 const MAX_TOTAL_MB = 54; // video + song together (they travel in one request)
 const MAX_SECONDS = 180;
+const MAX_REELS = 100; // videos that can wait in one go
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
 const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
@@ -405,9 +407,44 @@ const NewReel = ({ onClose, onPosted }) => {
     axiosInstance.get("/privacy").then((r) => setAudience((cur) => cur || r.data.reels)).catch(() => {});
   }, []);
 
+  // Unfinished upload is kept on this device: after an update, a reload or leaving the app the picked videos,
+  // caption and edits come back, so one tap on Share posts them all.
+  const draftKey = `reels:${useAuthStore.getState().authUser?._id || "me"}`;
+  const restored = useRef(false);
+  useEffect(() => {
+    let live = true;
+    draftGet(draftKey).then((d) => {
+      if (!live) { restored.current = true; return; }
+      if (d?.files?.length) {
+        setFile(d.files[0]);
+        setUrl(URL.createObjectURL(d.files[0]));
+        setExtras(d.files.slice(1));
+        setCaption(d.caption || "");
+        setFilter(d.filter || "none");
+        setRange(d.range || [0, 0]);
+        toast(`Your ${d.files.length} video${d.files.length === 1 ? "" : "s"} ${d.files.length === 1 ? "is" : "are"} still here`, { icon: "📥" });
+      }
+      restored.current = true;
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!restored.current) return undefined;
+    const t = setTimeout(() => {
+      if (!file || busy) return;
+      draftPut(draftKey, { files: [file, ...extras], caption, filter, range });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [file, extras, caption, filter, range, busy, draftKey]);
+
   const chooseMany = (list) => {
-    const files = Array.from(list || []);
+    let files = Array.from(list || []);
     if (!files.length) return;
+    if (files.length > MAX_REELS) {
+      toast(`Up to ${MAX_REELS} videos at once - the first ${MAX_REELS} were taken`);
+      files = files.slice(0, MAX_REELS);
+    }
     const ok = [];
     for (const f of files) {
       if (!f.type.startsWith("video/")) { toast.error(`${f.name}: not a video`); continue; }
@@ -460,6 +497,9 @@ const NewReel = ({ onClose, onPosted }) => {
       });
       const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}), ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
       const posted = [res.data];
+      // what is already posted leaves the saved draft, so a retry never posts it twice
+      const keepRest = (rest) => (rest.length ? draftPut(draftKey, { files: rest, caption: "", filter: "none", range: [0, 0] }) : draftDel(draftKey));
+      keepRest(extras);
       for (let i = 0; i < extras.length; i++) {
         setProgress(`Posting ${i + 2} of ${extras.length + 1}`);
         setPct(0);
@@ -469,10 +509,12 @@ const NewReel = ({ onClose, onPosted }) => {
           if (d > MAX_SECONDS + 0.5) { toast.error(`${f.name} is longer than ${MAX_SECONDS}s — skipped`); continue; }
           const r2 = await axiosInstance.post("/reels", { video: await toDataUrl(f), caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
           posted.push(r2.data);
+          keepRest(extras.slice(i + 1));
         } catch (e2) {
           toast.error(e2.response?.data?.error || `Couldn't post video ${i + 2}`);
         }
       }
+      draftDel(draftKey);
       toast.success(posted.length > 1 ? `${posted.length} reels posted` : "Reel posted");
       posted.forEach((r) => onPosted(r));
     } catch (err) {
@@ -511,7 +553,7 @@ const NewReel = ({ onClose, onPosted }) => {
         ) : (
           <button onClick={() => pick.current?.click()} className="flex flex-col items-center gap-3 text-white/80">
             <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
-            <span className="text-[15px]">Choose videos (up to {MAX_SECONDS}s, {MAX_MB} MB each) — pick several at once</span>
+            <span className="text-[15px]">Choose videos (up to {MAX_SECONDS}s, {MAX_MB} MB each) — pick up to {MAX_REELS} at once</span>
           </button>
         )}
         <input ref={pick} type="file" accept="video/*" multiple hidden onChange={(e) => { chooseMany(e.target.files); e.target.value = ""; }} />
@@ -854,6 +896,10 @@ const ReelsPage = () => {
   }, []);
   const [commentsFor, setCommentsFor] = useState(null);
   const [creating, setCreating] = useState(false);
+  // An unfinished upload (kept on this device) reopens by itself, so nothing picked is ever lost.
+  useEffect(() => {
+    draftGet(`reels:${useAuthStore.getState().authUser?._id || "me"}`).then((d) => d?.files?.length && setCreating(true));
+  }, []);
   const [sendFor, setSendFor] = useState(null);
   const [menuFor, setMenuFor] = useState(null);
   const [pickTab, setPickTab] = useState(false);

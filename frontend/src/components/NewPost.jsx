@@ -5,12 +5,15 @@ import { axiosInstance } from "../lib/axios";
 import { readFileAsBase64 } from "../lib/fileUtils";
 import StatusMusicSheet from "./StatusMusicSheet";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
+import { useAuthStore } from "../store/useAuthStore";
+import { draftPut, draftGet, draftDel, draftGetPrefix, draftDelPrefix } from "../lib/draftStore";
 
 // New post, in three calm steps (like Instagram):  1 pick photos  ->  2 edit (audio, filter, edit, ratio)  ->  3 details + Share.
 // Performance: every photo is shrunk ONCE from the file (full copy for upload, tiny copy for the grid), the
 // edits are only CSS while you play with them, and are baked into the picture one at a time when you press Share.
 
-const MAX = 10;
+const MAX = 100; // photos that can wait in one go
+const PER_POST = 10; // one post holds up to 10; more are posted as several posts, in order
 const FILTERS = [
   { id: "none", label: "Original", css: "" },
   { id: "vivid", label: "Vivid", css: "saturate(1.35) contrast(1.05)" },
@@ -174,6 +177,50 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const [box, setBox] = useState({ w: 0, h: 0 }); // size of the preview area on the edit step
   const busy = !!stage;
 
+  // Unfinished post is kept on this device (photos with their edits, caption, audio): an update, a reload or
+  // leaving the app never loses it. Each photo is saved once; only changed ones are written again.
+  const draftBase = `post:${useAuthStore.getState().authUser?._id || "me"}:`;
+  const loaded = useRef(false);
+  const savedItems = useRef(new WeakSet());
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const meta = await draftGet(`${draftBase}meta`);
+      if (meta?.order?.length && live) {
+        const rows = new Map(await draftGetPrefix(`${draftBase}item:`));
+        const back = meta.order.map((id) => rows.get(`${draftBase}item:${id}`)).filter(Boolean);
+        if (back.length) {
+          back.forEach((x) => savedItems.current.add(x));
+          setItems(back);
+          setCaption(meta.caption || "");
+          setLines(meta.lines || "");
+          if (meta.song) setSong(meta.song);
+          setStep(meta.step === "pick" ? "pick" : "edit");
+          toast(`Your ${back.length} photo${back.length === 1 ? "" : "s"} ${back.length === 1 ? "is" : "are"} still here`, { icon: "📥" });
+        }
+      }
+      loaded.current = true;
+    })();
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!loaded.current) return undefined;
+    const t = setTimeout(async () => {
+      if (busy) return;
+      if (!items.length) { draftDelPrefix(draftBase); return; }
+      const keep = new Set(items.map((x) => x.id));
+      for (const x of items) {
+        if (!savedItems.current.has(x)) { savedItems.current.add(x); await draftPut(`${draftBase}item:${x.id}`, x); }
+      }
+      const stored = await draftGetPrefix(`${draftBase}item:`);
+      for (const [k] of stored) if (!keep.has(k.slice(`${draftBase}item:`.length))) draftDel(k);
+      draftPut(`${draftBase}meta`, { order: items.map((x) => x.id), caption, lines, song, step });
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, caption, lines, song, step, busy]);
+
   const safeCur = Math.min(cur, Math.max(0, items.length - 1));
   const it = items[safeCur];
   const patch = (i, p) => setItems((l) => l.map((x, k) => (k === i ? { ...x, ...p } : x)));
@@ -241,18 +288,32 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
 
   const share = async () => {
     if (!items.length || busy) return;
+    const batches = [];
+    for (let i = 0; i < items.length; i += PER_POST) batches.push(items.slice(i, i + PER_POST));
+    let last = null;
+    let postedPhotos = 0;
     try {
-      const out = [];
-      for (let i = 0; i < items.length; i++) {
-        setStage(items.some((x) => !isPlain(x)) ? `Preparing photos ${i + 1}/${items.length}` : "Preparing…");
-        out.push(await bake(items[i]));
-        await nextFrame();
+      for (let b = 0; b < batches.length; b++) {
+        const group = batches[b];
+        const tag = batches.length > 1 ? ` (post ${b + 1} of ${batches.length})` : "";
+        const out = [];
+        for (let i = 0; i < group.length; i++) {
+          setStage((group.some((x) => !isPlain(x)) ? `Preparing photos ${i + 1}/${group.length}` : "Preparing…") + tag);
+          out.push(await bake(group[i]));
+          await nextFrame();
+        }
+        setStage(`Uploading ${out.length} photo${out.length === 1 ? "" : "s"}${tag} - keep this screen open`);
+        const { data } = await axiosInstance.post("/posts", { images: out, caption, lines, ...(song ? { song: { data: song.data, name: song.name } } : {}), ...(audience ? { audience } : {}) }, { timeout: 180000 });
+        last = data;
+        postedPhotos += group.length;
+        // what is already posted leaves the draft, so a retry never posts it twice
+        const posted = new Set(group.map((x) => x.id));
+        setItems((l) => l.filter((x) => !posted.has(x.id)));
       }
-      setStage(`Uploading ${out.length} photo${out.length === 1 ? "" : "s"} - keep this screen open`);
-      const { data } = await axiosInstance.post("/posts", { images: out, caption, lines, ...(song ? { song: { data: song.data, name: song.name } } : {}), ...(audience ? { audience } : {}) }, { timeout: 180000 });
-      onPosted(data);
+      await draftDelPrefix(draftBase);
+      onPosted(last);
     } catch (e) {
-      toast.error(e.response?.data?.error || "Couldn't post - check your connection and try again");
+      toast.error(e.response?.data?.error || (postedPhotos ? `${postedPhotos} photos were posted; the rest are saved - tap Share to continue` : "Couldn't post - check your connection and try again"));
       setStage(null);
     }
   };
@@ -296,7 +357,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
               <button onClick={() => gallery.current?.click()} className="flex flex-col items-center gap-3 text-wa-muted active:scale-95 transition-transform">
                 <span className="size-20 rounded-full bg-wa-field flex items-center justify-center"><ImagePlus size={34} /></span>
                 <span className="text-[16px] text-wa-text">Choose photos</span>
-                <span className="text-[13px]">Up to {MAX} at once</span>
+                <span className="text-[13px]">Up to {MAX} at once ({PER_POST} per post)</span>
               </button>
             )}
             {prep && <div className="absolute bottom-3 left-3 px-3 h-8 rounded-full bg-black/70 flex items-center gap-2 text-[13px] text-white"><Loader2 size={14} className="animate-spin" /> Getting photos ready… {prep.done}/{prep.total}</div>}

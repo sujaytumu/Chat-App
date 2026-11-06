@@ -1,10 +1,12 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 import toast from "react-hot-toast";
 import MainNav from "../components/MainNav";
 import FeedView, { NewPost } from "../components/FeedView";
 import { useTabSwipe } from "../lib/useTabSwipe";
+import { useAuthStore } from "../store/useAuthStore";
+import { draftGet } from "../lib/draftStore";
 
 // The Post tab: every photo post lives here (and only here, never in Reels). The feed comes first; the plus
 // buttons (floating, and at the end of the feed) open the composer, and sharing returns to the feed with the
@@ -13,6 +15,10 @@ const PostPage = () => {
   const root = useRef(null);
   useTabSwipe(root);
   const [composing, setComposing] = useState(false);
+  // An unfinished post (kept on this device) reopens by itself, so nothing picked is ever lost.
+  useEffect(() => {
+    draftGet(`post:${useAuthStore.getState().authUser?._id || "me"}:meta`).then((m) => m?.order?.length && setComposing(true));
+  }, []);
   const [feedKey, setFeedKey] = useState(0);
   const [params] = useSearchParams();
   const focusId = params.get("p") || undefined; // opened from a shared post link
