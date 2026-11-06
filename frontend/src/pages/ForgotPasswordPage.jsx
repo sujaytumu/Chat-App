@@ -25,6 +25,12 @@ const ForgotPasswordPage = () => {
     return () => clearTimeout(t);
   }, [cooldown]);
 
+  // Came from a failed sign-in with the email filled in: send the code straight away.
+  useEffect(() => {
+    if (location.state?.auto && email.trim()) sendCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const fail = (error, fallback) => toast.error(error.response?.data?.message || fallback);
 
   const sendCode = async (e) => {
