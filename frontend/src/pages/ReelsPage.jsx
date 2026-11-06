@@ -380,25 +380,46 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   );
 };
 
-// A video upload is retried by itself (up to 3 tries) when the connection drops or the server is waking up
+// A video upload is retried by itself (up to 4 tries) when the connection drops or the server is waking up
 // (502/503/504); a real refusal (too long, too big, daily limit...) is shown at once.
-const uploadReel = async (body, cfg) => {
+const withRetry = async (call) => {
   let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
-      return await axiosInstance.post("/reels", body, cfg);
+      return await call();
     } catch (err) {
       lastErr = err;
       const st = err.response?.status;
       const dropped = !err.response && err.code === "ERR_NETWORK";
       if (!(dropped || st === 502 || st === 503 || st === 504)) throw err;
-      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+      await new Promise((r) => setTimeout(r, 4000 * (attempt + 1)));
     }
   }
   throw lastErr;
 };
+const uploadReel = (body, cfg) => withRetry(() => axiosInstance.post("/reels", body, cfg)); // JSON (needed when a song is added)
+// The video file itself goes up as it is (no base64 copy): lighter for the phone and for the server.
+const uploadReelRaw = (file, meta, cfg) =>
+  withRetry(() =>
+    axiosInstance.post("/reels/raw", file, {
+      ...cfg,
+      headers: { "Content-Type": file.type || "video/mp4", "X-Reel-Meta": encodeURIComponent(JSON.stringify(meta)) },
+    })
+  );
+// Plain words for what went wrong with one video.
+const reasonOf = (err) => {
+  const st = err?.response?.status;
+  const msg = err?.response?.data?.error || err?.response?.data?.message;
+  if (msg) return String(msg);
+  if (st === 413) return "too big for the server (max about 50 MB)";
+  if (st === 429) return "too many requests - wait a minute and retry";
+  if (st >= 500) return `server error ${st} (it may have been restarting)`;
+  if (err?.code === "ECONNABORTED") return "the upload took too long (slow connection)";
+  if (!err?.response) return "the connection dropped during the upload";
+  return err?.message || "unknown problem";
+};
 
-const NewReel = ({ onClose, onPosted }) => {
+const NewReel = ({ onClose, onPosted, onAdded }) => {
   const [file, setFile] = useState(null);
   const [url, setUrl] = useState("");
   const [duration, setDuration] = useState(0);
@@ -411,6 +432,7 @@ const NewReel = ({ onClose, onPosted }) => {
   const [showMusic, setShowMusic] = useState(false);
   const [extras, setExtras] = useState([]); // more videos picked in the same go: posted one after another after this one
   const [progress, setProgress] = useState(""); // "Posting 2 of 4"
+  const [failed, setFailed] = useState([]); // videos that did not go, with the reason
   const [audience, setAudience] = useState(null); // null = my default for reels
   const [showAudience, setShowAudience] = useState(false);
   const pick = useRef(null);
@@ -506,38 +528,65 @@ const NewReel = ({ onClose, onPosted }) => {
     if ((trimmed ? effLen : duration) > MAX_SECONDS + 0.5) return toast.error(`Reels can be at most ${MAX_SECONDS} seconds — trim it shorter`);
     if (song && (file.size + song.size) / 1048576 > MAX_TOTAL_MB) return toast.error("Video + song are too big together — pick a shorter video or another song");
     setBusy(true);
+    setFailed([]);
+    const cfg = { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) };
+    const posted = [];
+    const bad = []; // { file, reason }
+    const keep = (files) => (files.length ? draftPut(draftKey, { files, caption: "", filter: "none", range: [0, 0] }) : draftDel(draftKey));
     try {
-      const data = await new Promise((ok, bad) => {
-        const r = new FileReader();
-        r.onload = () => ok(r.result);
-        r.onerror = bad;
-        r.readAsDataURL(file);
-      });
-      const res = await uploadReel({ video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}), ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
-      const posted = [res.data];
-      // what is already posted leaves the saved draft, so a retry never posts it twice
-      const keepRest = (rest) => (rest.length ? draftPut(draftKey, { files: rest, caption: "", filter: "none", range: [0, 0] }) : draftDel(draftKey));
-      keepRest(extras);
+      // the first video carries the caption, look, trim and song
+      try {
+        const meta = { caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(audience ? { audience } : {}) };
+        const res = song
+          ? await uploadReel({ video: await toDataUrl(file), ...meta, song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } }, cfg)
+          : await uploadReelRaw(file, meta, cfg);
+        posted.push(res.data);
+      } catch (err) {
+        console.warn("Reel upload failed:", file.name, file.size, err?.code, err?.response?.status, err?.message);
+        toast.error(`${file.name || "Video"}: ${reasonOf(err)}`);
+        setBusy(false);
+        setProgress("");
+        return;
+      }
+      keep(extras);
       for (let i = 0; i < extras.length; i++) {
+        const f = extras[i];
         setProgress(`Posting ${i + 2} of ${extras.length + 1}`);
         setPct(0);
         try {
-          const f = extras[i];
           const d = await probeDuration(f);
-          if (d > MAX_SECONDS + 0.5) { toast.error(`${f.name} is longer than ${MAX_SECONDS}s — skipped`); continue; }
-          const r2 = await uploadReel({ video: await toDataUrl(f), caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
-          posted.push(r2.data);
-          keepRest(extras.slice(i + 1));
+          if (d > MAX_SECONDS + 0.5) {
+            bad.push({ file: f, reason: `longer than ${MAX_SECONDS} seconds (${Math.round(d)}s)` });
+          } else {
+            const r2 = await uploadReelRaw(f, { caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, cfg);
+            posted.push(r2.data);
+          }
         } catch (e2) {
-          toast.error(e2.response?.data?.error || `Couldn't post video ${i + 2}`);
+          console.warn("Reel upload failed:", f.name, f.size, e2?.code, e2?.response?.status, e2?.message);
+          bad.push({ file: f, reason: reasonOf(e2) });
         }
+        keep([...extras.slice(i + 1), ...bad.map((x) => x.file)]); // posted ones leave the saved list; failed ones stay
+      }
+      if (bad.length) {
+        // stay here: show which video had which problem, keep them for a retry, and show what did go
+        posted.forEach((r) => (onAdded || onPosted)(r));
+        setFailed(bad.map((x) => ({ name: x.file.name || "video", mb: (x.file.size / 1048576).toFixed(1), reason: x.reason })));
+        choose(bad[0].file);
+        setExtras(bad.slice(1).map((x) => x.file));
+        setCaption("");
+        setFilter("none");
+        toast.error(`${posted.length} posted, ${bad.length} didn't go - the reasons are listed below`, { duration: 6000 });
+        setBusy(false);
+        setProgress("");
+        return;
       }
       draftDel(draftKey);
       toast.success(posted.length > 1 ? `${posted.length} reels posted` : "Reel posted");
       posted.forEach((r) => onPosted(r));
     } catch (err) {
-      toast.error(err.response?.data?.error || "Couldn't post the reel");
+      toast.error(reasonOf(err));
       setBusy(false);
+      setProgress("");
     }
   };
 
@@ -547,7 +596,7 @@ const NewReel = ({ onClose, onPosted }) => {
         <button onClick={onClose} disabled={busy} className="size-10 rounded-full bg-white/10 flex items-center justify-center"><X size={20} /></button>
         <h3 className="font-semibold">New reel</h3>
         <button onClick={post} disabled={!file || busy} className="px-4 py-2 rounded-full bg-[#25D366] text-black text-sm font-semibold disabled:opacity-40">
-          {busy ? <Loader2 size={16} className="animate-spin" /> : "Share"}
+          {busy ? <Loader2 size={16} className="animate-spin" /> : failed.length ? "Retry" : "Share"}
         </button>
       </div>
       <div className="flex-1 min-h-0 flex items-center justify-center p-3">
@@ -578,6 +627,15 @@ const NewReel = ({ onClose, onPosted }) => {
       </div>
       <div className="px-4 pb-[calc(16px+env(safe-area-inset-bottom))] space-y-2">
         {extras.length > 0 && !busy && <p className="text-[13px] text-white/70">+ {extras.length} more video{extras.length > 1 ? "s" : ""} will be posted right after this one</p>}
+        {failed.length > 0 && !busy && (
+          <div className="max-h-44 overflow-y-auto rounded-xl bg-red-500/15 p-3 text-[12.5px] space-y-1">
+            <p className="font-semibold text-red-300">These videos didn&apos;t go:</p>
+            {failed.map((f, i) => (
+              <p key={i} className="text-white/85 break-words">• {f.name} ({f.mb} MB) — {f.reason}</p>
+            ))}
+            <p className="text-white/60 pt-1">They&apos;re saved here. Tap {"\u201c"}Retry{"\u201d"} to send them again.</p>
+          </div>
+        )}
         {busy && progress && <p className="text-[13px] text-white/80">{progress}…</p>}
         {busy && (
           <div className="h-1.5 rounded-full bg-white/20 overflow-hidden"><div className="h-full bg-[#25D366] transition-all" style={{ width: `${pct}%` }} /></div>
@@ -1316,6 +1374,7 @@ const ReelsPage = () => {
       {creating && (
         <NewReel
           onClose={() => setCreating(false)}
+          onAdded={(r) => { setTab("foryou"); setReels((l) => [{ ...r, source: "reel" }, ...l]); }}
           onPosted={(r) => {
             setCreating(false);
             setTab("foryou");
