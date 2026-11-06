@@ -1,6 +1,6 @@
 import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useRef, useState } from "react";
 import WallpaperCropper from "./WallpaperCropper";
-import { Pencil, Undo2, Sticker, Smile, MapPin, Trash2, ArrowLeft, AlignCenter, AlignLeft, AlignRight, Image as ImageIcon } from "lucide-react";
+import { Download, Pencil, Undo2, Sticker, Smile, MapPin, Trash2, ArrowLeft, AlignCenter, AlignLeft, AlignRight, Image as ImageIcon } from "lucide-react";
 
 const EmojiPicker = lazy(() => import("emoji-picker-react"));
 
@@ -242,7 +242,7 @@ const readRecent = () => {
 // ---------------------------------------------------------------------------
 // Photo editor like WhatsApp's status editor: crop, draw (4 brushes), text, stickers.
 // Everything stays editable on screen and is flattened into the picture on send.
-const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, onMusic, hasSong, onRotated, onLocation, onModeChange, chat = false }, ref) {
+const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, onMusic, hasSong, onRotated, onLocation, onModeChange, onSave, chat = false }, ref) {
   const stage = useRef(null);
   const imgEl = useRef(null);
   const trashEl = useRef(null);
@@ -749,6 +749,11 @@ const StatusPhotoEditor = forwardRef(function StatusPhotoEditor({ src, onClose, 
           <button onClick={onClose} aria-label="Close" className={tb}>
             <span className="text-[22px] leading-none">✕</span>
           </button>
+          {onSave ? (
+            <button onClick={onSave} aria-label="Save to your phone" className={tb}>
+              <Download size={23} />
+            </button>
+          ) : null}
           <div className="flex-1" />
           {onMusic && (
             <button onClick={onMusic} aria-label="Add music" className={`${tb} ${hasSong ? "!bg-[#21C063] !text-black" : ""}`}>
