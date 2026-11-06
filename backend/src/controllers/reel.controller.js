@@ -498,6 +498,16 @@ export const createReel = async (req, res) => {
           stream.end(Buffer.from(video.slice(video.indexOf(",") + 1), "base64"));
         })
       : await cloudinary.uploader.upload(video, { folder: "chat-app/reels", resource_type: "video" });
+    return finishReel(req, res, { up, caption, secs, filter, trim, song, audience: req.body?.audience });
+  } catch (error) {
+    console.log("Error in createReel:", error.message);
+    res.status(500).json({ error: "Couldn't post the reel" });
+  }
+};
+
+// Everything after the video is on Cloudinary: checks, the saved reel, the answer and the follower notice.
+async function finishReel(req, res, { up, caption, secs, filter, trim, song, audience }) {
+  try {
     if (up.duration && up.duration > MAX_SECONDS + 1) {
       cloudinary.uploader.destroy(up.public_id, { resource_type: "video" }).catch(() => {});
       return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
@@ -518,7 +528,7 @@ export const createReel = async (req, res) => {
       const sStart = Number(song.start);
       cleanSong = { url: sUp.secure_url, name: String(song.name || "Song").slice(0, 80), start: Number.isFinite(sStart) ? Math.min(Math.max(sStart, 0), 3600) : 0 };
     }
-    const reelAud = cleanReelAudience(req.body?.audience, req.user._id) || (await defaultAudienceFor(req.user._id, "reels"));
+    const reelAud = cleanReelAudience(audience, req.user._id) || (await defaultAudienceFor(req.user._id, "reels"));
     const reel = await Reel.create({
       filter: cleanFilter,
       hashtags: extractTags(caption),
@@ -545,6 +555,41 @@ export const createReel = async (req, res) => {
   } catch (error) {
     console.log("Error in createReel:", error.message);
     res.status(500).json({ error: "Couldn't post the reel" });
+  }
+}
+
+// Video sent as the raw file (no base64, no giant JSON): it is streamed straight to Cloudinary, so the server
+// never holds the whole video in memory, and what went wrong is logged for every reel.
+export const createReelRaw = async (req, res) => {
+  const t0 = Date.now();
+  const bytes = Number(req.headers["content-length"]) || 0;
+  const who = String(req.user._id);
+  const fail = (status, error, why) => {
+    console.log(`reel upload FAILED user=${who} bytes=${bytes} status=${status} reason=${why || error}`);
+    if (!res.headersSent) res.status(status).json({ error });
+    req.resume();
+  };
+  try {
+    const today = await Reel.countDocuments({ userId: req.user._id, createdAt: { $gt: new Date(Date.now() - 24 * 3600 * 1000) } });
+    if (today >= 200) return fail(429, "You can post up to 200 reels a day - try again tomorrow");
+    const type = String(req.headers["content-type"] || "");
+    if (!/^video\//i.test(type) && !/octet-stream/i.test(type)) return fail(400, "That file isn't a video", `type=${type}`);
+    if (bytes > 52 * 1024 * 1024) return fail(413, "That video is too large (max about 50 MB)");
+    let meta = {};
+    try { meta = JSON.parse(decodeURIComponent(String(req.headers["x-reel-meta"] || "{}"))) || {}; } catch { meta = {}; }
+    const secs = Number(meta.duration) || 0;
+    if (secs > MAX_SECONDS + 0.5) return fail(400, `Reels can be at most ${MAX_SECONDS} seconds`, `secs=${secs}`);
+    const up = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream({ folder: "chat-app/reels", resource_type: "video" }, (err, r) => (err ? reject(err) : resolve(r)));
+      req.on("error", reject);
+      req.on("aborted", () => reject(new Error("upload cancelled by the phone")));
+      req.pipe(stream);
+    });
+    console.log(`reel upload ok user=${who} bytes=${bytes} secs=${up.duration || secs} ms=${Date.now() - t0}`);
+    return finishReel(req, res, { up, caption: meta.caption, secs, filter: meta.filter, trim: meta.trim, song: null, audience: meta.audience });
+  } catch (error) {
+    const why = error?.message || error?.error?.message || String(error);
+    fail(502, `Couldn't store the video (${String(why).slice(0, 80)})`, why);
   }
 };
 
