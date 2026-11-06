@@ -4,6 +4,9 @@ import AccessRequest from "../models/accessRequest.model.js";
 import { sendPushToUser } from "../lib/webPush.js";
 import { Visibility, pairKey, isOwner, forgetVisibility, ownerId, VISIBILITY_KINDS } from "../lib/visibility.js";
 import { io, getReceiverSocketId } from "../lib/socket.js";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import { endOtherSessions } from "./auth.controller.js";
 
 // Owner only: see everyone, and choose who can see whom.
 export const requireOwner = (req, res, next) => (isOwner(req.user) ? next() : res.status(403).json({ error: "Owner only" }));
@@ -113,5 +116,28 @@ export const clearAccess = async (req, res) => {
   } catch (e) {
     console.log("Error in clearAccess:", e.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Owner only: a way back into an account when its email can't receive the reset code, or the email itself is forgotten.
+// Makes a temporary password (shown once, to the owner), signs that person out everywhere, and the owner passes it on.
+const TEMP_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no look-alike characters (0/O, 1/l/I)
+export const resetUserPassword = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Person not found" });
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "Person not found" });
+    const temp = Array.from({ length: 10 }, () => TEMP_ALPHABET[crypto.randomInt(TEMP_ALPHABET.length)]).join("");
+    user.password = await bcrypt.hash(temp, await bcrypt.genSalt(10));
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
+    user.passwordReset = undefined;
+    await user.save();
+    endOtherSessions(user._id);
+    console.log(`owner reset the password of ${user.email.slice(0, 3)}***`);
+    res.set("Cache-Control", "no-store");
+    res.json({ tempPassword: temp, email: user.email, fullName: user.fullName });
+  } catch (e) {
+    console.log("resetUserPassword:", e.message);
+    res.status(500).json({ error: "Couldn't reset the password" });
   }
 };
