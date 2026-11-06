@@ -141,7 +141,7 @@ const LoginPage = () => {
               <div className="alert alert-warning text-sm py-2">
                 <span>
                   Can't sign in?{" "}
-                  <Link to="/forgot-password" state={{ email: formData.email }} className="link font-semibold">
+                  <Link to="/forgot-password" state={{ email: formData.email, auto: !!formData.email.trim() }} className="link font-semibold">
                     Get a code by email and set a new password
                   </Link>
                 </span>
