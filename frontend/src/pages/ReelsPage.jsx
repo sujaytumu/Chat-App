@@ -380,6 +380,24 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   );
 };
 
+// A video upload is retried by itself (up to 3 tries) when the connection drops or the server is waking up
+// (502/503/504); a real refusal (too long, too big, daily limit...) is shown at once.
+const uploadReel = async (body, cfg) => {
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await axiosInstance.post("/reels", body, cfg);
+    } catch (err) {
+      lastErr = err;
+      const st = err.response?.status;
+      const dropped = !err.response && err.code === "ERR_NETWORK";
+      if (!(dropped || st === 502 || st === 503 || st === 504)) throw err;
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
+};
+
 const NewReel = ({ onClose, onPosted }) => {
   const [file, setFile] = useState(null);
   const [url, setUrl] = useState("");
@@ -495,7 +513,7 @@ const NewReel = ({ onClose, onPosted }) => {
         r.onerror = bad;
         r.readAsDataURL(file);
       });
-      const res = await axiosInstance.post("/reels", { video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}), ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+      const res = await uploadReel({ video: data, caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(song ? { song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } } : {}), ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
       const posted = [res.data];
       // what is already posted leaves the saved draft, so a retry never posts it twice
       const keepRest = (rest) => (rest.length ? draftPut(draftKey, { files: rest, caption: "", filter: "none", range: [0, 0] }) : draftDel(draftKey));
@@ -507,7 +525,7 @@ const NewReel = ({ onClose, onPosted }) => {
           const f = extras[i];
           const d = await probeDuration(f);
           if (d > MAX_SECONDS + 0.5) { toast.error(`${f.name} is longer than ${MAX_SECONDS}s — skipped`); continue; }
-          const r2 = await axiosInstance.post("/reels", { video: await toDataUrl(f), caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, { timeout: 180000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
+          const r2 = await uploadReel({ video: await toDataUrl(f), caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, { timeout: 600000, onUploadProgress: (e) => e.total && setPct(Math.round((e.loaded / e.total) * 100)) });
           posted.push(r2.data);
           keepRest(extras.slice(i + 1));
         } catch (e2) {
