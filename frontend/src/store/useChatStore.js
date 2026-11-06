@@ -11,7 +11,7 @@ import {
 } from "../lib/notificationSound";
 import { vibrationPattern } from "../lib/soundSettings";
 import { useChatLockStore, isChatLocked } from "./useChatLockStore";
-import { swapSent, settleByClientId, dropStalePending, settlePreview } from "../lib/sendState";
+import { isTmp, swapSent, settleByClientId, dropStalePending, settlePreview } from "../lib/sendState";
 
 function notifyIncoming(senderName, message, isGroup = false) {
   // Muted chats stay silent (the unread badge still counts).
@@ -688,7 +688,7 @@ export const useChatStore = create((set, get) => ({
       } else {
         set((state) =>
           state.selectedChat?.data?._id === selectedChat.data._id
-            ? { messages: [...state.messages, res.data], replyingTo: null }
+            ? { messages: state.messages.some((m) => m._id === res.data._id) ? state.messages : [...state.messages, res.data], replyingTo: null }
             : { replyingTo: null }
         );
       }
@@ -1105,6 +1105,10 @@ export const useChatStore = create((set, get) => ({
       const isActiveChat = selectedChat?.type === "group" && selectedChat.data._id === message.groupId;
 
       if (isActiveChat) {
+        // My own message comes back through the group broadcast AND as the send's answer: show it once.
+        if (messages.some((m) => m._id === message._id)) return;
+        const mine = message.senderId === useAuthStore.getState().authUser?._id;
+        if (mine && sending.size && messages.some((m) => m.pending && isTmp(m) && sending.has(m._id) && m.groupId === message.groupId && m.text === message.text)) return; // the send's answer replaces the clock copy
         set({ messages: [...messages, message] });
       } else {
         set((state) => ({
