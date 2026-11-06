@@ -7,6 +7,7 @@ const postSchema = new mongoose.Schema(
     image: { type: String, required: true }, // first photo (older posts have only this)
     images: [{ type: String }], // all photos, up to 10
     caption: { type: String, default: "", maxlength: 500 },
+    photoText: [{ _id: false, text: { type: String, default: "", maxlength: 120 }, color: String, pos: String, size: Number }], // the line written on each photo (editable after posting)
     lines: { type: String, default: "", maxlength: 300 }, // lyric / quote lines shown with the photos
     song: { url: String, name: String, start: { type: Number, default: 0 } },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],

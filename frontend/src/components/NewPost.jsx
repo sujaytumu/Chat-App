@@ -341,11 +341,11 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
         const out = [];
         for (let i = 0; i < group.length; i++) {
           setStage((group.some((x) => !isPlain(x)) ? `Preparing photos ${i + 1}/${group.length}` : "Preparing…") + tag);
-          out.push(await bake(group[i]));
+          out.push(await bake({ ...group[i], text: "" })); // the line on a photo is kept as text (editable later), not burnt into the picture
           await nextFrame();
         }
         setStage(`Uploading ${out.length} photo${out.length === 1 ? "" : "s"}${tag} - keep this screen open`);
-        const { data } = await axiosInstance.post("/posts", { images: out, caption, lines, ...(song ? { song: { data: song.data, name: song.name } } : {}), ...(audience ? { audience } : {}) }, { timeout: 180000 });
+        const { data } = await axiosInstance.post("/posts", { images: out, caption, lines, photoText: group.map((x) => ({ text: x.text || "", color: x.tcolor, pos: x.tpos, size: x.tsize })), ...(song ? { song: { data: song.data, name: song.name } } : {}), ...(audience ? { audience } : {}) }, { timeout: 180000 });
         last = data;
         postedPhotos += group.length;
         // what is already posted leaves the draft, so a retry never posts it twice
