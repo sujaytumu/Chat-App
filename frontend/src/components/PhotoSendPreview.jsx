@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Send, ZoomIn } from "lucide-react";
+import { ZoomIn } from "lucide-react";
+import toast from "react-hot-toast";
+import WhatsAppSendIcon from "./icons/WhatsAppSendIcon";
 import { useBackToClose } from "../lib/useBackToClose";
 import StatusPhotoEditor from "./StatusPhotoEditor";
 
@@ -21,9 +23,26 @@ const PhotoSendPreview = ({ src, caption, onCaption, canViewOnce, viewOnce, onTo
     onSend(edited || undefined);
   };
 
+  // Save the photo as it looks now (with any drawing, text or stickers) to the phone.
+  const save = async () => {
+    try {
+      let url = null;
+      try { url = await editor.current?.exportImage?.(); } catch { /* fall back to the original */ }
+      const a = document.createElement("a");
+      a.href = url || src;
+      a.download = `Talkies-${Date.now()}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("Saved");
+    } catch {
+      toast.error("Couldn't save the photo");
+    }
+  };
+
   return createPortal(
     <div className="wa-dark fixed inset-0 z-[170] bg-black text-white flex flex-col">
-      <StatusPhotoEditor ref={editor} src={src} chat onClose={onClose} onRotated={onImageChange} onModeChange={setMode} />
+      <StatusPhotoEditor ref={editor} src={src} chat onClose={onClose} onRotated={onImageChange} onModeChange={setMode} onSave={save} />
 
       {!mode && (
         <div className="shrink-0 px-3 pt-2 pb-[calc(12px+env(safe-area-inset-bottom))] bg-gradient-to-t from-black via-black/90 to-transparent">
@@ -54,7 +73,7 @@ const PhotoSendPreview = ({ src, caption, onCaption, canViewOnce, viewOnce, onTo
           <div className="flex items-center justify-between mt-3">
             <span className="max-w-[70%] truncate rounded-full bg-[#1f2c34] px-4 py-2 text-[14px]">{to}</span>
             <button type="button" onClick={send} disabled={sending} aria-label="Send" className="size-14 rounded-full bg-[#25D366] text-black flex items-center justify-center shadow-lg disabled:opacity-60 active:scale-95 transition-transform">
-              <Send size={24} />
+              <WhatsAppSendIcon size={26} className="ml-0.5" />
             </button>
           </div>
         </div>
