@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Check, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Search, Check, ShieldCheck, KeyRound, Copy, Loader2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import Avatar from "../components/Avatar";
@@ -27,6 +27,7 @@ const KINDS = [
 ];
 
 const AccessPage = () => {
+  const [pw, setPw] = useState(null); // { user, step: "ask" | "busy" | "done", temp }
   const nav = useNavigate();
   const [params] = useSearchParams();
   const [requests, setRequests] = useState([]); // people waiting for the owner's answer
@@ -269,6 +270,14 @@ const AccessPage = () => {
               <span className="text-[12px] text-wa-muted shrink-0">{isOwnerUser(u) ? "Everyone" : `${countFor(u._id)} allowed`}</span>
             </button>
           ))}
+        {who && !isOwnerUser(who) && (
+          <div className="mx-4 mb-2 rounded-2xl bg-wa-surface p-3.5">
+            <p className="text-[12.5px] font-medium text-[#21C063] mb-1.5 flex items-center gap-1.5"><KeyRound size={15} /> Account help</p>
+            <p className="text-[13px] text-wa-muted break-all">Email: <span className="text-wa-text">{who.email}</span></p>
+            <button onClick={() => setPw({ user: who, step: "ask" })} className="mt-2.5 h-10 px-4 rounded-full bg-white/10 text-[13.5px] font-medium active:scale-[.98]">Reset password…</button>
+            <p className="mt-1.5 text-[11.5px] text-wa-muted leading-snug">Forgot their password and cannot get the email code? Make a temporary one and give it to them.</p>
+          </div>
+        )}
         {who &&
           list.map((u) => {
             const on = isOwnerUser(who) || isOwnerUser(u) || isOn(u._id); // the owner is ticked for everybody, and sees everybody
@@ -307,6 +316,45 @@ const AccessPage = () => {
             );
           })}
       </div>
+      {pw && (
+        <div className="fixed inset-0 z-[80] flex items-end lg:items-center justify-center bg-black/60" onClick={() => pw.step !== "busy" && setPw(null)}>
+          <div className="w-full max-w-md rounded-t-3xl lg:rounded-3xl bg-wa-pop text-wa-text p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            {pw.step !== "done" ? (
+              <>
+                <h3 className="text-[18px] font-semibold">Reset password for {pw.user.fullName}?</h3>
+                <p className="mt-2 text-[14px] text-wa-muted leading-snug">A temporary password is made now. They are signed out on every device and sign in with it, then change it in their settings.</p>
+                <div className="mt-4 flex gap-3">
+                  <button onClick={() => setPw(null)} disabled={pw.step === "busy"} className="flex-1 h-12 rounded-full bg-wa-field text-[15px]">Cancel</button>
+                  <button
+                    disabled={pw.step === "busy"}
+                    onClick={async () => {
+                      setPw((p) => ({ ...p, step: "busy" }));
+                      try {
+                        const { data } = await axiosInstance.post(`/admin/users/${pw.user._id}/reset-password`);
+                        setPw((p) => ({ ...p, step: "done", temp: data.tempPassword }));
+                      } catch (e) {
+                        toast.error(e.response?.data?.error || "Couldn't reset the password");
+                        setPw(null);
+                      }
+                    }}
+                    className="flex-1 h-12 rounded-full bg-[#21C063] text-black font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-60"
+                  >{pw.step === "busy" ? <Loader2 size={18} className="animate-spin" /> : "Reset"}</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-[18px] font-semibold">Temporary password</h3>
+                <p className="mt-1 text-[13px] text-wa-muted">For {pw.user.fullName} ({pw.user.email}). It is shown only now - give it to them privately.</p>
+                <div className="mt-3 flex items-center gap-2 rounded-2xl bg-wa-field px-4 h-14">
+                  <span className="flex-1 text-[22px] tracking-[0.12em] font-mono select-all">{pw.temp}</span>
+                  <button onClick={() => { navigator.clipboard?.writeText(pw.temp).then(() => toast.success("Copied")).catch(() => toast.error("Couldn't copy")); }} aria-label="Copy" className="size-10 rounded-full flex items-center justify-center active:bg-white/10"><Copy size={20} /></button>
+                </div>
+                <button onClick={() => setPw(null)} className="mt-4 w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[15.5px]">Done</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {who && (
         <div className="absolute inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-0 p-4 pt-8 bg-gradient-to-t from-wa-bg via-wa-bg/95 to-transparent z-20 flex gap-2">
           {!pendingForWho && !isOwnerUser(who) && chosenCount > 0 && (
