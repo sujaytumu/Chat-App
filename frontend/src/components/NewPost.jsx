@@ -44,36 +44,69 @@ const nextFrame = () => new Promise((r) => setTimeout(r, 30));
 const uid = () => Math.random().toString(36).slice(2, 9);
 
 // One pass over a picked file: a full-size copy (<=1440px) and a tiny one for the grid.
-const prepare = (file) =>
+// Every kind of photo is accepted. The file is opened the best way the phone can (upright, memory-light); if the
+// phone itself cannot decode it (HEIC and some rare formats), the original is sent as it is and the server
+// converts it - the photo still gets posted.
+const PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="#2a3942"/><g fill="none" stroke="#8696a0" stroke-width="8" stroke-linejoin="round"><rect x="62" y="78" width="116" height="90" rx="10"/><circle cx="120" cy="123" r="22"/></g></svg>');
+const fileToDataUrl = (file, mime) =>
   new Promise((res, rej) => {
-    const url = URL.createObjectURL(file);
+    const r = new FileReader();
+    r.onload = () => {
+      let out = String(r.result);
+      if (!out.startsWith("data:image/")) out = out.replace(/^data:[^;,]*/, `data:${mime}`);
+      res(out);
+    };
+    r.onerror = () => rej(new Error("unreadable"));
+    r.readAsDataURL(file);
+  });
+const drawScaled = (source, w, h) => {
+  const make = (max, q) => {
+    const k = Math.min(1, max / Math.max(w, h));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(w * k));
+    c.height = Math.max(1, Math.round(h * k));
+    c.getContext("2d").drawImage(source, 0, 0, c.width, c.height);
+    const out = c.toDataURL("image/jpeg", q);
+    c.width = c.height = 0;
+    if (!out.startsWith("data:image/jpeg")) throw new Error("canvas refused");
+    return out;
+  };
+  return { src: make(1440, 0.82), thumb: make(240, 0.7), ar0: w / h };
+};
+const loadImg = (url) =>
+  new Promise((res, rej) => {
     const img = new Image();
-    img.onload = () => {
-      try {
-        const make = (max, q) => {
-          const k = Math.min(1, max / Math.max(img.width, img.height));
-          const c = document.createElement("canvas");
-          c.width = Math.max(1, Math.round(img.width * k));
-          c.height = Math.max(1, Math.round(img.height * k));
-          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-          const out = c.toDataURL("image/jpeg", q);
-          c.width = c.height = 0;
-          return out;
-        };
-        const out = { src: make(1440, 0.82), thumb: make(240, 0.7), ar0: img.width / img.height };
-        URL.revokeObjectURL(url);
-        res(out);
-      } catch (e) {
-        URL.revokeObjectURL(url);
-        rej(e);
-      }
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      rej(new Error("bad image"));
-    };
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error("bad image"));
     img.src = url;
   });
+const prepare = async (file) => {
+  // 1. straight from the file, already turned upright
+  try {
+    if (typeof createImageBitmap === "function") {
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+      try { return drawScaled(bmp, bmp.width, bmp.height); } finally { bmp.close?.(); }
+    }
+  } catch { /* try the next way */ }
+  // 2. as a normal picture from the file
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImg(url);
+    return drawScaled(img, img.naturalWidth || img.width, img.naturalHeight || img.height);
+  } catch { /* try the next way */ } finally {
+    URL.revokeObjectURL(url);
+  }
+  // 3. as a picture read into memory first
+  try {
+    const img = await loadImg(await fileToDataUrl(file, file.type || "image/jpeg"));
+    return drawScaled(img, img.naturalWidth || img.width, img.naturalHeight || img.height);
+  } catch { /* try the next way */ }
+  // 4. the phone cannot decode it: send the original, the server converts it to JPEG
+  const ext = (file.name?.split(".").pop() || "").toLowerCase();
+  const mime = file.type && file.type.startsWith("image/") ? file.type : `image/${ext === "jpg" ? "jpeg" : ext || "heic"}`;
+  const src = await fileToDataUrl(file, mime);
+  return { src, thumb: PLACEHOLDER, ar0: 1, raw: true, name: file.name || "photo" };
+};
 
 // Bake the chosen look + crop into the picture (only when something was changed).
 const bake = (it) =>
@@ -145,7 +178,7 @@ const Shot = ({ it, box }) => {
   return (
     <div className="overflow-hidden" style={{ width: Math.floor(w), height: Math.floor(h) }}>
       <div className="relative w-full h-full">
-        <img src={it.src} alt="" draggable={false} style={{ filter: cssFilter(it) }} className="w-full h-full object-cover" />
+        <img src={it.raw ? it.thumb : it.src} alt="" draggable={false} style={{ filter: it.raw ? "none" : cssFilter(it) }} className={`w-full h-full ${it.raw ? "object-contain bg-[#2a3942]" : "object-cover"}`} />
         {it.text && (
           <div className="absolute inset-x-0 text-center font-bold leading-[1.25] whitespace-pre-wrap break-words pointer-events-none" style={{ top: `${(TEXT_POS.find((t) => t[0] === it.tpos)?.[2] ?? 0.88) * 100}%`, transform: "translateY(-50%)", padding: "0 6%", fontSize: textFont(Math.floor(w), it.tsize), color: it.tcolor, textShadow: "0 0 3px rgba(0,0,0,.7), 0 1px 4px rgba(0,0,0,.6), 1px 1px 0 rgba(0,0,0,.35), -1px -1px 0 rgba(0,0,0,.35)" }}>{it.text}</div>
         )}
@@ -226,7 +259,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const patch = (i, p) => setItems((l) => l.map((x, k) => (k === i ? { ...x, ...p } : x)));
 
   const add = async (e) => {
-    const chosen = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/") || /\.(heic|heif|jpe?g|png|webp)$/i.test(f.name || ""));
+    const chosen = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/") || /\.(heic|heif|heics|jpe?g|jfif|png|webp|avif|gif|bmp|tiff?|dng|raw|arw|cr2|nef|orf)$/i.test(f.name || ""));
     e.target.value = "";
     const room = MAX - items.length;
     if (chosen.length > room) toast(`Only ${room} more photo${room === 1 ? "" : "s"} fit (max ${MAX}) - the first ${room} were taken`);
@@ -288,8 +321,17 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
 
   const share = async () => {
     if (!items.length || busy) return;
+    // up to 10 photos per post and about 15 MB per request: a post is filled until either is reached
     const batches = [];
-    for (let i = 0; i < items.length; i += PER_POST) batches.push(items.slice(i, i + PER_POST));
+    let curBatch = [];
+    let curBytes = 0;
+    for (const x of items) {
+      const n = x.src.length;
+      if (curBatch.length && (curBatch.length >= PER_POST || curBytes + n > 15 * 1000 * 1000)) { batches.push(curBatch); curBatch = []; curBytes = 0; }
+      curBatch.push(x);
+      curBytes += n;
+    }
+    if (curBatch.length) batches.push(curBatch);
     let last = null;
     let postedPhotos = 0;
     try {
@@ -352,7 +394,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
           {header("New post", <button disabled={!items.length || !!prep} onClick={() => setStep("edit")} className="px-1 text-[17px] font-semibold text-[#21C063] disabled:opacity-40">Next</button>)}
           <div className="relative w-full aspect-square bg-black shrink-0 flex items-center justify-center overflow-hidden">
             {it ? (
-              <img src={it.src} alt="" className="w-full h-full object-contain" />
+              <img src={it.raw ? it.thumb : it.src} alt="" className="w-full h-full object-contain" />
             ) : (
               <button onClick={() => gallery.current?.click()} className="flex flex-col items-center gap-3 text-wa-muted active:scale-95 transition-transform">
                 <span className="size-20 rounded-full bg-wa-field flex items-center justify-center"><ImagePlus size={34} /></span>

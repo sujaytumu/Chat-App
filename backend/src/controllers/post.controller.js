@@ -63,7 +63,7 @@ export const createPost = async (req, res) => {
     const urls = new Array(list.length);
     for (let i = 0; i < list.length; i += 4) {
       const part = list.slice(i, i + 4);
-      const got = await Promise.all(part.map((s) => cloudinary.uploader.upload(s, { folder: "chat-app/posts", resource_type: "image" })));
+      const got = await Promise.all(part.map((s) => cloudinary.uploader.upload(s, { folder: "chat-app/posts", resource_type: "image", ...(/^data:image\/(jpe?g|png|webp|gif)[;,]/i.test(s) ? {} : { format: "jpg" }) })));
       got.forEach((r, k) => { urls[i + k] = r.secure_url; });
     }
     // who can see it: what the person picked for this post, else their default for posts
