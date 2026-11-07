@@ -21,6 +21,7 @@ import android.os.Build;
 import android.provider.Settings;
 
 import androidx.core.app.NotificationCompat;
+import me.leolin.shortcutbadger.ShortcutBadger;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.app.Person;
 import androidx.core.content.pm.ShortcutInfoCompat;
@@ -127,6 +128,7 @@ final class NotificationHelper {
                 .build();
         NotificationChannel msgs = new NotificationChannel(CH_MESSAGES, "Messages", NotificationManager.IMPORTANCE_HIGH);
         msgs.setDescription("New message notifications");
+        msgs.setShowBadge(true);
         msgs.setSound(Settings.System.DEFAULT_NOTIFICATION_URI, note);
         msgs.enableVibration(true);
         msgs.setVibrationPattern(new long[]{0, 220, 120, 220});
@@ -636,6 +638,12 @@ final class NotificationHelper {
             style = q.size() > 1 ? inbox : new NotificationCompat.BigTextStyle().bigText(text);
         }
 
+        int badge = badgeNow(ctx);
+        if (!missedCall) {
+            badge += 1; // one more unread message
+            setBadge(ctx, badge);
+        }
+
         PendingIntent tap = openIntent(ctx, id, "open", chatId, chatType, "", false);
 
         // WhatsApp-style: the sender's round photo, their messages as a conversation, and Reply / Mark as read / Mute.
@@ -683,6 +691,7 @@ final class NotificationHelper {
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(false)
+                .setNumber(Math.max(1, badge))
                 .setContentIntent(tap);
         b.setLargeIcon(avatar);
         if (missedCall && !chatId.isEmpty()) {
@@ -733,8 +742,33 @@ final class NotificationHelper {
         return PendingIntent.getBroadcast(ctx, requestCode, i, flags);
     }
 
+    // ---- the number on the app icon ----
+    private static final String BADGE_PREFS = "talkies_badge";
+
+    private static int badgeNow(Context ctx) {
+        return ctx.getSharedPreferences(BADGE_PREFS, Context.MODE_PRIVATE).getInt("count", 0);
+    }
+
+    /** Shows this number on the app icon (0 removes it). Launchers that do not show numbers just ignore it. */
+    static void setBadge(Context ctx, int count) {
+        int n = Math.max(0, count);
+        try {
+            ctx.getSharedPreferences(BADGE_PREFS, Context.MODE_PRIVATE).edit().putInt("count", n).apply();
+            if (n > 0) ShortcutBadger.applyCount(ctx.getApplicationContext(), n);
+            else ShortcutBadger.removeCount(ctx.getApplicationContext());
+        } catch (Throwable ignored) {
+            // a launcher without badge support: nothing to do
+        }
+    }
+
     static void clearChat(Context ctx, String chatId) {
         if (chatId == null || chatId.isEmpty()) return;
+        int dropped = 0;
+        synchronized (RECENT) {
+            ArrayDeque<String> q = RECENT.get(chatId);
+            if (q != null) dropped = q.size();
+        }
+        if (dropped > 0) setBadge(ctx, badgeNow(ctx) - dropped);
         clearRecent(chatId);
         try {
             NotificationManagerCompat.from(ctx).cancel(idFor("dm-" + chatId));
