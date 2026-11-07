@@ -380,3 +380,12 @@ main > * { animation: routeIn .16s ease-out both; }
 .react-pop { animation: react-pop 320ms cubic-bezier(.2,1.2,.4,1) both; }
 @keyframes jump-in { from { transform: translateY(14px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
 .jump-in { animation: jump-in 220ms cubic-bezier(.2,1,.4,1) both; }
+
+/* nav icon bounce when a tab becomes active, like heart pop + ring, carousel dots, smooth theme switch */
+@keyframes nav-bounce { 0% { transform: scale(.7); } 55% { transform: scale(1.22) translateY(-2px); } 100% { transform: scale(1); } }
+.nav-bounce { animation: nav-bounce 320ms cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes like-pop { 0% { transform: scale(.6); } 45% { transform: scale(1.35); } 100% { transform: scale(1); } }
+.like-pop { animation: like-pop 380ms cubic-bezier(.2,1.2,.4,1) both; }
+@keyframes like-ring { from { transform: scale(.4); opacity: .8; } to { transform: scale(2.1); opacity: 0; } }
+.like-ring { position: absolute; inset: 0; border-radius: 9999px; border: 2px solid #ef4444; pointer-events: none; animation: like-ring 480ms ease-out both; }
+html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after { transition: background-color .35s ease, color .35s ease, border-color .35s ease, fill .35s ease, stroke .35s ease !important; }
