@@ -673,6 +673,7 @@ final class NotificationHelper {
         if (!missedCall) {
             badge += 1; // one more unread message
             setBadge(ctx, badge);
+            bumpChat(ctx, key);
         }
 
         PendingIntent tap = openIntent(ctx, id, "open", chatId, chatType, "", false);
@@ -758,7 +759,15 @@ final class NotificationHelper {
             b.addAction(new NotificationCompat.Action.Builder(0, "Mute", actionIntent(ctx, id + 2, id, MessageActionReceiver.ACTION_MUTE, chatId, chatType, key, false))
                     .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MUTE).setShowsUserInterface(false).build());
         }
-        notifySafe(ctx, id, b.build());
+        Notification built = b.build();
+        // Xiaomi / MIUI shows the icon number from the notification itself.
+        if (!missedCall) {
+            try {
+                ShortcutBadger.applyNotification(ctx.getApplicationContext(), built, Math.max(1, badge));
+            } catch (Throwable ignored) {
+            }
+        }
+        notifySafe(ctx, id, built);
     }
 
     private static PendingIntent actionIntent(Context ctx, int requestCode, int notifId, String action, String chatId, String chatType, String key, boolean mutable) {
@@ -792,12 +801,51 @@ final class NotificationHelper {
         }
     }
 
-    static void clearChat(Context ctx, String chatId) {
+    // exact unread count per chat, so reading one chat takes exactly its messages off the icon number
+    private static org.json.JSONObject chatCounts(Context ctx) {
+        try {
+            return new org.json.JSONObject(ctx.getSharedPreferences(BADGE_PREFS, Context.MODE_PRIVATE).getString("chats", "{}"));
+        } catch (Exception e) {
+            return new org.json.JSONObject();
+        }
+    }
+
+    private static void saveChatCounts(Context ctx, org.json.JSONObject o) {
+        ctx.getSharedPreferences(BADGE_PREFS, Context.MODE_PRIVATE).edit().putString("chats", o.toString()).apply();
+    }
+
+    private static synchronized void bumpChat(Context ctx, String chatId) {
+        if (chatId == null || chatId.isEmpty()) return;
+        try {
+            org.json.JSONObject o = chatCounts(ctx);
+            o.put(chatId, o.optInt(chatId, 0) + 1);
+            saveChatCounts(ctx, o);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** The app tells the exact total and the per-chat split (it knows every unread chat, not just notified ones). */
+    static synchronized void setBadgeExact(Context ctx, int total, org.json.JSONObject chats) {
+        try {
+            saveChatCounts(ctx, chats == null ? new org.json.JSONObject() : chats);
+        } catch (Exception ignored) {
+        }
+        setBadge(ctx, total);
+    }
+
+    static synchronized void clearChat(Context ctx, String chatId) {
         if (chatId == null || chatId.isEmpty()) return;
         int dropped = 0;
-        synchronized (RECENT) {
-            ArrayDeque<String> q = RECENT.get(chatId);
-            if (q != null) dropped = q.size();
+        org.json.JSONObject counts = chatCounts(ctx);
+        if (counts.has(chatId)) {
+            dropped = counts.optInt(chatId, 0);
+            counts.remove(chatId);
+            saveChatCounts(ctx, counts);
+        } else {
+            synchronized (RECENT) {
+                ArrayDeque<String> q = RECENT.get(chatId);
+                if (q != null) dropped = q.size();
+            }
         }
         if (dropped > 0) setBadge(ctx, badgeNow(ctx) - dropped);
         clearRecent(chatId);

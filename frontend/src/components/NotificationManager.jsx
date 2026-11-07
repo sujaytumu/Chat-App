@@ -86,7 +86,12 @@ const NotificationManager = () => {
 
     // Android app: the same number goes onto the app icon
     try {
-      if (window.Capacitor?.isNativePlatform?.()) window.Capacitor.Plugins?.TalkiesPush?.setBadge?.({ count: totalUnread });
+      if (window.Capacitor?.isNativePlatform?.()) {
+        const chats = {};
+        users.forEach((u) => { if (u.unreadCount && !hidden.has(`d:${u._id}`)) chats[u._id] = u.unreadCount; });
+        groups.forEach((g) => { if (g.unreadCount && !hidden.has(`g:${g._id}`)) chats[g._id] = g.unreadCount; });
+        window.Capacitor.Plugins?.TalkiesPush?.setBadge?.({ count: totalUnread, chats });
+      }
     } catch { /* plugin not available */ }
 
     if (navigator.setAppBadge) {

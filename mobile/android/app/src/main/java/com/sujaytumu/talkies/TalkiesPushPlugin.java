@@ -198,7 +198,9 @@ public class TalkiesPushPlugin extends Plugin {
     @PluginMethod
     public void setBadge(PluginCall call) {
         try {
-            NotificationHelper.setBadge(getContext(), call.getInt("count", 0));
+            JSObject chats = call.getObject("chats");
+            if (chats != null) NotificationHelper.setBadgeExact(getContext(), call.getInt("count", 0), new org.json.JSONObject(chats.toString()));
+            else NotificationHelper.setBadge(getContext(), call.getInt("count", 0));
         } catch (Exception ignored) {
         }
         call.resolve();
