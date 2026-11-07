@@ -84,6 +84,15 @@
         </provider>
     </application>
 
+    <!-- Android 11+: lets the app see the launcher's badge provider (realme / OPPO) and the home launcher -->
+    <queries>
+        <provider android:authorities="com.android.badge" />
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
+    </queries>
+
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />

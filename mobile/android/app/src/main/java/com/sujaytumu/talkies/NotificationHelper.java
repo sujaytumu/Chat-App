@@ -799,6 +799,27 @@ final class NotificationHelper {
         } catch (Throwable ignored) {
             // a launcher without badge support: nothing to do
         }
+        applyOppoBadge(ctx.getApplicationContext(), n);
+    }
+
+    /** realme / OPPO / OnePlus (ColorOS) launchers take the icon number from their own badge provider. */
+    private static void applyOppoBadge(Context ctx, int n) {
+        String m = Build.MANUFACTURER == null ? "" : Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);
+        if (!(m.contains("oppo") || m.contains("realme") || m.contains("oneplus"))) return;
+        try {
+            android.os.Bundle extras = new android.os.Bundle();
+            extras.putInt("app_badge_count", n);
+            ctx.getContentResolver().call(Uri.parse("content://com.android.badge/badge"), "setAppBadgeCount", null, extras);
+        } catch (Throwable ignored) {
+        }
+        try {
+            Intent i = new Intent("com.oppo.unsettledevent");
+            i.putExtra("pakeageName", ctx.getPackageName());
+            i.putExtra("number", n);
+            i.putExtra("upgradeNumber", n);
+            ctx.sendBroadcast(i);
+        } catch (Throwable ignored) {
+        }
     }
 
     // exact unread count per chat, so reading one chat takes exactly its messages off the icon number
