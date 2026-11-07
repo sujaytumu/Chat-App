@@ -29,7 +29,7 @@ const StatusRowSheet = ({ entry, muted, onClose, onView, onMute }) => {
       <div className="w-full max-w-md bg-wa-panel text-wa-text rounded-t-3xl lg:rounded-2xl pb-[calc(8px+env(safe-area-inset-bottom))] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-white/20 lg:hidden" />
         <div className="flex items-center gap-3 px-6 pt-4 pb-3 border-b border-white/10">
-          <img src={optimizeImage(user.profilePic, 120) || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
+          <img loading="lazy" decoding="async" src={optimizeImage(user.profilePic, 120) || "/avatar.png"} alt="" className="size-11 rounded-full object-cover" />
           <p className="text-[16px] font-medium truncate">{user.fullName}</p>
         </div>
         <div className="py-1">
