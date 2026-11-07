@@ -31,6 +31,11 @@ final class CallRinger {
 
     static void start(final Context appCtx, String tag) {
         final Context ctx = appCtx.getApplicationContext();
+        synchronized (LOCK) {
+            // Already ringing for this very call (a repeated push, the 1.2 s double-check ...):
+            // carry on from where the tune is — never start it over.
+            if (activeTag != null && activeTag.equals(tag) && (player != null || stopper != null)) return;
+        }
         stop();
         try {
             AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);

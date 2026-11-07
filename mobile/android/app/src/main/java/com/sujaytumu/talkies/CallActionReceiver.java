@@ -55,8 +55,8 @@ public class CallActionReceiver extends BroadcastReceiver {
             if (token == null || token.isEmpty()) return false;
             c = (HttpURLConnection) new URL(NotificationHelper.SITE + "/api/push/device-decline").openConnection();
             c.setRequestMethod("POST");
-            c.setConnectTimeout(5000);
-            c.setReadTimeout(5000);
+            c.setConnectTimeout(8000);
+            c.setReadTimeout(20000); // a sleeping free-tier server needs a while to wake
             c.setDoOutput(true);
             c.setRequestProperty("Content-Type", "application/json");
             String safeCaller = callerId.replaceAll("[^A-Za-z0-9]", "");
@@ -79,8 +79,8 @@ public class CallActionReceiver extends BroadcastReceiver {
         try {
             c = (HttpURLConnection) new URL(NotificationHelper.SITE + "/api/calls/decline").openConnection();
             c.setRequestMethod("POST");
-            c.setConnectTimeout(4000);
-            c.setReadTimeout(4000);
+            c.setConnectTimeout(6000);
+            c.setReadTimeout(15000);
             c.setDoOutput(true);
             c.setRequestProperty("Content-Type", "application/json");
             String cookie = CookieManager.getInstance().getCookie(NotificationHelper.SITE);
