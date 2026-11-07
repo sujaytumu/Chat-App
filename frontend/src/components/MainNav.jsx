@@ -47,6 +47,7 @@ const MainNav = ({ bottomOnly = false }) => {
   const tabClick = (to) => (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
     e.preventDefault();
+    if (to !== pathname) navigator.vibrate?.(6); // a tiny tick on a tab change
     goTab(navigate, pathname, to);
   };
   const youActive = pathname === "/profile" || pathname === "/starred" || pathname.startsWith("/settings");
@@ -109,9 +110,9 @@ const MainNav = ({ bottomOnly = false }) => {
                     isActive ? "w-14 bg-wa-tint text-wa-tinttext" : "w-10 text-wa-text2 active:bg-white/5"
                   }`}
                 >
-                  <Icon size={26} filled={isActive} />
+                  <span key={isActive ? "on" : "off"} className={`flex ${isActive ? "nav-bounce" : ""}`}><Icon size={26} filled={isActive} /></span>
                   {to === "/" && unread > 0 && (
-                    <span className="absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-wa-bg text-[9.4px] font-semibold flex items-center justify-center">
+                    <span key={unread} className="react-pop absolute -top-1 right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-[#21C063] text-wa-bg text-[9.4px] font-semibold flex items-center justify-center">
                       {unread > 99 ? "99+" : unread}
                     </span>
                   )}

@@ -13,9 +13,16 @@ const read = () => {
 };
 
 // Puts the theme on <html> (our colour tokens + the browser/phone bar colour).
+let themeApplied = false;
 export function applyTheme(theme) {
   const dark = isDarkTheme(theme);
   const root = document.documentElement;
+  // changing theme later (not at start-up) fades the colours instead of cutting
+  if (themeApplied && root.getAttribute("data-theme") !== theme) {
+    root.classList.add("theme-fade");
+    setTimeout(() => root.classList.remove("theme-fade"), 450);
+  }
+  themeApplied = true;
   root.classList.toggle("wa-dark", dark);
   root.setAttribute("data-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');

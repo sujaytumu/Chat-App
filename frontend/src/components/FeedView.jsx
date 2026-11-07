@@ -17,6 +17,25 @@ import { optimizeImage } from "../lib/cdn";
 // 4:5 and 1.91:1, like Instagram) - so swiping to a taller or wider photo never resizes or stretches the others.
 const ratioCache = new Map(); // photo address -> frame shape, so a post doesn't jump when it scrolls back into view
 const frameShape = (w, h) => Math.min(1.91, Math.max(0.5625, w / h)); // 9:16 tall up to 1.91:1 wide
+// The like heart: pops with a ring when you like (not when a liked post simply scrolls into view)
+const LikeHeart = ({ liked }) => {
+  const first = useRef(true);
+  const [pop, setPop] = useState(false);
+  useEffect(() => {
+    if (first.current) { first.current = false; return undefined; }
+    if (!liked) return undefined;
+    setPop(true);
+    const t = setTimeout(() => setPop(false), 520);
+    return () => clearTimeout(t);
+  }, [liked]);
+  return (
+    <span className={`relative flex ${pop ? "like-pop" : ""}`}>
+      <Heart size={26} className={liked ? "text-red-500" : ""} fill={liked ? "currentColor" : "none"} strokeWidth={1.8} />
+      {pop && <span className="like-ring" />}
+    </span>
+  );
+};
+
 const PT_POS = { top: "12%", mid: "50%", bot: "88%" };
 const PT_SIZES = [["S", 0.7], ["M", 1], ["L", 1.5]];
 const PT_COLORS = ["#ffffff", "#111111", "#ffd43b", "#21C063", "#ff6b9d", "#4dabf7"];
@@ -93,7 +112,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
           {i > 0 && <button type="button" onClick={() => go(i - 1)} className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/55 items-center justify-center text-white active:scale-90" aria-label="Previous photo"><ChevronRight size={18} className="rotate-180" /></button>}
           {i < images.length - 1 && <button type="button" onClick={() => go(i + 1)} className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/55 items-center justify-center text-white active:scale-90" aria-label="Next photo"><ChevronRight size={18} /></button>}
           <div className="absolute bottom-2 inset-x-0 flex justify-center gap-1 pointer-events-none">
-            {images.map((_, k) => <span key={k} className={`size-1.5 rounded-full ${k === i ? "bg-white" : "bg-white/40"}`} />)}
+            {images.map((_, k) => <span key={k} className={`h-1.5 rounded-full transition-all duration-200 ${k === i ? "w-4 bg-white" : "w-1.5 bg-white/40"}`} />)}
           </div>
         </>
       )}
@@ -587,8 +606,8 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
               </div>
               <div className="px-3 pt-2.5">
                 <div className="flex items-center gap-5">
-                  <button onClick={() => like(p)} className="flex items-center gap-1.5 active:scale-90 transition-transform" aria-label="Like">
-                    <Heart size={26} className={p.liked ? "text-red-500" : ""} fill={p.liked ? "currentColor" : "none"} strokeWidth={1.8} />
+                  <button onClick={() => { if (!p.liked) navigator.vibrate?.(8); like(p); }} className="flex items-center gap-1.5 active:scale-90 transition-transform" aria-label="Like">
+                    <LikeHeart liked={p.liked} />
                     {!p.mine && <span className="text-[13.5px] tabular-nums">{p.likeCount > 0 ? p.likeCount : ""}</span>}
                   </button>
                   {p.mine && p.likeCount > 0 && <button onClick={() => setLikersFor(p)} className="-ml-3.5 text-[13.5px] tabular-nums underline-offset-2 active:opacity-60" aria-label="See who liked">{p.likeCount}</button>}
