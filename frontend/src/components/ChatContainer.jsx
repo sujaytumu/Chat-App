@@ -159,7 +159,13 @@ const ChatContainer = () => {
     }
     if (sw.x === Infinity) return;
     sw.dx = Math.min(dx, 90);
-    e.currentTarget.style.translate = `${Math.max(sw.dx, 0) * 0.8}px 0`;
+    const el = e.currentTarget;
+    // the further you pull, the less it follows (rubber band); the reply arrow grows and turns green at the point of no return
+    const pull = Math.max(sw.dx, 0);
+    el.style.translate = `${pull <= 56 ? pull * 0.8 : 44.8 + (pull - 56) * 0.35}px 0`;
+    el.style.setProperty("--swp", String(Math.min(pull / 56, 1)));
+    if (pull > 56 && !sw.hit) { sw.hit = true; navigator.vibrate?.(8); el.classList.add("swipe-hit"); }
+    else if (pull <= 56 && sw.hit) { sw.hit = false; el.classList.remove("swipe-hit"); }
   };
   const swipeEnd = (e, onReply, onDoubleTap, id) => {
     lpCancel();
@@ -173,9 +179,11 @@ const ChatContainer = () => {
     }
     const el = e.currentTarget;
     const sw = swipe.current;
-    el.style.transition = "translate .2s cubic-bezier(.2,.8,.2,1)";
+    el.style.transition = "translate .38s cubic-bezier(.34,1.56,.64,1)"; // springs back with a small overshoot
     el.style.translate = "0 0";
-    setTimeout(() => (el.style.transition = ""), 260);
+    el.style.setProperty("--swp", "0");
+    el.classList.remove("swipe-hit");
+    setTimeout(() => (el.style.transition = ""), 400);
     if (sw.on && sw.dx > 56 && onReply) {
       navigator.vibrate?.(12);
       onReply();
@@ -552,7 +560,7 @@ const ChatContainer = () => {
             )}
             <div
               ref={(el) => (messageRefs.current[message._id] = el)}
-              className={`msg-row relative flex items-end group transition-colors ${isFirstInGroup && !showDateDivider ? "pt-2 lg:pt-3.5" : "pt-0.5 lg:pt-1"} pb-px rounded-lg ${highlightId === message._id && !selectedMsgIds.includes(message._id) ? "duration-700" : "duration-100"} ${
+              className={`msg-row swipe-row relative flex items-end group transition-colors ${isFirstInGroup && !showDateDivider ? "pt-2 lg:pt-3.5" : "pt-0.5 lg:pt-1"} pb-px rounded-lg ${highlightId === message._id && !selectedMsgIds.includes(message._id) ? "duration-700" : "duration-100"} ${
                 selectedMsgIds.includes(message._id) ? "msg-sel" : highlightId === message._id ? "bg-[#25D366]/20" : ""
               } ${isMe ? "justify-end" : "justify-start"}`}
               onMouseEnter={() => setHoveredId(message._id)}
@@ -841,7 +849,7 @@ const ChatContainer = () => {
                   {Object.entries(
                     message.reactions.reduce((acc, r) => ({ ...acc, [r.emoji]: (acc[r.emoji] || 0) + 1 }), {})
                   ).map(([emoji, count]) => (
-                    <span key={emoji} className="text-[12px] leading-none flex items-center gap-0.5">
+                    <span key={`${emoji}${count}`} className="react-pop text-[12px] leading-none flex items-center gap-0.5">
                       {emoji}
                       {count > 1 && <span className="text-[9.4px] text-wa-muted">{count}</span>}
                     </span>
@@ -866,7 +874,7 @@ const ChatContainer = () => {
       {showJump && (
         <button
           onClick={jumpToLatest}
-          className="absolute bottom-3 right-4 z-10 size-11 rounded-full bg-wa-surface text-wa-icon hover:bg-wa-field shadow-lg shadow-black/40 flex items-center justify-center transition-colors"
+          className="jump-in absolute bottom-3 right-4 z-10 size-11 rounded-full bg-wa-surface text-wa-icon hover:bg-wa-field shadow-lg shadow-black/40 flex items-center justify-center transition-colors active:scale-90"
           aria-label="Jump to latest message"
         >
           <ChevronDown size={26} />
