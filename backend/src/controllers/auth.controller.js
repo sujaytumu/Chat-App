@@ -1,6 +1,6 @@
 import { canSee } from "../lib/visibility.js";
 import jwt from "jsonwebtoken";
-import { generateToken, deviceLabel } from "../lib/utils.js";
+import { generateToken, deviceLabel, renewToken } from "../lib/utils.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
@@ -217,6 +217,7 @@ export const changePassword = async (req, res) => {
 
 export const checkAuth = (req, res) => {
   try {
+    renewToken(req, res); // opening the app keeps the login alive (sliding 60 days)
     res.status(200).json(req.user);
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuthStore } from "../store/useAuthStore";
+import { getSavedLogin } from "../lib/savedLogin";
 import QrLoginPanel from "../components/QrLoginPanel";
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
@@ -22,6 +23,17 @@ const LoginPage = () => {
   };
 
   const [loginFailed, setLoginFailed] = useState(false);
+
+  // Saved on this phone (Android app): fill the form in as soon as the screen opens, without blocking it.
+  useEffect(() => {
+    let alive = true;
+    getSavedLogin().then((s) => {
+      if (alive && s) setFormData((f) => (f.email || f.password ? f : { email: s.email, password: s.password }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,9 +95,9 @@ const LoginPage = () => {
           ) : (
           <>
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" method="post" action="#">
             <div className="form-control">
-              <label className="label">
+              <label className="label" htmlFor="login-email">
                 <span className="label-text font-medium">Email</span>
               </label>
               <div className="relative">
@@ -93,7 +105,12 @@ const LoginPage = () => {
                   <Mail className="h-5 w-5 text-base-content/40" />
                 </div>
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   className={`input input-bordered w-full pl-10`}
                   placeholder="you@example.com"
                   value={formData.email}
@@ -103,7 +120,7 @@ const LoginPage = () => {
             </div>
 
             <div className="form-control">
-              <label className="label">
+              <label className="label" htmlFor="login-password">
                 <span className="label-text font-medium">Password</span>
               </label>
               <div className="relative">
@@ -111,6 +128,9 @@ const LoginPage = () => {
                   <Lock className="h-5 w-5 text-base-content/40" />
                 </div>
                 <input
+                  id="login-password"
+                  name="password"
+                  autoComplete="current-password"
                   type={showPassword ? "text" : "password"}
                   className={`input input-bordered w-full pl-10`}
                   placeholder="••••••••"
