@@ -267,20 +267,24 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
     if (!files.length) return;
     let done = 0;
     let failed = 0;
+    const failedNames = [];
     setPrep({ done: 0, total: files.length });
     for (const f of files) {
       try {
         const p = await prepare(f);
+        if (p.raw && p.src.length > 12.5 * 1000 * 1000) throw new Error("too big to send as it is"); // the phone can't shrink it and the server takes ~9 MB per photo
         setItems((l) => (l.length < MAX ? [...l, { id: uid(), ...p, filter: "none", b: 1, c: 1, ratio: "orig", text: "", tcolor: "#ffffff", tpos: "bot", tsize: 1 }] : l));
-      } catch {
+      } catch (err) {
         failed++;
+        failedNames.push(`${f.name || "photo"} (${(f.size / 1048576).toFixed(1)} MB)`);
+        console.warn("Photo not added:", f.name, f.type, f.size, err?.message);
       }
       done++;
       setPrep({ done, total: files.length });
       await nextFrame();
     }
     setPrep(null);
-    if (failed) toast.error(`${failed} photo${failed === 1 ? "" : "s"} couldn't be opened`);
+    if (failed) toast.error(`Couldn't add: ${failedNames.slice(0, 3).join(", ")}${failed > 3 ? ` and ${failed - 3} more` : ""} - this phone can't open ${failed === 1 ? "it" : "them"} and ${failed === 1 ? "it is" : "they are"} too big to send as ${failed === 1 ? "it is" : "they are"}`, { duration: 7000 });
   };
 
   // when new photos arrive, show the newest one
