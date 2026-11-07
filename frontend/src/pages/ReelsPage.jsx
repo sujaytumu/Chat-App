@@ -38,6 +38,43 @@ const MAX_MB = 200;
 const MAX_TOTAL_MB = 54; // video + song together (they travel in one request)
 const MAX_SECONDS = 180;
 const MAX_REELS = 100; // videos that can wait in one go
+
+const REEL_GAP_MS = 500; // the finished reel stays on its last frame this long before the next one slides in
+const GLIDE_MS = 420; // length of the slide to the next reel
+const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+// Slide the reel list to a reel in one steady, eased motion (the browser's own "smooth" scroll is short,
+// uneven and fights the snapping). Snapping is paused while it glides and the person's own touch stops it.
+function glideTo(root, el, ms = GLIDE_MS) {
+  if (!root || !el) return;
+  if (document.documentElement.classList.contains("reduce-motion")) {
+    el.scrollIntoView({ block: "start" });
+    return;
+  }
+  const from = root.scrollTop;
+  const dist = el.getBoundingClientRect().top - root.getBoundingClientRect().top;
+  if (Math.abs(dist) < 2) return;
+  const snap = root.style.scrollSnapType;
+  root.style.scrollSnapType = "none";
+  let stop = false;
+  const finish = () => {
+    stop = true;
+    root.style.scrollSnapType = snap;
+    root.removeEventListener("touchstart", finish);
+    root.removeEventListener("wheel", finish);
+  };
+  root.addEventListener("touchstart", finish, { passive: true, once: true });
+  root.addEventListener("wheel", finish, { passive: true, once: true });
+  const t0 = performance.now();
+  const step = (now) => {
+    if (stop) return;
+    const p = Math.min(1, (now - t0) / ms);
+    root.scrollTop = from + dist * easeInOut(p);
+    if (p < 1) requestAnimationFrame(step);
+    else finish();
+  };
+  requestAnimationFrame(step);
+}
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
 const Rail = ({ icon: Icon, label, onClick, active, fill, size = 30 }) => (
@@ -109,13 +146,17 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const bar = useRef(null);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
+  const endHandled = useRef(false); // the end can be reported twice (timeupdate + ended): move on only once
 
   useEffect(() => {
     const v = video.current;
     if (!v) return;
     if (active) {
       setPaused(false);
-      v.currentTime = reel.trim?.start || 0;
+      endHandled.current = false;
+      // (no needless seek: a seek while the page is still sliding in causes a visible hitch)
+      const startAt = reel.trim?.start || 0;
+      if (Math.abs(v.currentTime - startAt) > 0.05) v.currentTime = startAt;
       v.muted = muted;
       try { const r = Number(localStorage.getItem("reelRate")) || 1; setRateState(r); v.playbackRate = r; if (songEl.current) songEl.current.playbackRate = r; } catch { /* ignore */ }
       if (songEl.current) {
@@ -163,6 +204,8 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
         const start = reel.trim?.start || 0;
         const end = reel.trim?.end || v.duration || 0;
         if (end > start) setProg(Math.min(1, Math.max(0, (v.currentTime - start) / (end - start))));
+        // a trimmed reel ends exactly at its trim point (checked every frame, not at timeupdate's ~4 times a second)
+        if (reel.trim && end > start && !v.paused && !v.seeking && v.currentTime >= end - 0.03) finished();
       }
       raf = requestAnimationFrame(tick);
     };
@@ -174,8 +217,12 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   // Played to the end: go to the next reel by itself (the last one starts over).
   const finished = () => {
     const v = video.current;
-    if (!v || !active) return;
-    if (!readRepeat() && onNext && onNext(reel._id)) return;
+    if (!v || !active || endHandled.current) return;
+    if (!readRepeat() && onNext && onNext(reel._id)) {
+      endHandled.current = true;
+      v.pause(); // the last frame stays on screen for the short pause before the next reel slides in
+      return;
+    }
     v.currentTime = reel.trim?.start || 0;
     if (songEl.current) songEl.current.currentTime = reel.song?.start || 0;
     v.play().catch(() => {});
@@ -1087,15 +1134,27 @@ const ReelsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reels.length, view?.startId]);
 
-  // Called when a reel finishes: slide to the next one. Returns false on the last reel so it can replay.
+  // Called when a reel finishes: after a short pause on its last frame, slide to the next one.
+  // Returns false on the last reel so it can replay.
+  const nextTimer = useRef(null);
   const goNext = useCallback((id) => {
     const root = box.current;
     const cur = root?.querySelector(`[data-reel="${id}"]`);
     const next = cur?.nextElementSibling;
     if (!next || !next.hasAttribute("data-reel")) return false;
-    next.scrollIntoView({ behavior: "smooth", block: "start" });
+    clearTimeout(nextTimer.current);
+    nextTimer.current = setTimeout(() => {
+      nextTimer.current = null;
+      glideTo(root, next);
+    }, REEL_GAP_MS);
     return true;
   }, []);
+  // swiped to another reel during the pause (or left the page): the planned slide is dropped
+  useEffect(() => {
+    clearTimeout(nextTimer.current);
+    nextTimer.current = null;
+  }, [activeId]);
+  useEffect(() => () => clearTimeout(nextTimer.current), []);
 
   const activeIdx = Math.max(0, reels.findIndex((r) => r._id === (activeId || reels[0]?._id)));
 
@@ -1305,7 +1364,7 @@ const ReelsPage = () => {
               r.source === "instagram" ? (
                 <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx === activeIdx + 1} mount={Math.abs(idx - activeIdx) <= 1} />
               ) : (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} soundBlocked={soundBlocked} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx > activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} soundBlocked={soundBlocked} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx >= activeIdx - 1 && idx !== activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
               )
             ))}
           </div>
