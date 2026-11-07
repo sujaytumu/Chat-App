@@ -56,6 +56,24 @@ final class NotificationHelper {
     // cancel for an OLD call must never silence a newer one.
     private static final Map<String, String> RINGING = new HashMap<>();
     private static final Map<String, Long> CANCELLED = new HashMap<>();
+    // When each tag started ringing: a ring nobody cancelled (phone offline, push lost) must not stay
+    // "ringing" forever and mute the page's own ring for every later call.
+    private static final Map<String, Long> RING_AT = new HashMap<>();
+
+    private static void pruneStaleRinging() {
+        long now = System.currentTimeMillis();
+        synchronized (RINGING) {
+            java.util.Iterator<Map.Entry<String, String>> it = RINGING.entrySet().iterator();
+            while (it.hasNext()) {
+                String k = it.next().getKey();
+                Long at = RING_AT.get(k);
+                if (at == null || now - at > CALL_RING_MS + 5_000L) {
+                    it.remove();
+                    RING_AT.remove(k);
+                }
+            }
+        }
+    }
 
     static boolean wasCancelled(String callId) {
         if (callId == null || callId.isEmpty()) return false;
@@ -408,8 +426,18 @@ final class NotificationHelper {
     private static void showIncomingCallPlain(Context ctx, String name, String body, String tag, String callerId, String callId) {
         if (wasCancelled(callId)) return;
         appCtx = ctx.getApplicationContext();
+        pruneStaleRinging();
+        // The same call announced twice (FCM redelivery / server retry): one ring only. Re-posting would
+        // restart the tune and stack a second ring on top of the first.
+        if (callId != null && !callId.isEmpty()) {
+            synchronized (RINGING) {
+                String cur = RINGING.get(tag == null ? "" : tag);
+                if (callId.equals(cur) && callNotificationShown(ctx, idFor(tag))) return;
+            }
+        }
         synchronized (RINGING) {
             RINGING.put(tag == null ? "" : tag, callId == null ? "" : callId);
+            RING_AT.put(tag == null ? "" : tag, System.currentTimeMillis());
         }
         ensureChannels(ctx);
         int id = idFor(tag);
@@ -444,6 +472,7 @@ final class NotificationHelper {
         appCtx = ctx.getApplicationContext();
         synchronized (RINGING) {
             RINGING.put(tag == null ? "" : tag, callId == null ? "" : callId);
+            RING_AT.put(tag == null ? "" : tag, System.currentTimeMillis());
         }
         ensureChannels(ctx);
         int id = idFor(tag);
@@ -541,6 +570,7 @@ final class NotificationHelper {
 
     /** True while this phone is ringing for a call (the page asks, to avoid ringing a second time itself). */
     static boolean isAnyRinging() {
+        pruneStaleRinging();
         synchronized (RINGING) {
             return !RINGING.isEmpty();
         }
@@ -577,6 +607,7 @@ final class NotificationHelper {
         }
         synchronized (RINGING) {
             RINGING.remove(key);
+            RING_AT.remove(key);
         }
         CallRinger.stopFor(key);
         // A cancel names a specific call. If what is on screen under this tag is no longer that ringing
