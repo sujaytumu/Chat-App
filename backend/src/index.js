@@ -34,6 +34,7 @@ import { maskJsonMiddleware } from "./lib/privateMedia.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { app, server } from "./lib/socket.js";
 import { configureWebPush } from "./lib/webPush.js";
+import { checkMail } from "./lib/mailer.js";
 
 dotenv.config();
 
@@ -111,6 +112,7 @@ const resetLimiter = rateLimit({
   handler: json429("Too many attempts. Try again in a few minutes."),
 });
 app.use("/api/auth/forgot-password", resetLimiter);
+app.use("/api/auth/owner-recovery", resetLimiter);
 
 app.use("/api/media", mediaRoutes); // private chat files (checks you are in the chat, then redirects)
 app.use("/api", maskJsonMiddleware); // from here on, chat file addresses never leave the server as-is
@@ -184,6 +186,7 @@ if (process.env.NODE_ENV === "production") {
 
 server.listen(PORT, () => {
   console.log("server is running on PORT:" + PORT);
+  checkMail();
   connectDB().then(() => {
     startScheduler();
     wipeChatMediaOnce().catch((e) => console.log("wipe error:", e.message)); // one-time, owner-approved clean-up
