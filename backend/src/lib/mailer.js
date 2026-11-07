@@ -34,6 +34,21 @@ async function viaBrevo(to, subject, text, html) {
   });
 }
 
+// Called once when the server starts: tells the log whether the email key is accepted, so a wrong key is seen at once
+// (a send-only key is refused by this listing call with "restricted_api_key" - that means the key IS valid).
+export async function checkMail() {
+  try {
+    if (!mailEnabled()) return console.log("Mail: no provider configured - password reset emails cannot be sent");
+    if (!resendKey()) return console.log("Mail: Brevo is configured");
+    const r = await fetch("https://api.resend.com/domains", { headers: { Authorization: `Bearer ${resendKey()}` }, signal: AbortSignal.timeout(10000) });
+    const body = await r.json().catch(() => ({}));
+    if (r.ok || body?.name === "restricted_api_key") console.log(`Mail: Resend key accepted (${r.ok ? "full access" : "send-only"}), key length ${resendKey().length}`);
+    else console.log(`Mail: Resend key REJECTED (${r.status} ${body?.name || ""} ${body?.message || ""}), key length ${resendKey().length}`);
+  } catch (e) {
+    console.log("Mail: couldn't check the Resend key:", e.message);
+  }
+}
+
 export async function sendMail(to, subject, text, html) {
   try {
     if (!to) return false;
@@ -47,6 +62,7 @@ export async function sendMail(to, subject, text, html) {
       console.log("Email send failed:", r.status, t.slice(0, 300));
       return false;
     }
+    console.log(`Email sent to ${to.slice(0, 3)}***@${to.split("@")[1] || "?"}`);
     return true;
   } catch (e) {
     console.log("Email error:", e.message);

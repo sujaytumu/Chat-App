@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 import { sendMail, mailEnabled } from "../lib/mailer.js";
+import { ownerId } from "../lib/visibility.js";
 import { endOtherSessions, restoreDaysLeft } from "./auth.controller.js";
 
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -144,5 +145,49 @@ export const resetPassword = async (req, res) => {
   } catch (error) {
     console.log("Error in resetPassword controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+// ── Owner break-glass ──────────────────────────────────────────────────────────────────────────────
+// If the owner forgets the password AND cannot open the email, the secret OWNER_RECOVERY_KEY (kept only in the
+// hosting settings) sets a new password for the OWNER account. Nobody else's account can be reached this way,
+// and the endpoint is closed completely until the key is set. Wrong guesses are limited per address.
+const recoveryTries = new Map(); // ip -> { n, until }
+const sameSecret = (a, b) => {
+  const x = crypto.createHash("sha256").update(String(a)).digest();
+  const y = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(x, y);
+};
+export const ownerRecovery = async (req, res) => {
+  try {
+    const secret = process.env.OWNER_RECOVERY_KEY || "";
+    if (secret.length < 20) return res.status(404).json({ message: "Owner recovery is not set up" });
+    const ip = req.ip || "x";
+    const t = recoveryTries.get(ip);
+    if (t && t.until > Date.now() && t.n >= 5) return res.status(429).json({ message: "Too many wrong keys. Try again in 15 minutes." });
+    const { key, newPassword } = req.body || {};
+    if (typeof key !== "string" || typeof newPassword !== "string") return res.status(400).json({ message: "Enter the recovery key and a new password" });
+    if (newPassword.length < 8 || newPassword.length > 200) return res.status(400).json({ message: "Password must be at least 8 characters" });
+    if (!sameSecret(key.trim(), secret)) {
+      const cur = t && t.until > Date.now() ? t : { n: 0, until: Date.now() + 15 * 60 * 1000 };
+      cur.n += 1;
+      recoveryTries.set(ip, cur);
+      console.log(`owner recovery: wrong key (${cur.n}/5)`);
+      return res.status(400).json({ message: "That recovery key did not work" });
+    }
+    const id = await ownerId();
+    const owner = id ? await User.findById(id) : null;
+    if (!owner) return res.status(404).json({ message: "Owner account not found" });
+    owner.password = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+    owner.tokenVersion = (owner.tokenVersion || 0) + 1;
+    owner.passwordReset = undefined;
+    await owner.save();
+    endOtherSessions(owner._id);
+    recoveryTries.delete(ip);
+    console.log("owner recovery: owner password was reset with the recovery key");
+    res.json({ message: "Password changed" });
+  } catch (e) {
+    console.log("ownerRecovery:", e.message);
+    res.status(500).json({ message: "Couldn't change the password" });
   }
 };
