@@ -856,7 +856,7 @@ const Sidebar = () => {
                   </span>
                 )}
                 {item.online && (
-                  <span className="absolute bottom-0 right-0 size-3.5 bg-[#25D366] rounded-full ring-[3px] ring-wa-bg" />
+                  <span className="online-dot absolute bottom-0 right-0 size-3.5 bg-[#25D366] rounded-full ring-[3px] ring-wa-bg" />
                 )}
               </div>
 
