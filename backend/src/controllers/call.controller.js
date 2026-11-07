@@ -41,7 +41,31 @@ export const clearCallHistory = async (req, res) => {
 // Without a working TURN relay, calls between two different networks (e.g. a
 // phone on mobile data + a laptop on Wi-Fi) often connect "silently" with no
 // audio, then drop with "connection lost".
-export const getIceConfig = (req, res) => {
+// Metered.ca TURN with the account's own key (free tier): METERED_APP (the name before .metered.live) and
+// METERED_API_KEY. Short-lived credentials are fetched here and remembered for 10 minutes.
+let meteredCache = { at: 0, servers: null };
+async function fetchMeteredServers() {
+  const app = process.env.METERED_APP;
+  const key = process.env.METERED_API_KEY;
+  if (!app || !key) return null;
+  if (meteredCache.servers && Date.now() - meteredCache.at < 10 * 60_000) return meteredCache.servers;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 4000);
+  try {
+    const r = await fetch(`https://${encodeURIComponent(app)}.metered.live/api/v1/turn/credentials?apiKey=${encodeURIComponent(key)}`, { signal: ctrl.signal });
+    if (r.ok) {
+      const list = await r.json();
+      if (Array.isArray(list) && list.length) meteredCache = { at: Date.now(), servers: list };
+    }
+  } catch {
+    /* keep the last good list */
+  } finally {
+    clearTimeout(timer);
+  }
+  return meteredCache.servers;
+}
+
+export const getIceConfig = async (req, res) => {
   const iceServers = [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
@@ -54,6 +78,8 @@ export const getIceConfig = (req, res) => {
       credential: process.env.TURN_CREDENTIAL,
     });
   }
+  const metered = await fetchMeteredServers();
+  if (metered) iceServers.push(...metered);
   if (iceServers.length === 2) {
     // No private TURN configured: fall back to the free public relay so calls
     // between different networks (mobile data <-> Wi-Fi) still carry audio.
