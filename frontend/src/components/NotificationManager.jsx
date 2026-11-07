@@ -84,6 +84,11 @@ const NotificationManager = () => {
 
     document.title = totalUnread > 0 ? `(${totalUnread > 99 ? "99+" : totalUnread}) ${BASE_TITLE}` : BASE_TITLE;
 
+    // Android app: the same number goes onto the app icon
+    try {
+      if (window.Capacitor?.isNativePlatform?.()) window.Capacitor.Plugins?.TalkiesPush?.setBadge?.({ count: totalUnread });
+    } catch { /* plugin not available */ }
+
     if (navigator.setAppBadge) {
       if (totalUnread > 0) navigator.setAppBadge(totalUnread).catch(() => {});
       else navigator.clearAppBadge?.().catch(() => {});

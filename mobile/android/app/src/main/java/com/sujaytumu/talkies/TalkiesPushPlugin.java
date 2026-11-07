@@ -194,6 +194,16 @@ public class TalkiesPushPlugin extends Plugin {
         call.resolve(res);
     }
 
+    /** The exact number of unread chats' messages, shown on the app icon (0 removes it). */
+    @PluginMethod
+    public void setBadge(PluginCall call) {
+        try {
+            NotificationHelper.setBadge(getContext(), call.getInt("count", 0));
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
     /** The call was answered / declined / ended inside the app: stop the notification's ring and buzz at once. */
     @PluginMethod
     public void stopCallRing(PluginCall call) {
