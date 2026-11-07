@@ -61,7 +61,7 @@ const ActivityPage = () => {
           items.map((a) => (
             <button key={a._id} onClick={() => open(a)} className={`w-full flex items-center gap-3 px-4 py-3 text-left active:bg-white/10 ${a.read ? "" : "bg-white/[0.05]"}`}>
               <span className="relative shrink-0">
-                <img src={optimizeImage(a.user.profilePic || "/avatar.png", 96)} alt="" className="size-11 rounded-full object-cover" />
+                <img loading="lazy" decoding="async" src={optimizeImage(a.user.profilePic || "/avatar.png", 96)} alt="" className="size-11 rounded-full object-cover" />
                 <span className={`absolute -bottom-0.5 -right-0.5 size-5 rounded-full flex items-center justify-center border-2 border-black ${a.type === "like" ? "bg-[#ff3b5c]" : "bg-[#25D366]"}`}>
                   {a.type === "like" ? <Heart size={10} fill="white" strokeWidth={0} /> : <MessageCircle size={10} fill="white" strokeWidth={0} />}
                 </span>
@@ -69,7 +69,7 @@ const ActivityPage = () => {
               <span className="flex-1 min-w-0 text-[14px] leading-snug">
                 <b>{a.user.fullName}</b> <span className="text-white/80">{line(a)}</span> <span className="text-white/45">{ago(a.createdAt)}</span>
               </span>
-              {a.thumb && <img src={optimizeImage(a.thumb, 120)} alt="" className="size-11 rounded-md object-cover shrink-0" />}
+              {a.thumb && <img loading="lazy" decoding="async" src={optimizeImage(a.thumb, 120)} alt="" className="size-11 rounded-md object-cover shrink-0" />}
             </button>
           ))
         )}

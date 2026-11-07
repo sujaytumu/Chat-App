@@ -91,7 +91,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
       >
         {images.map((src, k) => (
           <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always" style={{ containerType: "inline-size" }}>
-            <img src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />
+            <img loading="lazy" decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />
             <img
               src={optimizeImage(src, 1080)}
               alt=""
@@ -181,7 +181,7 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
             {imgs.map((src, k) => (
               <div key={k} className="rounded-2xl bg-wa-field p-2.5">
                 <div className="flex items-center gap-2.5">
-                  <img src={optimizeImage(src, 160)} alt="" className="size-12 rounded-lg object-cover shrink-0" />
+                  <img loading="lazy" decoding="async" src={optimizeImage(src, 160)} alt="" className="size-12 rounded-lg object-cover shrink-0" />
                   <input
                     value={ptexts[k]?.text || ""}
                     onChange={(e) => setPt(k, { text: e.target.value })}
@@ -276,7 +276,7 @@ const LikersSheet = ({ post, onClose }) => {
             : !users.length ? <p className="py-10 text-center text-wa-muted text-[14px]">No likes yet</p>
             : users.map((u) => (
               <div key={u._id} className="flex items-center gap-3 px-5 py-2.5">
-                <img src={optimizeImage(u.profilePic || "/avatar.png", 80)} alt="" className="size-11 rounded-full object-cover" />
+                <img loading="lazy" decoding="async" src={optimizeImage(u.profilePic || "/avatar.png", 80)} alt="" className="size-11 rounded-full object-cover" />
                 <span className="flex-1 text-[16px] truncate">{u.fullName}</span>
                 <Heart size={16} className="text-red-500" fill="currentColor" strokeWidth={0} />
               </div>
@@ -583,7 +583,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
             <article key={p._id} className="mb-5 pb-4 border-b border-white/[0.06]" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <button type="button" onClick={() => openProfile(p)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-70" aria-label={`Open ${p.user?.fullName || "profile"}`}>
-                <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
+                <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img loading="lazy" decoding="async" src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
                 <span className="flex-1 min-w-0 flex flex-col leading-tight">
                   <span className="text-[14px] font-semibold truncate">{p.user?.fullName}</span>
                   {p.song?.url && <span className="flex items-center gap-1 text-[12px] text-white/70 truncate"><Music size={11} className="text-[#25D366] shrink-0" /><span className="truncate">{p.song.name}</span></span>}
