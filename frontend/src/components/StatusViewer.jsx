@@ -443,7 +443,13 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             >{linkify(current.content)}</p>
           </div>
         )}
-        {current.type === "image" && <img src={optimizeImage(current.content, 1080)} decoding="async" alt="Status" className="max-w-full max-h-full object-contain" draggable={false} />}
+        {current.type === "image" && (
+          <>
+            {/* shown whole at any shape; the empty space is a soft blurred copy of the picture */}
+            <img src={optimizeImage(current.content, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />
+            <img src={optimizeImage(current.content, 1080)} decoding="async" alt="Status" className="relative max-w-full max-h-full object-contain" draggable={false} />
+          </>
+        )}
         {current.type === "video" && (
           <>
             <video

@@ -312,6 +312,8 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
     <section className="h-full w-full snap-start snap-always relative bg-black flex items-center justify-center overflow-hidden" style={{ contain: "layout paint" }} data-reel={reel._id}>
       {/* Only the reel on screen and its neighbours get a real video player; the rest are just a still picture.
           That keeps phone memory and the video decoder free, which is what stops the lag. */}
+      {/* Whatever the video's shape, it is shown whole (never cropped); the empty space is filled with a soft blurred copy of its first frame */}
+      {reel.poster && <img src={reel.poster} alt="" aria-hidden="true" decoding="async" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
       {mount ? (
         <video
           ref={video}

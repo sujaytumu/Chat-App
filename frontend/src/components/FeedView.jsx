@@ -16,7 +16,7 @@ import { optimizeImage } from "../lib/cdn";
 // Every photo of a post sits in ONE fixed frame whose shape comes from the first photo (kept between
 // 4:5 and 1.91:1, like Instagram) - so swiping to a taller or wider photo never resizes or stretches the others.
 const ratioCache = new Map(); // photo address -> frame shape, so a post doesn't jump when it scrolls back into view
-const frameShape = (w, h) => Math.min(1.91, Math.max(0.8, w / h));
+const frameShape = (w, h) => Math.min(1.91, Math.max(0.5625, w / h)); // 9:16 tall up to 1.91:1 wide
 const PT_POS = { top: "12%", mid: "50%", bot: "88%" };
 const PT_SIZES = [["S", 0.7], ["M", 1], ["L", 1.5]];
 const PT_COLORS = ["#ffffff", "#111111", "#ffd43b", "#21C063", "#ff6b9d", "#4dabf7"];
@@ -72,6 +72,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
       >
         {images.map((src, k) => (
           <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always" style={{ containerType: "inline-size" }}>
+            <img src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />
             <img
               src={optimizeImage(src, 1080)}
               alt=""
@@ -80,7 +81,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
               draggable={false}
               onLoad={k === 0 ? first : undefined}
               onClick={() => onTap(k)}
-              className="w-full h-full object-contain"
+              className="relative w-full h-full object-contain"
             />
             <PhotoLine t={texts[k]} />
           </div>
