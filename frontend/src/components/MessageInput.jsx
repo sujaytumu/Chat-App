@@ -1209,7 +1209,7 @@ const MessageInput = () => {
             title="Send (hold to schedule)"
             aria-label="Send"
           >
-            {isSending ? <Loader2 size={20} className="animate-spin" /> : <WhatsAppSendIcon size={20} className="ml-0.5" />}
+            {isSending ? <Loader2 size={20} className="animate-spin" /> : <span className="icon-swap flex"><WhatsAppSendIcon size={20} className="ml-0.5" /></span>}
           </button>
         ) : (
           <button
@@ -1235,7 +1235,7 @@ const MessageInput = () => {
             ) : isRecording ? (
               <WhatsAppSendIcon size={20} className="ml-0.5" />
             ) : (
-              <Mic size={23} />
+              <span className="icon-swap flex"><Mic size={23} /></span>
             )}
           </button>
         )}
