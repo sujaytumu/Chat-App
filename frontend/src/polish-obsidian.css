@@ -1,0 +1,127 @@
+/* ==========================================================================
+   Obsidian — premium dark theme. Pure CSS on the existing colour tokens, scoped
+   to html[data-theme="obsidian"], so no other theme or behaviour changes.
+   Deep ink background, hairline borders, emerald glow, champagne highlights.
+   NOTE: no backdrop-filter / transform / filter on headers or bubbles (it traps
+   position:fixed sheets inside them) — depth comes from gradients and shadows.
+   ========================================================================== */
+html[data-theme="obsidian"] {
+  --wa-bg: 7 9 13;
+  --wa-panel: 11 15 22;
+  --wa-surface: 18 24 33;
+  --wa-pop: 24 31 43;
+  --wa-field: 21 28 39;
+  --wa-hover: 27 35 48;
+  --wa-text: 232 236 243;
+  --wa-muted: 138 148 163;
+  --wa-icon: 170 179 194;
+  --wa-text2: 205 212 224;
+  --wa-muted2: 100 110 126;
+  --wa-out: 10 84 66;
+  --wa-tint: 12 62 50;
+  --wa-tinttext: 190 255 225;
+  --wa-wallpaper: #07090D;
+  --wa-doodle: #FFFFFF;
+  --wa-doodle-opacity: 0.03;
+  --wa-scroll: #232C38;
+  --wa-scroll-hover: #344052;
+  --ob-hair: rgb(255 255 255 / .07);
+  --ob-glow: 52 227 160;
+  --ob-gold: 232 201 135;
+  color-scheme: dark;
+}
+
+/* Ambient backdrop: a faint emerald bloom top-left and indigo bloom bottom-right */
+html[data-theme="obsidian"] body {
+  background-image:
+    radial-gradient(60% 40% at 0% 0%, rgb(var(--ob-glow) / .07), transparent 70%),
+    radial-gradient(55% 40% at 100% 100%, rgb(124 140 255 / .06), transparent 70%);
+  background-attachment: fixed;
+}
+
+/* Chat wallpaper: near-black with a whisper of light from the top */
+html[data-theme="obsidian"] .chat-wallpaper {
+  background-color: #07090D;
+  background-image:
+    radial-gradient(90% 45% at 50% 0%, rgb(var(--ob-glow) / .06), transparent 70%),
+    linear-gradient(180deg, #0A0E14 0%, #07090D 100%);
+}
+
+/* Headers & bars: raised panel with a hairline and soft shadow */
+html[data-theme="obsidian"] header,
+html[data-theme="obsidian"] nav.fixed.bottom-0 {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / .035), rgb(255 255 255 / 0));
+  border-color: var(--ob-hair);
+}
+html[data-theme="obsidian"] nav.fixed.bottom-0 { box-shadow: 0 -10px 30px -18px rgb(0 0 0 / .9), inset 0 1px 0 var(--ob-hair); }
+html[data-theme="obsidian"] nav.hidden.lg\:flex { border-color: var(--ob-hair); background-color: rgb(var(--wa-panel)); }
+
+/* Active tab: emerald glass pill */
+html[data-theme="obsidian"] nav.fixed.bottom-0 .bg-wa-tint.rounded-full {
+  background-image: linear-gradient(135deg, rgb(var(--ob-glow) / .22), rgb(var(--ob-glow) / .08));
+  box-shadow: inset 0 0 0 1px rgb(var(--ob-glow) / .28), 0 0 18px -6px rgb(var(--ob-glow) / .55);
+}
+
+/* Chat list: hairline dividers, lifted hover */
+html[data-theme="obsidian"] .group > button.w-full.select-none::after { background: var(--ob-hair); }
+html[data-theme="obsidian"] .group > button.w-full.select-none:hover { background-color: rgb(var(--wa-hover) / .7); }
+
+/* Message bubbles: sent = deep emerald gradient with a soft glow; received = smoked glass */
+html[data-theme="obsidian"] .msg-row .bg-wa-out.rounded-lg,
+html[data-theme="obsidian"] .msg-row .bg-wa-out {
+  background-image: linear-gradient(155deg, #0F6B54 0%, #0A5442 55%, #083F33 100%);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .09) inset, 0 10px 24px -14px rgb(var(--ob-glow) / .6);
+  color: #F2FFF9;
+}
+html[data-theme="obsidian"] .msg-row .bg-wa-surface.rounded-lg,
+html[data-theme="obsidian"] .msg-row .bg-wa-surface {
+  background-image: linear-gradient(155deg, rgb(255 255 255 / .05), rgb(255 255 255 / 0) 60%);
+  box-shadow: 0 0 0 1px var(--ob-hair), 0 10px 22px -16px rgb(0 0 0 / .9);
+}
+
+/* Message box: floating glass pill with an emerald focus ring */
+html[data-theme="obsidian"] .wa-input-field {
+  background: rgb(var(--wa-field));
+  box-shadow: 0 0 0 1px var(--ob-hair), 0 12px 28px -18px rgb(0 0 0 / .9);
+  caret-color: rgb(var(--ob-glow));
+}
+html[data-theme="obsidian"] form:focus-within .wa-input-field {
+  box-shadow: 0 0 0 1px rgb(var(--ob-glow) / .45), 0 0 22px -8px rgb(var(--ob-glow) / .5);
+}
+
+/* Primary actions (green buttons / FABs): gradient + glow, champagne on press */
+html[data-theme="obsidian"] .btn-primary,
+html[data-theme="obsidian"] .bg-\[\#00A884\] {
+  background-image: linear-gradient(135deg, #3BE9A8, #0FB784);
+  border-color: transparent;
+  color: #04120D;
+  box-shadow: 0 10px 26px -10px rgb(var(--ob-glow) / .7), inset 0 1px 0 rgb(255 255 255 / .35);
+}
+html[data-theme="obsidian"] .btn-primary:active,
+html[data-theme="obsidian"] .bg-\[\#00A884\]:active { filter: brightness(.95); }
+
+/* Cards, sheets and menus: hairline edge + deep shadow */
+html[data-theme="obsidian"] .rounded-2xl.bg-wa-surface,
+html[data-theme="obsidian"] .bg-wa-pop {
+  box-shadow: 0 0 0 1px var(--ob-hair), 0 18px 40px -22px rgb(0 0 0 / .95);
+}
+html[data-theme="obsidian"] .modal-box { background-color: rgb(var(--wa-pop)); box-shadow: 0 0 0 1px var(--ob-hair), 0 30px 70px -20px rgb(0 0 0 / .95); }
+
+/* Inputs */
+html[data-theme="obsidian"] .input,
+html[data-theme="obsidian"] .textarea,
+html[data-theme="obsidian"] .select { background-color: rgb(var(--wa-field)); border-color: var(--ob-hair); }
+html[data-theme="obsidian"] .input:focus,
+html[data-theme="obsidian"] .textarea:focus,
+html[data-theme="obsidian"] .select:focus { border-color: rgb(var(--ob-glow) / .7); box-shadow: 0 0 0 3px rgb(var(--ob-glow) / .16); }
+
+/* Unread badges and online dots: emerald with a halo */
+html[data-theme="obsidian"] .bg-\[\#25D366\] { box-shadow: 0 0 12px -2px rgb(var(--ob-glow) / .7); }
+
+/* Selected message band: emerald veil instead of flat teal */
+html[data-theme="obsidian"] .msg-row.msg-sel { background-color: rgb(var(--ob-glow) / .16); }
+
+/* Text selection + splash */
+html[data-theme="obsidian"] ::selection { background: rgb(var(--ob-glow) / .3); }
+html[data-theme="obsidian"] .splash img { box-shadow: 0 18px 48px -14px rgb(var(--ob-glow) / .7); }
+html[data-theme="obsidian"] .splash b { background: linear-gradient(90deg, #E8ECF3, rgb(var(--ob-gold))); -webkit-background-clip: text; background-clip: text; color: transparent; }

@@ -1,8 +1,10 @@
 import { create } from "zustand";
 
 // Bright (white) is the default; the person can pick any theme in Settings.
-export const DARK_THEMES = ["dark", "night", "dracula", "forest", "business", "luxury", "black", "synthwave"];
+export const DARK_THEMES = ["obsidian", "dark", "night", "dracula", "forest", "business", "luxury", "black", "synthwave"];
 export const isDarkTheme = (t) => DARK_THEMES.includes(t);
+// Colour of the browser / phone bars for each theme.
+const barColor = (theme, dark) => (theme === "obsidian" ? "#07090D" : dark ? "#111B21" : "#FFFFFF");
 
 const read = () => {
   try {
@@ -26,7 +28,7 @@ export function applyTheme(theme) {
   root.classList.toggle("wa-dark", dark);
   root.setAttribute("data-theme", theme);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", dark ? "#111B21" : "#FFFFFF");
+  if (meta) meta.setAttribute("content", barColor(theme, dark));
   // Android app: make the status/navigation bar icons readable on this theme.
   try {
     window.Capacitor?.Plugins?.SystemBars?.setStyle?.({ style: dark ? "DARK" : "LIGHT" });
@@ -35,7 +37,7 @@ export function applyTheme(theme) {
   }
   // Android app: bars + the strip behind them take the theme colour (dark theme -> dark bars)
   try {
-    window.Capacitor?.Plugins?.AppChrome?.setTheme?.({ color: dark ? "#111B21" : "#FFFFFF", dark })?.catch?.(() => {});
+    window.Capacitor?.Plugins?.AppChrome?.setTheme?.({ color: barColor(theme, dark), dark })?.catch?.(() => {});
   } catch {
     /* not in the app */
   }

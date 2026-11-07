@@ -1,5 +1,6 @@
 export const THEMES = [
   "light",
+  "obsidian",
   "dark",
   "night",
   "dracula",
