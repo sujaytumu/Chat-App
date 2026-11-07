@@ -65,7 +65,10 @@ public class MessageActionReceiver extends BroadcastReceiver {
                 try {
                     if (ok) {
                         NotificationManagerCompat.from(context).cancel(notifId);
-                        if (key != null) NotificationHelper.clearRecent(key);
+                        if (key != null) {
+                            if (ACTION_MUTE.equals(action)) NotificationHelper.clearRecent(key); // still unread: icon number stays
+                            else NotificationHelper.clearChat(context, key); // read / replied: number drops by this chat's messages
+                        }
                     }
                 } catch (Exception ignored) {
                 }
