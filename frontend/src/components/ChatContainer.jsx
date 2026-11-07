@@ -647,7 +647,7 @@ const ChatContainer = () => {
                     if (e.detail > 1) e.preventDefault(); // no word-selection flash on the 2nd click
                   }}
                   className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[68%] px-3 pt-2 pb-1.5 lg:px-3.5 lg:pt-2 lg:pb-2 rounded-[18px] break-words shadow-sm flex flex-col text-wa-text text-[15.5px] lg:text-[14.5px] leading-[1.35] ${
-                    isMe ? "bg-wa-out" : "bg-wa-surface"
+                    isMe ? "bg-wa-out bubble-out" : "bg-wa-surface bubble-in"
                   } ${
                     isFirstInGroup ? (isMe ? "rounded-tr-none bubble-tail-out" : "rounded-tl-none bubble-tail-in") : ""
                   }`}

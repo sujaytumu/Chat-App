@@ -389,3 +389,22 @@ main > * { animation: routeIn .16s ease-out both; }
 @keyframes like-ring { from { transform: scale(.4); opacity: .8; } to { transform: scale(2.1); opacity: 0; } }
 .like-ring { position: absolute; inset: 0; border-radius: 9999px; border: 2px solid #ef4444; pointer-events: none; animation: like-ring 480ms ease-out both; }
 html.theme-fade, html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after { transition: background-color .35s ease, color .35s ease, border-color .35s ease, fill .35s ease, stroke .35s ease !important; }
+
+/* ---- Decoration only (no layout or behaviour): richer colour, depth and glow ---- */
+/* every green accent (unread badges, Share/Post/Send buttons, online dots) gets a soft gradient */
+.bg-\[\#21C063\], .bg-\[\#25D366\], .bg-\[\#00A884\] { background-image: linear-gradient(135deg, #3be584 0%, #19b35e 100%); }
+/* the chat header carries a faint green wash, and the active tab a soft glow */
+.chat-header { background-image: linear-gradient(180deg, rgb(var(--wa-tint) / .16), transparent 85%); }
+nav span.bg-wa-tint { box-shadow: 0 3px 12px -3px rgb(33 192 99 / .45); }
+/* message bubbles: gentle depth and a light top edge */
+.bubble-out { box-shadow: 0 1px 2px rgb(0 0 0 / .16), inset 0 1px 0 rgb(255 255 255 / .09); }
+.bubble-in { box-shadow: 0 1px 2px rgb(0 0 0 / .12), inset 0 1px 0 rgb(255 255 255 / .05); }
+/* send / mic button glows */
+button[aria-label="Send"], button[aria-label="Record voice message"], button[aria-label="Send voice message"] { box-shadow: 0 6px 16px -4px rgb(33 192 99 / .55); }
+/* online dot breathes */
+@keyframes online-pulse { 0% { box-shadow: 0 0 0 0 rgb(37 211 102 / .55); } 70% { box-shadow: 0 0 0 7px rgb(37 211 102 / 0); } 100% { box-shadow: 0 0 0 0 rgb(37 211 102 / 0); } }
+.online-dot { animation: online-pulse 2.2s ease-out infinite; }
+/* text fields light up when you type in them; selected text takes the brand colour */
+input:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 3px rgb(37 211 102 / .22); }
+::selection { background: rgb(37 211 102 / .35); }
+@media (prefers-reduced-motion: reduce) { .online-dot { animation: none; } }
