@@ -6,6 +6,23 @@ import { io } from "socket.io-client";
 import { useChatStore } from "./useChatStore";
 import { useCallStore } from "./useCallStore";
 import { useGroupCallStore } from "./useGroupCallStore";
+import {
+  canSaveLogin,
+  getSavedLogin,
+  saveLogin,
+  clearSavedLogin,
+  isNeverSave,
+  setNeverSave,
+  markSignedOut,
+  wasSignedOut,
+} from "../lib/savedLogin";
+
+// True while the app is quietly signing back in with the saved login. The socket's
+// "unauthorized" handler must not sign the person out during that moment.
+let silentBusy = false;
+// Email + password typed on the login screen, kept in memory only while the
+// two-step code is being entered, so "Save password?" can be offered afterwards.
+let pendingCreds = null;
 
 const BASE_URL = import.meta.env.MODE === "development" ? "http://localhost:5001" : "/";
 
@@ -33,6 +50,53 @@ export const useAuthStore = create((set, get) => ({
   isCheckingAuth: !cachedAuthUser,
   onlineUsers: [],
   socket: null,
+  savePrompt: null, // { email, password, update } while the "Save password?" popup is showing
+
+  // Ask "Save password?" after a successful sign-in (Android app only; browsers have their own).
+  offerSavePassword: async (creds) => {
+    try {
+      const email = (creds?.email || "").trim();
+      if (!email || !creds?.password || !canSaveLogin() || isNeverSave(email)) return;
+      const saved = await getSavedLogin();
+      const same = saved && saved.email.toLowerCase() === email.toLowerCase();
+      if (same && saved.password === creds.password) return; // already saved
+      set({ savePrompt: { email, password: creds.password, update: !!same } });
+    } catch {
+      // the popup is a convenience only
+    }
+  },
+  confirmSavePassword: async () => {
+    const p = get().savePrompt;
+    set({ savePrompt: null });
+    if (!p) return;
+    const ok = await saveLogin(p.email, p.password);
+    toast[ok ? "success" : "error"](ok ? "Password saved" : "Couldn't save the password");
+  },
+  dismissSavePassword: (never) => {
+    const p = get().savePrompt;
+    set({ savePrompt: null });
+    if (never && p) setNeverSave(p.email);
+  },
+
+  // Session ended (cookie lost/expired) but this phone has a saved login: sign in again
+  // quietly instead of showing the login screen. Not after an explicit "Log out".
+  silentRelogin: async () => {
+    if (silentBusy || wasSignedOut()) return false;
+    const saved = await getSavedLogin();
+    if (!saved) return false;
+    silentBusy = true;
+    try {
+      const ok = await get().login(saved, { silent: true });
+      if (ok && get().authUser) {
+        get().disconnectSocket();
+        get().connectSocket();
+        return true;
+      }
+      return false;
+    } finally {
+      silentBusy = false;
+    }
+  },
 
   checkAuth: async () => {
     // Known user from last time: connect the realtime socket right away,
@@ -46,6 +110,10 @@ export const useAuthStore = create((set, get) => ({
     } catch (error) {
       console.log("Error in checkAuth:", error);
       const status = error.response?.status;
+      // A real "not signed in" answer: if the phone has a saved login, quietly sign in again.
+      if (status === 401 || status === 404) {
+        if (await get().silentRelogin()) return;
+      }
       // Only a real "not signed in" answer signs the person out. A slow/asleep
       // server or no network must not kick them out of a cached session.
       if (!get().authUser || status === 401 || status === 404) {
@@ -61,9 +129,11 @@ export const useAuthStore = create((set, get) => ({
     set({ isSigningUp: true });
     try {
       const res = await axiosInstance.post("/auth/signup", data);
+      markSignedOut(false);
       set({ authUser: res.data });
       toast.success("Account created successfully");
       get().connectSocket();
+      get().offerSavePassword(data);
     } catch (error) {
       toast.error(error.response.data.message);
     } finally {
@@ -71,22 +141,32 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  login: async (data) => {
+  login: async (data, { silent = false } = {}) => {
     set({ isLoggingIn: true });
     try {
       const res = await axiosInstance.post("/auth/login", data);
       if (res.data?.twoFactorRequired) {
         // Password was right — now ask for the authenticator code.
+        if (!silent) pendingCreds = { email: data.email, password: data.password };
         set({ pendingTwoFactor: { ticket: res.data.ticket } });
         return true;
       }
+      markSignedOut(false);
       set({ authUser: res.data });
-      toast.success("Logged in successfully");
+      if (!silent) {
+        toast.success("Logged in successfully");
+        get().offerSavePassword(data); // popup appears after the chat list is already open
+      }
 
       get().connectSocket();
       return true;
     } catch (error) {
       const d = error.response?.data;
+      if (silent) {
+        // The saved password no longer works (changed elsewhere): forget it so the person is asked again.
+        if (error.response?.status === 400) clearSavedLogin();
+        return false;
+      }
       // Deleted less than 30 days ago: offer to bring everything back.
       if (d?.restorable && d.restoreToken) {
         const yes = window.confirm(`${d.message}\n\nRestore this account with all your chats, groups and media?`);
@@ -118,9 +198,12 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoggingIn: true });
     try {
       const res = await axiosInstance.post("/auth/login/2fa", { ticket: pending.ticket, code });
+      markSignedOut(false);
       set({ authUser: res.data, pendingTwoFactor: null });
       toast.success("Logged in successfully");
       get().connectSocket();
+      if (pendingCreds) get().offerSavePassword(pendingCreds);
+      pendingCreds = null;
       return true;
     } catch (error) {
       const msg = error.response?.data?.message || "Couldn't verify the code";
@@ -131,14 +214,18 @@ export const useAuthStore = create((set, get) => ({
       set({ isLoggingIn: false });
     }
   },
-  cancelTwoFactor: () => set({ pendingTwoFactor: null }),
+  cancelTwoFactor: () => {
+    pendingCreds = null;
+    set({ pendingTwoFactor: null });
+  },
 
   logout: async () => {
     if (window.Capacitor?.isNativePlatform?.()) await import("../lib/nativePush").then((m) => m.unregisterNativePush()).catch(() => {});
     try {
       await axiosInstance.post("/auth/logout");
+      markSignedOut(true); // an explicit Log out is respected: no silent sign-in until the next login
       clearChatCache();
-      set({ authUser: null });
+      set({ authUser: null, savePrompt: null });
       toast.success("Logged out successfully");
       get().disconnectSocket();
     } catch (error) {
@@ -187,6 +274,7 @@ export const useAuthStore = create((set, get) => ({
     });
     socket.on("connect_error", async (err) => {
       if (err?.message !== "unauthorized") return;
+      if (silentBusy) return; // quietly signing in again right now; the socket is rebuilt after it
       try {
         await axiosInstance.get("/auth/check");
         if (!authRetried) {

@@ -80,6 +80,9 @@ const SignUpPage = () => {
                   <Mail className="size-5 text-base-content/40" />
                 </div>
                 <input
+                  name="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
                   type="email"
                   className={`input input-bordered w-full pl-10`}
                   placeholder="you@example.com"
@@ -98,6 +101,8 @@ const SignUpPage = () => {
                   <Lock className="size-5 text-base-content/40" />
                 </div>
                 <input
+                  name="password"
+                  autoComplete="new-password"
                   type={showPassword ? "text" : "password"}
                   className={`input input-bordered w-full pl-10`}
                   placeholder="••••••••"

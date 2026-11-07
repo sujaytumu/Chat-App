@@ -202,6 +202,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(PrivacyScreenPlugin.class);
         registerPlugin(TalkiesPushPlugin.class);
         registerPlugin(CallKeepAlivePlugin.class);
+        registerPlugin(SavedLoginPlugin.class);
         showOverLockScreenIfCall(getIntent());
         super.onCreate(savedInstanceState);
         TalkiesPushPlugin.handleIntent(getIntent());
