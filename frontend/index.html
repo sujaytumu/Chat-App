@@ -20,12 +20,12 @@
     <script>
       try {
         var t = localStorage.getItem("chat-theme") || "light";
-        var d = ["dark","night","dracula","forest","business","luxury","black","synthwave"].indexOf(t) > -1;
+        var d = ["obsidian","dark","night","dracula","forest","business","luxury","black","synthwave"].indexOf(t) > -1;
         if (d) document.documentElement.classList.add("wa-dark");
         document.documentElement.setAttribute("data-theme", t);
         var cc = localStorage.getItem("talkies-chat-color");
         if (cc) document.documentElement.setAttribute("data-chat-color", cc);
-        document.querySelector('meta[name="theme-color"]').setAttribute("content", d ? "#111B21" : "#FFFFFF");
+        document.querySelector('meta[name="theme-color"]').setAttribute("content", t === "obsidian" ? "#07090D" : d ? "#111B21" : "#FFFFFF");
       } catch (e) {}
     </script>
     <!-- Safety net: if the app never starts (stale cached files after an update, a failed script, a crash before anything draws), clear the saved copy and reload once; if it still can't start, say so with a Reload button instead of leaving a blank page. -->
@@ -81,6 +81,8 @@
     <style>
       html, body, #root { margin: 0; min-height: 100%; background: #FFFFFF; }
       html.wa-dark, html.wa-dark body, html.wa-dark #root { background: #0B141A; }
+      html[data-theme="obsidian"], html[data-theme="obsidian"] body, html[data-theme="obsidian"] #root { background: #07090D; }
+      html[data-theme="obsidian"] .splash { background: radial-gradient(120% 80% at 50% 0%, #10161F 0%, #07090D 60%); }
       /* Branded loading screen: shown by the page itself, then by the app while it signs in. */
       .splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #FFFFFF; color: #111B21; font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; }
       html.wa-dark .splash { background: #0B141A; color: #E9EDEF; }

@@ -59,6 +59,22 @@ export default {
   plugins: [require("daisyui")], // ✅ add DaisyUI plugin
   daisyui: {
     themes: [
+      {
+        obsidian: {
+          primary: "#34E3A0",
+          secondary: "#7C8CFF",
+          accent: "#E8C987",
+          neutral: "#121821",
+          "base-100": "#07090D",
+          "base-200": "#0C1017",
+          "base-300": "#121821",
+          "base-content": "#E8ECF3",
+          info: "#5BB8FF",
+          success: "#34E3A0",
+          warning: "#E8C987",
+          error: "#FF6B7A",
+        },
+      },
       "dark", "night", "dracula", "forest", "business", "luxury",
       "black", "synthwave", "winter", "light", "emerald", "corporate"
     ],
