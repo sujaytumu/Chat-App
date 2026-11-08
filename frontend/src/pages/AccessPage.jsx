@@ -335,6 +335,7 @@ const AccessPage = () => {
                   try {
                     await axiosInstance.delete(`/admin/users/${del.user._id}`);
                     setUsers((us) => us.filter((u) => u._id !== del.user._id));
+                    setPairs((ps) => new Set([...ps].filter((k) => !k.split("|").includes(del.user._id)))); // everyone allowed with them has one fewer
                     setWho(null);
                     toast.success("Account deleted");
                     setDel(null);

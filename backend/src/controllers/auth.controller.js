@@ -1,4 +1,4 @@
-import { canSee } from "../lib/visibility.js";
+import { canSee, dropUserPairs } from "../lib/visibility.js";
 import jwt from "jsonwebtoken";
 import { generateToken, deviceLabel, renewToken } from "../lib/utils.js";
 import User from "../models/user.model.js";
@@ -310,6 +310,7 @@ export async function wipeAccount(user) {
   await Status.deleteMany({ userId: uid });
   await Group.updateMany({ members: uid }, { $pull: { members: uid, admins: uid } });
   await Group.deleteMany({ members: { $size: 0 } });
+  await dropUserPairs(uid); // the owner's "allowed" lists lose this person
   const salt = await bcrypt.genSalt(10);
   user.fullName = "Deleted account";
   user.email = `deleted-${uid}@deleted.invalid`;
