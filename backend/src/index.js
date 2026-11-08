@@ -159,6 +159,21 @@ app.get("/api/health/push", (req, res) => {
 });
 
 if (process.env.NODE_ENV === "production") {
+  // The app's files are linked relative ("./assets/..."), so a page opened at /settings/ or /chat/12/x would ask for
+  // /settings/assets/... and get index.html back ("script failed"). Send those straight to the real file, and send a
+  // trailing-slash address to the same address without it.
+  app.use((req, res, next) => {
+    if (req.method !== "GET" && req.method !== "HEAD") return next();
+    const q = req.originalUrl.includes("?") ? req.originalUrl.slice(req.originalUrl.indexOf("?")) : "";
+    const asset = req.path.match(/^\/.+?\/(assets\/[^/]+)$/);
+    if (asset) { req.url = `/${asset[1]}${q}`; return next(); }
+    const root = req.path.match(/^\/.+?\/(manifest\.json|sw\.js|favicon[^/]*|icon[^/]*\.png)$/);
+    if (root) { req.url = `/${root[1]}${q}`; return next(); }
+    if (req.path.length > 1 && req.path.endsWith("/") && !req.path.startsWith("/api/")) {
+      return res.redirect(301, req.path.replace(/\/+$/, "") + q);
+    }
+    next();
+  });
   app.use(
     express.static(path.join(__dirname, "../frontend/dist"), {
       maxAge: "1d",
