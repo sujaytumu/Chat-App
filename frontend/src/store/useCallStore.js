@@ -241,7 +241,14 @@ const tuneScreenSender = (sender) => {
 };
 
 // A signal that names a different call than the one on screen is about an old call: ignore it.
-const isOtherCall = (id) => !!id && !!currentCallId && id !== currentCallId;
+// While a call is still being dialled (microphone starting, offer being sent) our own call has no id yet, so
+// any signal that carries an id belongs to an OLDER call (e.g. the last attempt timing out) and must not
+// hang up the new one - that is what ended calls the moment they were placed.
+const isOtherCall = (id) => {
+  if (!id) return false;
+  if (currentCallId) return id !== currentCallId;
+  return useCallStore.getState().callStatus === "calling";
+};
 
 let pc = null;
 let callUsageBytes = 0; // approx. bytes sent + received in the current call (sampled every few seconds)
