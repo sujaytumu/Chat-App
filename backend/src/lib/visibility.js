@@ -24,6 +24,12 @@ export const VISIBILITY_KINDS = ["status", "highlights", "reels", "posts"];
 const listCache = new Map(); // userId -> { ids, hide, at }  (a few seconds, so the chat list opens fast)
 export const forgetPair = (a, b) => { listCache.delete(String(a)); listCache.delete(String(b)); };
 export const forgetVisibility = () => { listCache.clear(); seenCache.clear(); };
+// An erased account leaves every "allowed" list: each person who was allowed with it has one fewer.
+export async function dropUserPairs(userId) {
+  const id = new mongoose.Types.ObjectId(String(userId));
+  await Visibility.deleteMany({ $or: [{ a: id }, { b: id }] });
+  forgetVisibility();
+}
 async function visibleEntry(me) {
   const k = String(me._id || me);
   const c = listCache.get(k);

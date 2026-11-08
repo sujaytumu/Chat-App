@@ -13,12 +13,15 @@ export const requireOwner = (req, res, next) => (isOwner(req.user) ? next() : re
 
 export const listAccess = async (req, res) => {
   try {
-    const [users, pairs] = await Promise.all([
+    const [users, allPairs] = await Promise.all([
       User.find({ deleted: { $ne: true } }).select("fullName email profilePic").sort({ fullName: 1 }).lean(),
       Visibility.find({}).select("a b hide").lean(),
     ]);
     res.set("Cache-Control", "no-store");
     // hides: "idA|idB" (sorted) -> the kinds of content (status / highlights / reels / posts) those two do NOT see of each other
+    // only pairs where both people still have an account: erased or hidden accounts never count as "allowed"
+    const live = new Set(users.map((u) => String(u._id)));
+    const pairs = allPairs.filter((p) => live.has(String(p.a)) && live.has(String(p.b)));
     const hides = {};
     for (const p of pairs) if (p.hide?.length) hides[[String(p.a), String(p.b)].sort().join("|")] = p.hide;
     res.status(200).json({ users, pairs: pairs.map((p) => [String(p.a), String(p.b)]), hides, kinds: VISIBILITY_KINDS, ownerId: await ownerId() });
