@@ -1,7 +1,7 @@
 // Notification / ringtone sounds. Built-in tones are synthesized with the
 // Web Audio API so we don't need to ship/license audio assets; people can also
 // pick their own sound file in Settings (played through an <audio> element).
-import {
+import { nativePush, hasPhoneSounds,
   isMessageSoundEnabled,
   isCallRingtoneEnabled,
   getCallTone,
@@ -356,6 +356,21 @@ export function startRingtone({ keepIfPlaying = false } = {}) {
 
   if (!isCallRingtoneEnabled()) return; // silent mode still buzzes
 
+  // Android app: the phone's own ringtone plays (and vibrates) natively; the page makes no sound of its own
+  if (hasPhoneSounds() && getCallTone() !== "custom") {
+    clearInterval(ringVibrateInterval);
+    ringVibrateInterval = null;
+    nativeRingOn = true;
+    nativePush().startPhoneRing().catch(() => {
+      nativeRingOn = false;
+      if (token === ringToken) startRingtoneWeb(token); // old app build: the built-in tune
+    });
+    return;
+  }
+  startRingtoneWeb(token);
+}
+
+function startRingtoneWeb(token) {
   const startPreset = (id) => {
     playPresetOnce(CALL_PRESETS, id, "classic");
     ringSoundInterval = setInterval(() => playPresetOnce(CALL_PRESETS, id, "classic"), 2000);
@@ -434,11 +449,29 @@ function startPattern(steps, periodMs, maxMs) {
 }
 
 // no time limit: both repeat until they pick up, decline, or the caller hangs up
-export function startCallingTone() { startPattern(CALLING_STEPS, 3000); }
-export function startRingback() { startPattern(RINGING_STEPS, 3200); }
-export function startBusyTone() { startPattern(BUSY_STEPS, 1500, 4300); }
+// In the Android app these are the phone's own standard call tones (ringback / busy), never a Talkies sound.
+let nativeToneOn = false;
+const nativeCallTone = (kind, maxMs) => {
+  const p = nativePush();
+  if (!p?.startCallTone || !isCallRingtoneEnabled()) return false;
+  stopRingback();
+  nativeToneOn = true;
+  p.startCallTone({ kind }).catch(() => {
+    nativeToneOn = false;
+    startPattern(kind === "busy" ? BUSY_STEPS : kind === "ringback" ? RINGING_STEPS : CALLING_STEPS, kind === "busy" ? 1500 : 3200, kind === "busy" ? 4300 : undefined); // old app build: built-in tone
+  });
+  if (maxMs) backStopTimer = setTimeout(stopRingback, maxMs);
+  return true;
+};
+export function startCallingTone() { if (!nativeCallTone("calling")) startPattern(CALLING_STEPS, 3000); }
+export function startRingback() { if (!nativeCallTone("ringback")) startPattern(RINGING_STEPS, 3200); }
+export function startBusyTone() { if (!nativeCallTone("busy", 4300)) startPattern(BUSY_STEPS, 1500, 4300); }
 
 export function stopRingback() {
+  if (nativeToneOn) {
+    nativeToneOn = false;
+    try { nativePush()?.stopCallTone?.().catch(() => {}); } catch { /* not available */ }
+  }
   backToken++;
   clearInterval(backTimer);
   clearTimeout(backStopTimer);
@@ -446,7 +479,12 @@ export function stopRingback() {
   backStopTimer = null;
 }
 
+let nativeRingOn = false;
 export function stopRingtoneSound() {
+  if (nativeRingOn) {
+    nativeRingOn = false;
+    try { nativePush()?.stopPhoneRing?.().catch(() => {}); } catch { /* not available */ }
+  }
   stopRingback();
   ringToken++;
   clearInterval(ringVibrateInterval);
@@ -462,6 +500,7 @@ export function stopRingtoneSound() {
 // switches, so people can hear what they're choosing.
 const PREVIEW_MS = 10000; // call tones preview for 10 seconds
 export function stopTonePreview() {
+  try { if (hasPhoneSounds()) nativePush().stopPhonePreview?.().catch(() => {}); } catch { /* not available */ }
   clearTimeout(previewTimer);
   clearInterval(ringSoundInterval);
   ringSoundInterval = null;
@@ -473,12 +512,15 @@ export function stopTonePreview() {
 export async function previewCallTone(id) {
   primeAudio();
   stopTonePreview();
+  if (id === "phone" && hasPhoneSounds()) {
+    try { await nativePush().previewPhoneRing(); return true; } catch { return false; }
+  }
   if (id === "custom") {
     const url = await loadCustomTone("call");
     if (!url) return false;
     try {
       ensureElements();
-      await playElement(ringEl, url, { loop: true });
+      await playElement(ringEl, url, { loop: false }); // one play, not a repeat
       previewTimer = setTimeout(() => stopElement(ringEl), PREVIEW_MS);
       return true;
     } catch {
@@ -488,7 +530,7 @@ export async function previewCallTone(id) {
   if (id === "talkies") {
     try {
       ensureElements();
-      await playElement(ringEl, TALKIES_RING_URL, { loop: true });
+      await playElement(ringEl, TALKIES_RING_URL, { loop: false }); // one play, not a repeat
       previewTimer = setTimeout(() => stopElement(ringEl), PREVIEW_MS);
       return true;
     } catch {
@@ -496,12 +538,7 @@ export async function previewCallTone(id) {
     }
   }
   // built-in tones: repeat the ring cycle (every 2 s) for the whole preview
-  playPresetOnce(CALL_PRESETS, id, "classic");
-  let n = 1;
-  ringSoundInterval = setInterval(() => {
-    if (++n > PREVIEW_MS / 2000) return stopTonePreview();
-    playPresetOnce(CALL_PRESETS, id, "classic");
-  }, 2000);
+  playPresetOnce(CALL_PRESETS, id, "classic"); // one ring cycle, once
   return true;
 }
 

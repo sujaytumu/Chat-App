@@ -33,7 +33,11 @@ export function setCallRingtoneEnabled(enabled) {
 // Built-in tones are synthesized in notificationSound.js (no audio assets to
 // ship). "custom" means a sound file the person picked from their device.
 
-export const CALL_TONES = [
+// The Android app uses the phone's OWN ringtone (nothing bundled or synthesised); the website keeps the built-in tones.
+export const nativePush = () => (window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesPush : null);
+export const hasPhoneSounds = () => !!nativePush()?.startPhoneRing;
+
+const WEB_CALL_TONES = [
   { id: "talkies", label: "Talkies ringtone" }, // the tune bundled with the app: same on every phone
   { id: "classic", label: "Classic ring" },
   { id: "digital", label: "Digital beeps" },
@@ -41,6 +45,9 @@ export const CALL_TONES = [
   { id: "marimba", label: "Marimba" },
   { id: "trill", label: "Old phone trill" },
 ];
+
+export const PHONE_CALL_TONES = [{ id: "phone", label: "Phone ringtone (your phone's own)" }];
+export const CALL_TONES = hasPhoneSounds() ? PHONE_CALL_TONES : WEB_CALL_TONES;
 
 export const MESSAGE_TONES = [
   { id: "ding", label: "Ding" },
@@ -51,7 +58,9 @@ export const MESSAGE_TONES = [
 ];
 
 export function getCallTone() {
-  return localStorage.getItem(CALL_TONE_KEY) || "talkies";
+  const v = localStorage.getItem(CALL_TONE_KEY);
+  if (hasPhoneSounds()) return v === "custom" ? "custom" : "phone";
+  return v || "talkies";
 }
 export function setCallTone(id) {
   localStorage.setItem(CALL_TONE_KEY, id);
@@ -171,7 +180,7 @@ export async function syncNativeCallTone() {
   try {
     const p = window.Capacitor?.isNativePlatform?.() ? window.Capacitor?.Plugins?.TalkiesPush : null;
     if (!p?.setCallTone) return; // web, or an older app build
-    let mode = "talkies";
+    let mode = "phone";
     if (!isCallRingtoneEnabled()) mode = "silent";
     else if (getCallTone() === "custom") mode = "custom";
 
@@ -180,8 +189,8 @@ export async function syncNativeCallTone() {
     if (mode === "custom") {
       const blob = await dbRun("readonly", (store) => store.get("call"));
       if (!blob) {
-        payload = { mode: "talkies" };
-        sig = "talkies";
+        payload = { mode: "phone" };
+        sig = "phone";
       } else {
         const name = getCustomToneName("call");
         sig = `custom:${name}:${blob.size}`;
