@@ -194,6 +194,101 @@ public class TalkiesPushPlugin extends Plugin {
         call.resolve(res);
     }
 
+    // ---- the phone's own call sounds (nothing bundled or synthesised) ----
+    private static android.media.Ringtone previewRingtone;
+    private static android.media.ToneGenerator callTone;
+    private static final android.os.Handler SOUND_MAIN = new android.os.Handler(android.os.Looper.getMainLooper());
+    private static Runnable previewStopper;
+
+    /** Rings with the phone's ringtone while a call is incoming on screen (until stopPhoneRing). */
+    @PluginMethod
+    public void startPhoneRing(PluginCall call) {
+        try {
+            CallRinger.start(getContext(), "inapp-call");
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopPhoneRing(PluginCall call) {
+        try {
+            CallRinger.stop();
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    /** Plays the phone's ringtone ONCE (for the picker), cut off after a few seconds. */
+    @PluginMethod
+    public void previewPhoneRing(PluginCall call) {
+        try {
+            stopPreviewNow();
+            Context c = getContext();
+            android.media.Ringtone r = android.media.RingtoneManager.getRingtone(c, NotificationHelper.phoneRingtone(c));
+            if (r != null) {
+                if (android.os.Build.VERSION.SDK_INT >= 28) r.setLooping(false);
+                r.play();
+                previewRingtone = r;
+                previewStopper = new Runnable() {
+                    @Override
+                    public void run() {
+                        stopPreviewNow();
+                    }
+                };
+                SOUND_MAIN.postDelayed(previewStopper, 6000);
+            }
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopPhonePreview(PluginCall call) {
+        stopPreviewNow();
+        call.resolve();
+    }
+
+    private static void stopPreviewNow() {
+        try {
+            if (previewStopper != null) SOUND_MAIN.removeCallbacks(previewStopper);
+            previewStopper = null;
+            if (previewRingtone != null) previewRingtone.stop();
+        } catch (Exception ignored) {
+        }
+        previewRingtone = null;
+    }
+
+    /** The phone's standard ringback / busy tone for the caller ("calling" | "ringback" | "busy"). */
+    @PluginMethod
+    public void startCallTone(PluginCall call) {
+        try {
+            stopCallToneNow();
+            String kind = call.getString("kind", "ringback");
+            callTone = new android.media.ToneGenerator(android.media.AudioManager.STREAM_VOICE_CALL, 100);
+            callTone.startTone("busy".equals(kind) ? android.media.ToneGenerator.TONE_SUP_BUSY : android.media.ToneGenerator.TONE_SUP_RINGTONE);
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void stopCallTone(PluginCall call) {
+        stopCallToneNow();
+        call.resolve();
+    }
+
+    private static void stopCallToneNow() {
+        try {
+            if (callTone != null) {
+                callTone.stopTone();
+                callTone.release();
+            }
+        } catch (Exception ignored) {
+        }
+        callTone = null;
+    }
+
     /** The exact number of unread chats' messages, shown on the app icon (0 removes it). */
     @PluginMethod
     public void setBadge(PluginCall call) {

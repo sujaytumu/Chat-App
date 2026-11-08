@@ -168,8 +168,9 @@ final class NotificationHelper {
 
     /** "talkies" (bundled tune) | "custom" (their own file) | "silent". Falls back to the bundled tune if the file is gone. */
     private static String toneMode(Context ctx) {
-        String mode = tonePrefs(ctx).getString("mode", "talkies");
-        if ("custom".equals(mode) && customToneFile(ctx) == null) return "talkies";
+        String mode = tonePrefs(ctx).getString("mode", "phone");
+        if ("talkies".equals(mode)) return "phone"; // the bundled tune is no longer used: the phone's own ringtone
+        if ("custom".equals(mode) && customToneFile(ctx) == null) return "phone";
         return mode;
     }
 
