@@ -27,6 +27,7 @@ const KINDS = [
 ];
 
 const AccessPage = () => {
+  const [del, setDel] = useState(null); // { user, text, busy }
   const [pw, setPw] = useState(null); // { user, step: "ask" | "busy" | "done", temp }
   const nav = useNavigate();
   const [params] = useSearchParams();
@@ -276,6 +277,7 @@ const AccessPage = () => {
             <p className="text-[13px] text-wa-muted break-all">Email: <span className="text-wa-text">{who.email}</span></p>
             <button onClick={() => setPw({ user: who, step: "ask" })} className="mt-2.5 h-10 px-4 rounded-full bg-white/10 text-[13.5px] font-medium active:scale-[.98]">Reset password…</button>
             <p className="mt-1.5 text-[11.5px] text-wa-muted leading-snug">Forgot their password and cannot get the email code? Make a temporary one and give it to them.</p>
+            <button onClick={() => setDel({ user: who, text: "", busy: false })} className="mt-3 h-10 px-4 rounded-full bg-[#F15C6D]/15 text-[#F15C6D] text-[13.5px] font-medium active:scale-[.98]">Delete account…</button>
           </div>
         )}
         {who &&
@@ -316,6 +318,37 @@ const AccessPage = () => {
             );
           })}
       </div>
+      {del && (
+        <div className="fixed inset-0 z-[80] flex items-end lg:items-center justify-center bg-black/60" onClick={() => !del.busy && setDel(null)}>
+          <div className="w-full max-w-md rounded-t-3xl lg:rounded-3xl bg-wa-pop text-wa-text p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[18px] font-semibold">Delete {del.user.fullName} for good?</h3>
+            <p className="mt-1 text-[13px] text-wa-muted break-all">{del.user.email}</p>
+            <p className="mt-2 text-[14px] text-wa-muted leading-snug">The profile is wiped, they leave every group and are signed out everywhere. This cannot be undone. Messages already sent stay in other chats.</p>
+            <p className="mt-3 text-[13px] text-wa-muted">Type <span className="text-wa-text font-semibold">DELETE</span> to confirm</p>
+            <input value={del.text} onChange={(e) => setDel((d) => ({ ...d, text: e.target.value }))} autoCapitalize="characters" className="mt-1.5 w-full h-12 rounded-2xl bg-wa-field px-4 outline-none" />
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => setDel(null)} disabled={del.busy} className="flex-1 h-12 rounded-full bg-wa-field text-[15px]">Cancel</button>
+              <button
+                disabled={del.busy || del.text.trim() !== "DELETE"}
+                onClick={async () => {
+                  setDel((d) => ({ ...d, busy: true }));
+                  try {
+                    await axiosInstance.delete(`/admin/users/${del.user._id}`);
+                    setUsers((us) => us.filter((u) => u._id !== del.user._id));
+                    setWho(null);
+                    toast.success("Account deleted");
+                    setDel(null);
+                  } catch (e) {
+                    toast.error(e.response?.data?.error || "Couldn't delete the account");
+                    setDel((d) => ({ ...d, busy: false }));
+                  }
+                }}
+                className="flex-1 h-12 rounded-full bg-[#F15C6D] text-white font-semibold text-[15px] flex items-center justify-center gap-2 disabled:opacity-40"
+              >{del.busy ? <Loader2 size={18} className="animate-spin" /> : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {pw && (
         <div className="fixed inset-0 z-[80] flex items-end lg:items-center justify-center bg-black/60" onClick={() => pw.step !== "busy" && setPw(null)}>
           <div className="w-full max-w-md rounded-t-3xl lg:rounded-3xl bg-wa-pop text-wa-text p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
