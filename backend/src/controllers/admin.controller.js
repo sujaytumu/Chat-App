@@ -6,7 +6,7 @@ import { Visibility, pairKey, isOwner, forgetVisibility, ownerId, VISIBILITY_KIN
 import { io, getReceiverSocketId } from "../lib/socket.js";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { endOtherSessions } from "./auth.controller.js";
+import { endOtherSessions, wipeAccount } from "./auth.controller.js";
 
 // Owner only: see everyone, and choose who can see whom.
 export const requireOwner = (req, res, next) => (isOwner(req.user) ? next() : res.status(403).json({ error: "Owner only" }));
@@ -139,5 +139,24 @@ export const resetUserPassword = async (req, res) => {
   } catch (e) {
     console.log("resetUserPassword:", e.message);
     res.status(500).json({ error: "Couldn't reset the password" });
+  }
+};
+
+// Owner only: erase someone's account for good (profile wiped, out of every group, statuses gone, signed out
+// everywhere). Messages already sent stay in other people's chats. The owner's own account cannot be erased here.
+export const deleteUserByOwner = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Person not found" });
+    const user = await User.findById(req.params.id).select("+deletedGroups");
+    if (!user || user.deleted) return res.status(404).json({ error: "Person not found" });
+    if (isOwner(user) || String(user._id) === String(req.user._id)) return res.status(400).json({ error: "The owner account can't be deleted here" });
+    const label = `${String(user.email || "").slice(0, 3)}***`;
+    await wipeAccount(user);
+    await endOtherSessions(user._id);
+    console.log(`owner erased account ${user._id} (${label})`);
+    res.json({ ok: true });
+  } catch (e) {
+    console.log("deleteUserByOwner:", e.message);
+    res.status(500).json({ error: "Couldn't delete the account" });
   }
 };
