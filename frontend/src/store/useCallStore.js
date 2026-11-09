@@ -124,7 +124,12 @@ function attachConnectionWatchdog(peerConnection, get) {
 
   peerConnection.oniceconnectionstatechange = () => {
     const state = peerConnection.iceConnectionState;
-    if (state === "connected" || state === "completed") tuneAudioSenders(peerConnection);
+    if (state === "connected" || state === "completed") {
+      tuneAudioSenders(peerConnection);
+      try {
+        peerConnection.getSenders().forEach((sn) => { if (sn.track?.kind === "video" && sn.track.contentHint !== "detail") tuneCameraSender(sn); });
+      } catch { /* ignore */ }
+    }
     if (state === "failed") {
       if (!restartAttempted && peerConnection.restartIce) {
         restartAttempted = true;
@@ -227,6 +232,20 @@ const rememberEnded = (id) => {
 };
 const wasEnded = (id) => !!id && endedCallIds.has(id);
 // Screen content: keep the text sharp and the call smooth (drop frame rate, not sharpness, when the line is slow).
+// Camera picture: smooth motion first (frames are kept, detail dips a little when the line is slow).
+const tuneCameraSender = (sender) => {
+  try {
+    const p = sender.getParameters();
+    if (!p.encodings?.length) p.encodings = [{}];
+    p.encodings[0].maxBitrate = 1_800_000;
+    p.encodings[0].maxFramerate = 30;
+    p.encodings[0].scaleResolutionDownBy = 1;
+    p.degradationPreference = "maintain-framerate";
+    sender.setParameters(p).catch(() => {});
+  } catch {
+    /* not supported — defaults are fine */
+  }
+};
 const tuneScreenSender = (sender) => {
   try {
     const p = sender.getParameters();
@@ -955,6 +974,7 @@ export const useCallStore = create((set, get) => ({
         }
         cameraTrack.enabled = !get().isVideoOff;
         await videoSender.replaceTrack(cameraTrack);
+        tuneCameraSender(videoSender); // back from a screen share: the screen's slow-frame settings must not stay
         set({
           localStream: new MediaStream([...audioTracks, cameraTrack]),
           isScreenSharing: false,

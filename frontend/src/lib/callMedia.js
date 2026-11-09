@@ -74,10 +74,14 @@ export function openPermissionSettings(err) {
   }, 1800);
 }
 
+// Camera for a call: 960x540 at up to 30 fps is sharp on a phone screen yet light enough that the picture stays
+// smooth ("ideal" only, so no device is ever refused).
+export const CALL_CAMERA = { facingMode: "user", width: { ideal: 960 }, height: { ideal: 540 }, frameRate: { ideal: 30, max: 30 } };
+
 // Call media with the video-to-audio fallback: { stream, videoDropped }.
 export async function acquireCallMedia(audio, callType) {
   try {
-    return { stream: await getCallStream({ audio, video: callType === "video" }), videoDropped: false };
+    return { stream: await getCallStream({ audio, video: callType === "video" ? CALL_CAMERA : false }), videoDropped: false };
   } catch (err) {
     if (callType === "video") {
       try {

@@ -107,23 +107,42 @@ export const useGroupCallStore = create((set, get) => {
     set({ localVideo: t ? new MediaStream([t]) : null, cameraOn: camOn, isScreenSharing: !!screenTrack });
   };
 
+  // In a group everyone sends their video to every other person, so the more people there are the thinner each
+  // stream has to be, or the upload line chokes and the whole call stutters. The total is budgeted and split:
+  // camera ~1.4 Mbps overall, screen ~2 Mbps overall. Smooth motion for faces, sharp (but slower) frames for a screen.
+  const tuneVideoSenders = () => {
+    const n = Math.max(1, peers.size);
+    const sharing = !!screenTrack && outboundVideoTrack() === screenTrack;
+    peers.forEach((rec) => {
+      if (!rec.videoSender) return;
+      try {
+        const prm = rec.videoSender.getParameters();
+        if (!prm.encodings?.length) prm.encodings = [{}];
+        const e = prm.encodings[0];
+        if (sharing) {
+          e.maxBitrate = Math.min(1_500_000, Math.max(300_000, Math.round(2_000_000 / n)));
+          e.maxFramerate = n > 2 ? 8 : 12;
+          e.scaleResolutionDownBy = 1;
+          prm.degradationPreference = "maintain-resolution";
+        } else {
+          e.maxBitrate = Math.min(900_000, Math.max(150_000, Math.round(1_400_000 / n)));
+          e.maxFramerate = n <= 2 ? 24 : n <= 4 ? 20 : 15;
+          e.scaleResolutionDownBy = n >= 4 ? 1.33 : 1;
+          prm.degradationPreference = "maintain-framerate";
+        }
+        rec.videoSender.setParameters(prm).catch(() => {});
+      } catch { /* not supported — defaults are fine */ }
+    });
+  };
+
   // Put the right outgoing video (camera / screen / nothing) on every connection.
   const applyOutboundVideo = () => {
     const v = outboundVideoTrack();
     peers.forEach((rec) => {
       if (rec.videoSender) rec.videoSender.replaceTrack(v).catch(() => {});
       else if (v && localStream) rec.videoSender = rec.pc.addTrack(v, localStream);
-      // Sharing the screen to several people: keep each stream light so nothing stutters.
-      if (rec.videoSender && v && v === screenTrack) {
-        try {
-          const prm = rec.videoSender.getParameters();
-          if (!prm.encodings?.length) prm.encodings = [{}];
-          prm.encodings[0].maxBitrate = 900_000;
-          prm.encodings[0].maxFramerate = 10;
-          rec.videoSender.setParameters(prm).catch(() => {});
-        } catch { /* defaults are fine */ }
-      }
     });
+    tuneVideoSenders();
     updateLocalVideo();
     sendMedia();
   };
@@ -184,6 +203,7 @@ export const useGroupCallStore = create((set, get) => {
       if (st === "connected") {
         patchTile(userId, { connected: true });
         tuneAudioSenders(pc, 32000);
+        tuneVideoSenders();
       }
       else if (st === "failed") {
         patchTile(userId, { connected: false });
@@ -211,6 +231,7 @@ export const useGroupCallStore = create((set, get) => {
         /* ignore */
       }
       peers.delete(userId);
+      tuneVideoSenders(); // fewer people: everyone's picture can get sharper again
     }
     set((s) => {
       const tiles = { ...s.tiles };
