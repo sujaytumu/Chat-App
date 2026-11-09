@@ -58,6 +58,37 @@ public class CallKeepAliveService extends Service {
         }
     }
 
+    private static final android.os.Handler MAIN = new android.os.Handler(android.os.Looper.getMainLooper());
+
+    /**
+     * Back to normal media audio (songs / videos at their proper volume). Safe to repeat. Never touches a real
+     * phone call, nor a Talkies call that is still running.
+     */
+    static void normalizeAudio(Context ctx) {
+        try {
+            if (MainActivity.callActive) return;
+            AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+            if (am == null) return;
+            if (am.getMode() == AudioManager.MODE_IN_COMMUNICATION) am.setMode(AudioManager.MODE_NORMAL);
+            if (Build.VERSION.SDK_INT >= 31) {
+                try { am.clearCommunicationDevice(); } catch (Throwable ignored) { }
+            } else {
+                am.setSpeakerphoneOn(false);
+            }
+            try {
+                am.stopBluetoothSco(); // a Bluetooth headset left in "call" mode plays music thin and quiet
+                am.setBluetoothScoOn(false);
+            } catch (Throwable ignored) { }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** The call's own audio (the web view's) is wound down a moment AFTER ours, and can put the old mode back — so check again. */
+    static void normalizeAudioSoon(Context ctx) {
+        final Context app = ctx.getApplicationContext();
+        for (long delay : new long[] {0L, 1500L, 4000L}) MAIN.postDelayed(() -> normalizeAudio(app), delay);
+    }
+
     private void releaseCallAudio() {
         if (!audioHeld) return;
         AudioManager am = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
@@ -66,7 +97,13 @@ public class CallKeepAliveService extends Service {
                 if (Build.VERSION.SDK_INT >= 26 && focusRequest != null) am.abandonAudioFocusRequest(focusRequest);
                 if (Build.VERSION.SDK_INT >= 31) am.clearCommunicationDevice();
                 else am.setSpeakerphoneOn(false);
-                am.setMode(prevAudioMode);
+                try {
+                    am.stopBluetoothSco();
+                    am.setBluetoothScoOn(false);
+                } catch (Throwable ignored) { }
+                // If the phone was already in call mode when we started (the call's audio began first), "previous" is
+                // call mode too: restoring it would leave every song at call volume. Only a real phone call is kept.
+                am.setMode(prevAudioMode == AudioManager.MODE_IN_CALL ? prevAudioMode : AudioManager.MODE_NORMAL);
             }
         } catch (Exception ignored) {
         }
@@ -186,6 +223,7 @@ public class CallKeepAliveService extends Service {
         }
         wakeLock = null;
         MainActivity.callActive = false;
+        normalizeAudioSoon(getApplicationContext());
         super.onDestroy();
     }
 }
