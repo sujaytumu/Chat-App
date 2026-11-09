@@ -29,7 +29,12 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            // Smaller and faster: unused code and resources are stripped. Signed with the same fixed key as
+            // before so it installs straight over the existing app.
+            minifyEnabled true
+            shrinkResources true
+            debuggable false
+            signingConfig signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }

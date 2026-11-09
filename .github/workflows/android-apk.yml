@@ -36,25 +36,30 @@ jobs:
           npm ci
           npx cap sync android
 
-      - name: Build debug APK
+      - name: Build APKs (optimised release + plain debug fallback)
         working-directory: mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
+          ls -l app/build/outputs/apk/release app/build/outputs/apk/debug
 
       - name: Keep a copy on the run
         uses: actions/upload-artifact@v4
         with:
           name: talkies-apk
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            mobile/android/app/build/outputs/apk/release/app-release.apk
+            mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk talkies.apk
+          # talkies.apk = the smaller optimised build; talkies-debug.apk = the previous plain build, if ever needed
+          cp mobile/android/app/build/outputs/apk/release/app-release.apk talkies.apk
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk talkies-debug.apk
           gh release delete android-latest --cleanup-tag -y || true
-          gh release create android-latest talkies.apk \
+          gh release create android-latest talkies.apk talkies-debug.apk \
             --title "Talkies Android app" \
             --notes "Install on Android: open this page on your phone, download talkies.apk and allow installing from your browser when asked. Adds screen sharing to calls." \
             --target "${{ github.sha }}"

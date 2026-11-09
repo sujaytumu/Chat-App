@@ -19,3 +19,17 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# --- Talkies: everything reached by name (manifest components, Capacitor plugin calls from JS, badge reflection) ---
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
+-keep class com.sujaytumu.talkies.** { *; }
+-keep class com.getcapacitor.** { *; }
+-keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }
+-keepclassmembers class * { @com.getcapacitor.PluginMethod <methods>; }
+-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }
+-keep class me.leolin.shortcutbadger.** { *; }
+-keep class com.google.crypto.tink.** { *; }
+-keep class androidx.security.crypto.** { *; }
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
+-dontwarn org.apache.cordova.**
