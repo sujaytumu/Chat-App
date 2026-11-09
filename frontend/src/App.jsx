@@ -170,12 +170,29 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signedIn]);
 
-  // Warm the other screens' code in the background once the app is idle.
+  // Warm the other screens' code in the background — one at a time, after the chat list has had the network to
+  // itself, most-used first (sign-in screens are pointless once signed in). Skipped on Data Saver / slow links,
+  // where each screen simply loads when it is opened.
   useEffect(() => {
     if (!authUser) return;
-    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
-    const id = idle(() => { Object.values(loaders).forEach((load) => load().catch(() => {})); [() => import("./pages/ReelsPage"), () => import("./pages/ExplorePage"), () => import("./pages/PostPage")].forEach((load) => load().catch(() => {})); });
-    return () => (window.cancelIdleCallback || clearTimeout)(id);
+    const c = navigator.connection;
+    if (c && (c.saveData || /^(slow-2g|2g|3g)$/.test(c.effectiveType || ""))) return;
+    const jobs = [
+      loaders.CallsPage, loaders.StatusPage, loaders.NotificationsPage, loaders.ProfilePage, loaders.SettingsPage,
+      () => import("./pages/ReelsPage"), () => import("./pages/ExplorePage"), () => import("./pages/PostPage"), loaders.SettingsMore,
+    ];
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 800));
+    let stopped = false;
+    let timer;
+    const next = () => {
+      if (stopped) return;
+      const load = jobs.shift();
+      if (!load) return;
+      load().catch(() => {});
+      timer = setTimeout(() => idle(next), 600);
+    };
+    const start = setTimeout(() => idle(next), 3000);
+    return () => { stopped = true; clearTimeout(start); clearTimeout(timer); };
   }, [authUser]);
 
   // Let the service worker know the vibration / silent-group choices.
