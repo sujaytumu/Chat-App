@@ -33,3 +33,7 @@
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn org.apache.cordova.**
+# Tink (used by encrypted storage) mentions optional Google HTTP / Joda classes it never loads here
+-dontwarn com.google.api.client.**
+-dontwarn org.joda.time.**
+-dontwarn com.google.crypto.tink.**
