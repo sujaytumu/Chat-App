@@ -376,6 +376,7 @@ public class CallKeepAlivePlugin extends Plugin {
     public void stop(PluginCall call) {
         MainActivity.callActive = false;
         getContext().stopService(new Intent(getContext(), CallKeepAliveService.class));
+        CallKeepAliveService.normalizeAudioSoon(getContext()); // even if the service was already gone: songs back to full volume
         call.resolve();
     }
 
