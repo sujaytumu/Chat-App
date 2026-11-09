@@ -56,12 +56,37 @@ const newestFirst = (a, b) => {
   const bt = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : new Date(b.createdAt || 0).getTime();
   return bt - at;
 };
+const lastTs = (c) => (c?.lastMessage?.createdAt ? new Date(c.lastMessage.createdAt).getTime() : 0);
+// A refresh answered by the server must never push a chat back down. If this device already holds a newer last
+// message than the server's snapshot (taken a moment before it arrived), keep ours — otherwise the chat drops in the
+// list and only climbs back on the next refresh. Only for fresh messages, so a deleted last message still corrects.
+const mergeFresh = (server, local) => {
+  if (!local?.length) return server;
+  const byId = new Map(local.map((c) => [c._id, c]));
+  const now = Date.now();
+  let changed = false;
+  const out = server.map((s) => {
+    const l = byId.get(s._id);
+    if (l && lastTs(l) > lastTs(s) && now - lastTs(l) < 30000) {
+      changed = true;
+      return { ...s, lastMessage: l.lastMessage, unreadCount: l.unreadCount ?? s.unreadCount };
+    }
+    return s;
+  });
+  return changed ? out.sort(newestFirst) : out;
+};
 const setListPreview = (chat, message) =>
-  useChatStore.setState((st) =>
-    chat.type === "direct"
-      ? { users: st.users.map((u) => (u._id === chat.data._id ? { ...u, lastMessage: message } : u)).sort(newestFirst) }
-      : { groups: st.groups.map((g) => (g._id === chat.data._id ? { ...g, lastMessage: message } : g)).sort(newestFirst) }
-  );
+  useChatStore.setState((st) => {
+    // The message I just sent goes to the very top, even if this phone's clock runs a little behind the server's.
+    let m = message;
+    if (m?.pending) {
+      const newest = Math.max(0, ...st.users.map(lastTs), ...st.groups.map(lastTs));
+      if (new Date(m.createdAt).getTime() <= newest) m = { ...m, createdAt: new Date(newest + 1).toISOString() };
+    }
+    return chat.type === "direct"
+      ? { users: st.users.map((u) => (u._id === chat.data._id ? { ...u, lastMessage: m } : u)).sort(newestFirst) }
+      : { groups: st.groups.map((g) => (g._id === chat.data._id ? { ...g, lastMessage: m } : g)).sort(newestFirst) };
+  });
 // A waiting / failed message changes state (clock -> "Tap to retry"): the list preview follows.
 const patchListMessage = (tmpId, patch) =>
   useChatStore.setState((st) => ({
@@ -240,8 +265,8 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/messages/users");
       usersRetried = false;
-      set({ users: res.data });
-      writeChatCache(userId, "users", res.data);
+      set((st) => ({ users: mergeFresh(res.data, st.users) }));
+      writeChatCache(userId, "users", get().users);
       setTimeout(() => prefetchTopChats(res.data), 400);
     } catch (error) {
       // No popup: the saved list stays on screen and the next refresh (or one quiet retry) fills it in.
@@ -268,8 +293,8 @@ export const useChatStore = create((set, get) => ({
     try {
       const res = await axiosInstance.get("/groups");
       groupsRetried = false;
-      set({ groups: res.data });
-      writeChatCache(userId, "groups", res.data);
+      set((st) => ({ groups: mergeFresh(res.data, st.groups) }));
+      writeChatCache(userId, "groups", get().groups);
     } catch (error) {
       console.warn("Couldn't refresh groups:", error?.message);
       if (!groupsRetried) { groupsRetried = true; setTimeout(() => get().getGroups?.(), 5000); }
