@@ -20,6 +20,7 @@ import BackgroundCallSetup from "./components/BackgroundCallSetup";
 import AccessNotifier from "./components/AccessNotifier";
 import PayReturn from "./components/PayReturn";
 import SavePasswordPrompt from "./components/SavePasswordPrompt";
+import LeaveMessageSheet from "./components/LeaveMessageSheet";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
 import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
@@ -257,6 +258,7 @@ const App = () => {
       {authUser && (
         <ErrorBoundary silent>
           <CallManager />
+          <LeaveMessageSheet />
           <AccessNotifier />
           <PayReturn />
         </ErrorBoundary>

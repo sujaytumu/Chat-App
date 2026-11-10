@@ -317,6 +317,9 @@ const CallManager = () => {
     endCall,
     toggleMute,
     sendReaction,
+    pushToTalk,
+    togglePushToTalk,
+    holdToTalk,
     toggleVideo,
     toggleScreenShare,
     flipCamera,
@@ -643,6 +646,23 @@ const CallManager = () => {
         </div>
       )}
 
+      {callStatus === "in-call" && pushToTalk && (
+        <div className="shrink-0 flex justify-center pb-2">
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              holdToTalk(true);
+            }}
+            onPointerUp={() => holdToTalk(false)}
+            onPointerCancel={() => holdToTalk(false)}
+            onContextMenu={(e) => e.preventDefault()}
+            className={`h-14 px-8 rounded-full flex items-center gap-2 font-medium select-none touch-none transition-colors ${isMuted ? "bg-white/15 text-white" : "bg-[#00A884] text-white"}`}
+          >
+            <Mic size={22} /> {isMuted ? "Hold to talk" : "Talking…"}
+          </button>
+        </div>
+      )}
       {callStatus === "in-call" && !compact && <CallReactionBar onEmoji={sendReaction} />}
       <CallReactionLayer />
 
@@ -690,6 +710,15 @@ const CallManager = () => {
                   className="w-full text-left px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
                 >
                   Switch to chat
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    togglePushToTalk();
+                  }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-wa-text2 hover:bg-white/5"
+                >
+                  {pushToTalk ? "Turn off push-to-talk" : "Push-to-talk"}
                 </button>
               </div>
             )}

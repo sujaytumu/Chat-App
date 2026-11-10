@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Zap, X } from "lucide-react";
-import { getQuickReplies, saveQuickReplies } from "../lib/quickReplies";
+import { getQuickReplies, saveQuickReplies } from "../lib/savedReplies";
 
 // Shown above the message box when the text starts with "/". Tap a reply to put it in the box; "Edit" adds or removes.
 const QuickReplyPicker = ({ query, onPick, onClose }) => {
