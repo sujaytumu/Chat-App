@@ -351,6 +351,8 @@ export const useCallStore = create((set, get) => ({
   localStream: null,
   remoteStream: null,
   isMuted: false,
+  pushToTalk: false, // mic stays closed until the talk button is held
+  leaveMessageFor: null, // person who did not answer: offers a voice message
   isVideoOff: false,
   isRemoteRinging: false, // true once the callee's device has actually started ringing
   isSpeakerOn: false, // calls start on earpiece by default, like a real phone call
@@ -624,10 +626,28 @@ export const useCallStore = create((set, get) => ({
     showCallReaction(emoji, "You");
   },
 
+  dismissLeaveMessage: () => set({ leaveMessageFor: null }),
+
+  // Push-to-talk: mic closed until the talk button is held (walkie-talkie style). Turning it off restores the normal mic.
+  togglePushToTalk: () => {
+    const { localStream, pushToTalk } = get();
+    const on = !pushToTalk;
+    localStream?.getAudioTracks().forEach((t) => (t.enabled = !on));
+    set({ pushToTalk: on, isMuted: on });
+    sendMediaState(get);
+  },
+  holdToTalk: (talking) => {
+    const { localStream, pushToTalk } = get();
+    if (!pushToTalk) return;
+    localStream?.getAudioTracks().forEach((t) => (t.enabled = !!talking));
+    set({ isMuted: !talking });
+    sendMediaState(get);
+  },
+
   toggleMute: () => {
     const { localStream, isMuted } = get();
     localStream?.getAudioTracks().forEach((track) => (track.enabled = isMuted));
-    set({ isMuted: !isMuted });
+    set({ isMuted: !isMuted, pushToTalk: false });
     sendMediaState(get);
   },
 
@@ -730,6 +750,7 @@ export const useCallStore = create((set, get) => ({
       localStream: null,
       remoteStream: null,
       isMuted: false,
+      pushToTalk: false,
       isVideoOff: false,
       isRemoteRinging: false,
       isScreenSharing: false,
@@ -1214,7 +1235,9 @@ export const useCallStore = create((set, get) => ({
       if (isOtherCall(payload?.callId) || get().callStatus === "idle") return;
       const busy = !!payload?.busy && get().callStatus === "calling";
       toast(busy ? "They're on another call" : "Call declined", { icon: busy ? "📞" : "📵" });
+      const missedUser = get().callStatus === "calling" ? get().remoteUser : null;
       get().resetCall();
+      if (missedUser) set({ leaveMessageFor: missedUser });
       if (busy) startBusyTone(); // one long tone a few times, like a real busy line
     });
 
@@ -1238,7 +1261,9 @@ export const useCallStore = create((set, get) => ({
       if (isOtherCall(callId)) return;
       if (get().callStatus === "idle") return;
       toast.error(reason || "Call failed");
+      const missedUser = get().callStatus === "calling" && /no answer/i.test(reason || "") ? get().remoteUser : null;
       get().resetCall();
+      if (missedUser) set({ leaveMessageFor: missedUser });
     });
 
     // Internet came back (or the socket reconnected) while a call is ringing / calling: the call must
