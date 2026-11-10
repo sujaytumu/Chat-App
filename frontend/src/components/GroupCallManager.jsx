@@ -4,6 +4,7 @@ import { Minimize2, Mic, MicOff, Video, VideoOff, ScreenShare, ScreenShareOff, P
 import { isPhoneLike } from "../lib/device";
 import CallReturnBar from "./CallReturnBar";
 import { useBackToClose } from "../lib/useBackToClose";
+import { CallReactionBar, CallReactionLayer } from "./CallReactions";
 import { useGroupCallStore, canShareScreen, MAX_GROUP_CALL } from "../store/useGroupCallStore";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -37,7 +38,7 @@ const useElapsed = (startedAt) => {
 
 const hasLiveVideo = (stream) => !!stream && stream.getVideoTracks().some((t) => t.readyState === "live");
 
-const Tile = ({ stream, name, label, pic, muted, videoOn, mirror, contain, self, connecting, small }) => {
+const Tile = ({ stream, name, label, pic, muted, videoOn, mirror, contain, self, connecting, small, hand }) => {
   const ref = useRef(null);
   useEffect(() => {
     if (ref.current && ref.current.srcObject !== (stream || null)) ref.current.srcObject = stream || null;
@@ -67,6 +68,9 @@ const Tile = ({ stream, name, label, pic, muted, videoOn, mirror, contain, self,
           <span className="truncate">{label ?? (self ? "You" : name)}</span>
         </span>
       </div>
+      {hand && (
+        <div className="absolute top-2 right-2 size-8 rounded-full bg-[#FFD54A] text-black flex items-center justify-center text-[17px] shadow animate-bounce" title="Hand raised">✋</div>
+      )}
       {connecting && !self && (
         <div className="absolute top-2 left-2 rounded-full bg-black/55 px-2.5 py-1 text-[10px] text-white/90">Connecting…</div>
       )}
@@ -240,6 +244,9 @@ const Active = () => {
     isScreenSharing,
     leave,
     toggleMute,
+    sendReaction,
+    toggleHand,
+    handUp,
     toggleCamera,
     toggleScreenShare,
     cameraFacing,
@@ -272,6 +279,7 @@ const Active = () => {
     mirror: !isScreenSharing && cameraFacing === "user",
     contain: isScreenSharing,
     sharing: isScreenSharing,
+    hand: handUp,
   };
   const others = Object.entries(tiles).map(([id, t]) => ({
     id,
@@ -284,6 +292,7 @@ const Active = () => {
     contain: !!t.screen,
     sharing: !!t.screen,
     connecting: !t.connected,
+    hand: !!t.hand,
   }));
   const all = [me, ...others];
   const spot = all.find((t) => t.sharing);
@@ -348,6 +357,9 @@ const Active = () => {
       ) : (
         <div className={`flex-1 min-h-0 grid ${gridCls} auto-rows-fr gap-2 px-2 pb-2`}>{all.map((t) => renderTile(t))}</div>
       )}
+
+      <CallReactionBar onEmoji={sendReaction} onHand={toggleHand} handOn={handUp} />
+      <CallReactionLayer />
 
       {/* Bottom panel: same dark rounded sheet with labelled round buttons as 1-to-1 calls */}
       <div className="shrink-0 bg-wa-panel rounded-t-3xl px-3 pt-4 pb-[calc(18px+env(safe-area-inset-bottom))]">

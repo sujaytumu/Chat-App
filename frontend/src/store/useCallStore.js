@@ -1,4 +1,5 @@
 import { tuneAudioSenders } from "../lib/audioTune";
+import { showCallReaction } from "../components/CallReactions";
 import { canCaptureScreen, getScreenTrack, noScreenShareMessage } from "../lib/screenCapture";
 import { create } from "zustand";
 import toast from "react-hot-toast";
@@ -614,6 +615,15 @@ export const useCallStore = create((set, get) => ({
     get().resetCall();
   },
 
+  // Send a floating emoji to the other person (and show it on this screen too).
+  sendReaction: (emoji) => {
+    const { callStatus, remoteUser } = get();
+    const socket = useAuthStore.getState().socket;
+    if (callStatus !== "in-call" || !remoteUser?._id || !socket) return;
+    socket.emit("callReaction", { toUserId: remoteUser._id, emoji });
+    showCallReaction(emoji, "You");
+  },
+
   toggleMute: () => {
     const { localStream, isMuted } = get();
     localStream?.getAudioTracks().forEach((track) => (track.enabled = isMuted));
@@ -1142,6 +1152,11 @@ export const useCallStore = create((set, get) => ({
       }
     });
 
+    socket.on("callReaction", ({ emoji }) => {
+      if (get().callStatus !== "in-call") return;
+      showCallReaction(emoji, get().remoteUser?.fullName?.split(" ")[0] || "");
+    });
+
     socket.on("remoteMediaState", ({ isMuted, isVideoOff, isScreenSharing, hasCamera }) => {
       if (get().callStatus === "idle") return;
       const wasSharing = get().remoteScreenSharing;
@@ -1261,6 +1276,7 @@ export const useCallStore = create((set, get) => ({
       "callAnswered",
       "remoteDeviceRinging",
       "remoteMediaState",
+      "callReaction",
       "iceCandidate",
       "webrtcRenegotiateOffer",
       "webrtcRenegotiateAnswer",

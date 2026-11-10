@@ -1,3 +1,4 @@
+import QuickReplyPicker from "./QuickReplyPicker";
 import { useRef, useState, useEffect, lazy, Suspense } from "react";
 import { lazyDialog } from "../lib/lazyDialog";
 import { useChatStore } from "../store/useChatStore";
@@ -616,6 +617,21 @@ const MessageInput = () => {
     setTimeout(() => el?.focus(), 0);
   };
 
+  // "/" at the start of the box opens the quick replies; anything typed after it narrows the list
+  const quickQuery = /^\/[^\n]{0,30}$/.test(text) && !editingMessage ? text.slice(1) : null;
+  const [quickClosed, setQuickClosed] = useState(false);
+  useEffect(() => {
+    if (quickQuery === null) setQuickClosed(false);
+  }, [quickQuery]);
+  const pickQuick = (t) => {
+    setText(t);
+    setQuickClosed(true);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      resizeTextarea();
+    }, 0);
+  };
+
   const handleChange = (e) => {
     if (isGroupChat) {
       const v = e.target.value;
@@ -789,6 +805,9 @@ const MessageInput = () => {
         />
       )}
       {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
+      {quickQuery !== null && !quickClosed && (
+        <QuickReplyPicker query={quickQuery} onPick={pickQuick} onClose={() => setQuickClosed(true)} />
+      )}
       {mentionCandidates.length > 0 && (
         <div className="mb-2 rounded-xl bg-wa-pop shadow-lg overflow-hidden">
           {mentionCandidates.map((m) => (

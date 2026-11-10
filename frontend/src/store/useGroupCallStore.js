@@ -1,4 +1,5 @@
 import { canCaptureScreen, getScreenTrack, noScreenShareMessage } from "../lib/screenCapture";
+import { showCallReaction } from "../components/CallReactions";
 import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
@@ -80,6 +81,7 @@ const initial = {
   cameraOn: false,
   cameraFacing: "user", // "user" = front camera, "environment" = back
   isScreenSharing: false,
+  handUp: false, // my hand is raised
 };
 
 export const useGroupCallStore = create((set, get) => {
@@ -470,6 +472,22 @@ export const useGroupCallStore = create((set, get) => {
       cleanup();
     },
 
+    sendReaction: (emoji) => {
+      const { status, groupId } = get();
+      if (status !== "active") return;
+      socketOf()?.emit("groupCall:react", { groupId, kind: "emoji", emoji });
+      showCallReaction(emoji, "You");
+    },
+
+    toggleHand: () => {
+      const { status, groupId, handUp } = get();
+      if (status !== "active") return;
+      const on = !handUp;
+      set({ handUp: on });
+      socketOf()?.emit("groupCall:react", { groupId, kind: "hand", on });
+      if (on) showCallReaction("✋", "You");
+    },
+
     toggleMute: () => {
       const track = localStream?.getAudioTracks()[0];
       if (!track) return;
@@ -620,6 +638,16 @@ export const useGroupCallStore = create((set, get) => {
         handleSignal(fromUserId, data);
       });
 
+      socket.on("groupCall:react", ({ groupId, userId, kind, emoji, on }) => {
+        if (get().status !== "active" || get().groupId !== groupId) return;
+        const t = get().tiles[userId];
+        const name = (t?.profile?.fullName || "").split(" ")[0];
+        if (kind === "hand") {
+          patchTile(userId, { hand: !!on });
+          if (on) showCallReaction("✋", name);
+        } else if (emoji) showCallReaction(emoji, name);
+      });
+
       socket.on("groupCall:media", ({ groupId, userId, state }) => {
         if (get().status !== "active" || get().groupId !== groupId) return;
         patchTile(userId, { muted: !!state.muted, videoOff: !!state.videoOff, screen: !!state.screen });
@@ -641,6 +669,7 @@ export const useGroupCallStore = create((set, get) => {
         "groupCall:left",
         "groupCall:signal",
         "groupCall:media",
+        "groupCall:react",
       ].forEach((e) => socket?.off(e));
       window.removeEventListener("pagehide", get().leave);
       if (get().status !== "idle") cleanup();

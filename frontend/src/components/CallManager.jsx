@@ -1,3 +1,4 @@
+import { CallReactionBar, CallReactionLayer } from "./CallReactions";
 import CallReturnBar from "./CallReturnBar";
 import { lazyDialog } from "../lib/lazyDialog";
 import { useBackToClose } from "../lib/useBackToClose";
@@ -315,6 +316,7 @@ const CallManager = () => {
     rejectCall,
     endCall,
     toggleMute,
+    sendReaction,
     toggleVideo,
     toggleScreenShare,
     flipCamera,
@@ -640,6 +642,9 @@ const CallManager = () => {
           <p className="text-sm text-white/70 mt-1 tabular-nums">{statusText}</p>
         </div>
       )}
+
+      {callStatus === "in-call" && !compact && <CallReactionBar onEmoji={sendReaction} />}
+      <CallReactionLayer />
 
       {/* Bottom control panel — 2x3 grid matching WhatsApp:
           Speaker / Video / Mute

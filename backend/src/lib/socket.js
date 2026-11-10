@@ -93,6 +93,7 @@ const pendingCalls = new Map(); // toUserId -> { offer, callType, fromUser, from
 const CALL_GRACE_PERIOD_MS = 30_000; // how long a call to someone offline keeps trying before it ends as "No answer"
 const activeCallLogs = new Map(); // sorted pairKey -> CallLog _id
 const pairKey = (a, b) => [a, b].sort().join("_");
+const CALL_REACTIONS = new Set(["👍", "❤️", "😂", "😮", "😢", "🎉", "👏", "🔥"]);
 // One entry per live 1:1 call (ringing or answered). Every call gets its own id, and every signal
 // about it (ring / answer / decline / end / cancel) carries that id, so a late or duplicated signal
 // from an OLD call can never ring again, end or decline a different one.
@@ -617,6 +618,15 @@ io.on("connection", (socket) => {
     }
   });
 
+  // In-call emoji reaction (floats up on the other person's screen). Pure relay, nothing is stored;
+  // only a fixed set of emojis, and only between two people who are actually in a call together.
+  socket.on("callReaction", ({ toUserId, emoji } = {}) => {
+    if (!CALL_REACTIONS.has(emoji) || !toUserId) return;
+    if (!activeCalls.has(pairKey(userId, String(toUserId)))) return;
+    const room = roomFor(String(toUserId));
+    if (room) io.to(room).emit("callReaction", { emoji });
+  });
+
   socket.on("rejectCall", ({ toUserId, callId, busy }) => {
     toUserId = String(toUserId);
     const key = pairKey(userId, toUserId);
@@ -931,6 +941,20 @@ io.on("connection", (socket) => {
       if (id === userId) continue;
       const room = roomFor(id);
       if (room) io.to(room).emit("groupCall:media", { groupId, userId, state: clean });
+    }
+  });
+
+  // Emoji reaction or raised hand in a group call; shown on everyone's screen. Relay only.
+  socket.on("groupCall:react", (payload) => {
+    const { groupId, kind, emoji, on } = payload || {};
+    const call = typeof groupId === "string" ? groupCalls.get(groupId) : null;
+    if (!call || !call.participants.has(userId)) return;
+    if (kind === "emoji" && !CALL_REACTIONS.has(emoji)) return;
+    if (kind !== "emoji" && kind !== "hand") return;
+    for (const id of call.participants.keys()) {
+      if (id === userId) continue;
+      const room = roomFor(id);
+      if (room) io.to(room).emit("groupCall:react", { groupId, userId, kind, emoji: kind === "emoji" ? emoji : undefined, on: !!on });
     }
   });
 
