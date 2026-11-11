@@ -10,6 +10,7 @@ const JoinGroupDialog = ({ code, onDone }) => {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
+  const [sent, setSent] = useState(false);
 
   useEffect(() => {
     axiosInstance
@@ -28,6 +29,10 @@ const JoinGroupDialog = ({ code, onDone }) => {
     setJoining(true);
     try {
       const r = await axiosInstance.post(`/groups/join/${code}`);
+      if (r.status === 202 || r.data?.pending) {
+        setSent(true); // an admin has to approve
+        return;
+      }
       toast.success(info?.alreadyMember ? "Opening group" : `You joined ${r.data.name}`);
       open(r.data);
       onDone();
@@ -55,12 +60,22 @@ const JoinGroupDialog = ({ code, onDone }) => {
             </div>
             <h3 className="text-[18px] font-medium mt-3 break-words">{info.name}</h3>
             <p className="text-[12.5px] text-wa-muted mt-0.5">Group · {info.memberCount} members</p>
+            {(sent || info.requested) && !info.alreadyMember ? (
+              <>
+                <p className="text-[13.5px] text-wa-muted mt-4">Request sent. You&apos;ll be added when an admin approves it.</p>
+                <button onClick={onDone} className="mt-4 h-10 px-6 rounded-full text-[#25D366]">OK</button>
+              </>
+            ) : (
+            <>
+            {info.needsApproval && !info.alreadyMember && <p className="text-[12.5px] text-wa-muted mt-3">An admin has to approve new members.</p>}
             <div className="flex gap-3 mt-5">
               <button onClick={onDone} className="flex-1 h-11 rounded-full border border-white/15 text-[14px]">Cancel</button>
               <button onClick={join} disabled={joining} className="flex-1 h-11 rounded-full bg-[#00A884] text-white text-[14px] disabled:opacity-60">
-                {info.alreadyMember ? "Open" : joining ? "Joining…" : "Join group"}
+                {info.alreadyMember ? "Open" : joining ? (info.needsApproval ? "Sending…" : "Joining…") : info.needsApproval ? "Request to join" : "Join group"}
               </button>
             </div>
+            </>
+            )}
           </>
         )}
       </div>
