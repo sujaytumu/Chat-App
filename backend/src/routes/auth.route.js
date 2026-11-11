@@ -1,7 +1,7 @@
 import express from "express";
 import { changePassword, checkAuth, login, logout, signup, updateProfile, getPreferences, updatePreferences, logoutAllDevices,
   listSessions,
-  endSession, deleteAccount, restoreAccount, qrNew, qrPoll, qrLookup, qrApprove, checkUsername, setUsername, findByUsername, getQuietHours, setQuietHours } from "../controllers/auth.controller.js";
+  endSession, deleteAccount, restoreAccount, qrNew, qrPoll, qrLookup, qrApprove, checkUsername, setUsername, findByUsername, getQuietHours, setQuietHours, getAwayReply, setAwayReply } from "../controllers/auth.controller.js";
 import {
   loginWithTwoFactor,
   setupTwoFactor,
@@ -45,6 +45,8 @@ router.delete("/sessions/:sid", protectRoute, endSession);
 router.delete("/account", protectRoute, deleteAccount);
 router.get("/quiet-hours", protectRoute, getQuietHours);
 router.put("/quiet-hours", protectRoute, setQuietHours);
+router.get("/away-reply", protectRoute, getAwayReply);
+router.put("/away-reply", protectRoute, setAwayReply);
 
 router.get("/check", protectRoute, checkAuth);
 router.get("/preferences", protectRoute, getPreferences);

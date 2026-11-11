@@ -290,6 +290,43 @@ async function getDirectSetting(a, b) {
 }
 const getDisappearAfter = async (a, b) => (await getDirectSetting(a, b)).seconds;
 
+// Away message: answer the first message from each person (then at most once every 12 h) with the saved text.
+const AWAY_GAP_MS = 12 * 3600 * 1000;
+const awaySent = new Map(); // "owner:sender" -> time of the last automatic reply
+const maybeAutoReply = async (owner, sender, incoming) => {
+  try {
+    const away = owner?.awayReply;
+    if (!away?.on || !away.text?.trim() || incoming.autoReply) return;
+    const key = `${owner._id}:${sender._id}`;
+    const last = awaySent.get(key);
+    if (last && Date.now() - last < AWAY_GAP_MS) return;
+    awaySent.set(key, Date.now());
+    if (awaySent.size > 5000) awaySent.delete(awaySent.keys().next().value);
+    const seconds = await getDisappearAfter(owner._id, sender._id);
+    const reply = await new Message({
+      senderId: owner._id,
+      receiverId: sender._id,
+      text: away.text.trim().slice(0, 300),
+      autoReply: true,
+      expiresAt: seconds > 0 ? new Date(Date.now() + seconds * 1000) : null,
+    }).save();
+    rememberMessage(reply);
+    for (const uid of [String(sender._id), String(owner._id)]) {
+      const sid = getReceiverSocketId(uid);
+      if (sid) io.to(sid).emit("newMessage", reply);
+    }
+    sendPushToUser(sender._id, {
+      title: owner.fullName,
+      body: reply.text,
+      icon: owner.profilePic || "/icon-v2-192.png",
+      tag: `dm-${owner._id}`,
+      data: { url: "/", chatType: "direct", chatId: String(owner._id), messageId: String(reply._id) },
+    }, {}, `d:${owner._id}`);
+  } catch (e) {
+    console.log("auto reply:", e.message);
+  }
+};
+
 const sendMessageCore = async (req, res) => {
   try {
     const { text, replyTo, viewOnce, forwarded } = req.body;
@@ -417,6 +454,7 @@ const sendMessageCore = async (req, res) => {
       },
     }, {}, `d:${senderId}`);
 
+    maybeAutoReply(receiver, req.user, newMessage); // after the reply below is on its way; never blocks it
     res.status(201).json(newMessage);
   } catch (error) {
     console.log("Error in sendMessage controller: ", error.message);

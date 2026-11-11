@@ -57,6 +57,11 @@ const userSchema = new mongoose.Schema(
       type: { _id: false, on: { type: Boolean, default: false }, from: { type: Number, default: 1320 }, to: { type: Number, default: 420 }, tz: { type: Number, default: 0 } },
       default: () => ({ on: false, from: 1320, to: 420, tz: 0 }),
     },
+    // Away message: while on, the first message from each person (then once every 12 h) gets this reply automatically.
+    awayReply: {
+      type: { _id: false, on: { type: Boolean, default: false }, text: { type: String, default: "", maxlength: 300 } },
+      default: () => ({ on: false, text: "" }),
+    },
     // Chat lock: chats hidden behind the person's PIN ("d:<id>" / "g:<id>").
     // The PIN is stored only as a bcrypt hash and never returned by queries.
     lockedChats: { type: [String], default: [] },

@@ -702,6 +702,11 @@ const ChatContainer = () => {
                       ❤️
                     </span>
                   )}
+                  {message.autoReply && (
+                    <span className="flex items-center gap-1 text-[10.5px] italic mb-0.5 text-wa-muted">
+                      <Clock size={12} /> Automatic reply
+                    </span>
+                  )}
                   {message.forwarded && (
                     <span className="flex items-center gap-1 text-[10.5px] italic mb-0.5 text-wa-muted">
                       <Forward size={12} /> Forwarded

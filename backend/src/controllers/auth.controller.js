@@ -599,3 +599,23 @@ export const setQuietHours = async (req, res) => {
     res.status(500).json({ message: "Couldn't save quiet hours" });
   }
 };
+
+// Away message: an automatic reply to people who write while the owner is away.
+export const getAwayReply = async (req, res) => {
+  const u = await User.findById(req.user._id).select("awayReply").lean();
+  res.set("Cache-Control", "no-store");
+  res.json({ on: u?.awayReply?.on === true, text: u?.awayReply?.text || "" });
+};
+
+export const setAwayReply = async (req, res) => {
+  try {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, 300) : "";
+    const on = req.body?.on === true;
+    if (on && !text) return res.status(400).json({ message: "Write the message first" });
+    await User.updateOne({ _id: req.user._id }, { $set: { awayReply: { on, text } } });
+    res.json({ on, text });
+  } catch (error) {
+    console.log("Error in setAwayReply:", error.message);
+    res.status(500).json({ message: "Couldn't save the away message" });
+  }
+};
