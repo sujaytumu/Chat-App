@@ -10,6 +10,7 @@ import {
   isPushActive,
 } from "../lib/notificationSound";
 import { vibrationPattern } from "../lib/soundSettings";
+import { inQuietHours } from "../lib/quietHours";
 import { useChatLockStore, isChatLocked } from "./useChatLockStore";
 import { isTmp, swapSent, settleByClientId, dropStalePending, settlePreview } from "../lib/sendState";
 
@@ -17,6 +18,8 @@ function notifyIncoming(senderName, message, isGroup = false) {
   // Muted chats stay silent (the unread badge still counts).
   const muteKey = isGroup ? `g:${message.groupId}` : `d:${message.senderId}`;
   if (useAuthStore.getState().authUser?.mutedChats?.includes(muteKey)) return;
+  // Quiet hours: no sound, vibration or popup in the person's do-not-disturb window.
+  if (inQuietHours()) return;
   // Phone with the app in the background: the system notification (from Web
   // Push) carries the sound — don't also try to play one from a frozen page.
   if (shouldLeaveToSystemAlert()) return;

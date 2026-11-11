@@ -1,6 +1,7 @@
 import { canSee, dropUserPairs } from "../lib/visibility.js";
 import jwt from "jsonwebtoken";
 import { generateToken, deviceLabel, renewToken } from "../lib/utils.js";
+import { cleanQuietHours } from "../lib/quietHours.js";
 import User from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import cloudinary from "../lib/cloudinary.js";
@@ -577,5 +578,24 @@ export const findByUsername = async (req, res) => {
   } catch (error) {
     console.log("error in findByUsername:", error.message);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// Quiet hours (do not disturb): read and change the person's daily window.
+export const getQuietHours = async (req, res) => {
+  const u = await User.findById(req.user._id).select("quietHours").lean();
+  res.set("Cache-Control", "no-store");
+  res.json(u?.quietHours || { on: false, from: 1320, to: 420, tz: 0 });
+};
+
+export const setQuietHours = async (req, res) => {
+  try {
+    const q = cleanQuietHours(req.body);
+    if (!q) return res.status(400).json({ message: "That time isn't valid" });
+    await User.updateOne({ _id: req.user._id }, { $set: { quietHours: q } });
+    res.json(q);
+  } catch (error) {
+    console.log("Error in setQuietHours:", error.message);
+    res.status(500).json({ message: "Couldn't save quiet hours" });
   }
 };
