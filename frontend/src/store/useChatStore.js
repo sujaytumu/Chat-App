@@ -1113,7 +1113,7 @@ export const useChatStore = create((set, get) => ({
         }));
       }
 
-      if (!isActiveChat || document.visibilityState !== "visible") {
+      if (message.senderId !== me && (!isActiveChat || document.visibilityState !== "visible")) {
         const sender = get().users.find((u) => u._id === message.senderId);
         notifyIncoming(sender?.fullName || "New message", message);
       }

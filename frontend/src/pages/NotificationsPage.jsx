@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, BellOff, BellRing, MoreVertical, Moon, Music, Trash2 } from "lucide-react";
+import { Bell, BellOff, BellRing, MoreVertical, Moon, MessageSquareReply, Music, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import SettingsShell, { Switch } from "../components/SettingsShell";
 import { axiosInstance } from "../lib/axios";
@@ -268,6 +268,88 @@ const QuietHours = () => {
   );
 };
 
+// Away message: while on, the first message from each person (then once every 12 hours) gets this reply automatically.
+const AwayMessage = () => {
+  const [a, setA] = useState({ on: false, text: "" });
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    axiosInstance
+      .get("/auth/away-reply")
+      .then(({ data }) => {
+        if (!alive) return;
+        setA(data);
+        setDraft(data.text || "");
+      })
+      .catch(() => {})
+      .finally(() => alive && setLoaded(true));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const save = async (on, text) => {
+    const before = a;
+    setSaving(true);
+    try {
+      const { data } = await axiosInstance.put("/auth/away-reply", { on, text });
+      setA(data);
+      setDraft(data.text);
+      return true;
+    } catch (e) {
+      toast.error(e.response?.data?.message || "Couldn't save the away message. Check your connection.");
+      setA(before);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dirty = draft.trim() !== (a.text || "");
+  return (
+    <>
+      <Divider />
+      <Section>Away message</Section>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={a.on}
+        disabled={saving || !loaded}
+        onClick={() => save(!a.on, draft)}
+        className="w-full flex items-center gap-4 px-4 py-4 text-left hover:bg-white/5 disabled:opacity-70"
+      >
+        <MessageSquareReply size={20} className="text-wa-muted shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[14.5px] leading-[22px] text-wa-text">Send an automatic reply</span>
+          <span className="block text-[12.5px] leading-5 text-wa-muted mt-0.5">When someone messages you, they get this once (then again after 12 hours). Not sent in groups.</span>
+        </span>
+        <Switch checked={a.on} />
+      </button>
+      <div className="px-4 pb-3">
+        <textarea
+          value={draft}
+          maxLength={300}
+          rows={3}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="e.g. I'm away right now. I'll reply when I'm back."
+          className="w-full rounded-2xl bg-wa-surface px-4 py-3 text-[15px] text-wa-text placeholder:text-wa-muted outline-none resize-none"
+        />
+        <div className="mt-1 flex items-center justify-between">
+          <span className="text-[12px] text-wa-muted">{draft.length}/300</span>
+          {dirty && (
+            <button type="button" disabled={saving || (a.on && !draft.trim())} onClick={() => save(a.on, draft)} className="rounded-full bg-[#00A884] px-4 py-1.5 text-[13.5px] font-medium text-black disabled:opacity-50">
+              Save
+            </button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+};
+
 const toneLabel = (list, id, kind) => {
   if (id === "custom") return `My sound: ${getCustomToneName(kind) || "custom"}`;
   return list.find((t) => t.id === id)?.label || list[0].label;
@@ -355,6 +437,8 @@ export const NotificationsPage = () => {
         </button>
 
         <QuietHours />
+
+        <AwayMessage />
 
         <Divider />
         <Section>Messages</Section>
