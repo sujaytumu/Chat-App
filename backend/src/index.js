@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { fcmEnabled } from "./lib/fcm.js";
 import rateLimit from "express-rate-limit";
 import path from "path";
+import fs from "fs";
 
 import { connectDB } from "./lib/db.js";
 import { wipeChatMediaOnce } from "./lib/wipeChatMedia.js";
@@ -173,6 +174,27 @@ if (process.env.NODE_ENV === "production") {
       return res.redirect(301, req.path.replace(/\/+$/, "") + q);
     }
     next();
+  });
+  // Pre-compressed (brotli) copies made at build time: sent to browsers that accept them, otherwise the normal file.
+  const distDir = path.join(__dirname, "../frontend/dist");
+  const MIME = { ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".json": "application/json; charset=utf-8" };
+  const brExists = new Map();
+  app.use((req, res, next) => {
+    if ((req.method !== "GET" && req.method !== "HEAD") || !String(req.headers["accept-encoding"] || "").includes("br")) return next();
+    const m = req.path.match(/^\/(assets\/[\w.-]+(\.js|\.css|\.svg|\.json))$/);
+    if (!m) return next();
+    const file = path.join(distDir, m[1] + ".br");
+    let ok = brExists.get(file);
+    if (ok === undefined) {
+      ok = fs.existsSync(file);
+      brExists.set(file, ok);
+    }
+    if (!ok) return next();
+    res.setHeader("Content-Encoding", "br");
+    res.setHeader("Content-Type", MIME[m[2]]);
+    res.setHeader("Vary", "Accept-Encoding");
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.sendFile(file, (err) => err && !res.headersSent && next());
   });
   app.use(
     express.static(path.join(__dirname, "../frontend/dist"), {
