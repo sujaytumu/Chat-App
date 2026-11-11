@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import { axiosInstance } from "../lib/axios.js";
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Clock, Timer, Ghost, Eraser, Info, Phone, Video, X, Search, Palette, Ban, Lock, LockOpen, Sparkles } from "lucide-react";
@@ -50,9 +51,9 @@ const lastSeenText = (iso) => {
 };
 
 const ChatHeader = () => {
-  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked, clearChat } = useChatStore();
-  const { onlineUsers, authUser } = useAuthStore();
-  const { startCall, callStatus } = useCallStore();
+  const { selectedChat, setSelectedChat, typingUsers, setChatArchived, setChatSearchOpen, setUserBlocked, clearChat } = useChatStore(useShallow((s) => ({ selectedChat: s.selectedChat, setSelectedChat: s.setSelectedChat, typingUsers: s.typingUsers, setChatArchived: s.setChatArchived, setChatSearchOpen: s.setChatSearchOpen, setUserBlocked: s.setUserBlocked, clearChat: s.clearChat })));
+  const { onlineUsers, authUser } = useAuthStore(useShallow((s) => ({ onlineUsers: s.onlineUsers, authUser: s.authUser })));
+  const { startCall, callStatus } = useCallStore(useShallow((s) => ({ startCall: s.startCall, callStatus: s.callStatus })));
   const groupCallStatus = useGroupCallStore((st) => st.status);
   const groupCallState = useGroupCallStore((st) => (selectedChat?.type === "group" ? st.states[selectedChat.data._id] : null));
   const startGroupCall = useGroupCallStore((st) => st.startCall);

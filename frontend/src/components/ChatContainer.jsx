@@ -88,8 +88,8 @@ const ChatContainer = () => {
     reactToMessage,
     openViewOnce,
     votePoll,
-  } = useChatStore();
-  const { authUser } = useAuthStore();
+  } = useChatStore(useShallow((s) => ({ messages: s.messages, isMessagesLoading: s.isMessagesLoading, selectedChat: s.selectedChat, selectedMsgIds: s.selectedMsgIds, toggleSelectMessage: s.toggleSelectMessage, typingUsers: s.typingUsers, togglePinMessage: s.togglePinMessage, deleteMessage: s.deleteMessage, setReplyingTo: s.setReplyingTo, setEditingMessage: s.setEditingMessage, setSelectedChat: s.setSelectedChat, toggleStarMessage: s.toggleStarMessage, hasMoreMessages: s.hasMoreMessages, isLoadingOlder: s.isLoadingOlder, loadOlderMessages: s.loadOlderMessages, chatSearchOpen: s.chatSearchOpen, pendingJump: s.pendingJump, clearPendingJump: s.clearPendingJump, isFetchingMessages: s.isFetchingMessages, reactToMessage: s.reactToMessage, openViewOnce: s.openViewOnce, votePoll: s.votePoll })));
+  const { authUser } = useAuthStore(useShallow((s) => ({ authUser: s.authUser })));
   const wallpaperStyle = useChatWallpaperStyle(selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "");
   // Instagram-style theme for this chat (a live "Preview" wins over the saved choice). The font is the app's one font.
   const themeKey = selectedChat ? `${selectedChat.type}:${selectedChat.data._id}` : "";

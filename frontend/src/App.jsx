@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import MainLayout from "./components/MainLayout";
@@ -96,8 +97,8 @@ const RouteFallback = () => (
 );
 
 const App = () => {
-  const { authUser, checkAuth, isCheckingAuth } = useAuthStore();
-  const { theme } = useThemeStore();
+  const { authUser, checkAuth, isCheckingAuth } = useAuthStore(useShallow((s) => ({ authUser: s.authUser, checkAuth: s.checkAuth, isCheckingAuth: s.isCheckingAuth })));
+  const { theme } = useThemeStore(useShallow((s) => ({ theme: s.theme })));
   const location = useLocation();
   const navigate = useNavigate();
   rememberPostLink(); // post link …/post?p=<id> (remembered through sign-in)
