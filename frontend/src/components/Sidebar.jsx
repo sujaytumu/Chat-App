@@ -109,7 +109,7 @@ const Sidebar = () => {
     }))
   );
 
-  const { onlineUsers, authUser, logout } = useAuthStore();
+  const { onlineUsers, authUser, logout } = useAuthStore(useShallow((s) => ({ onlineUsers: s.onlineUsers, authUser: s.authUser, logout: s.logout })));
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);

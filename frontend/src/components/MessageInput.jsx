@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import QuickReplyPicker from "./QuickReplyPicker";
 import { useRef, useState, useEffect, lazy, Suspense } from "react";
 import { lazyDialog } from "../lib/lazyDialog";
@@ -88,7 +89,7 @@ const MessageInput = () => {
   const attachMenuRef = useRef(null);
   const messages = useChatStore((st) => st.messages);
   const vanishActive = useChatStore((s) => (s.selectedChat?.type === "direct" ? !!s.directVanish[s.selectedChat.data._id] : false));
-  const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore();
+  const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore(useShallow((s) => ({ sendMessage: s.sendMessage, emitTyping: s.emitTyping, emitStopTyping: s.emitStopTyping, selectedChat: s.selectedChat, replyingTo: s.replyingTo, clearReplyingTo: s.clearReplyingTo, editingMessage: s.editingMessage, clearEditingMessage: s.clearEditingMessage, editMessage: s.editMessage })));
 
   const typingTimeoutRef = useRef(null);
 
