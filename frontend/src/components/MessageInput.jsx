@@ -559,6 +559,7 @@ const MessageInput = () => {
       if (isGroupChat) {
         const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
         if (tagged.length) payload.mentions = tagged.map((m) => m._id);
+        if (canMentionAll && /(^|\s)@everyone(?=\s|$|[.,!?])/.test(text)) payload.mentionAll = true;
       }
       setMentionIds([]);
       setMentionQuery(null);
@@ -574,6 +575,7 @@ const MessageInput = () => {
       if (isGroupChat) {
         const tagged = (selectedChat.data.members || []).filter((m) => mentionIds.includes(m._id) && text.includes(`@${m.fullName}`));
         if (tagged.length) payload.mentions = tagged.map((m) => m._id);
+        if (canMentionAll && /(^|\s)@everyone(?=\s|$|[.,!?])/.test(text)) payload.mentionAll = true;
       }
       if (imagePreview) {
         payload.image = typeof editedImage === "string" ? editedImage : imagePreview;
@@ -603,17 +605,20 @@ const MessageInput = () => {
   };
 
   const isGroupChat = selectedChat?.type === "group";
+  // Admins can tag the whole group with @everyone
+  const canMentionAll = isGroupChat && (selectedChat.data.admins || []).some((a) => (a._id || a) === authUser?._id) && (selectedChat.data.members || []).length > 2;
   const mentionCandidates = isGroupChat && mentionQuery !== null
-    ? (selectedChat.data.members || [])
-        .filter((m) => m._id !== authUser?._id && m.fullName?.toLowerCase().includes(mentionQuery.toLowerCase()))
-        .slice(0, 6)
+    ? [
+        ...(canMentionAll && "everyone".startsWith(mentionQuery.toLowerCase()) ? [{ _id: "__everyone", fullName: "everyone", everyone: true }] : []),
+        ...(selectedChat.data.members || []).filter((m) => m._id !== authUser?._id && m.fullName?.toLowerCase().includes(mentionQuery.toLowerCase())),
+      ].slice(0, 6)
     : [];
   const pickMention = (m) => {
     const el = textareaRef.current;
     const pos = el?.selectionStart ?? text.length;
     const before = text.slice(0, pos).replace(/@[^\s@]*$/, `@${m.fullName} `);
     setText(before + text.slice(pos));
-    setMentionIds((ids) => [...new Set([...ids, m._id])]);
+    if (!m.everyone) setMentionIds((ids) => [...new Set([...ids, m._id])]);
     setMentionQuery(null);
     setTimeout(() => el?.focus(), 0);
   };
@@ -819,8 +824,15 @@ const MessageInput = () => {
               onClick={() => pickMention(m)}
               className="w-full flex items-center gap-3 px-3 py-2 text-left active:bg-wa-hover hover:bg-wa-hover"
             >
-              <Avatar src={m.profilePic} name={m.fullName} size="size-8" textSize="text-sm" />
-              <span className="text-[14px] text-wa-text truncate">{m.fullName}</span>
+              {m.everyone ? (
+                <span className="size-8 shrink-0 rounded-full bg-[#00A884]/15 text-[#00A884] flex items-center justify-center text-[15px] font-semibold">@</span>
+              ) : (
+                <Avatar src={m.profilePic} name={m.fullName} size="size-8" textSize="text-sm" />
+              )}
+              <span className="min-w-0">
+                <span className="block text-[14px] text-wa-text truncate">{m.fullName}</span>
+                {m.everyone && <span className="block text-[11.5px] text-wa-muted truncate">Notify all {(selectedChat.data.members || []).length - 1} members</span>}
+              </span>
             </button>
           ))}
         </div>

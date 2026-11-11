@@ -164,7 +164,7 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, replyTo, mentions, forwarded } = req.body;
+    const { text, replyTo, mentions, forwarded, mentionAll } = req.body;
     let { image, file } = req.body;
     try {
       // forwarding hands back the /api/media/ address it was shown: check access, turn it into a fetchable one
@@ -198,14 +198,23 @@ export const sendGroupMessage = async (req, res) => {
       return res.status(403).json({ error: "Only admins can send messages in this group" });
     }
 
-    // @mentions: only real members of this group, at most 20
-    const mentionIds = [
-      ...new Set(
-        (Array.isArray(mentions) ? mentions : [])
-          .map(String)
-          .filter((id) => group.members.some((m) => m.toString() === id) && id !== String(senderId))
-      ),
-    ].slice(0, 20);
+    // @everyone: only an admin can tag the whole group, and the text has to say so
+    const tagsEveryone =
+      mentionAll === true &&
+      typeof text === "string" &&
+      /(^|\s)@everyone(?=\s|$|[.,!?])/.test(text) &&
+      group.admins.some((a) => a.equals(senderId));
+
+    // @mentions: only real members of this group, at most 20 (@everyone tags all of them)
+    const mentionIds = tagsEveryone
+      ? group.members.map((m) => m.toString()).filter((id) => id !== String(senderId))
+      : [
+          ...new Set(
+            (Array.isArray(mentions) ? mentions : [])
+              .map(String)
+              .filter((id) => group.members.some((m) => m.toString() === id) && id !== String(senderId))
+          ),
+        ].slice(0, 20);
 
     let imageUrl;
     if (image) {
@@ -240,6 +249,7 @@ export const sendGroupMessage = async (req, res) => {
       replyTo: replyTo || null,
       forwarded: forwarded === true,
       mentions: mentionIds.length ? mentionIds : undefined,
+      mentionAll: tagsEveryone ? true : undefined,
       seenBy: [senderId],
       expiresAt: group.disappearAfter > 0 ? new Date(Date.now() + group.disappearAfter * 1000) : null,
     });
@@ -255,7 +265,7 @@ export const sendGroupMessage = async (req, res) => {
       sendPushToUsers(
         group.members.filter((m) => mentioned.has(m.toString())),
         {
-          title: `${req.user.fullName} mentioned you in ${group.name}`,
+          title: tagsEveryone ? `${req.user.fullName} mentioned everyone in ${group.name}` : `${req.user.fullName} mentioned you in ${group.name}`,
           body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
           icon: group.groupPic || "/icon-v2-192.png",
           tag: `group-${groupId}`,

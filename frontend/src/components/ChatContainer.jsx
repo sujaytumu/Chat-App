@@ -41,6 +41,7 @@ import { stopLiveShare } from "./LiveLocationManager";
 import { replyWithPhoto } from "../lib/replyWithPhoto";
 import ContactCard from "./ContactCard";
 import toast from "react-hot-toast";
+import { useDraftStore } from "../store/useDraftStore";
 import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
 import { optimizeImage } from "../lib/cdn";
@@ -286,6 +287,21 @@ const ChatContainer = () => {
   const isGroup = selectedChat.type === "group";
   const data = selectedChat.data;
 
+  // Group message -> chat with that person on their own, with the message quoted at the top of the box.
+  const replyPrivately = (message) => {
+    const peer = useChatStore.getState().users.find((u) => u._id === message.senderId);
+    if (!peer) {
+      toast.error("You can't message this person directly");
+      return;
+    }
+    const quote = (message.text || (message.image ? "📷 Photo" : message.file ? `📎 ${message.file.name || "File"}` : ""))
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 80);
+    useDraftStore.getState().setDraft(`d:${peer._id}`, `↪ "${quote}" (in ${data.name})\n`);
+    useChatStore.getState().setSelectedChat({ type: "direct", data: peer });
+  };
+
   const membersById = isGroup
     ? Object.fromEntries(data.members.map((m) => [m._id, m]))
     : {};
@@ -529,6 +545,7 @@ const ChatContainer = () => {
             onDelete: (mode) => deleteMessage(message._id, mode),
             onReply: () => setReplyingTo(message),
             onReplyPhoto: () => replyWithPhoto(message),
+            onReplyPrivately: isGroup && !isMe && !message.deletedForEveryone && sender ? () => replyPrivately(message) : undefined,
             onToggleStar: () => toggleStarMessage(message._id),
             onForward: () => setForwardingMessage(message),
             onInfo: () => setInfoMessage(message),
@@ -785,7 +802,7 @@ const ChatContainer = () => {
                           const shown = long ? `${message.text.slice(0, READ_MORE_AT).trimEnd()}…` : message.text;
                           return (
                             <>
-                              {message.mentions?.length ? <MentionText text={shown} mentions={message.mentions} members={data.members} /> : renderFormatted(shown)}
+                              {message.mentions?.length ? <MentionText text={shown} mentions={message.mentions} members={data.members} mentionAll={message.mentionAll} /> : renderFormatted(shown)}
                               {long && (
                                 <button
                                   type="button"

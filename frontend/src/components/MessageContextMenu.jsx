@@ -50,6 +50,7 @@ const MessageContextMenu = ({ message, isMe, authUserId, menu, x, y, align, onCl
   const items = [
     { label: "Message info", icon: Info, onClick: menu.onInfo },
     { label: "Reply", icon: Reply, onClick: menu.onReply },
+    { label: "Reply privately", icon: Reply, hidden: !menu.onReplyPrivately, onClick: menu.onReplyPrivately },
     { label: "Reply with photo", icon: Camera, hidden: !menu.onReplyPhoto || message.deletedForEveryone, onClick: menu.onReplyPhoto },
     {
       label: "Copy",
