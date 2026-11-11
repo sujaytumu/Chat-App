@@ -200,24 +200,34 @@ export const useGroupCallStore = create((set, get) => {
       patchTile(userId, { stream, rev: Date.now() });
       e.track.onunmute = () => patchTile(userId, { rev: Date.now() });
     };
+    // Find a new path for this person's connection (throttled; every drop gets a fresh chance, not just the first).
+    const kick = () => {
+      const now = Date.now();
+      if (now - (rec.lastKick || 0) < 3500) return;
+      rec.lastKick = now;
+      try {
+        pc.restartIce();
+      } catch {
+        /* ignore */
+      }
+    };
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
+      clearTimeout(rec.dropTimer);
       if (st === "connected") {
         patchTile(userId, { connected: true });
         tuneAudioSenders(pc, 32000);
         tuneVideoSenders();
-      }
-      else if (st === "failed") {
+      } else if (st === "failed") {
         patchTile(userId, { connected: false });
-        if (!rec.restarted) {
-          rec.restarted = true;
-          try {
-            pc.restartIce();
-          } catch {
-            /* ignore */
-          }
-        }
-      } else if (st === "disconnected") patchTile(userId, { connected: false });
+        kick();
+      } else if (st === "disconnected") {
+        patchTile(userId, { connected: false });
+        // Don't wait ~30 s for "failed": a drop that lasts 3 s gets a reconnect attempt right away.
+        rec.dropTimer = setTimeout(() => {
+          if (pc.connectionState === "disconnected" || pc.connectionState === "failed") kick();
+        }, 3000);
+      }
     };
 
     if (addTracks) attachLocalTracks(rec);
@@ -678,3 +688,23 @@ export const useGroupCallStore = create((set, get) => {
     },
   };
 });
+
+// Wi-Fi <-> mobile data switch or signal coming back: every connection of a running group call finds its new path at
+// once instead of freezing until the old one times out.
+if (typeof window !== "undefined") {
+  let lastNet = 0;
+  const kickAll = () => {
+    const now = Date.now();
+    if (now - lastNet < 3000) return;
+    lastNet = now;
+    peers.forEach((rec) => {
+      try {
+        rec.pc.restartIce();
+      } catch {
+        /* ignore */
+      }
+    });
+  };
+  window.addEventListener("online", () => setTimeout(kickAll, 500));
+  navigator.connection?.addEventListener?.("change", () => setTimeout(kickAll, 800));
+}
