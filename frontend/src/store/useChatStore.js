@@ -24,7 +24,7 @@ function notifyIncoming(senderName, message, isGroup = false) {
   // Push) carries the sound — don't also try to play one from a frozen page.
   if (shouldLeaveToSystemAlert()) return;
   const locked = useAuthStore.getState().authUser?.lockedChats?.includes(muteKey);
-  playNotificationSound(isGroup);
+  playNotificationSound(isGroup, muteKey);
   const buzz = vibrationPattern(isGroup ? "group" : "message");
   if (buzz) navigator.vibrate?.(buzz);
   // With Web Push active the service worker shows the notification itself.

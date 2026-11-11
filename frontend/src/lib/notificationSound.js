@@ -8,6 +8,7 @@ import { nativePush, hasPhoneSounds,
   getCallTone,
   getMessageTone,
   getGroupTone,
+  getChatTone,
   vibrationPattern,
   loadCustomTone,
 } from "./soundSettings";
@@ -312,8 +313,15 @@ function playPresetOnce(table, id, fallbackId) {
 }
 
 // Message sound (respects the on/off setting).
-export function playNotificationSound(isGroup = false) {
+export function playNotificationSound(isGroup = false, chatKey = null) {
   if (!isMessageSoundEnabled() || inQuietHours()) return;
+  // This chat has its own tone (or is set to silent)
+  const own = getChatTone(chatKey);
+  if (own === "none") return;
+  if (own) {
+    playMessageTone(own);
+    return;
+  }
   if (isGroup) {
     const g = getGroupTone();
     if (g === "none") return; // groups set to Silent
