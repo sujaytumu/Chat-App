@@ -146,6 +146,8 @@ const messageSchema = new mongoose.Schema(
     viewOnceUrl: { type: String, select: false },
     // Group @mentions: the members tagged in this message.
     mentions: { type: [mongoose.Schema.Types.ObjectId], default: undefined },
+    // @everyone: an admin tagged the whole group (everyone is in `mentions` too)
+    mentionAll: { type: Boolean, default: undefined },
     pinned: {
       type: Boolean,
       default: false,
