@@ -2,10 +2,11 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check,
   Loader2, Smile, ChevronRight, ChevronDown, Star, Settings, Timer, ThumbsDown, Link2, MoreVertical, QrCode, Share2, Lock,
-  Heart, ListPlus, Upload, Eraser, UsersRound, Users, Bell, Music,
+  Heart, ListPlus, Upload, Eraser, UsersRound, Users, Bell, Music, UserCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { optimizeImage } from "../lib/cdn";
+import { axiosInstance } from "../lib/axios";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { useChatLockStore } from "../store/useChatLockStore";
@@ -19,6 +20,7 @@ import WallpaperCropper from "./WallpaperCropper";
 import ReportGroupDialog from "./ReportGroupDialog";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
+import GroupJoinRequestsPanel from "./GroupJoinRequestsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import MuteSheet from "./MuteSheet";
 import ChatTonePicker from "./ChatTonePicker";
@@ -86,6 +88,12 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
   const [showPerms, setShowPerms] = useState(false);
+  const [showJoins, setShowJoins] = useState(false);
+  const [joinCount, setJoinCount] = useState(null);
+  useEffect(() => {
+    if (!group.approveJoins || !group.admins.some((a) => (a._id || a) === useAuthStore.getState().authUser?._id)) return;
+    axiosInstance.get(`/groups/${group._id}/join-requests`).then((r) => setJoinCount(r.data.length)).catch(() => {});
+  }, [group._id, group.approveJoins]); // eslint-disable-line react-hooks/exhaustive-deps
   const [memberMenu, setMemberMenu] = useState(null);
   const [memberMenuPos, setMemberMenuPos] = useState({ top: 8, right: 8, maxHeight: 320 }); // where the member ⋮ menu sits (px, fixed)
   const [viewMember, setViewMember] = useState(null);
@@ -691,6 +699,14 @@ const GroupInfoModal = ({ group, onClose }) => {
               />
               <Row icon={Lock} title="Chat lock" subtitle="Lock and hide this chat on this device" right={<Toggle on={locked} />} onClick={toggleLock} />
               {isAdmin && <Row icon={Link2} title="Invite to group via link" onClick={() => setShowInvite(true)} />}
+              {isAdmin && (
+                <Row
+                  icon={UserCheck}
+                  title="Approve new members"
+                  subtitle={group.approveJoins ? (joinCount ? `On · ${joinCount} waiting` : "On") : "Off"}
+                  onClick={() => setShowJoins(true)}
+                />
+              )}
             </div>
 
           {/* ---- Settings ---- */}
@@ -770,6 +786,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           <GroupInviteSheet group={group} onClose={() => setShowInvite(false)} />
         </Suspense>
       )}
+      {showJoins && <GroupJoinRequestsPanel group={group} onCount={setJoinCount} onClose={() => setShowJoins(false)} />}
       {showPerms && <GroupPermissionsPanel group={group} isAdmin={isAdmin} onClose={() => setShowPerms(false)} />}
       {showStarred && (
         <ChatStarredPanel

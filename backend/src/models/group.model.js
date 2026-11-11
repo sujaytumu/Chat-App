@@ -30,6 +30,12 @@ const groupSchema = new mongoose.Schema(
     ],
     // Anyone signed in with this code can join (admins can reset it).
     inviteCode: { type: String, index: true, sparse: true, select: false },
+    // Join approval: when on, people who open the invite link ask to join and an admin lets them in.
+    approveJoins: { type: Boolean, default: false },
+    joinRequests: {
+      type: [{ _id: false, user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, at: { type: Date, default: Date.now } }],
+      select: false,
+    },
     // Disappearing messages: new messages vanish this many seconds after being sent (0 = off).
     disappearAfter: { type: Number, default: 0 },
     // Who may do what. Defaults keep the original behaviour.
