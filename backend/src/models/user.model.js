@@ -51,6 +51,12 @@ const userSchema = new mongoose.Schema(
     mutedChats: { type: [String], default: [] },
     // Timed mutes ("8 hours", "1 week"): the chat is un-muted automatically at `until`.
     mutedUntil: { type: [{ _id: false, key: String, until: Date }], default: [] },
+    // Quiet hours: a daily window with no message sounds, vibration or push. Times are minutes after
+    // midnight in the person's own time (tz = their offset from UTC in minutes), so 22:00 -> 07:00 is 1320 -> 420.
+    quietHours: {
+      type: { _id: false, on: { type: Boolean, default: false }, from: { type: Number, default: 1320 }, to: { type: Number, default: 420 }, tz: { type: Number, default: 0 } },
+      default: () => ({ on: false, from: 1320, to: 420, tz: 0 }),
+    },
     // Chat lock: chats hidden behind the person's PIN ("d:<id>" / "g:<id>").
     // The PIN is stored only as a bcrypt hash and never returned by queries.
     lockedChats: { type: [String], default: [] },

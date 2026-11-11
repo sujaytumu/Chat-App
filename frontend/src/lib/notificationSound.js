@@ -1,6 +1,7 @@
 // Notification / ringtone sounds. Built-in tones are synthesized with the
 // Web Audio API so we don't need to ship/license audio assets; people can also
 // pick their own sound file in Settings (played through an <audio> element).
+import { inQuietHours } from "./quietHours";
 import { nativePush, hasPhoneSounds,
   isMessageSoundEnabled,
   isCallRingtoneEnabled,
@@ -312,7 +313,7 @@ function playPresetOnce(table, id, fallbackId) {
 
 // Message sound (respects the on/off setting).
 export function playNotificationSound(isGroup = false) {
-  if (!isMessageSoundEnabled()) return;
+  if (!isMessageSoundEnabled() || inQuietHours()) return;
   if (isGroup) {
     const g = getGroupTone();
     if (g === "none") return; // groups set to Silent

@@ -31,6 +31,7 @@ import { syncPreferences } from "./lib/prefsSync";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { startVersionWatcher, GlobalUpdatePill, UpdatePopup } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
+import { syncQuietHours, refreshQuietHoursZone } from "./lib/quietHours";
 
 import { Loader } from "lucide-react";
 import { warmReels } from "./lib/reelsCache";
@@ -128,6 +129,14 @@ const App = () => {
   useEffect(() => {
     if (!authUser?._id) return;
     const t = setTimeout(warmReels, 1500);
+    return () => clearTimeout(t);
+  }, [authUser?._id]);
+
+  // Quiet hours: take the server's copy (set on another phone / before this sign-in), and tell the server this
+  // phone's current time zone offset (changes with daylight saving or travel) so push uses the right clock.
+  useEffect(() => {
+    if (!authUser?._id) return;
+    const t = setTimeout(() => syncQuietHours().then(refreshQuietHoursZone), 2500);
     return () => clearTimeout(t);
   }, [authUser?._id]);
 

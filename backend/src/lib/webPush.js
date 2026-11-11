@@ -1,6 +1,7 @@
 import webpush from "web-push";
 import User from "../models/user.model.js";
 import { sendFcmToUser } from "./fcm.js";
+import { inQuietHours } from "./quietHours.js";
 
 let configured = false;
 
@@ -31,10 +32,12 @@ export async function sendPushToUser(userId, payload, options = {}, muteKey) {
 export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
   if (!userIds?.length) return;
   try {
-    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats profilePic").lean();
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats profilePic quietHours").lean();
     await Promise.all(
       users
         .filter((u) => !(muteKey && (u.mutedChats || []).includes(muteKey)))
+        // Quiet hours: nothing is pushed in the person's do-not-disturb window (a missed-call alert still is).
+        .filter((u) => String(payload?.tag || "").startsWith("incoming-call-") || !inQuietHours(u.quietHours))
         .map((u) => {
           // Locked chats never reveal who wrote or what was said on the lock screen
           const locked = muteKey && payload?.title && (u.lockedChats || []).includes(muteKey);

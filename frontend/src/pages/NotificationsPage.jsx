@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, BellOff, BellRing, MoreVertical, Music, Trash2 } from "lucide-react";
+import { Bell, BellOff, BellRing, MoreVertical, Moon, Music, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import SettingsShell, { Switch } from "../components/SettingsShell";
 import { axiosInstance } from "../lib/axios";
 import { registerPushSubscription, previewCallTone, previewMessageTone, stopTonePreview } from "../lib/notificationSound";
 import { useBackToClose } from "../lib/useBackToClose";
+import { getQuietHours, saveQuietHours, syncQuietHours, minutesToTime, timeToMinutes, prettyTime } from "../lib/quietHours";
 import {
   isMessageSoundEnabled,
   setMessageSoundEnabled,
@@ -191,6 +192,82 @@ const ChoiceDialog = ({ title, options, value, onPreview, onSave, onClose, kind,
   );
 };
 
+// Quiet hours: a daily window with no message sounds, vibration or push notifications. Calls still ring.
+const QuietHours = () => {
+  const [q, setQ] = useState(getQuietHours);
+  const [saving, setSaving] = useState(false);
+
+  // pick up a change made on another phone
+  useEffect(() => {
+    let alive = true;
+    syncQuietHours().then((fresh) => alive && fresh && setQ(fresh));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const change = async (next) => {
+    const before = q;
+    setQ(next); // shown at once; the phone applies it immediately, the server copy follows
+    setSaving(true);
+    try {
+      await saveQuietHours(next);
+    } catch {
+      toast.error("Couldn't save quiet hours. Check your connection.");
+      setQ(before);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const same = q.from === q.to;
+  return (
+    <>
+      <Divider />
+      <Section>Quiet hours</Section>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={q.on}
+        disabled={saving}
+        onClick={() => change({ ...q, on: !q.on })}
+        className="w-full flex items-center gap-4 px-4 py-4 text-left hover:bg-white/5 disabled:opacity-70"
+      >
+        <Moon size={20} className="text-wa-muted shrink-0" />
+        <span className="flex-1 min-w-0">
+          <span className="block text-[14.5px] leading-[22px] text-wa-text">Do not disturb every day</span>
+          <span className="block text-[12.5px] leading-5 text-wa-muted mt-0.5">
+            {q.on && !same ? `Silent from ${prettyTime(q.from)} to ${prettyTime(q.to)}. Calls still ring.` : "No message sounds, vibration or notifications in this time. Calls still ring."}
+          </span>
+        </span>
+        <Switch checked={q.on} />
+      </button>
+      {q.on && (
+        <div className="flex gap-3 px-4 pb-3">
+          {[
+            ["From", "from"],
+            ["Until", "to"],
+          ].map(([label, k]) => (
+            <label key={k} className="flex-1 rounded-2xl bg-wa-surface px-4 py-2.5">
+              <span className="block text-[12px] text-wa-muted">{label}</span>
+              <input
+                type="time"
+                value={minutesToTime(q[k])}
+                onChange={(e) => {
+                  const m = timeToMinutes(e.target.value);
+                  if (m !== null) change({ ...q, [k]: m });
+                }}
+                className="mt-0.5 w-full bg-transparent text-[17px] text-wa-text outline-none [color-scheme:dark]"
+              />
+            </label>
+          ))}
+        </div>
+      )}
+      {q.on && same && <p className="px-4 pb-3 text-[12.5px] text-[#F15C6D]">Start and end are the same, so nothing is silenced. Pick two different times.</p>}
+    </>
+  );
+};
+
 const toneLabel = (list, id, kind) => {
   if (id === "custom") return `My sound: ${getCustomToneName(kind) || "custom"}`;
   return list.find((t) => t.id === id)?.label || list[0].label;
@@ -276,6 +353,8 @@ export const NotificationsPage = () => {
           </span>
           <Switch checked={convTones} />
         </button>
+
+        <QuietHours />
 
         <Divider />
         <Section>Messages</Section>
