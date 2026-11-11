@@ -208,6 +208,35 @@ export async function syncNativeCallTone() {
 }
 
 
+// ---- Tone for one chat (per device) ----------------------------------------
+// Each chat can have its own message tone (or be silent). Used when the app is open;
+// background alerts come from the phone's system and keep following the app-wide setting.
+const CHAT_TONES_KEY = "talkies-chat-tones"; // { "d:<userId>" | "g:<groupId>": toneId | "none" }
+const readChatTones = () => {
+  try {
+    const o = JSON.parse(localStorage.getItem(CHAT_TONES_KEY) || "{}");
+    return o && typeof o === "object" ? o : {};
+  } catch {
+    return {};
+  }
+};
+export function getChatTone(key) {
+  const id = key ? readChatTones()[key] : null;
+  return id === "none" || MESSAGE_TONES.some((t) => t.id === id) ? id : null; // null = same as everyone else
+}
+export function setChatTone(key, id) {
+  if (!key) return;
+  try {
+    const all = readChatTones();
+    if (id) all[key] = id;
+    else delete all[key];
+    localStorage.setItem(CHAT_TONES_KEY, JSON.stringify(all));
+  } catch {
+    /* storage unavailable */
+  }
+}
+export const chatToneLabel = (id) => (id === "none" ? "Silent" : MESSAGE_TONES.find((t) => t.id === id)?.label || "Default");
+
 // ---- Group tone + vibration (per device) -----------------------------------
 const GROUP_TONE_KEY = "talkies-group-tone"; // "same" (default) | "none" | tone id | "custom"
 export function getGroupTone() {
@@ -269,6 +298,7 @@ export async function resetNotificationSettings() {
     CALL_TONE_KEY,
     MESSAGE_TONE_KEY,
     GROUP_TONE_KEY,
+    CHAT_TONES_KEY,
     ...Object.values(VIB_KEYS),
   ].forEach((k) => localStorage.removeItem(k));
   await Promise.all(["message", "group", "call"].map((k) => removeCustomTone(k)));

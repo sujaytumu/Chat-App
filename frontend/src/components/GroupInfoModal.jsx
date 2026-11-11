@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft, X, Phone, Video, Search, UserPlus, UserMinus, LogOut, Camera, Eye, FolderOpen, Trash2, Pencil, Check,
   Loader2, Smile, ChevronRight, ChevronDown, Star, Settings, Timer, ThumbsDown, Link2, MoreVertical, QrCode, Share2, Lock,
-  Heart, ListPlus, Upload, Eraser, UsersRound, Users, Bell,
+  Heart, ListPlus, Upload, Eraser, UsersRound, Users, Bell, Music,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { optimizeImage } from "../lib/cdn";
@@ -21,6 +21,8 @@ import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import MuteSheet from "./MuteSheet";
+import ChatTonePicker from "./ChatTonePicker";
+import { getChatTone, chatToneLabel } from "../lib/soundSettings";
 import CreateGroupModal from "./CreateGroupModal";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
@@ -89,6 +91,8 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [viewMember, setViewMember] = useState(null);
   const [showInvite, setShowInvite] = useState(false);
   const [showMute, setShowMute] = useState(false);
+  const [showTone, setShowTone] = useState(false);
+  const [, bumpTone] = useState(0);
   const [showReport, setShowReport] = useState(false);
   const [showDisappear, setShowDisappear] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
@@ -678,6 +682,7 @@ const GroupInfoModal = ({ group, onClose }) => {
                 subtitle={muted ? "Muted" : "All"}
                 onClick={() => (muted ? useChatStore.getState().setChatMuted(chat, false) : setShowMute(true))}
               />
+              <Row icon={Music} title="Notification tone" subtitle={chatToneLabel(getChatTone(key))} onClick={() => setShowTone(true)} />
               <Row
                 icon={Timer}
                 title="Disappearing messages"
@@ -749,6 +754,7 @@ const GroupInfoModal = ({ group, onClose }) => {
         />
       )}
       {showDisappear && <DisappearingPanel group={group} isAdmin={isAdmin} onClose={() => setShowDisappear(false)} />}
+      {showTone && <ChatTonePicker chatKey={key} name={group.name} onClose={() => setShowTone(false)} onSaved={() => bumpTone((n) => n + 1)} />}
       {showMute && (
         <MuteSheet
           name={group.name}

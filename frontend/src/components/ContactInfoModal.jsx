@@ -1,6 +1,6 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { Phone, Video, Search, Star, Timer, Bell, BellOff, Ban, ChevronRight, X, ThumbsDown } from "lucide-react";
+import { Phone, Video, Search, Star, Timer, Bell, BellOff, Ban, ChevronRight, X, ThumbsDown, Music } from "lucide-react";
 import { optimizeImage } from "../lib/cdn";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
@@ -10,6 +10,8 @@ import ImageLightbox from "./ImageLightbox";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import MuteSheet from "./MuteSheet";
+import ChatTonePicker from "./ChatTonePicker";
+import { getChatTone, chatToneLabel } from "../lib/soundSettings";
 import ProfileHighlights from "./ProfileHighlights";
 import ChatMediaPanel, { useChatMedia, MediaThumb } from "./ChatMediaPanel";
 
@@ -26,6 +28,8 @@ const ContactInfoModal = ({ user, status, onClose }) => {
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
   const [showMute, setShowMute] = useState(false);
+  const [showTone, setShowTone] = useState(false);
+  const [, bumpTone] = useState(0);
   const [showDisappear, setShowDisappear] = useState(false);
   const starred = useStarredCount("direct", user._id);
   const mediaData = useChatMedia("direct", user._id);
@@ -117,6 +121,14 @@ const ContactInfoModal = ({ user, status, onClose }) => {
               <span className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${muted ? "left-[18px]" : "left-0.5"}`} />
             </span>
           </button>
+          <button onClick={() => setShowTone(true)} className={row}>
+            <Music size={22} className="text-wa-muted" />
+            <span className="flex-1">
+              <span className="block text-[15px]">Notification tone</span>
+              <span className="block text-[11.5px] text-wa-muted">{chatToneLabel(getChatTone(`d:${user._id}`))}</span>
+            </span>
+            <ChevronRight size={18} className="text-wa-muted" />
+          </button>
           <button onClick={() => setShowDisappear(true)} className={row}>
             <Timer size={22} className="text-wa-muted" />
             <span className="flex-1">
@@ -146,6 +158,7 @@ const ContactInfoModal = ({ user, status, onClose }) => {
         </div>
       </div>
 
+      {showTone && <ChatTonePicker chatKey={`d:${user._id}`} name={user.fullName} onClose={() => setShowTone(false)} onSaved={() => bumpTone((n) => n + 1)} />}
       {showMute && (
         <MuteSheet
           name={user.fullName}
