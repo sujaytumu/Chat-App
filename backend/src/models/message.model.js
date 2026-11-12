@@ -114,6 +114,16 @@ const messageSchema = new mongoose.Schema(
       },
       default: undefined,
     },
+    // Split bill: the sender paid `amount` (paise) and it is shared by splitAmong; settled = those who paid their share back.
+    expense: {
+      type: {
+        title: String,
+        amount: Number,
+        splitAmong: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+        settled: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      },
+      default: undefined,
+    },
     // Event: title, time, place and the RSVP lists (ids of who is going / maybe / can't make it).
     event: {
       type: {

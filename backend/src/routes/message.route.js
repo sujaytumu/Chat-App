@@ -35,6 +35,8 @@ import {
   setDirectDisappearing,
   setNote,
   rsvpEvent,
+  settleExpense,
+  getExpenseBalances,
   updateLiveLocation,
   createReminder,
   listReminders,
@@ -50,6 +52,8 @@ const router = express.Router();
 router.get("/users", protectRoute, getUsersForSidebar);
 router.put("/note", protectRoute, setNote);
 router.put("/event/:id/rsvp", protectRoute, rsvpEvent);
+router.put("/expense/:id/settle", protectRoute, settleExpense);
+router.get("/expenses/balances", protectRoute, getExpenseBalances);
 router.post("/summary", protectRoute, summarizeChat);
 router.post("/reminders", protectRoute, createReminder);
 router.get("/reminders", protectRoute, listReminders);

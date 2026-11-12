@@ -19,6 +19,7 @@ import {
   Smile,
   Camera,
   CalendarDays,
+  Receipt,
   IndianRupee,
   CalendarClock,
 } from "lucide-react";
@@ -42,6 +43,7 @@ const ContactPicker = lazyDialog(() => import("./ContactPicker"));
 const EventModal = lazyDialog(() => import("./EventModal"));
 const PollModal = lazyDialog(() => import("./PollModal"));
 const FreeSlotsModal = lazyDialog(() => import("./FreeSlotsModal"));
+const ExpenseModal = lazyDialog(() => import("./ExpenseModal"));
 const LocationSheet = lazyDialog(() => import("./LocationSheet"));
 const PaymentModal = lazyDialog(() => import("./PaymentModal"));
 
@@ -84,6 +86,7 @@ const MessageInput = () => {
   const [showPoll, setShowPoll] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
   const [showFree, setShowFree] = useState(false);
+  const [showBill, setShowBill] = useState(false);
   const [eventInitial, setEventInitial] = useState(null); // pre-filled event (from the best "free" slot)
 
   // The "Plan it" button on a free-time card opens the event sheet already filled with the best slot.
@@ -809,6 +812,18 @@ const MessageInput = () => {
       )}
       {showPay && selectedChat?.type === "direct" && <PaymentModal user={selectedChat.data} onClose={() => setShowPay(false)} />}
       {showEvent && <EventModal initial={eventInitial} onClose={() => { setShowEvent(false); setEventInitial(null); }} onSend={(event) => sendMessage({ event })} />}
+      {showBill && (
+        <ExpenseModal
+          people={
+            selectedChat?.type === "group"
+              ? Object.fromEntries((selectedChat.data.members || []).map((m) => [m._id, m]))
+              : { [authUser._id]: authUser, [selectedChat.data._id]: selectedChat.data }
+          }
+          meId={authUser._id}
+          onClose={() => setShowBill(false)}
+          onSend={(expense) => sendMessage({ expense })}
+        />
+      )}
       {showFree && <FreeSlotsModal onClose={() => setShowFree(false)} onSend={(poll) => sendMessage({ poll })} />}
       {showVideoNote && (
         <Suspense fallback={null}>
@@ -873,7 +888,7 @@ const MessageInput = () => {
         const last = messages[messages.length - 1];
         if (!last || !getQuickReplies() || text.trim() || replyingTo || editingMessage || isRecording) return null;
         if (dismissedQuick === last._id || String(last.senderId) === String(authUser?._id)) return null;
-        if (!last.text || last.image || last.file || last.poll || last.event || last.liveLocation || last.contact || last.deletedForEveryone) return null;
+        if (!last.text || last.image || last.file || last.poll || last.event || last.expense || last.liveLocation || last.contact || last.deletedForEveryone) return null;
         if (Date.now() - new Date(last.createdAt).getTime() > 30 * 60 * 1000) return null;
         const options = suggestReplies(last.text);
         if (!options.length) return null;
@@ -1092,6 +1107,19 @@ const MessageInput = () => {
                       <CalendarClock size={16} className="text-white" />
                     </span>
                     Free time
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowBill(true);
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#e0a526] flex items-center justify-center shrink-0">
+                      <Receipt size={16} className="text-white" />
+                    </span>
+                    Split bill
                   </button>
                   {selectedChat?.type === "direct" && !selectedChat.data.isSelf && (
                     <button

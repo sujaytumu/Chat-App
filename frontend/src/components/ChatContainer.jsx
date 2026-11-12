@@ -1,4 +1,6 @@
 import { BirthdayBanner } from "./BirthdayStrip";
+import ExpenseCard from "./ExpenseCard";
+import BalancesSheet from "./BalancesSheet";
 import { useChatStore } from "../store/useChatStore";
 import { lazyDialog } from "../lib/lazyDialog";
 import { useChatWallpaperStyle } from "../lib/wallpaper";
@@ -306,6 +308,9 @@ const ChatContainer = () => {
   const membersById = isGroup
     ? Object.fromEntries(data.members.map((m) => [m._id, m]))
     : {};
+  // Names for bill cards: the group's members, or the two people in a 1:1 chat.
+  const billPeople = isGroup ? membersById : { [authUser._id]: authUser, [data._id]: data };
+  const [balancesOpen, setBalancesOpen] = useState(false);
 
   const isOtherTyping = isGroup
     ? (typingUsers[`group:${data._id}`]?.size ?? 0) > 0
@@ -473,6 +478,7 @@ const ChatContainer = () => {
         </button>
       )}
 
+      {balancesOpen && <BalancesSheet chat={selectedChat} people={billPeople} authUserId={authUser._id} onClose={() => setBalancesOpen(false)} />}
       <BirthdayBanner peer={selectedChat?.type === "direct" ? selectedChat.data : null} key={selectedChat?.data?._id} />
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
       {vanishPeer && (
@@ -536,7 +542,7 @@ const ChatContainer = () => {
           // The first bubble of a run from the same person gets a tail and a
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
-          const hasText = !!message.text && !location && !message.poll && !message.event && !message.liveLocation && !message.contact && !message.payment;
+          const hasText = !!message.text && !location && !message.poll && !message.event && !message.expense && !message.liveLocation && !message.contact && !message.payment;
 
           const menuProps = {
             message,
@@ -788,6 +794,14 @@ const ChatContainer = () => {
                     />
                   ) : message.liveLocation ? (
                     <LiveLocationCard message={message} isMe={isMe} sender={sender} onStop={() => stopLiveShare(message._id)} />
+                  ) : message.expense ? (
+                    <ExpenseCard
+                      message={message}
+                      authUserId={authUser._id}
+                      people={billPeople}
+                      onSettle={(uid, paid) => useChatStore.getState().settleExpense(message._id, paid, uid)}
+                      onBalances={() => setBalancesOpen(true)}
+                    />
                   ) : message.event ? (
                     <EventCard message={message} authUserId={authUser._id} onRsvp={(a) => useChatStore.getState().rsvpEvent(message._id, a)} />
                   ) : message.poll ? (

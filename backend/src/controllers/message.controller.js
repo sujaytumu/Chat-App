@@ -6,6 +6,7 @@ import DirectChatSetting, { pairKey } from "../models/directChatSetting.model.js
 import { buildStatusReply, buildHighlightReply } from "../lib/statusReply.js";
 import { getLinkPreview } from "../lib/linkPreview.js";
 import { sanitizePoll } from "../lib/poll.js";
+import { sanitizeExpense, scopeExpense, computeBalances } from "../lib/expense.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 import { markDirectDeliveredFor } from "../lib/directReceipts.js";
@@ -344,6 +345,11 @@ const sendMessageCore = async (req, res) => {
     const liveLocation = sanitizeLiveLocation(req.body.liveLocation);
     const { id: receiverId } = req.params;
     const senderId = req.user._id;
+    // A bill in a 1:1 chat is always between these two people, whatever the client sent.
+    const bothIds = [...new Set([String(senderId), String(receiverId)])];
+    const cleanBill = sanitizeExpense(req.body.expense);
+    const expense = cleanBill ? scopeExpense({ ...cleanBill, splitAmong: bothIds }, bothIds) : null;
+    if (req.body.expense && !expense) return res.status(400).json({ error: "Enter what the bill was for and a valid amount" });
     const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
     // Independent lookups run together instead of one after another.
     const [contact, statusReply, receiver, disappearAfter, allowedToSee] = await Promise.all([
@@ -354,7 +360,7 @@ const sendMessageCore = async (req, res) => {
       isSelf ? true : canSee(req.user, receiverId), // checked alongside the other lookups, not after them
     ]);
 
-    if (!text?.trim() && !image && !file && !poll && !event && !liveLocation && !contact) {
+    if (!text?.trim() && !image && !file && !poll && !event && !expense && !liveLocation && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -402,9 +408,10 @@ const sendMessageCore = async (req, res) => {
       clientId: typeof req.body.clientId === "string" ? req.body.clientId.slice(0, 64) : undefined,
       vanish,
       expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
-      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : expense ? `💸 ${expense.title} · ₹${(expense.amount / 100).toLocaleString("en-IN")}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
       event: event || undefined,
+      expense: expense || undefined,
       liveLocation: liveLocation || undefined,
       contact: contact || undefined,
       image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
@@ -1036,6 +1043,71 @@ export const rsvpEvent = async (req, res) => {
   }
 };
 
+// Who is in the chat a bill belongs to (for access checks and live updates).
+const expenseAudience = async (message, myId) => {
+  if (message.groupId) {
+    const group = await Group.findById(message.groupId).select("members").lean();
+    if (!group?.members?.some((m) => String(m) === String(myId))) return null;
+    return { group: String(message.groupId), members: group.members.map(String) };
+  }
+  const pair = [String(message.senderId), String(message.receiverId)];
+  return pair.includes(String(myId)) ? { pair, members: pair } : null;
+};
+
+const broadcastExpense = (message, audience) => {
+  const payload = { _id: message._id, expense: message.expense };
+  if (audience.group) io.to(audience.group).emit("messageExpense", payload);
+  else audience.pair.forEach((uid) => { const sid = getReceiverSocketId(uid); if (sid) io.to(sid).emit("messageExpense", payload); });
+  return payload;
+};
+
+// Mark a share as paid back (or undo it). Body: { paid: true|false, userId? }. You can mark yourself; whoever paid
+// the bill can mark anyone.
+export const settleExpense = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = String(req.user._id);
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const message = await Message.findById(id).select("expense senderId receiverId groupId deletedForEveryone");
+    if (!message?.expense || message.deletedForEveryone) return res.status(404).json({ error: "Bill not found" });
+    const audience = await expenseAudience(message, myId);
+    if (!audience) return res.status(403).json({ error: "Not allowed" });
+    const payer = String(message.senderId);
+    const target = String(req.body?.userId || myId);
+    if (target !== myId && myId !== payer) return res.status(403).json({ error: "Only the person who paid can mark others" });
+    if (target === payer || !message.expense.splitAmong.some((u) => String(u) === target)) return res.status(400).json({ error: "That person doesn't owe a share" });
+    // Atomic, so two friends ticking "paid" at the same moment never overwrite each other.
+    const update = req.body?.paid === false ? { $pull: { "expense.settled": target } } : { $addToSet: { "expense.settled": target } };
+    const fresh = await Message.findByIdAndUpdate(id, update, { new: true }).select("expense");
+    if (!fresh?.expense) return res.status(404).json({ error: "Bill not found" });
+    res.status(200).json(broadcastExpense(fresh, audience));
+  } catch (error) {
+    console.log("Error in settleExpense controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Who owes whom in this chat, from every bill sent in it. Query: ?groupId=… or ?userId=… (the other person).
+export const getExpenseBalances = async (req, res) => {
+  try {
+    const myId = String(req.user._id);
+    const { groupId, userId } = req.query;
+    let filter;
+    if (groupId) {
+      if (!mongoose.isValidObjectId(groupId) || !(await Group.exists({ _id: groupId, members: myId }))) return res.status(403).json({ error: "Not allowed" });
+      filter = { groupId };
+    } else if (userId && mongoose.isValidObjectId(userId)) {
+      filter = { groupId: null, $or: [{ senderId: myId, receiverId: userId }, { senderId: userId, receiverId: myId }] };
+    } else return res.status(400).json({ error: "Which chat?" });
+    const bills = await Message.find({ ...filter, expense: { $exists: true }, deletedForEveryone: { $ne: true } }).select("senderId expense").limit(1000).lean();
+    const { net, transfers } = computeBalances(bills.map((b) => ({ payer: b.senderId, amount: b.expense.amount, splitAmong: b.expense.splitAmong, settled: b.expense.settled })));
+    res.status(200).json({ transfers, net, count: bills.length });
+  } catch (error) {
+    console.log("Error in getExpenseBalances controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Live location: only the sender moves it. Everyone in the chat gets the new position live.
 const liveRecipients = (message) => {
   if (message.groupId) return null;
@@ -1598,7 +1670,7 @@ onSocketConnection((socket) => {
 // ---- Message reminders: "remind me about this" ----
 const previewOf = (m) =>
   (m.text && m.text.trim().slice(0, 120)) ||
-  (m.image ? "📷 Photo" : m.file?.videoNote ? "🎥 Video message" : m.file ? `📎 ${m.file.name || "File"}` : m.poll ? "📊 Poll" : m.event ? "📅 Event" : "Message");
+  (m.image ? "📷 Photo" : m.file?.videoNote ? "🎥 Video message" : m.file ? `📎 ${m.file.name || "File"}` : m.poll ? "📊 Poll" : m.event ? "📅 Event" : m.expense ? "💸 Bill" : "Message");
 
 export const createReminder = async (req, res) => {
   try {

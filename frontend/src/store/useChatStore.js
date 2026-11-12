@@ -655,7 +655,7 @@ export const useChatStore = create((set, get) => ({
       // Plain text shows up in the chat at once (with a clock) and is swapped
       // for the real message when the server confirms — no waiting on the network.
       const me = useAuthStore.getState().authUser;
-      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.event && !messageData.liveLocation && !messageData.contactUserId && !messageData.statusId;
+      const simple = !!messageData.text && !messageData.image && !messageData.file && !messageData.poll && !messageData.event && !messageData.expense && !messageData.liveLocation && !messageData.contactUserId && !messageData.statusId;
       const tmpId = `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       if (simple && me) {
         const temp = {
@@ -832,6 +832,15 @@ export const useChatStore = create((set, get) => ({
       set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, event: res.data.event } : m)) }));
     } catch (error) {
       toast.error(error.response?.data?.error || "Couldn't save your answer");
+    }
+  },
+  // Mark a share of a split bill as paid back (or undo it). userId: whose share (defaults to mine).
+  settleExpense: async (messageId, paid, userId) => {
+    try {
+      const res = await axiosInstance.put(`/messages/expense/${messageId}/settle`, { paid, userId });
+      set((state) => ({ messages: state.messages.map((m) => (m._id === messageId ? { ...m, expense: res.data.expense } : m)) }));
+    } catch (error) {
+      toast.error(error.response?.data?.error || "Couldn't update the bill");
     }
   },
   votePoll: async (messageId, optionIds) => {
@@ -1206,6 +1215,9 @@ export const useChatStore = create((set, get) => ({
     socket.on("directDisappearing", ({ userId, seconds }) =>
       set((state) => ({ directDisappear: { ...state.directDisappear, [userId]: seconds || 0 } }))
     );
+    socket.on("messageExpense", ({ _id, expense }) =>
+      set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, expense } : m)) }))
+    );
     socket.on("messageEvent", ({ _id, event }) =>
       set((state) => ({ messages: state.messages.map((m) => (m._id === _id ? { ...m, event } : m)) }))
     );
@@ -1415,6 +1427,7 @@ export const useChatStore = create((set, get) => ({
       "messageEdited",
       "messagePoll",
       "messageEvent",
+      "messageExpense",
       "messageLive",
       "messageViewOnce",
     ].forEach((event) => socket.off(event));
