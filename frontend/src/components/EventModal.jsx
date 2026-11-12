@@ -6,12 +6,12 @@ const pad = (n) => String(n).padStart(2, "0");
 const toDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 // "Create event": name, date, time, place, details — people answer Going / Maybe / Can't go.
-const EventModal = ({ onClose, onSend }) => {
+const EventModal = ({ onClose, onSend, initial }) => {
   useBackToClose(true, onClose);
-  const soon = new Date(Date.now() + 24 * 3600 * 1000);
-  const [title, setTitle] = useState("");
+  const soon = initial?.startsAt ? new Date(initial.startsAt) : new Date(Date.now() + 24 * 3600 * 1000);
+  const [title, setTitle] = useState(initial?.title || "");
   const [date, setDate] = useState(toDate(soon));
-  const [time, setTime] = useState("18:00");
+  const [time, setTime] = useState(initial?.startsAt ? `${pad(soon.getHours())}:${pad(soon.getMinutes())}` : "18:00");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [sending, setSending] = useState(false);

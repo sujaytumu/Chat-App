@@ -2,6 +2,7 @@
 export function sanitizePoll(raw) {
   if (!raw || typeof raw !== "object") return null;
   const question = String(raw.question || "").trim().slice(0, 200);
+  const free = raw.kind === "free"; // "When are we free?": several slots can be ticked, each has a start time
   const seen = new Set();
   const options = [];
   for (const o of Array.isArray(raw.options) ? raw.options : []) {
@@ -9,8 +10,13 @@ export function sanitizePoll(raw) {
     const key = text.toLowerCase();
     if (!text || seen.has(key)) continue;
     seen.add(key);
-    options.push({ text, votes: [] });
+    const opt = { text, votes: [] };
+    if (free && o?.at) {
+      const at = new Date(o.at);
+      if (!Number.isNaN(at.getTime())) opt.at = at;
+    }
+    options.push(opt);
   }
   if (!question || options.length < 2 || options.length > 12) return null;
-  return { question, multiple: !!raw.multiple, options };
+  return free ? { question, multiple: true, kind: "free", options } : { question, multiple: !!raw.multiple, options };
 }

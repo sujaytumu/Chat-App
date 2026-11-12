@@ -145,9 +145,24 @@ export const logout = (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { profilePic, fullName, about } = req.body;
+    const { profilePic, fullName, about, birthday } = req.body;
     const userId = req.user._id;
     const update = {};
+
+    if (birthday !== undefined) {
+      if (birthday === null) {
+        update.$unset = { birthday: 1 }; // clear it
+      } else {
+        const month = Number(birthday?.month);
+        const day = Number(birthday?.day);
+        const rawYear = birthday?.year;
+        const year = rawYear === undefined || rawYear === null || rawYear === "" ? undefined : Number(rawYear);
+        const daysIn = Number.isInteger(month) && month >= 1 && month <= 12 ? new Date(2024, month, 0).getDate() : 0; // 2024 is a leap year: 29 Feb is allowed
+        if (!daysIn || !Number.isInteger(day) || day < 1 || day > daysIn) return res.status(400).json({ message: "Enter a valid birthday" });
+        if (year !== undefined && (!Number.isInteger(year) || year < 1920 || year > new Date().getFullYear())) return res.status(400).json({ message: "Enter a valid birth year" });
+        update.birthday = year === undefined ? { month, day } : { month, day, year };
+      }
+    }
 
     if (fullName !== undefined) {
       if (typeof fullName !== "string" || !fullName.trim() || fullName.trim().length > 50) {

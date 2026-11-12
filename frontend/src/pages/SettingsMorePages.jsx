@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import LinkDeviceSheet from "../components/LinkDeviceSheet";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import { getQuickReplies, setQuickReplies } from "../lib/quickReplies";
+import { MONTHS } from "../lib/birthdays";
 import Avatar from "../components/Avatar";
 import { InstallAppControl } from "./SettingsPage";
 import { useAuthStore } from "../store/useAuthStore";
@@ -29,6 +30,9 @@ export const AccountPage = () => {
   const { authUser, updateProfile, isUpdatingProfile } = useAuthStore();
   const [name, setName] = useState(authUser?.fullName || "");
   const [about, setAbout] = useState(authUser?.about || "");
+  const [bdDay, setBdDay] = useState(String(authUser?.birthday?.day || ""));
+  const [bdMonth, setBdMonth] = useState(String(authUser?.birthday?.month || ""));
+  const [bdYear, setBdYear] = useState(String(authUser?.birthday?.year || ""));
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [savingPw, setSavingPw] = useState(false);
@@ -119,6 +123,45 @@ export const AccountPage = () => {
             className={primaryBtn}
             disabled={!dirty || !name.trim() || isUpdatingProfile}
             onClick={() => updateProfile({ fullName: name, about })}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+
+      <div className={card}>
+        <p className={label}>Birthday</p>
+        <p className="text-[12px] text-wa-muted mb-2">Friends you chat with get a reminder. Only the day and month are shown to them — your year stays private.</p>
+        <div className="flex gap-2">
+          <select className={`${field} !w-20`} value={bdDay} onChange={(e) => setBdDay(e.target.value)} aria-label="Day">
+            <option value="">Day</option>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <select className={`${field} flex-1`} value={bdMonth} onChange={(e) => setBdMonth(e.target.value)} aria-label="Month">
+            <option value="">Month</option>
+            {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
+          <input className={`${field} !w-24`} inputMode="numeric" maxLength={4} placeholder="Year" value={bdYear} onChange={(e) => setBdYear(e.target.value.replace(/\D/g, ""))} aria-label="Year (optional)" />
+        </div>
+        <div className="flex justify-end gap-3 mt-3">
+          {authUser?.birthday?.day && (
+            <button
+              className="h-10 px-4 rounded-full bg-wa-field text-[13.5px] text-wa-text"
+              disabled={isUpdatingProfile}
+              onClick={async () => {
+                await updateProfile({ birthday: null });
+                setBdDay("");
+                setBdMonth("");
+                setBdYear("");
+              }}
+            >
+              Remove
+            </button>
+          )}
+          <button
+            className={primaryBtn}
+            disabled={!bdDay || !bdMonth || isUpdatingProfile}
+            onClick={() => updateProfile({ birthday: { day: Number(bdDay), month: Number(bdMonth), year: bdYear ? Number(bdYear) : undefined } })}
           >
             Save
           </button>

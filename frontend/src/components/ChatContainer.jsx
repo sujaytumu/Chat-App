@@ -1,3 +1,4 @@
+import { BirthdayBanner } from "./BirthdayStrip";
 import { useChatStore } from "../store/useChatStore";
 import { lazyDialog } from "../lib/lazyDialog";
 import { useChatWallpaperStyle } from "../lib/wallpaper";
@@ -21,7 +22,7 @@ import ReelCard from "./ReelCard";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
-import { Pin, X, ChevronDown } from "lucide-react";
+import { Pin, X, ChevronDown, Clock } from "lucide-react";
 import { VanishPullIndicator } from "./VanishPull";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
@@ -472,6 +473,7 @@ const ChatContainer = () => {
         </button>
       )}
 
+      <BirthdayBanner peer={selectedChat?.type === "direct" ? selectedChat.data : null} key={selectedChat?.data?._id} />
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
       {vanishPeer && (
         // Vanish mode turns the chat dark, like Instagram
@@ -789,7 +791,7 @@ const ChatContainer = () => {
                   ) : message.event ? (
                     <EventCard message={message} authUserId={authUser._id} onRsvp={(a) => useChatStore.getState().rsvpEvent(message._id, a)} />
                   ) : message.poll ? (
-                    <PollCard message={message} authUserId={authUser._id} onVote={(ids) => votePoll(message._id, ids)} />
+                    <PollCard message={message} authUserId={authUser._id} onVote={(ids) => votePoll(message._id, ids)} members={selectedChat?.type === "group" ? selectedChat.data.members?.length : 2} />
                   ) : location ? (
                     <LocationCard location={location} />
                   ) : reelShare ? (

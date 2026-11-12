@@ -106,7 +106,9 @@ const messageSchema = new mongoose.Schema(
       type: {
         question: String,
         multiple: { type: Boolean, default: false },
-        options: [{ text: String, votes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }] }],
+        // kind "free" = "When are we free?": every option is a date + part of the day (at = when it starts)
+        kind: { type: String, enum: ["free"], default: undefined },
+        options: [{ text: String, at: Date, votes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }] }],
       },
       default: undefined,
     },

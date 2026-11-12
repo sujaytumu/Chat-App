@@ -41,6 +41,7 @@ import { axiosInstance } from "../lib/axios";
 const ContactPicker = lazyDialog(() => import("./ContactPicker"));
 const EventModal = lazyDialog(() => import("./EventModal"));
 const PollModal = lazyDialog(() => import("./PollModal"));
+const FreeSlotsModal = lazyDialog(() => import("./FreeSlotsModal"));
 const LocationSheet = lazyDialog(() => import("./LocationSheet"));
 const PaymentModal = lazyDialog(() => import("./PaymentModal"));
 
@@ -82,6 +83,18 @@ const MessageInput = () => {
   const [showContacts, setShowContacts] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
   const [showEvent, setShowEvent] = useState(false);
+  const [showFree, setShowFree] = useState(false);
+  const [eventInitial, setEventInitial] = useState(null); // pre-filled event (from the best "free" slot)
+
+  // The "Plan it" button on a free-time card opens the event sheet already filled with the best slot.
+  useEffect(() => {
+    const open = (e) => {
+      setEventInitial(e.detail || null);
+      setShowEvent(true);
+    };
+    window.addEventListener("talkies:plan-event", open);
+    return () => window.removeEventListener("talkies:plan-event", open);
+  }, []);
   const [showPay, setShowPay] = useState(false);
   const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
   const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
@@ -795,7 +808,8 @@ const MessageInput = () => {
         />
       )}
       {showPay && selectedChat?.type === "direct" && <PaymentModal user={selectedChat.data} onClose={() => setShowPay(false)} />}
-      {showEvent && <EventModal onClose={() => setShowEvent(false)} onSend={(event) => sendMessage({ event })} />}
+      {showEvent && <EventModal initial={eventInitial} onClose={() => { setShowEvent(false); setEventInitial(null); }} onSend={(event) => sendMessage({ event })} />}
+      {showFree && <FreeSlotsModal onClose={() => setShowFree(false)} onSend={(poll) => sendMessage({ poll })} />}
       {showVideoNote && (
         <Suspense fallback={null}>
           <VideoNoteRecorder onSend={sendVideoNote} onClose={() => setShowVideoNote(false)} />
@@ -1065,6 +1079,19 @@ const MessageInput = () => {
                       <CalendarDays size={16} className="text-white" />
                     </span>
                     Event
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAttachMenu(false);
+                      setShowFree(true);
+                    }}
+                    className="flex flex-col items-center gap-1.5 text-[12.5px] text-wa-text2 active:opacity-70 lg:w-full lg:flex-row lg:gap-3 lg:px-4 lg:py-2.5 lg:text-sm lg:hover:bg-white/5"
+                  >
+                    <span className="size-14 lg:size-8 [&>svg]:size-6 lg:[&>svg]:size-4 rounded-full bg-[#1fa67a] flex items-center justify-center shrink-0">
+                      <CalendarClock size={16} className="text-white" />
+                    </span>
+                    Free time
                   </button>
                   {selectedChat?.type === "direct" && !selectedChat.data.isSelf && (
                     <button

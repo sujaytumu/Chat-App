@@ -1,3 +1,4 @@
+import BirthdayStrip from "./BirthdayStrip";
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { lazyDialog } from "../lib/lazyDialog";
 import { UpdateButton } from "../lib/versionCheck";
@@ -812,6 +813,10 @@ const Sidebar = () => {
             <span className="flex-1 text-[14.5px] text-wa-muted">Locked chats</span>
             <span className="text-[11px] font-medium text-wa-muted">{lockedCount}</span>
           </button>
+        )}
+
+        {!folderOpen && !search && filter === "all" && (
+          <BirthdayStrip users={users} authUser={authUser} onOpen={(u) => setSelectedChat({ type: "direct", data: u })} />
         )}
 
         {items.map((item) => {
