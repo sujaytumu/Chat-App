@@ -16,6 +16,7 @@ function describe(m) {
   if (m.image) parts.push("<image>");
   else if (m.file?.url) parts.push(`<${m.file.type || "file"}: ${m.file.name || "attachment"}>`);
   else if (m.poll) parts.push(`<poll: ${m.poll.question || ""}>`);
+  else if (m.expense) parts.push(`<bill: ${m.expense.title || ""} ₹${((m.expense.amount || 0) / 100).toFixed(2)}>`);
   if (m.text) parts.push(m.text);
   return parts.join(" ") || "<message>";
 }

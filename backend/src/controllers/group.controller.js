@@ -7,6 +7,7 @@ import { io, getReceiverSocketId } from "../lib/socket.js";
 import { uploadFileAttachment, MAX_BASE64_LENGTH } from "../lib/uploadFile.js";
 import { sendPushToUsers } from "../lib/webPush.js";
 import { sanitizePoll } from "../lib/poll.js";
+import { sanitizeExpense, scopeExpense } from "../lib/expense.js";
 import { sanitizeEvent } from "../lib/event.js";
 import { sanitizeLiveLocation } from "../lib/liveLocation.js";
 import { visibleUserIds } from "../lib/visibility.js";
@@ -180,8 +181,10 @@ export const sendGroupMessage = async (req, res) => {
     const contact = await buildContact(req.body.contactUserId);
     const { id: groupId } = req.params;
     const senderId = req.user._id;
+    const rawExpense = sanitizeExpense(req.body.expense); // narrowed to the group's members once the group is loaded
+    if (req.body.expense && !rawExpense) return res.status(400).json({ error: "Enter what the bill was for and a valid amount" });
 
-    if (!text?.trim() && !image && !file && !poll && !event && !liveLocation && !contact) {
+    if (!text?.trim() && !image && !file && !poll && !event && !rawExpense && !liveLocation && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -198,6 +201,8 @@ export const sendGroupMessage = async (req, res) => {
     if (group.permissions?.sendMessages === "admins" && !group.admins.some((a) => a.equals(senderId))) {
       return res.status(403).json({ error: "Only admins can send messages in this group" });
     }
+    const expense = rawExpense ? scopeExpense(rawExpense, group.members) : null;
+    if (rawExpense && !expense) return res.status(400).json({ error: "Pick at least one person to split with" });
 
     // @everyone: only an admin can tag the whole group, and the text has to say so
     const tagsEveryone =
@@ -240,9 +245,10 @@ export const sendGroupMessage = async (req, res) => {
       senderId,
       groupId,
       deliveredTo,
-      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : expense ? `💸 ${expense.title} · ₹${(expense.amount / 100).toLocaleString("en-IN")}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
       event: event || undefined,
+      expense: expense || undefined,
       liveLocation: liveLocation || undefined,
       contact: contact || undefined,
       image: imageUrl,
