@@ -32,7 +32,7 @@ export async function sendPushToUser(userId, payload, options = {}, muteKey) {
 export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
   if (!userIds?.length) return;
   try {
-    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats profilePic quietHours").lean();
+    const users = await User.find({ _id: { $in: userIds } }).select("pushSubscriptions fcmTokens mutedChats lockedChats profilePic quietHours appLock").lean();
     await Promise.all(
       users
         .filter((u) => !(muteKey && (u.mutedChats || []).includes(muteKey)))
@@ -40,7 +40,10 @@ export async function sendPushToUsers(userIds, payload, options = {}, muteKey) {
         .filter((u) => String(payload?.tag || "").startsWith("incoming-call-") || !inQuietHours(u.quietHours))
         .map((u) => {
           // Locked chats never reveal who wrote or what was said on the lock screen
-          const locked = muteKey && payload?.title && (u.lockedChats || []).includes(muteKey);
+          // App lock on: message alerts say nothing about who or what (calls and missed-call alerts are left alone)
+          const isCallAlert = payload?.isCall || /^(incoming-call|missed-call|call)/.test(String(payload?.tag || ""));
+          const appLocked = u.appLock === true && payload?.title && payload?.data?.chatType && !isCallAlert;
+          const locked = appLocked || (muteKey && payload?.title && (u.lockedChats || []).includes(muteKey));
           const safe = locked
             ? { title: "Talkies", body: "You have a new message", icon: "/icon-v2-192.png", tag: "locked-chat", data: { url: "/", messageId: payload.data?.messageId } }
             : payload;

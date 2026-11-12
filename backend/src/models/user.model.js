@@ -64,6 +64,8 @@ const userSchema = new mongoose.Schema(
       type: { _id: false, on: { type: Boolean, default: false }, text: { type: String, default: "", maxlength: 300 } },
       default: () => ({ on: false, text: "" }),
     },
+    // App lock is on (set from the phone): message notifications hide the sender and text, calls still show in full.
+    appLock: { type: Boolean, default: false },
     // Chat lock: chats hidden behind the person's PIN ("d:<id>" / "g:<id>").
     // The PIN is stored only as a bcrypt hash and never returned by queries.
     lockedChats: { type: [String], default: [] },
