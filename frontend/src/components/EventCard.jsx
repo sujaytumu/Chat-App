@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { CalendarDays, MapPin } from "lucide-react";
+import { timeLeft } from "../lib/birthdays";
 
 const when = (iso) => {
   const d = new Date(iso);
@@ -8,6 +10,13 @@ const when = (iso) => {
 // An event inside a message bubble: what / when / where, and Going · Maybe · Can't go.
 const EventCard = ({ message, authUserId, onRsvp }) => {
   const ev = message.event;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (new Date(ev.startsAt).getTime() <= Date.now()) return;
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, [ev.startsAt]);
+  const left = timeLeft(ev.startsAt, now);
   const has = (list) => (list || []).some((u) => String(u) === String(authUserId));
   const mine = has(ev.going) ? "going" : has(ev.maybe) ? "maybe" : has(ev.declined) ? "no" : "";
   const past = new Date(ev.startsAt).getTime() < Date.now();
@@ -31,6 +40,7 @@ const EventCard = ({ message, authUserId, onRsvp }) => {
         <div className="min-w-0">
           <p className="text-[14.5px] font-semibold leading-snug break-words">{ev.title}</p>
           <p className="text-[12px] text-wa-text/70">{when(ev.startsAt)}{past ? " · ended" : ""}</p>
+          {left && <p className="mt-0.5 inline-block rounded-full bg-[#25D366]/15 px-2 py-0.5 text-[11.5px] font-medium text-[#25D366]">⏳ in {left}</p>}
         </div>
       </div>
       {ev.location && (

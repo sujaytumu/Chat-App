@@ -87,7 +87,7 @@ export const getUsersForSidebar = async (req, res) => {
     markDirectDelivered(loggedInUserId); // opening the app = all waiting messages have arrived
     const visible = await visibleUserIds(req.user); // only the people the owner has allowed (or you already chat with)
     const filteredUsers = await User.find({ _id: visible ? { $in: [...visible], $ne: loggedInUserId } : { $ne: loggedInUserId }, deleted: { $ne: true } })
-      .select("-tokenVersion -deleted -password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled")
+      .select("-tokenVersion -deleted -password -pushSubscriptions -archivedChats -lockedChats -chatLockPin -pinnedChats -mutedChats -chatLists -privacy -blockedUsers -twoFactor.enabled -birthday.year")
       .lean();
 
     const [lastMessages, unreadCounts] = await Promise.all([
