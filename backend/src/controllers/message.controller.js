@@ -330,6 +330,7 @@ const maybeAutoReply = async (owner, sender, incoming) => {
 const sendMessageCore = async (req, res) => {
   try {
     const { text, replyTo, viewOnce, forwarded } = req.body;
+    const silent = req.body.silent === true && typeof text === "string" && !!text.trim(); // text only
     let { image, file } = req.body;
     try {
       // forwarding hands back the /api/media/ address it was shown: check access, turn it into a fetchable one
@@ -412,6 +413,7 @@ const sendMessageCore = async (req, res) => {
       file: fileAttachment,
       replyTo: replyTo || null,
       forwarded: forwarded === true,
+      silent: silent || undefined,
       statusReply: statusReply || undefined,
       delivered: isDelivered || isSelf,
       deliveredAt: isDelivered || isSelf ? new Date() : null,
@@ -440,7 +442,7 @@ const sendMessageCore = async (req, res) => {
     // isn't open at all, as long as they've granted notification permission.
     if (blockedByThem) return res.status(201).json(newMessage);
 
-    sendPushToUser(receiverId, {
+    if (!silent) sendPushToUser(receiverId, {
       title: req.user.fullName,
       body: fileAttachment ? `📎 ${fileAttachment.name}` : imageUrl ? "📷 Photo" : newMessage.text,
       icon: req.user.profilePic || "/icon-v2-192.png",
