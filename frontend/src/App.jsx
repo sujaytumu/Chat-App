@@ -21,6 +21,7 @@ import BackgroundCallSetup from "./components/BackgroundCallSetup";
 import AccessNotifier from "./components/AccessNotifier";
 import PayReturn from "./components/PayReturn";
 import SavePasswordPrompt from "./components/SavePasswordPrompt";
+import AppLockScreen from "./components/AppLockScreen";
 import LeaveMessageSheet from "./components/LeaveMessageSheet";
 import CallManager from "./components/CallManager"; // NOT lazy: calls must be ready to render the instant a socket event fires, even on a slow/cold connection
 
@@ -260,6 +261,11 @@ const App = () => {
         </ErrorBoundary>
       )}
       {authUser && <BackgroundCallSetup />}
+      {authUser && (
+        <ErrorBoundary silent>
+          <AppLockScreen />
+        </ErrorBoundary>
+      )}
       {authUser && (
         <ErrorBoundary silent>
           <SavePasswordPrompt />

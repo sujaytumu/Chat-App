@@ -165,6 +165,7 @@ export const getGroupMessages = async (req, res) => {
 export const sendGroupMessage = async (req, res) => {
   try {
     const { text, replyTo, mentions, forwarded, mentionAll } = req.body;
+    const silent = req.body.silent === true && typeof text === "string" && !!text.trim(); // text only
     let { image, file } = req.body;
     try {
       // forwarding hands back the /api/media/ address it was shown: check access, turn it into a fetchable one
@@ -250,6 +251,7 @@ export const sendGroupMessage = async (req, res) => {
       forwarded: forwarded === true,
       mentions: mentionIds.length ? mentionIds : undefined,
       mentionAll: tagsEveryone ? true : undefined,
+      silent: silent || undefined,
       seenBy: [senderId],
       expiresAt: group.disappearAfter > 0 ? new Date(Date.now() + group.disappearAfter * 1000) : null,
     });
@@ -261,7 +263,7 @@ export const sendGroupMessage = async (req, res) => {
     // notified even with the app closed
     // People tagged with @ are told even if they muted the group (like WhatsApp).
     const mentioned = new Set(mentionIds);
-    if (mentioned.size) {
+    if (!silent && mentioned.size) {
       sendPushToUsers(
         group.members.filter((m) => mentioned.has(m.toString())),
         {
@@ -275,7 +277,7 @@ export const sendGroupMessage = async (req, res) => {
         {}
       );
     }
-    sendPushToUsers(
+    if (!silent) sendPushToUsers(
       group.members.filter((memberId) => !memberId.equals(senderId) && !mentioned.has(memberId.toString())),
       {
         title: `${req.user.fullName} in ${group.name}`,

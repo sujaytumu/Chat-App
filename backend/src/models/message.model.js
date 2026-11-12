@@ -96,6 +96,8 @@ const messageSchema = new mongoose.Schema(
     forwarded: { type: Boolean, default: false },
     // Sent by the away message, not typed by the person.
     autoReply: { type: Boolean, default: undefined },
+    // Sent without a notification: no push, and the receiving app stays quiet for it.
+    silent: { type: Boolean, default: undefined },
     // Shared contact card (another Talkies user).
     contact: {
       type: { userId: mongoose.Schema.Types.ObjectId, fullName: String, profilePic: String },
