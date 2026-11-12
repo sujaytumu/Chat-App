@@ -619,3 +619,14 @@ export const setAwayReply = async (req, res) => {
     res.status(500).json({ message: "Couldn't save the away message" });
   }
 };
+
+// App lock switched on/off on a phone: message notifications then show no names or text (calls are unchanged).
+export const setAppLockFlag = async (req, res) => {
+  try {
+    await User.updateOne({ _id: req.user._id }, { $set: { appLock: req.body?.on === true } });
+    res.json({ on: req.body?.on === true });
+  } catch (error) {
+    console.log("Error in setAppLockFlag:", error.message);
+    res.status(500).json({ message: "Couldn't save that" });
+  }
+};

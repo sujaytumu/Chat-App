@@ -2,6 +2,7 @@
 // Kept on this phone only: the PIN is never sent anywhere, only a salted hash of it is stored here.
 // Forgot it? Signing out removes the lock (you need your account password to sign back in).
 import { create } from "zustand";
+import { axiosInstance } from "./axios";
 
 const KEY = "talkies-app-lock";
 export const LOCK_DELAYS = [
@@ -46,14 +47,19 @@ export const getLockDelay = () => (Number.isFinite(read()?.delay) ? read().delay
 // Starts locked when a PIN exists (a fresh launch always asks).
 export const useAppLockStore = create(() => ({ locked: isAppLockOn() }));
 
+// Tell the server, so message notifications stop showing names and text while the lock is on. Best effort.
+export const syncAppLockFlag = () => axiosInstance.put("/auth/app-lock", { on: isAppLockOn() }).catch(() => {});
+
 export async function enableAppLock(pin, delay = 0) {
   if (!/^\d{4,6}$/.test(pin)) throw new Error("bad-pin");
   const salt = toHex(globalThis.crypto.getRandomValues(new Uint8Array(16)));
   write({ salt, hash: await hashPin(pin, salt), delay });
+  syncAppLockFlag();
 }
 export function disableAppLock() {
   write(null);
   useAppLockStore.setState({ locked: false });
+  syncAppLockFlag();
 }
 export function setLockDelay(delay) {
   const v = read();

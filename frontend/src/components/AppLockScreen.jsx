@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Lock } from "lucide-react";
-import { useAppLockStore, checkPin, waitSeconds, disableAppLock, watchAppLock, isAppLockOn } from "../lib/appLock";
+import { useAppLockStore, checkPin, waitSeconds, disableAppLock, watchAppLock, isAppLockOn, syncAppLockFlag } from "../lib/appLock";
 import { useAuthStore } from "../store/useAuthStore";
 import PinPad from "./PinPad";
 
@@ -17,6 +17,7 @@ const AppLockScreen = () => {
 
   useEffect(() => {
     watchAppLock();
+    syncAppLockFlag(); // keeps the server's copy right even if an earlier save didn't get through
   }, []);
 
   useEffect(() => {

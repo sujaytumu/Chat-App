@@ -12,6 +12,7 @@ import {
 import { vibrationPattern } from "../lib/soundSettings";
 import { inQuietHours } from "../lib/quietHours";
 import { useChatLockStore, isChatLocked } from "./useChatLockStore";
+import { useAppLockStore } from "../lib/appLock";
 import { isTmp, swapSent, settleByClientId, dropStalePending, settlePreview } from "../lib/sendState";
 
 function notifyIncoming(senderName, message, isGroup = false) {
@@ -23,7 +24,8 @@ function notifyIncoming(senderName, message, isGroup = false) {
   // Phone with the app in the background: the system notification (from Web
   // Push) carries the sound — don't also try to play one from a frozen page.
   if (shouldLeaveToSystemAlert()) return;
-  const locked = useAuthStore.getState().authUser?.lockedChats?.includes(muteKey);
+  // Chat lock, or the app lock while it is showing: say nothing about who wrote or what.
+  const locked = useAuthStore.getState().authUser?.lockedChats?.includes(muteKey) || useAppLockStore.getState().locked;
   playNotificationSound(isGroup, muteKey);
   const buzz = vibrationPattern(isGroup ? "group" : "message");
   if (buzz) navigator.vibrate?.(buzz);
