@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Loader2, Camera, ExternalLink, RefreshCw, Smartphone, Monitor, QrCode } from "lucide-react";
 import toast from "react-hot-toast";
 import LinkDeviceSheet from "../components/LinkDeviceSheet";
+import AppLockSettings from "../components/AppLockSettings";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
 import { getQuickReplies, setQuickReplies } from "../lib/quickReplies";
 import Avatar from "../components/Avatar";
@@ -556,6 +557,8 @@ export const PrivacyPage = () => {
         checked={pv.online !== false}
         onChange={(v) => updatePrivacy({ online: v })}
       />
+
+      <AppLockSettings />
 
       <Link to="/settings/two-step" className={`${card} flex items-center gap-3 hover:bg-wa-pop`}>
         <span className="flex-1 min-w-0">
