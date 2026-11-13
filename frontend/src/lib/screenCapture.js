@@ -119,6 +119,18 @@ async function nativeScreenTrack() {
 // person cancels the permission prompt.
 export async function getScreenTrack() {
   if (hasNativeScreenShare()) return nativeScreenTrack();
-  const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  // Capped at full HD and 15 frames: a 4K or retina screen would otherwise be captured and encoded at several times
+  // the pixels the call can send (1.5 Mbps), which only burns CPU and makes the shared screen stutter.
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { width: { max: 1920 }, height: { max: 1080 }, frameRate: { ideal: 15, max: 30 } },
+      audio: false,
+    });
+  } catch (e) {
+    if (e?.name !== "OverconstrainedError" && e?.name !== "TypeError") throw e; // cancelled/denied stays an error
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  }
+  try { stream.getVideoTracks()[0].contentHint = "detail"; } catch { /* optional */ }
   return stream.getVideoTracks()[0];
 }
