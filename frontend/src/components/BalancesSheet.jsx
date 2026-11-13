@@ -7,7 +7,7 @@ import { rupees } from "../lib/expense";
 const first = (p) => String(p?.fullName || "Someone").trim().split(/\s+/)[0];
 
 // Everything unpaid in this chat boiled down to the fewest payments ("Ravi pays Sujay ₹500").
-const BalancesSheet = ({ chat, people, authUserId, onClose }) => {
+const BalancesSheet = ({ chat, people, authUserId, hasUpi, onClose }) => {
   useBackToClose(true, onClose);
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState(false);
@@ -41,10 +41,19 @@ const BalancesSheet = ({ chat, people, authUserId, onClose }) => {
                   <span className="font-medium">{name(t.from)}</span> {String(t.from) === me ? "pay" : "pays"} <span className="font-medium">{name(t.to)}</span>
                 </p>
                 <span className="text-[15px] font-semibold tabular-nums text-wa-text">{rupees(t.amount)}</span>
+                {mineOut && data.upi?.[t.to] && (
+                  <a
+                    href={`upi://pay?pa=${data.upi[t.to]}&pn=${encodeURIComponent(name(t.to))}&am=${(t.amount / 100).toFixed(2)}&cu=INR&tn=${encodeURIComponent("Talkies split")}`}
+                    className="shrink-0 h-8 px-3.5 rounded-full bg-[#25D366] text-wa-bg text-[12.5px] font-medium flex items-center"
+                  >
+                    Pay
+                  </a>
+                )}
               </div>
             );
           })}
-          {data && data.transfers.length > 0 && <p className="pt-1 text-[11.5px] text-wa-muted">Based on unpaid bills in this chat.</p>}
+          {data && data.transfers.length > 0 && <p className="pt-1 text-[11.5px] text-wa-muted">Based on unpaid bills in this chat. After paying, tap “I paid” on the bill.</p>}
+          {data?.transfers.some((t) => String(t.to) === me) && !hasUpi && <p className="text-[11.5px] text-wa-muted">Add your UPI ID in Settings → Account so friends can pay you in one tap.</p>}
         </div>
       </div>
     </div>
