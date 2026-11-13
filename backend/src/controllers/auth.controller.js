@@ -145,9 +145,15 @@ export const logout = (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { profilePic, fullName, about, birthday } = req.body;
+    const { profilePic, fullName, about, birthday, upiId } = req.body;
     const userId = req.user._id;
     const update = {};
+
+    if (upiId !== undefined) {
+      const v = String(upiId || "").trim();
+      if (v && !/^[a-zA-Z0-9._-]{2,64}@[a-zA-Z][a-zA-Z0-9.-]{1,30}$/.test(v)) return res.status(400).json({ message: "Enter a valid UPI ID, like name@bank" });
+      update.upiId = v;
+    }
 
     if (birthday !== undefined) {
       if (birthday === null) {

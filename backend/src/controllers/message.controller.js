@@ -1101,7 +1101,10 @@ export const getExpenseBalances = async (req, res) => {
     } else return res.status(400).json({ error: "Which chat?" });
     const bills = await Message.find({ ...filter, expense: { $exists: true }, deletedForEveryone: { $ne: true } }).select("senderId expense").limit(1000).lean();
     const { net, transfers } = computeBalances(bills.map((b) => ({ payer: b.senderId, amount: b.expense.amount, splitAmong: b.expense.splitAmong, settled: b.expense.settled })));
-    res.status(200).json({ transfers, net, count: bills.length });
+    // Where each payment would go: the receiver's UPI ID, if they added one.
+    const payees = [...new Set(transfers.map((t) => t.to))];
+    const upi = payees.length ? Object.fromEntries((await User.find({ _id: { $in: payees } }).select("upiId").lean()).filter((u) => u.upiId).map((u) => [String(u._id), u.upiId])) : {};
+    res.status(200).json({ transfers, net, count: bills.length, upi });
   } catch (error) {
     console.log("Error in getExpenseBalances controller: ", error.message);
     res.status(500).json({ error: "Internal server error" });
