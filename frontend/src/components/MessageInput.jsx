@@ -29,7 +29,7 @@ import toast from "react-hot-toast";
 import Avatar from "./Avatar";
 const PhotoSendPreview = lazy(() => import("./PhotoSendPreview"));
 import { liveShares } from "../lib/liveShare";
-import { getQuickReplies, suggestReplies } from "../lib/quickReplies";
+import { getQuickReplies, suggestReplies, getAiReplies } from "../lib/quickReplies";
 import { useAuthStore } from "../store/useAuthStore";
 import { createPortal } from "react-dom";
 import { compressImage } from "../lib/imageUtils";
@@ -62,6 +62,8 @@ const MessageInput = () => {
   const [isSharingLocation, setIsSharingLocation] = useState(false);
   const [showLocSheet, setShowLocSheet] = useState(false);
   const [dismissedQuick, setDismissedQuick] = useState(null);
+  const [aiSuggest, setAiSuggest] = useState({ id: null, list: [] }); // AI-written replies for one message id
+  const aiAskedRef = useRef(new Set());
   const [showVideoNote, setShowVideoNote] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -90,6 +92,24 @@ const MessageInput = () => {
   const [eventInitial, setEventInitial] = useState(null); // pre-filled event (from the best "free" slot)
 
   // The "Plan it" button on a free-time card opens the event sheet already filled with the best slot.
+  // AI smart replies (opt-in): ask once per new incoming text, keep the rule-based ones as the fallback.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last?._id || !getQuickReplies() || !getAiReplies()) return;
+    if (!last.text || String(last.senderId) === String(authUser?._id) || last.deletedForEveryone) return;
+    if (last.image || last.file || last.poll || last.event || last.expense || last.liveLocation || last.contact) return;
+    if (Date.now() - new Date(last.createdAt).getTime() > 30 * 60 * 1000 || aiAskedRef.current.has(last._id)) return;
+    aiAskedRef.current.add(last._id);
+    const ctx = messages
+      .slice(-6)
+      .filter((m) => m.text && !m.deletedForEveryone)
+      .map((m) => ({ from: String(m.senderId) === String(authUser?._id) ? "me" : "them", text: m.text }));
+    axiosInstance
+      .post("/ai/suggest", { messages: ctx })
+      .then((r) => setAiSuggest({ id: last._id, list: Array.isArray(r.data?.replies) ? r.data.replies : [] }))
+      .catch(() => {});
+  }, [messages, authUser?._id]);
+
   useEffect(() => {
     const open = (e) => {
       setEventInitial(e.detail || null);
@@ -890,7 +910,7 @@ const MessageInput = () => {
         if (dismissedQuick === last._id || String(last.senderId) === String(authUser?._id)) return null;
         if (!last.text || last.image || last.file || last.poll || last.event || last.expense || last.liveLocation || last.contact || last.deletedForEveryone) return null;
         if (Date.now() - new Date(last.createdAt).getTime() > 30 * 60 * 1000) return null;
-        const options = suggestReplies(last.text);
+        const options = aiSuggest.id === last._id && aiSuggest.list.length ? aiSuggest.list : suggestReplies(last.text);
         if (!options.length) return null;
         return (
           <div className="flex items-center gap-2 px-3 pt-2 overflow-x-auto no-scrollbar">

@@ -41,3 +41,21 @@ export function suggestReplies(text) {
   if (t.endsWith("?")) return YES_NO.test(t) ? ["Yes", "No", "Maybe later"] : ["Let me check", "Not sure yet", "I'll tell you later"];
   return [];
 }
+
+// AI smart replies: off by default. When on, the latest incoming text (and the few messages before it) is sent
+// to the server's AI model to write the suggestions, so it is the person's choice.
+const AI_KEY = "talkies.aiReplies";
+export const getAiReplies = () => {
+  try {
+    return localStorage.getItem(AI_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+export const setAiReplies = (on) => {
+  try {
+    localStorage.setItem(AI_KEY, on ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+};
