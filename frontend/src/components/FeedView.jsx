@@ -593,7 +593,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
                 {p.mine && <button onClick={() => remove(p)} className="size-8 flex items-center justify-center text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
-                <PostImages images={p.images?.length ? p.images : [p.image]} texts={p.photoText || []} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k }); }} />
+                <PostImages images={p.images?.length ? p.images : [p.image]} texts={p.photoText || []} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k, texts: p.photoText || [], caption: p.caption || "" }); }} />
                 {p.song?.url && <PostSong id={p._id} song={p.song} />}
                 {p.mine && !p.song?.url && (
                   <button onClick={() => setEditing({ post: p, autoSong: true })} className="absolute z-10 left-3 bottom-3 h-8 pl-2.5 pr-3 rounded-full bg-black/60 backdrop-blur-sm text-white text-[12.5px] flex items-center gap-1.5 active:scale-95"><Music size={14} className="text-[#25D366]" /> Add song</button>
@@ -631,7 +631,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
       )}
       {likersFor && <LikersSheet post={likersFor} onClose={() => setLikersFor(null)} />}
       {editing && <EditPostSheet post={editing.post} autoSong={!!editing.autoSong} onClose={() => setEditing(null)} onSaved={(d) => { setPosts((l) => l.map((x) => (x._id === editing.post._id ? { ...x, ...d } : x))); setEditing(null); toast.success("Saved"); }} />}
-      {viewer && <PhotoViewer images={viewer.images} index={viewer.index} onClose={() => setViewer(null)} />}
+      {viewer && <PhotoViewer images={viewer.images} index={viewer.index} texts={viewer.texts} caption={viewer.caption} onClose={() => setViewer(null)} />}
       {commentsFor && (
         <StatusComments
           targetId={commentsFor._id}

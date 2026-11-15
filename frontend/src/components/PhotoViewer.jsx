@@ -11,7 +11,7 @@ const MIN = 1;
 const MAX = 5;
 const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
 
-const PhotoViewer = ({ images, index = 0, onClose }) => {
+const PhotoViewer = ({ images, index = 0, onClose, texts = [], caption = "" }) => {
   useBackToClose(true, onClose);
   const [i, setI] = useState(Math.min(Math.max(0, index), images.length - 1));
   const [t, setT] = useState({ s: 1, x: 0, y: 0, anim: false }); // scale + translate of the photo (from the centre of the screen)
@@ -207,6 +207,16 @@ const PhotoViewer = ({ images, index = 0, onClose }) => {
       </div>
       {images.length > 1 && i > 0 && <button onClick={() => go(-1)} aria-label="Previous photo" className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 size-11 rounded-full bg-black/50 items-center justify-center"><ChevronLeft size={26} /></button>}
       {images.length > 1 && i < images.length - 1 && <button onClick={() => go(1)} aria-label="Next photo" className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 size-11 rounded-full bg-black/50 items-center justify-center"><ChevronRight size={26} /></button>}
+      {t.s <= 1.02 && (texts[i]?.text || caption) && (
+        <div className="absolute inset-x-0 bottom-[calc(44px+env(safe-area-inset-bottom))] px-5 pointer-events-none flex flex-col items-center gap-1.5">
+          {texts[i]?.text && (
+            <p className="max-w-[92%] rounded-2xl bg-black/55 px-3.5 py-1.5 text-center text-[15px] font-medium leading-snug break-words" style={{ color: texts[i].color || "#fff" }}>
+              {texts[i].text}
+            </p>
+          )}
+          {caption && <p className="max-w-[92%] line-clamp-2 text-center text-[13px] text-white/75 break-words">{caption}</p>}
+        </div>
+      )}
       {t.s <= 1.02 && (
         <p className="absolute bottom-[calc(18px+env(safe-area-inset-bottom))] inset-x-0 text-center text-[12.5px] text-white/55 pointer-events-none">Pinch or double-tap to zoom</p>
       )}
