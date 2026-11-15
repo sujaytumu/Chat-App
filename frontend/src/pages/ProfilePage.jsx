@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ShieldCheck, Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode, IndianRupee, Eye } from "lucide-react";
+import { ShieldCheck, Search, Share2, Pencil, Bell, Palette, Users, LogOut, ChevronDown, X, Loader2, KeyRound, Lock, Star, MessageSquareText, PieChart, PersonStanding, HelpCircle, Smartphone, QrCode, IndianRupee, Eye, Sparkles } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuthStore } from "../store/useAuthStore";
 import { compressImage } from "../lib/imageUtils";
@@ -65,6 +65,7 @@ const ProfilePage = () => {
     { icon: Smartphone, title: "Linked devices", sub: "Phones and browsers signed in to your account", to: "/settings/devices" },
     { icon: Lock, title: "Privacy", sub: "Read receipts, typing, blocked contacts", to: "/settings/privacy" },
     { icon: Eye, title: "Who can see my content", sub: "Status, highlights, reels and posts", to: "/settings/content-privacy" },
+    { icon: Sparkles, title: "Talkies AI", sub: "Ask questions, get message ideas, translate", to: "/ai" },
     { icon: Star, title: "Starred messages", sub: "Messages you've saved", to: "/starred" },
     { icon: MessageSquareText, title: "Chats", sub: "Enter key, archive, chat history", to: "/settings/chats" },
     { icon: Bell, title: "Notifications", sub: "Message, group & call tones", to: "/settings/notifications" },

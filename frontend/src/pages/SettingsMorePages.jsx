@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import LinkDeviceSheet from "../components/LinkDeviceSheet";
 import AppLockSettings from "../components/AppLockSettings";
 import SettingsShell, { ToggleRow } from "../components/SettingsShell";
-import { getQuickReplies, setQuickReplies } from "../lib/quickReplies";
+import { getQuickReplies, setQuickReplies, getAiReplies, setAiReplies } from "../lib/quickReplies";
 import { MONTHS } from "../lib/birthdays";
 import Avatar from "../components/Avatar";
 import { InstallAppControl } from "./SettingsPage";
@@ -664,6 +664,7 @@ export const PrivacyPage = () => {
 export const ChatsSettingsPage = () => {
   const [enterSends, setEnter] = useState(getEnterSends());
   const [quick, setQuick] = useState(getQuickReplies());
+  const [aiQuick, setAiQuick] = useState(getAiReplies());
   const [fontSize, setFont] = useState(getFontSize());
   const { authUser } = useAuthStore();
   const { users, groups, setChatArchived } = useChatStore();
@@ -693,6 +694,15 @@ export const ChatsSettingsPage = () => {
         onChange={(v) => {
           setQuick(v);
           setQuickReplies(v);
+        }}
+      />
+      <ToggleRow
+        title="AI smart replies"
+        sub="Smarter suggestions written by AI. When on, the new message and a few before it are sent to the server's AI to write them. Off by default."
+        checked={aiQuick}
+        onChange={(v) => {
+          setAiQuick(v);
+          setAiReplies(v);
         }}
       />
       <ToggleRow

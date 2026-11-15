@@ -59,6 +59,7 @@ const NotificationsPage = lazy(loaders.NotificationsPage);
 const AppearancePage = lazy(() => loaders.SettingsPage().then((m) => ({ default: m.AppearancePage })));
 const more = (name) => lazy(() => loaders.SettingsMore().then((m) => ({ default: m[name] })));
 const AccountPage = more("AccountPage");
+const AIChatPage = lazy(() => import("./pages/AIChatPage"));
 const AccessPage = lazy(() => import("./pages/AccessPage"));
 const StarredPage = more("StarredPage");
 const PaymentsPage = lazy(() => import("./pages/PaymentsPage"));
@@ -318,6 +319,7 @@ const App = () => {
               )
             }
           />
+          <Route path="/ai" element={authUser ? <AIChatPage /> : <Navigate to="/login" />} />
           <Route path="/reels" element={authUser ? <ReelsPage /> : <Navigate to="/login" />} />
           <Route path="/highlight" element={authUser ? <HighlightLinkPage /> : <Navigate to="/login" />} />
           <Route path="/post" element={authUser ? <PostPage /> : <Navigate to="/login" />} />
