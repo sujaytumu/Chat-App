@@ -39,7 +39,7 @@ function notifyIncoming(senderName, message, isGroup = false) {
   });
 }
 
-const PAGE_SIZE = 40; // messages fetched per page (newest first, older on demand) — small = opens fast
+const PAGE_SIZE = 25; // messages fetched per page (newest first, older on demand) — small = opens fast
 // ---- speed helpers ----
 // "I read it": over the live connection when there is one (arrives at once), HTTP only as a fallback.
 const emitSeen = (senderId) => {
