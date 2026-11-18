@@ -512,7 +512,7 @@ const ChatContainer = () => {
             <button
               onClick={handleLoadOlder}
               disabled={isLoadingOlder}
-              className="bg-wa-surface/95 text-wa-muted hover:text-wa-text text-[11px] px-4 py-1.5 rounded-full shadow-sm disabled:opacity-60"
+              className="bg-white text-black font-bold text-[13px] leading-none px-5 py-2.5 rounded-full shadow-md border border-black/5 active:scale-95 transition-transform disabled:opacity-70"
             >
               {isLoadingOlder ? "Loading…" : "Load older messages"}
             </button>
