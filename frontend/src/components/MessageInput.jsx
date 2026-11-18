@@ -92,6 +92,22 @@ const MessageInput = () => {
   const [eventInitial, setEventInitial] = useState(null); // pre-filled event (from the best "free" slot)
 
   // The "Plan it" button on a free-time card opens the event sheet already filled with the best slot.
+
+  useEffect(() => {
+    const open = (e) => {
+      setEventInitial(e.detail || null);
+      setShowEvent(true);
+    };
+    window.addEventListener("talkies:plan-event", open);
+    return () => window.removeEventListener("talkies:plan-event", open);
+  }, []);
+  const [showPay, setShowPay] = useState(false);
+  const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
+  const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
+  const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
+  const attachMenuRef = useRef(null);
+  const messages = useChatStore((st) => st.messages);
+
   // AI smart replies (opt-in): ask once per new incoming text, keep the rule-based ones as the fallback.
   useEffect(() => {
     const last = messages[messages.length - 1];
@@ -109,21 +125,6 @@ const MessageInput = () => {
       .then((r) => setAiSuggest({ id: last._id, list: Array.isArray(r.data?.replies) ? r.data.replies : [] }))
       .catch(() => {});
   }, [messages, authUser?._id]);
-
-  useEffect(() => {
-    const open = (e) => {
-      setEventInitial(e.detail || null);
-      setShowEvent(true);
-    };
-    window.addEventListener("talkies:plan-event", open);
-    return () => window.removeEventListener("talkies:plan-event", open);
-  }, []);
-  const [showPay, setShowPay] = useState(false);
-  const [viewOnce, setViewOnce] = useState(false); // send this photo to be opened just once
-  const [mentionIds, setMentionIds] = useState([]); // members tagged with @ in the text being written
-  const [mentionQuery, setMentionQuery] = useState(null); // text typed after an @, or null
-  const attachMenuRef = useRef(null);
-  const messages = useChatStore((st) => st.messages);
   const vanishActive = useChatStore((s) => (s.selectedChat?.type === "direct" ? !!s.directVanish[s.selectedChat.data._id] : false));
   const { sendMessage, emitTyping, emitStopTyping, selectedChat, replyingTo, clearReplyingTo, editingMessage, clearEditingMessage, editMessage } = useChatStore(useShallow((s) => ({ sendMessage: s.sendMessage, emitTyping: s.emitTyping, emitStopTyping: s.emitStopTyping, selectedChat: s.selectedChat, replyingTo: s.replyingTo, clearReplyingTo: s.clearReplyingTo, editingMessage: s.editingMessage, clearEditingMessage: s.clearEditingMessage, editMessage: s.editMessage })));
 
