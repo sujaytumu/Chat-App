@@ -24,7 +24,7 @@ import ReelCard from "./ReelCard";
 import { useAuthStore } from "../store/useAuthStore";
 import { formatMessageTime, formatDateDivider, isDifferentDay } from "../lib/utils";
 import { translateAndToast } from "../lib/translate";
-import { Pin, X, ChevronDown, Clock } from "lucide-react";
+import { Pin, X, ChevronDown, Clock, Loader2 } from "lucide-react";
 import { VanishPullIndicator } from "./VanishPull";
 import MentionText from "./MentionText";
 import ReactionsSheet from "./ReactionsSheet";
@@ -512,8 +512,9 @@ const ChatContainer = () => {
             <button
               onClick={handleLoadOlder}
               disabled={isLoadingOlder}
-              className="bg-white text-black font-bold text-[13px] leading-none px-5 py-2.5 rounded-full shadow-md border border-black/5 active:scale-95 transition-transform disabled:opacity-70"
+              className="inline-flex items-center gap-2 bg-white text-black font-bold text-[13px] leading-none px-5 py-2.5 rounded-full shadow-md border border-black/5 active:scale-95 transition-transform disabled:opacity-70"
             >
+              {isLoadingOlder && <Loader2 size={16} strokeWidth={2.75} className="animate-spin" aria-hidden />}
               {isLoadingOlder ? "Loading…" : "Load older messages"}
             </button>
           </div>
