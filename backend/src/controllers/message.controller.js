@@ -7,6 +7,7 @@ import { buildStatusReply, buildHighlightReply } from "../lib/statusReply.js";
 import { getLinkPreview } from "../lib/linkPreview.js";
 import { sanitizePoll } from "../lib/poll.js";
 import { sanitizeExpense, scopeExpense, computeBalances } from "../lib/expense.js";
+import { newGame, seatFor, applyMove } from "../lib/game.js";
 import { buildContact } from "../lib/contactCard.js";
 import { markGroupDelivered } from "../lib/groupReceipts.js";
 import { markDirectDeliveredFor } from "../lib/directReceipts.js";
@@ -350,6 +351,8 @@ const sendMessageCore = async (req, res) => {
     const cleanBill = sanitizeExpense(req.body.expense);
     const expense = cleanBill ? scopeExpense({ ...cleanBill, splitAmong: bothIds }, bothIds) : null;
     if (req.body.expense && !expense) return res.status(400).json({ error: "Enter what the bill was for and a valid amount" });
+    const game = req.body.game ? newGame(req.body.game, senderId, receiverId) : null;
+    if (req.body.game && (!game || String(senderId) === String(receiverId))) return res.status(400).json({ error: "You need someone else to play with" });
     const isSelf = String(senderId) === String(receiverId); // "Message yourself": a private notes chat
     // Independent lookups run together instead of one after another.
     const [contact, statusReply, receiver, disappearAfter, allowedToSee] = await Promise.all([
@@ -360,7 +363,7 @@ const sendMessageCore = async (req, res) => {
       isSelf ? true : canSee(req.user, receiverId), // checked alongside the other lookups, not after them
     ]);
 
-    if (!text?.trim() && !image && !file && !poll && !event && !expense && !liveLocation && !contact) {
+    if (!text?.trim() && !image && !file && !poll && !event && !expense && !game && !liveLocation && !contact) {
       return res.status(400).json({ error: "Message must have text or an attachment" });
     }
     if (image && image.length > MAX_IMAGE_BASE64_LENGTH) {
@@ -408,10 +411,11 @@ const sendMessageCore = async (req, res) => {
       clientId: typeof req.body.clientId === "string" ? req.body.clientId.slice(0, 64) : undefined,
       vanish,
       expiresAt: disappearAfter > 0 ? new Date(Date.now() + disappearAfter * 1000) : null,
-      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : expense ? `💸 ${expense.title} · ₹${(expense.amount / 100).toLocaleString("en-IN")}` : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
+      text: poll ? `📊 ${poll.question}` : event ? `📅 ${event.title}` : expense ? `💸 ${expense.title} · ₹${(expense.amount / 100).toLocaleString("en-IN")}` : game ? "🎮 Tic-tac-toe" : liveLocation ? "📍 Live location" : contact ? `👤 ${contact.fullName}` : text?.trim() || "",
       poll: poll || undefined,
       event: event || undefined,
       expense: expense || undefined,
+      game: game || undefined,
       liveLocation: liveLocation || undefined,
       contact: contact || undefined,
       image: viewOnce && imageUrl && !fileAttachment ? undefined : imageUrl,
@@ -1061,6 +1065,39 @@ const broadcastExpense = (message, audience) => {
   return payload;
 };
 
+// Play a cell in a tic-tac-toe game. Body: { cell: 0-8 }. Checked here (turn, free cell, seat), and written
+// only if nobody moved in between, so a double-tap or a race can never give someone two moves.
+export const playGame = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const myId = String(req.user._id);
+    const cell = Number(req.body?.cell);
+    if (!mongoose.isValidObjectId(id)) return res.status(400).json({ error: "Invalid message" });
+    const message = await Message.findById(id).select("game senderId receiverId groupId deletedForEveryone");
+    if (!message?.game || message.deletedForEveryone) return res.status(404).json({ error: "Game not found" });
+    const audience = await expenseAudience(message, myId);
+    if (!audience) return res.status(403).json({ error: "Not allowed" });
+    const game = message.game.toObject();
+    const seat = seatFor(game, myId, !!message.groupId);
+    if (!seat) return res.status(403).json({ error: "This game already has two players" });
+    const next = applyMove(game, cell, seat.mark);
+    if (!next) return res.status(400).json({ error: game.winner ? "The game is over" : game.turn !== seat.mark ? "Not your turn" : "That square is taken" });
+    const filter = { _id: id, "game.turn": seat.mark, [`game.board.${cell}`]: "", "game.winner": null };
+    const set = { [`game.board.${cell}`]: seat.mark, "game.turn": next.turn };
+    if (next.winner) set["game.winner"] = next.winner;
+    if (seat.join) { filter["game.o"] = null; set["game.o"] = myId; }
+    const fresh = await Message.findOneAndUpdate(filter, { $set: set }, { new: true }).select("game");
+    if (!fresh?.game) return res.status(409).json({ error: "Someone just moved — try again" });
+    const payload = { _id: fresh._id, game: fresh.game };
+    if (audience.group) io.to(audience.group).emit("messageGame", payload);
+    else audience.pair.forEach((uid) => { const sid = getReceiverSocketId(uid); if (sid) io.to(sid).emit("messageGame", payload); });
+    res.status(200).json(payload);
+  } catch (error) {
+    console.log("Error in playGame controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // Mark a share as paid back (or undo it). Body: { paid: true|false, userId? }. You can mark yourself; whoever paid
 // the bill can mark anyone.
 export const settleExpense = async (req, res) => {
@@ -1673,7 +1710,7 @@ onSocketConnection((socket) => {
 // ---- Message reminders: "remind me about this" ----
 const previewOf = (m) =>
   (m.text && m.text.trim().slice(0, 120)) ||
-  (m.image ? "📷 Photo" : m.file?.videoNote ? "🎥 Video message" : m.file ? `📎 ${m.file.name || "File"}` : m.poll ? "📊 Poll" : m.event ? "📅 Event" : m.expense ? "💸 Bill" : "Message");
+  (m.image ? "📷 Photo" : m.file?.videoNote ? "🎥 Video message" : m.file ? `📎 ${m.file.name || "File"}` : m.poll ? "📊 Poll" : m.event ? "📅 Event" : m.expense ? "💸 Bill" : m.game ? "🎮 Game" : "Message");
 
 export const createReminder = async (req, res) => {
   try {
