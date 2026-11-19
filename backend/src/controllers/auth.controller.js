@@ -10,8 +10,22 @@ import Group from "../models/group.model.js";
 import { io } from "../lib/socket.js";
 import { createQr, qrInfo, approveQr, collectQr } from "../lib/qrLogin.js";
 
+// One email, one account: the same address typed with other capitals, spaces, or (for Gmail) dots / "+tag" is the same mailbox.
+const escRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+export const emailMatcher = (raw) => {
+  const e = String(raw).trim().toLowerCase();
+  const [local, domain] = e.split("@");
+  if ((domain === "gmail.com" || domain === "googlemail.com") && local) {
+    const base = local.split("+")[0].replace(/\./g, "");
+    const dotted = [...base].map(escRe).join("\\.?");
+    return { $regex: `^${dotted}(\\+[^@]*)?@(gmail|googlemail)\\.com$`, $options: "i" };
+  }
+  return { $regex: `^${escRe(e)}$`, $options: "i" };
+};
+
 export const signup = async (req, res) => {
-  const { fullName, email, password } = req.body;
+  const { fullName, email: rawEmail, password } = req.body;
+  const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : rawEmail;
   try {
     // Only plain strings (blocks {"$ne": null}-style query injection)
     if ([fullName, email, password].some((v) => typeof v !== "string")) {
@@ -25,12 +39,14 @@ export const signup = async (req, res) => {
       return res.status(400).json({ message: "Password must be at least 8 characters" });
     }
 
-    const user = await User.findOne({ email });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: "Enter a valid email address" });
+
+    const user = await User.findOne({ email: emailMatcher(email) });
 
     if (user?.deleted) {
       return res.status(400).json({ message: "This email belongs to a deleted account that can still be restored. Log in with it to get everything back." });
     }
-    if (user) return res.status(400).json({ message: "Email already exists" });
+    if (user) return res.status(400).json({ message: "This email already has an account. Log in instead, or use a different email." });
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password.trim(), salt); // a stray space from a keyboard suggestion is not part of the password
