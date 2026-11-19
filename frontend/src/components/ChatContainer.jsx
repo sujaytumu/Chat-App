@@ -852,7 +852,7 @@ const ChatContainer = () => {
                   <span
                     className={`${
                       hasText || (message.viewOnce && !message.image) ? "absolute bottom-1 right-2 lg:bottom-1.5 lg:right-3" : "self-end mt-0.5"
-                    } text-[10.5px] lg:text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/75`}
+                    } text-[11px] leading-none flex items-center gap-1 whitespace-nowrap text-wa-text/75`}
                   >
                     {message.editedAt && <span>Edited</span>}
                     {formatMessageTime(message.createdAt)}
