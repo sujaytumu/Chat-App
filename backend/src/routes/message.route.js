@@ -36,6 +36,7 @@ import {
   setNote,
   rsvpEvent,
   settleExpense,
+  playGame,
   getExpenseBalances,
   updateLiveLocation,
   createReminder,
@@ -53,6 +54,7 @@ router.get("/users", protectRoute, getUsersForSidebar);
 router.put("/note", protectRoute, setNote);
 router.put("/event/:id/rsvp", protectRoute, rsvpEvent);
 router.put("/expense/:id/settle", protectRoute, settleExpense);
+router.put("/game/:id/move", protectRoute, playGame);
 router.get("/expenses/balances", protectRoute, getExpenseBalances);
 router.post("/summary", protectRoute, summarizeChat);
 router.post("/reminders", protectRoute, createReminder);
