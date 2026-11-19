@@ -9,6 +9,7 @@ import Reminder from "../models/reminder.model.js";
 import Message from "../models/message.model.js";
 import { purgeExpiredAccounts } from "../controllers/auth.controller.js";
 import { destroyPrivateAsset, VIEW_ONCE_TTL_MS } from "./privateMedia.js";
+import { birthdayPushes } from "./birthdayPush.js";
 
 // Every few seconds: send whatever has come due, through the normal send code
 // (so ticks, push notifications, blocking and disappearing timers all behave).
@@ -106,6 +107,7 @@ async function tick() {
   await callReminders().catch((e) => console.log("Call reminder error:", e.message));
   await purgeExpiredAccounts().catch((e) => console.log("Account purge error:", e.message));
   await endExpiredMutes().catch((e) => console.log("Mute expiry error:", e.message));
+  await birthdayPushes().catch((e) => console.log("Birthday push error:", e.message));
   const due = await ScheduledMessage.find({ sendAt: { $lte: new Date() } }).sort({ sendAt: 1 }).limit(30).lean();
   for (const item of due) {
     // claim it first so it can never be sent twice

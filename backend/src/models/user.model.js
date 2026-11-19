@@ -26,6 +26,9 @@ const userSchema = new mongoose.Schema(
     // Short "about" line shown on their profile (max 139 chars, like WhatsApp)
     about: { type: String, default: "", maxlength: 139 },
     // Birthday: day + month shown to people I chat with (so friends get a reminder); the year stays private to me.
+    // UPI ID friends can pay (shown only in the "who owes whom" sheet of chats you share)
+    upiId: { type: String, default: "", maxlength: 80 },
+    birthdayPushedOn: { type: String, select: false }, // the day (IST) the birthday notifications went out, so they go out once
     birthday: { month: { type: Number, min: 1, max: 12 }, day: { type: Number, min: 1, max: 31 }, year: { type: Number } },
     // Instagram-style "Note": a short line shown above their picture in chat lists for 24 hours.
     note: { text: { type: String, default: "", maxlength: 60 }, expiresAt: { type: Date, default: null } },

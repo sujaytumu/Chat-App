@@ -34,6 +34,7 @@ export const AccountPage = () => {
   const [bdDay, setBdDay] = useState(String(authUser?.birthday?.day || ""));
   const [bdMonth, setBdMonth] = useState(String(authUser?.birthday?.month || ""));
   const [bdYear, setBdYear] = useState(String(authUser?.birthday?.year || ""));
+  const [upi, setUpi] = useState(authUser?.upiId || "");
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [savingPw, setSavingPw] = useState(false);
@@ -166,6 +167,15 @@ export const AccountPage = () => {
           >
             Save
           </button>
+        </div>
+      </div>
+
+      <div className={card}>
+        <p className={label}>UPI ID</p>
+        <p className="text-[12px] text-wa-muted mb-2">Friends you share a bill with get a one-tap Pay button to this ID. Leave empty to hide it.</p>
+        <input className={field} placeholder="name@bank" autoCapitalize="none" autoCorrect="off" value={upi} onChange={(e) => setUpi(e.target.value.trim())} />
+        <div className="flex justify-end mt-3">
+          <button className={primaryBtn} disabled={isUpdatingProfile || upi === (authUser?.upiId || "")} onClick={() => updateProfile({ upiId: upi })}>Save</button>
         </div>
       </div>
 

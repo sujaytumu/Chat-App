@@ -478,7 +478,7 @@ const ChatContainer = () => {
         </button>
       )}
 
-      {balancesOpen && <BalancesSheet chat={selectedChat} people={billPeople} authUserId={authUser._id} onClose={() => setBalancesOpen(false)} />}
+      {balancesOpen && <BalancesSheet chat={selectedChat} people={billPeople} authUserId={authUser._id} hasUpi={!!authUser.upiId} onClose={() => setBalancesOpen(false)} />}
       <BirthdayBanner peer={selectedChat?.type === "direct" ? selectedChat.data : null} key={selectedChat?.data?._id} />
       <div className="relative flex-1 min-h-0 flex flex-col overflow-hidden">
       {vanishPeer && (

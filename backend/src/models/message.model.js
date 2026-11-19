@@ -114,6 +114,18 @@ const messageSchema = new mongoose.Schema(
       },
       default: undefined,
     },
+    // Tic-tac-toe: board of 9 ("" | "X" | "O"); x = challenger, o = opponent (open in a group until someone joins)
+    game: {
+      type: {
+        kind: String,
+        board: [String],
+        x: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        o: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        turn: String,
+        winner: String,
+      },
+      default: undefined,
+    },
     // Split bill: the sender paid `amount` (paise) and it is shared by splitAmong; settled = those who paid their share back.
     expense: {
       type: {
