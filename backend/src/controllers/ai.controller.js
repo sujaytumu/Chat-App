@@ -75,3 +75,29 @@ export const aiSuggest = async (req, res) => {
     res.status(200).json({ replies: [] });
   }
 };
+
+const TONES = {
+  fix: "Fix spelling, grammar and punctuation only. Keep the wording, tone and meaning.",
+  friendly: "Rewrite it in a warm, friendly, casual tone.",
+  formal: "Rewrite it in a polite, professional tone.",
+  shorter: "Make it shorter and clearer, keeping the meaning.",
+};
+const REWRITE_SYSTEM = `You help someone polish a chat message before they send it.
+Follow the instruction, keep the same language and script as the message (including Hinglish), keep emojis that fit, and do not add facts.
+Return ONLY the rewritten message, with no quotes and no explanation.`;
+
+export const aiRewrite = async (req, res) => {
+  try {
+    const text = typeof req.body?.text === "string" ? req.body.text.trim().slice(0, 1500) : "";
+    const tone = TONES[req.body?.tone] ? req.body.tone : "fix";
+    if (!text) return res.status(400).json({ error: "Type a message first." });
+    if (!aiEnabled()) return res.status(503).json({ error: errorText.not_configured, code: "not_configured" });
+    if (limited("rewrite", req.user._id, 80)) return res.status(429).json({ error: "You've used this a lot this hour. Try again in a while." });
+    const out = await aiComplete({ system: `${REWRITE_SYSTEM}\nInstruction: ${TONES[tone]}`, messages: [{ role: "user", content: text }], maxTokens: 400, temperature: 0.4 });
+    if (out.error) return res.status(502).json({ error: errorText[out.error] || errorText.failed });
+    res.status(200).json({ text: out.text.replace(/^["“]|["”]$/g, "").slice(0, 2000) });
+  } catch (error) {
+    console.log("Error in aiRewrite controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
