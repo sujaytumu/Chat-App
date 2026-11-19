@@ -25,7 +25,7 @@ import toast from "react-hot-toast";
 import SearchSnippet from "./SearchSnippet";
 import { buzz } from "../lib/uiSettings";
 import ChatListModal from "./ChatListModal";
-import { UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { CheckCheck, UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
 import { useScrollMemory } from "../lib/useScrollMemory";
@@ -632,6 +632,16 @@ const Sidebar = () => {
                 }}
               >
                 <UsersRound size={18} className="text-wa-icon" /> New group
+              </button>
+              <button
+                className={menuItem}
+                onClick={async () => {
+                  setShowMenu(false);
+                  const n = await useChatStore.getState().markAllRead();
+                  toast(n ? `${n} chat${n === 1 ? "" : "s"} marked as read` : "No unread chats", { icon: "✅" });
+                }}
+              >
+                <CheckCheck size={18} className="text-wa-icon" /> Mark all as read
               </button>
               <button
                 className={menuItem}
