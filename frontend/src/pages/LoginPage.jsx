@@ -108,7 +108,7 @@ const LoginPage = () => {
                   id="login-email"
                   name="email"
                   type="email"
-                  autoComplete="username"
+                  autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false}
                   autoCapitalize="none"
                   spellCheck={false}
                   className={`input input-bordered w-full pl-10`}
@@ -130,7 +130,7 @@ const LoginPage = () => {
                 <input
                   id="login-password"
                   name="password"
-                  autoComplete="current-password"
+                  autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                   type={showPassword ? "text" : "password"}
                   className={`input input-bordered w-full pl-10`}
                   placeholder="••••••••"

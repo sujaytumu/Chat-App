@@ -33,7 +33,7 @@ export const signup = async (req, res) => {
     if (user) return res.status(400).json({ message: "Email already exists" });
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password.trim(), salt); // a stray space from a keyboard suggestion is not part of the password
 
     const newUser = new User({
       fullName,
@@ -87,8 +87,19 @@ export const login = async (req, res) => {
     }
 
     let isPasswordCorrect = await bcrypt.compare(password, user.password);
-    // a keyboard suggestion can also leave a space after the password
-    if (!isPasswordCorrect && password !== password.trim()) isPasswordCorrect = await bcrypt.compare(password.trim(), user.password);
+    // Same password, different bytes: a keyboard can add a space, or type an accented letter in the other Unicode form.
+    // Try those forms before saying "wrong" (only runs after a miss). A trailing space is also tried, because an older
+    // sign-up may have saved the password with the space a suggestion added.
+    if (!isPasswordCorrect) {
+      const t = password.trim();
+      const forms = [...new Set([t, password.normalize("NFC"), t.normalize("NFC"), t.normalize("NFKC"), `${t} `])].filter((f) => f && f !== password);
+      for (const f of forms) {
+        if (await bcrypt.compare(f, user.password)) {
+          isPasswordCorrect = true;
+          break;
+        }
+      }
+    }
     if (!isPasswordCorrect) {
       console.log(`login failed: wrong password for ${mask(user.email)} (typed ${password.length} characters)`);
       return res.status(400).json({ message: "Invalid credentials" });
@@ -218,7 +229,7 @@ export const changePassword = async (req, res) => {
     if (!ok) return res.status(400).json({ message: "Current password is incorrect" });
 
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
+    user.password = await bcrypt.hash(newPassword.trim(), salt);
     user.tokenVersion = (user.tokenVersion || 0) + 1; // every other device must sign in again
     await user.save();
     generateToken(user._id, res, user.tokenVersion, req);

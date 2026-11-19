@@ -190,8 +190,8 @@ export const AccountPage = () => {
 
       <form onSubmit={changePw} className={card}>
         <p className="text-[13.5px] text-wa-text mb-3">Change password</p>
-        <input className={`${field} mb-3`} type="password" autoComplete="current-password" placeholder="Current password" value={cur} onChange={(e) => setCur(e.target.value)} />
-        <input className={field} type="password" autoComplete="new-password" placeholder="New password (8+ characters)" value={next} onChange={(e) => setNext(e.target.value)} />
+        <input className={`${field} mb-3`} type="password" autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="Current password" value={cur} onChange={(e) => setCur(e.target.value)} />
+        <input className={field} type="password" autoComplete="new-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="New password (8+ characters)" value={next} onChange={(e) => setNext(e.target.value)} />
         <div className="flex justify-end mt-3">
           <button type="submit" className={primaryBtn} disabled={!cur || !next || savingPw}>
             {savingPw ? <Loader2 className="animate-spin" size={18} /> : "Update"}
@@ -234,7 +234,7 @@ export const AccountPage = () => {
             <input
               className={field}
               type="password"
-              autoComplete="current-password"
+              autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false}
               placeholder="Enter your password to confirm"
               value={delPw}
               onChange={(e) => setDelPw(e.target.value)}
@@ -469,7 +469,7 @@ export const TwoStepPage = () => {
           {status.enabled && mode === "disable" && (
             <div className={card}>
               <p className="text-[13.5px] text-wa-text mb-2">Confirm it&apos;s you</p>
-              <input className={`${field} mb-3`} type="password" autoComplete="current-password" placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
+              <input className={`${field} mb-3`} type="password" autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} placeholder="Password" value={pw} onChange={(e) => setPw(e.target.value)} />
               {codeInput}
               <p className="text-[10.5px] text-wa-muted2 mt-2">Use your authenticator code or a backup code.</p>
               <div className="flex justify-end gap-2 mt-3">
