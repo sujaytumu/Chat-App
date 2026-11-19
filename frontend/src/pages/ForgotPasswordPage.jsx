@@ -259,7 +259,7 @@ const ForgotPasswordPage = () => {
                 <label className="label"><span className="label-text font-medium">New password</span></label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Lock className="h-5 w-5 text-base-content/40" /></div>
-                  <input autoFocus type={showPassword ? "text" : "password"} autoComplete="new-password" className="input input-bordered w-full pl-10 pr-11" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
+                  <input autoFocus type={showPassword ? "text" : "password"} autoComplete="new-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} className="input input-bordered w-full pl-10 pr-11" placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} />
                   <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute inset-y-0 right-0 pr-3 flex items-center" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <EyeOff className="h-5 w-5 text-base-content/40" /> : <Eye className="h-5 w-5 text-base-content/40" />}
                   </button>
@@ -277,7 +277,7 @@ const ForgotPasswordPage = () => {
                 <label className="label"><span className="label-text font-medium">Confirm new password</span></label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><KeyRound className="h-5 w-5 text-base-content/40" /></div>
-                  <input type={showPassword ? "text" : "password"} autoComplete="new-password" className={`input input-bordered w-full pl-10 ${mismatch ? "input-error" : ""}`} placeholder="Type it again" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                  <input type={showPassword ? "text" : "password"} autoComplete="new-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} className={`input input-bordered w-full pl-10 ${mismatch ? "input-error" : ""}`} placeholder="Type it again" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                 </div>
                 {mismatch && <p className="mt-1.5 text-[12.5px] text-error">The two passwords do not match yet.</p>}
               </div>
@@ -298,7 +298,7 @@ const ForgotPasswordPage = () => {
                   <p className="text-[13.5px] font-medium flex items-center gap-2"><KeyRound className="h-4 w-4 text-primary" /> Owner recovery</p>
                   <p className="text-[12.5px] text-base-content/60 leading-snug">The recovery key is saved in your hosting settings (Render, OWNER_RECOVERY_KEY). It only works for the owner account.</p>
                   <input type="password" autoComplete="off" className="input input-bordered w-full" placeholder="Recovery key" value={recovery.key} onChange={(e) => setRecovery({ ...recovery, key: e.target.value })} />
-                  <input type="password" autoComplete="new-password" className="input input-bordered w-full" placeholder="New password (8+ characters)" value={recovery.password} onChange={(e) => setRecovery({ ...recovery, password: e.target.value })} />
+                  <input type="password" autoComplete="new-password" autoCapitalize="off" autoCorrect="off" spellCheck={false} className="input input-bordered w-full" placeholder="New password (8+ characters)" value={recovery.password} onChange={(e) => setRecovery({ ...recovery, password: e.target.value })} />
                   <div className="flex gap-2">
                     <button type="button" className="btn btn-ghost flex-1" onClick={() => setRecovery({ open: false, key: "", password: "" })}>Cancel</button>
                     <button type="submit" className="btn btn-primary flex-1" disabled={busy || !recovery.key || recovery.password.length < 8}>

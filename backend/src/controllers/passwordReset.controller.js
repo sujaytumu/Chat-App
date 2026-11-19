@@ -134,7 +134,7 @@ export const resetPassword = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
+    user.password = await bcrypt.hash(newPassword.trim(), salt);
     user.tokenVersion = (user.tokenVersion || 0) + 1; // every device signs in again with the new password
     user.passwordReset = undefined;
     await user.save();
@@ -178,7 +178,7 @@ export const ownerRecovery = async (req, res) => {
     const id = await ownerId();
     const owner = id ? await User.findById(id) : null;
     if (!owner) return res.status(404).json({ message: "Owner account not found" });
-    owner.password = await bcrypt.hash(newPassword, await bcrypt.genSalt(10));
+    owner.password = await bcrypt.hash(newPassword.trim(), await bcrypt.genSalt(10));
     owner.tokenVersion = (owner.tokenVersion || 0) + 1;
     owner.passwordReset = undefined;
     await owner.save();

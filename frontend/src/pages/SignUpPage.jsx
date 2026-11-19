@@ -102,7 +102,7 @@ const SignUpPage = () => {
                 </div>
                 <input
                   name="password"
-                  autoComplete="new-password"
+                  autoComplete="new-password" autoCapitalize="off" autoCorrect="off" spellCheck={false}
                   type={showPassword ? "text" : "password"}
                   className={`input input-bordered w-full pl-10`}
                   placeholder="••••••••"

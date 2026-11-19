@@ -108,7 +108,7 @@ const PinDialog = ({ modal }) => {
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError(""); }}
               placeholder="Account password"
-              autoComplete="current-password"
+              autoComplete="current-password" autoCapitalize="off" autoCorrect="off" spellCheck={false}
               className="w-full rounded-xl bg-wa-field px-4 py-3 text-[14px] outline-none focus:ring-2 focus:ring-[#25d366]/40"
             />
             {error && <p className="text-center text-[12.5px] text-red-500">{error}</p>}
