@@ -616,6 +616,22 @@ export const useChatStore = create((set, get) => ({
     }
   },
 
+  // Mark every chat that has unread messages as read (same as opening each one: senders see their ticks turn blue).
+  markAllRead: async () => {
+    const { users, groups } = get();
+    const unreadUsers = users.filter((u) => u.unreadCount > 0);
+    const unreadGroups = groups.filter((g) => g.unreadCount > 0);
+    if (!unreadUsers.length && !unreadGroups.length) return 0;
+    set((state) => ({
+      users: state.users.map((u) => (u.unreadCount > 0 ? { ...u, unreadCount: 0 } : u)),
+      groups: state.groups.map((g) => (g.unreadCount > 0 ? { ...g, unreadCount: 0 } : g)),
+    }));
+    unreadUsers.forEach((u) => axiosInstance.put(`/messages/seen/${u._id}`).catch(() => {}));
+    // fetching a group's newest message is what marks the group read on the server
+    unreadGroups.forEach((g) => axiosInstance.get(`/groups/${g._id}/messages`, { params: { limit: 1 } }).catch(() => {}));
+    return unreadUsers.length + unreadGroups.length;
+  },
+
   // "Load older messages": fetch the page before the oldest one we have.
   loadOlderMessages: async () => {
     const { selectedChat: chat, messages, isLoadingOlder, hasMoreMessages } = get();
