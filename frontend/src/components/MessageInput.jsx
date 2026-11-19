@@ -1,3 +1,4 @@
+import AiWriteHelp from "./AiWriteHelp";
 import { useShallow } from "zustand/react/shallow";
 import QuickReplyPicker from "./QuickReplyPicker";
 import { useRef, useState, useEffect, lazy, Suspense } from "react";
@@ -861,6 +862,19 @@ const MessageInput = () => {
         />
       )}
       {showPoll && <PollModal onClose={() => setShowPoll(false)} onSend={(poll) => sendMessage({ poll })} />}
+      {text.trim().length >= 8 && !text.startsWith("/") && !editingMessage && !isRecording && (
+        <AiWriteHelp
+          key={selectedChat?.data?._id}
+          text={text}
+          onUse={(t) => {
+            setText(t);
+            setTimeout(() => {
+              textareaRef.current?.focus();
+              resizeTextarea();
+            }, 0);
+          }}
+        />
+      )}
       {quickQuery !== null && !quickClosed && (
         <QuickReplyPicker query={quickQuery} onPick={pickQuick} onClose={() => setQuickClosed(true)} />
       )}
