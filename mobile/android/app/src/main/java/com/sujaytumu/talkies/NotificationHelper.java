@@ -44,7 +44,7 @@ import java.util.Map;
  * Answer / Decline) and per-chat message notifications.
  */
 final class NotificationHelper {
-    static final String CH_CALLS = "talkies_calls_v4"; // v4: the phone's own ringtone (double ring) // v3: louder bundled Talkies ringtone (a channel's sound can't be changed once created)
+    static final String CH_CALLS = "talkies_calls_v5"; // v4: the phone's own ringtone (double ring) // v3: louder bundled Talkies ringtone (a channel's sound can't be changed once created)
     static final String CH_MESSAGES = "talkies_messages_v1";
     static final String CH_MISSED = "talkies_missed_v1";
     static final String SITE = "https://chat-app-jjcg.onrender.com";
@@ -244,6 +244,48 @@ final class NotificationHelper {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /** Called-out alert channel: pop-up only (the ring itself comes from the call channel or from CallRinger). */
+    private static final String CH_CALL_ALERT = "talkies_callalert_v1";
+
+    /** True when the phone has turned the call channel down (blocked / not a pop-up), so the call card would stay hidden. */
+    static boolean callChannelDegraded(Context ctx) {
+        try {
+            if (Build.VERSION.SDK_INT < 26) return false;
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return false;
+            NotificationChannel ch = nm.getNotificationChannel(callChannelId(ctx));
+            return ch != null && ch.getImportance() < NotificationManager.IMPORTANCE_HIGH;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Channel the incoming-call card is posted on. Normally the call channel. If the phone (or its battery/notification
+     * manager) has turned that channel down, the card would never show, only the ring would play. Then the card goes out
+     * on a separate always-pop-up channel instead, so it still appears like a real call.
+     */
+    static String postChannelId(Context ctx) {
+        String main = callChannelId(ctx);
+        if (Build.VERSION.SDK_INT < 26 || !callChannelDegraded(ctx)) return main;
+        try {
+            NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return main;
+            if (nm.getNotificationChannel(CH_CALL_ALERT) == null) {
+                NotificationChannel alert = new NotificationChannel(CH_CALL_ALERT, "Incoming call pop-up", NotificationManager.IMPORTANCE_HIGH);
+                alert.setDescription("Shows the incoming call card on screen");
+                alert.setSound(null, null);
+                alert.enableVibration(false);
+                alert.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+                nm.createNotificationChannel(alert);
+            }
+            NotificationChannel got = nm.getNotificationChannel(CH_CALL_ALERT);
+            if (got != null && got.getImportance() >= NotificationManager.IMPORTANCE_HIGH) return CH_CALL_ALERT;
+        } catch (Exception ignored) {
+        }
+        return main;
     }
 
     /** Id of the notification channel that carries the currently chosen call tone. */
@@ -452,7 +494,7 @@ final class NotificationHelper {
         screen.putExtra(IncomingCallActivity.EXTRA_STARTED, System.currentTimeMillis());
         screen.setData(Uri.parse("talkies://call/" + id));
         PendingIntent fullScreen = PendingIntent.getActivity(ctx, id + 3, screen, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, callChannelId(ctx))
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, postChannelId(ctx))
                 .setSmallIcon(R.drawable.ic_stat_talkies)
                 .setContentTitle(name)
                 .setContentText(body)
@@ -524,7 +566,7 @@ final class NotificationHelper {
             pb.setIcon(IconCompat.createWithBitmap(avatar));
         }
         Person caller = pb.build();
-        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, callChannelId(ctx))
+        NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, postChannelId(ctx))
                 .setSmallIcon(R.drawable.ic_stat_talkies)
                 .setColor(Color.parseColor("#00A884"))
                 .setContentTitle(name)
