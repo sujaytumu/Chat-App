@@ -29,6 +29,15 @@ const LoginPage = () => {
     let alive = true;
     getSavedLogin().then((s) => {
       if (alive && s) setFormData((f) => (f.email || f.password ? f : { email: s.email, password: s.password }));
+      else if (alive) {
+        // Browser: remember the last email for 30 days so only the password has to be typed (or filled by the password manager).
+        try {
+          const last = JSON.parse(localStorage.getItem("talkies-last-email") || "null");
+          if (last?.email && Date.now() - last.at < 30 * 86400000) setFormData((f) => (f.email ? f : { ...f, email: last.email }));
+        } catch {
+          /* storage blocked */
+        }
+      }
     });
     return () => {
       alive = false;
@@ -39,6 +48,13 @@ const LoginPage = () => {
     e.preventDefault();
     const ok = await login(formData);
     setLoginFailed(ok === false);
+    if (ok) {
+      try {
+        localStorage.setItem("talkies-last-email", JSON.stringify({ email: formData.email.trim(), at: Date.now() }));
+      } catch {
+        /* storage blocked */
+      }
+    }
   };
 
   return (
