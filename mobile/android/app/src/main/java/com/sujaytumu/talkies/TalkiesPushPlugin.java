@@ -129,6 +129,7 @@ public class TalkiesPushPlugin extends Plugin {
             fullScreen = nm != null && nm.canUseFullScreenIntent();
         }
         res.put("fullScreen", fullScreen);
+        res.put("callAlerts", !NotificationHelper.callChannelDegraded(getContext()));
         call.resolve(res);
     }
 
@@ -328,6 +329,27 @@ public class TalkiesPushPlugin extends Plugin {
             i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             c.startActivity(i);
         } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    /** Opens the settings page of the "Incoming calls" channel (set it to Pop-up / Urgent, sound on). */
+    @PluginMethod
+    public void openCallChannelSettings(PluginCall call) {
+        Context c = getContext();
+        try {
+            Intent i = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                    .putExtra(Settings.EXTRA_APP_PACKAGE, c.getPackageName())
+                    .putExtra(Settings.EXTRA_CHANNEL_ID, NotificationHelper.callChannelId(c));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, c.getPackageName());
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(i);
+            } catch (Exception ignored) {
+            }
         }
         call.resolve();
     }
