@@ -135,7 +135,7 @@ export const useAuthStore = create((set, get) => ({
       get().connectSocket();
       get().offerSavePassword(data);
     } catch (error) {
-      toast.error(error.response.data.message);
+      toast.error(error.response?.data?.message || "Couldn't create the account. Check your connection and try again.");
     } finally {
       set({ isSigningUp: false });
     }
