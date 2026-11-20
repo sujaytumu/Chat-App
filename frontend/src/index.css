@@ -414,3 +414,20 @@ button[aria-label="Send"], button[aria-label="Record voice message"], button[ari
 input:focus-visible, textarea:focus-visible { box-shadow: 0 0 0 3px rgb(37 211 102 / .22); }
 ::selection { background: rgb(37 211 102 / .35); }
 @media (prefers-reduced-motion: reduce) { .online-dot { animation: none; } }
+
+
+/* "N unread messages" line inside a chat: a soft glowing pill between two fading green lines. */
+.unread-divider { display: flex; align-items: center; gap: 10px; margin: 14px 8px; animation: unreadIn .45s cubic-bezier(.2,.8,.2,1) both; }
+.unread-line { flex: 1; height: 1px; }
+.unread-line-l { background: linear-gradient(90deg, transparent, rgba(37, 211, 102, .55)); }
+.unread-line-r { background: linear-gradient(270deg, transparent, rgba(37, 211, 102, .55)); }
+.unread-pill {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px 6px 10px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .01em; color: #eafff3;
+  background: linear-gradient(135deg, rgba(0, 168, 132, .92), rgba(37, 211, 102, .78));
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .14) inset, 0 4px 14px rgba(0, 168, 132, .35);
+}
+.unread-pill svg { animation: unreadBob 1.6s ease-in-out infinite; }
+@keyframes unreadIn { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes unreadBob { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(2px); } }
+@media (prefers-reduced-motion: reduce) { .unread-divider, .unread-pill svg { animation: none; } }

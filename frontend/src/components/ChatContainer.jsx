@@ -579,10 +579,13 @@ const ChatContainer = () => {
             >
             <div className={isFreshMsg(message._id) ? "msg-in" : undefined}>
             {unreadDividerId === message._id && unreadMark.count > 0 && (
-              <div className="flex justify-center my-3">
-                <span className="px-3 py-1 rounded-lg bg-wa-surface/90 text-wa-muted text-[11.5px] uppercase tracking-wide">
+              <div className="unread-divider" role="separator" aria-label={`${unreadMark.count} unread message${unreadMark.count > 1 ? "s" : ""}`}>
+                <span className="unread-line unread-line-l" />
+                <span className="unread-pill">
+                  <ChevronDown size={14} strokeWidth={3} aria-hidden />
                   {unreadMark.count} unread message{unreadMark.count > 1 ? "s" : ""}
                 </span>
+                <span className="unread-line unread-line-r" />
               </div>
             )}
             {showDateDivider && (
