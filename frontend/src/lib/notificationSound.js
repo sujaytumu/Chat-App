@@ -651,6 +651,23 @@ export function hasPhoneRing() {
   return !!nativePhone();
 }
 
+// Android app, app in the background, call arriving over the live connection: if the phone has not started its
+// own ring (card + sound) a moment later, ask the app to show the incoming-call card itself.
+export function ensureCallCard({ name, body, callerId, photo, callId, stillIncoming }) {
+  const p = nativePhone();
+  if (!p?.ensureCallCard || !callerId) return;
+  setTimeout(async () => {
+    try {
+      if (document.visibilityState === "visible") return; // the call screen is already in front
+      if (!stillIncoming?.()) return;
+      if (await isPhoneRinging()) return; // the push already did it
+      await p.ensureCallCard({ name: name || "Talkies", body: body || "Incoming call", callerId: String(callerId), photo: photo || "", callId: callId || "" });
+    } catch {
+      /* older app build without the method: nothing to do */
+    }
+  }, 1200);
+}
+
 export async function isPhoneRinging() {
   try {
     const p = nativePhone();

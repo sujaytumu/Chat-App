@@ -5,8 +5,8 @@ import { create } from "zustand";
 import toast from "react-hot-toast";
 import { useAuthStore } from "./useAuthStore";
 import { axiosInstance } from "../lib/axios";
-import { acquireCallMedia } from "../lib/callMedia";
-import { startRingtone, stopRingtoneSound, warmRingtone, vibrateCallEnded, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing } from "../lib/notificationSound";
+import { acquireCallMedia, getCallStream } from "../lib/callMedia";
+import { startRingtone, stopRingtoneSound, warmRingtone, vibrateCallEnded, startRingback, startCallingTone, startBusyTone, primeAudio, shouldLeaveToSystemAlert, isRingtoneActive, isPhoneRinging, stopPhoneRing, hasPhoneRing, ensureCallCard } from "../lib/notificationSound";
 import { isGroupCallBusy } from "../lib/callBusy";
 
 // STUN alone frequently fails to establish a working media path on mobile
@@ -85,12 +85,51 @@ function attachConnectionWatchdog(peerConnection, get) {
   let lastBytes = -1;
   let stalls = 0;
   let kicked = false;
+  // "They can't hear me" guard: packets can flow while the microphone itself is dead (another app or a phone call took
+  // it, a Bluetooth switch dropped it, the system muted it). When my mic track is ended or muted by the system for ~6 s,
+  // get a fresh microphone and swap it in without touching the call. At most 3 repairs per call.
+  let micBad = 0;
+  let micFixes = 0;
+  let micBusy = false;
+  const healMic = async () => {
+    if (micBusy || micFixes >= 3) return;
+    const sender = peerConnection.getSenders().find((sn) => sn.track?.kind === "audio");
+    const old = sender?.track;
+    if (!old) return;
+    if (old.readyState !== "ended" && !old.muted) {
+      micBad = 0;
+      return;
+    }
+    if (++micBad < 2) return;
+    micBusy = true;
+    try {
+      const stream = await getCallStream({ audio: AUDIO_CONSTRAINTS });
+      const fresh = stream.getAudioTracks()[0];
+      if (!fresh || peerConnection.signalingState === "closed") {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      fresh.enabled = old.enabled; // keeps the person's own mute / push-to-talk choice
+      await sender.replaceTrack(fresh);
+      tuneAudioSenders(peerConnection);
+      const ls = get().localStream;
+      useCallStore.setState({ localStream: new MediaStream([...(ls?.getTracks() || []).filter((t) => t.kind !== "audio"), fresh]) });
+      try { old.stop(); } catch { /* already ended */ }
+      micFixes++;
+      micBad = 0;
+    } catch {
+      /* the microphone is still held by something else: try again on the next checks */
+    } finally {
+      micBusy = false;
+    }
+  };
   const statsTimer = setInterval(async () => {
     if (peerConnection.signalingState === "closed" || peerConnection.connectionState === "closed") {
       clearInterval(statsTimer);
       return;
     }
     if (peerConnection.iceConnectionState !== "connected" && peerConnection.iceConnectionState !== "completed") return;
+    healMic();
     try {
       const stats = await peerConnection.getStats();
       let bytes = 0;
@@ -1124,6 +1163,17 @@ export const useCallStore = create((set, get) => ({
       // Tell the caller our device actually got the call and is ringing —
       // lets their screen switch from "Calling…" to "Ringing…"
       socket.emit("callRingingAck", { toUserId: fromUser._id, callId });
+
+      // Phone in the background and the push never produced the call card (a late or dropped push, an app the
+      // phone froze): the page puts the incoming-call notification up itself, so the call is never sound-only.
+      ensureCallCard({
+        name: fromUser.fullName,
+        body: callType === "video" ? "Incoming video call" : "Incoming voice call",
+        callerId: fromUser._id,
+        photo: fromUser.profilePic || "",
+        callId: callId || "",
+        stillIncoming: () => get().callStatus === "incoming" && !get().isAnswering && currentCallId === (callId || null),
+      });
 
       // They already pressed "Answer" on the notification: pick up right away
       // instead of ringing.
