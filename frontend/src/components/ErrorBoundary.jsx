@@ -98,4 +98,31 @@ class ErrorBoundary extends Component {
   }
 }
 
+// A tiny boundary for one piece of a screen (a single message bubble, the open chat pane): if it throws,
+// only that piece shows `fallback` — the rest of the app keeps working. It tries the piece again by itself
+// whenever `resetKey` changes (the message was updated, another chat was opened). No global listeners, so it is
+// cheap enough to wrap every message.
+export class SafeBlock extends Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error) {
+    console.error("Block crashed:", error);
+    const msg = String(error?.message || error || "");
+    if (CHUNK_RE.test(msg)) reloadForNewVersion();
+  }
+
+  componentDidUpdate(prev) {
+    if (this.state.failed && prev.resetKey !== this.props.resetKey) this.setState({ failed: false });
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return this.props.fallback ?? null;
+  }
+}
+
 export default ErrorBoundary;

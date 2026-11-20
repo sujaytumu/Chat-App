@@ -3,6 +3,7 @@ import { useBackToClose } from "../lib/useBackToClose";
 import Sidebar from "../components/Sidebar";
 import NoChatSelected from "../components/NoChatSelected";
 import ChatContainer from "../components/ChatContainer";
+import { SafeBlock } from "../components/ErrorBoundary";
 
 // Phone: either the chat list OR the open chat, full screen (like WhatsApp).
 // Desktop (lg+): list and chat side by side.
@@ -22,7 +23,23 @@ const HomePage = () => {
         <Sidebar />
       </div>
       <div className={`${selectedChat ? "flex chat-slide-in" : "hidden lg:flex"} flex-1 min-w-0 min-h-0`}>
-        {selectedChat ? <ChatContainer /> : <NoChatSelected />}
+        {selectedChat ? (
+          <SafeBlock
+            resetKey={`${selectedChat.type}:${selectedChat.data?._id}`}
+            fallback={
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6 text-center bg-wa-bg">
+                <p className="text-wa-text font-medium">This chat couldn't open.</p>
+                <button onClick={() => setSelectedChat(null)} className="px-4 py-2 rounded-lg bg-[#00A884] text-white text-sm">
+                  Back to chats
+                </button>
+              </div>
+            }
+          >
+            <ChatContainer />
+          </SafeBlock>
+        ) : (
+          <NoChatSelected />
+        )}
       </div>
     </div>
   );
