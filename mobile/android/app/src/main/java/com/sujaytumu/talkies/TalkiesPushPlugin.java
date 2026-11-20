@@ -268,6 +268,15 @@ public class TalkiesPushPlugin extends Plugin {
             String kind = call.getString("kind", "ringback");
             callTone = new android.media.ToneGenerator(android.media.AudioManager.STREAM_VOICE_CALL, 100);
             callTone.startTone("busy".equals(kind) ? android.media.ToneGenerator.TONE_SUP_BUSY : android.media.ToneGenerator.TONE_SUP_RINGTONE);
+            // Safety net: a ringback that nobody stopped must never carry on into a conversation (the page stops it
+            // at pick-up; this only matters if that stop was ever missed).
+            final android.media.ToneGenerator mine = callTone;
+            SOUND_MAIN.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    if (callTone == mine) stopCallToneNow();
+                }
+            }, 70_000);
         } catch (Exception ignored) {
         }
         call.resolve();
@@ -307,6 +316,23 @@ public class TalkiesPushPlugin extends Plugin {
     public void stopCallRing(PluginCall call) {
         try {
             NotificationHelper.stopAllRinging(getContext());
+        } catch (Exception ignored) {
+        }
+        call.resolve();
+    }
+
+    /**
+     * The page got a call over the live connection while the app is in the background and the push has not
+     * produced the call card: show it now (card + ring), exactly as the push would have.
+     */
+    @PluginMethod
+    public void ensureCallCard(PluginCall call) {
+        try {
+            String callerId = call.getString("callerId", "");
+            if (!callerId.isEmpty() && !NotificationHelper.isAnyRinging()) {
+                NotificationHelper.showIncomingCall(getContext(), call.getString("name", "Talkies"), call.getString("body", "Incoming call"),
+                        "incoming-call-" + callerId, callerId, call.getString("photo", ""), call.getString("callId", ""));
+            }
         } catch (Exception ignored) {
         }
         call.resolve();

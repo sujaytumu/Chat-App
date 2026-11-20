@@ -631,6 +631,24 @@ final class NotificationHelper {
         for (String t : tags) {
             cancel(ctx, t);
         }
+        // The call is over for this phone: nothing may keep ringing into the conversation. Also stop a ring the
+        // bookkeeping above lost track of (app process restarted, stale-entry cleanup) and any call card still up.
+        try {
+            CallRinger.stop();
+        } catch (Throwable ignored) {
+        }
+        try {
+            if (Build.VERSION.SDK_INT >= 23) {
+                NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+                if (nm != null) {
+                    for (android.service.notification.StatusBarNotification sbn : nm.getActiveNotifications()) {
+                        String chan = Build.VERSION.SDK_INT >= 26 ? sbn.getNotification().getChannelId() : null;
+                        if (chan != null && chan.startsWith("talkies_calls")) NotificationManagerCompat.from(ctx).cancel(sbn.getId());
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /** Replaces / removes whatever is shown for this tag (stops a ring). */
