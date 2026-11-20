@@ -35,7 +35,7 @@ const ChatVideo = ({ file, onError, onLoadedMetadata, overlay }) => {
         aria-label="Play video"
         onClick={() => setOpen(true)}
         onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
-        className="relative w-[250px] max-w-full overflow-hidden rounded-lg bg-black cursor-pointer select-none"
+        className="relative w-[260px] max-w-full overflow-hidden rounded-[15px] bg-black cursor-pointer select-none"
         style={{ aspectRatio: String(ratio) }}
       >
         <video

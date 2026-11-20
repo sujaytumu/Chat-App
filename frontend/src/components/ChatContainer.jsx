@@ -680,7 +680,7 @@ const ChatContainer = () => {
                   onMouseDown={(e) => {
                     if (e.detail > 1) e.preventDefault(); // no word-selection flash on the 2nd click
                   }}
-                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[68%] px-3 pt-2 pb-1.5 lg:px-3.5 lg:pt-2 lg:pb-2 rounded-[18px] break-words shadow-sm flex flex-col text-wa-text text-[15.5px] lg:text-[14.5px] leading-[1.35] ${
+                  className={`relative max-w-[82%] sm:max-w-[65%] lg:max-w-[68%] ${videoOverlay ? "p-[3px]" : "px-3 pt-2 pb-1.5 lg:px-3.5 lg:pt-2 lg:pb-2"} rounded-[18px] break-words shadow-sm flex flex-col text-wa-text text-[15.5px] lg:text-[14.5px] leading-[1.35] ${
                     isMe ? "bg-wa-out bubble-out" : "bg-wa-surface bubble-in"
                   } ${
                     isFirstInGroup ? (isMe ? "rounded-tr-none bubble-tail-out" : "rounded-tl-none bubble-tail-in") : ""
@@ -688,7 +688,7 @@ const ChatContainer = () => {
                 >
                   {isGroup && !isMe && isFirstInGroup && (
                     <span
-                      className="text-[11px] font-medium mb-0.5"
+                      className={`text-[11px] font-medium mb-0.5 ${videoOverlay ? "px-2 pt-1" : ""}`}
                       style={{ color: colorForId(message.senderId, !!activeTheme) }}
                     >
                       {sender?.fullName || "Unknown"}
