@@ -1,10 +1,11 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
-import { getCallHistory, getIceConfig, declineCall, clearCallHistory, createCallLink, myCallLinks, getCallLink, deleteCallLink } from "../controllers/call.controller.js";
+import { getCallHistory, getCallStats, getIceConfig, declineCall, clearCallHistory, createCallLink, myCallLinks, getCallLink, deleteCallLink } from "../controllers/call.controller.js";
 
 const router = express.Router();
 
 router.get("/", protectRoute, getCallHistory);
+router.get("/stats", protectRoute, getCallStats);
 router.delete("/", protectRoute, clearCallHistory);
 router.get("/ice-config", protectRoute, getIceConfig);
 router.get("/links", protectRoute, myCallLinks);

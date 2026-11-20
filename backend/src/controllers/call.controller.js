@@ -23,6 +23,103 @@ export const getCallHistory = async (req, res) => {
   }
 };
 
+// Call statistics for the signed-in person: totals, and who they talk to most.
+// GET /api/calls/stats?days=7|30|90|365  (no days = all time). Read-only: nothing else depends on it.
+export const getCallStats = async (req, res) => {
+  try {
+    const myId = new mongoose.Types.ObjectId(String(req.user._id)); // aggregation does not cast ids by itself
+    const days = [7, 30, 90, 365].includes(parseInt(req.query.days, 10)) ? parseInt(req.query.days, 10) : 0;
+    const match = { $or: [{ callerId: myId }, { calleeId: myId }], hiddenFor: { $ne: myId } };
+    if (days) match.createdAt = { $gte: new Date(Date.now() - days * 24 * 3600 * 1000) };
+
+    const rows = await CallLog.aggregate([
+      { $match: match },
+      {
+        $addFields: {
+          iCalled: { $eq: ["$callerId", myId] },
+          peer: { $cond: [{ $eq: ["$callerId", myId] }, "$calleeId", "$callerId"] },
+          secs: { $cond: [{ $eq: ["$status", "answered"] }, { $ifNull: ["$durationSeconds", 0] }, 0] },
+        },
+      },
+      {
+        $facet: {
+          totals: [
+            {
+              $group: {
+                _id: null,
+                calls: { $sum: 1 },
+                answered: { $sum: { $cond: [{ $eq: ["$status", "answered"] }, 1, 0] } },
+                outgoing: { $sum: { $cond: ["$iCalled", 1, 0] } },
+                incoming: { $sum: { $cond: ["$iCalled", 0, 1] } },
+                missedIncoming: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "missed"] }, { $not: ["$iCalled"] }] }, 1, 0] } },
+                noAnswerOutgoing: { $sum: { $cond: [{ $and: [{ $eq: ["$status", "missed"] }, "$iCalled"] }, 1, 0] } },
+                declined: { $sum: { $cond: [{ $eq: ["$status", "declined"] }, 1, 0] } },
+                video: { $sum: { $cond: [{ $eq: ["$callType", "video"] }, 1, 0] } },
+                audio: { $sum: { $cond: [{ $eq: ["$callType", "audio"] }, 1, 0] } },
+                totalSeconds: { $sum: "$secs" },
+                longestSeconds: { $max: "$secs" },
+                dataBytes: { $sum: { $ifNull: ["$dataBytes", 0] } },
+              },
+            },
+          ],
+          people: [
+            {
+              $group: {
+                _id: "$peer",
+                calls: { $sum: 1 },
+                answered: { $sum: { $cond: [{ $eq: ["$status", "answered"] }, 1, 0] } },
+                missed: { $sum: { $cond: [{ $eq: ["$status", "missed"] }, 1, 0] } },
+                totalSeconds: { $sum: "$secs" },
+                lastCallAt: { $max: "$createdAt" },
+              },
+            },
+            { $sort: { totalSeconds: -1, calls: -1 } },
+            { $limit: 10 },
+          ],
+          byHour: [{ $group: { _id: { $hour: "$createdAt" }, calls: { $sum: 1 } } }, { $sort: { calls: -1 } }, { $limit: 1 }],
+        },
+      },
+    ]);
+
+    const t = rows[0]?.totals?.[0] || {};
+    const totals = {
+      calls: t.calls || 0,
+      answered: t.answered || 0,
+      outgoing: t.outgoing || 0,
+      incoming: t.incoming || 0,
+      missedIncoming: t.missedIncoming || 0,
+      noAnswerOutgoing: t.noAnswerOutgoing || 0,
+      declined: t.declined || 0,
+      video: t.video || 0,
+      audio: t.audio || 0,
+      totalSeconds: t.totalSeconds || 0,
+      averageSeconds: t.answered ? Math.round((t.totalSeconds || 0) / t.answered) : 0,
+      longestSeconds: t.longestSeconds || 0,
+      dataBytes: t.dataBytes || 0,
+    };
+
+    const peers = rows[0]?.people || [];
+    const User = mongoose.model("User");
+    const users = await User.find({ _id: { $in: peers.map((p) => p._id) } }).select("fullName profilePic").lean();
+    const byId = new Map(users.map((u) => [String(u._id), u]));
+    const topPeople = peers
+      .filter((p) => byId.has(String(p._id)))
+      .map((p) => ({
+        user: byId.get(String(p._id)),
+        calls: p.calls,
+        answered: p.answered,
+        missed: p.missed,
+        totalSeconds: p.totalSeconds,
+        lastCallAt: p.lastCallAt,
+      }));
+
+    res.status(200).json({ days: days || null, totals, topPeople, busiestHour: rows[0]?.byHour?.[0]?._id ?? null });
+  } catch (error) {
+    console.log("Error in getCallStats controller:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // "Clear call log": hides every entry from MY list only.
 export const clearCallHistory = async (req, res) => {
   try {
