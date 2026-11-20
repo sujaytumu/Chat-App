@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FileText, Download, AlertCircle } from "lucide-react";
 import VoiceMessagePlayer from "./VoiceMessagePlayer";
-import SpeedVideo from "./SpeedVideo";
+import ChatVideo from "./ChatVideo";
 import VideoNotePlayer from "./VideoNotePlayer";
 import { formatFileSize, fileIconKind } from "../lib/fileUtils";
 
@@ -28,7 +28,7 @@ const DownloadFallbackCard = ({ file, label }) => (
 // downloadable document card. Falls back to a download card if the
 // browser can't actually play the video/audio format (common across
 // different browsers/devices for recorded voice notes and videos).
-const AttachmentContent = ({ file, onMediaLoaded, incoming, messageId, transcript }) => {
+const AttachmentContent = ({ file, onMediaLoaded, incoming, messageId, transcript, overlay }) => {
   const [videoFailed, setVideoFailed] = useState(false);
   const [audioFailed, setAudioFailed] = useState(false);
 
@@ -37,17 +37,7 @@ const AttachmentContent = ({ file, onMediaLoaded, incoming, messageId, transcrip
   if (file.type === "video") {
     if (videoFailed) return <DownloadFallbackCard file={file} label="Video" />;
     if (file.videoNote) return <VideoNotePlayer file={file} onError={() => setVideoFailed(true)} onLoadedMetadata={onMediaLoaded} />;
-    return (
-      <SpeedVideo
-        wrapperClassName="mb-1 max-w-[240px]"
-        src={file.url}
-        controls
-        preload="metadata"
-        onError={() => setVideoFailed(true)}
-        onLoadedMetadata={onMediaLoaded}
-        className="max-w-[240px] rounded-md bg-black"
-      />
-    );
+    return <ChatVideo file={file} overlay={overlay} onError={() => setVideoFailed(true)} onLoadedMetadata={onMediaLoaded} />;
   }
 
   if (file.type === "audio") {
