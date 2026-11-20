@@ -545,6 +545,8 @@ const ChatContainer = () => {
           // little extra space above it, like WhatsApp.
           const isFirstInGroup = showDateDivider || !prev || prev.senderId !== message.senderId;
           const hasText = !!message.text && !location && !message.poll && !message.event && !message.expense && !message.liveLocation && !message.contact && !message.payment;
+          // a plain video (no caption) wears its time and ticks on top of the picture, like WhatsApp
+          const videoOverlay = message.file?.type === "video" && !message.file.videoNote && !hasText && !message.image && !message.deletedForEveryone && !message.viewOnce;
 
           const menuProps = {
             message,
@@ -786,7 +788,24 @@ const ChatContainer = () => {
                   {message.image && (
                     <ChatPhoto src={message.image} mine={isMe} onLoad={handleMediaLoaded} onOpen={() => setLightboxSrc(message.image)} />
                   )}
-                  {message.file && <AttachmentContent file={message.file} incoming={!isMe} onMediaLoaded={handleMediaLoaded} messageId={message._id} transcript={message.transcript?.text} />}
+                  {message.file && (
+                    <AttachmentContent
+                      file={message.file}
+                      incoming={!isMe}
+                      onMediaLoaded={handleMediaLoaded}
+                      messageId={message._id}
+                      transcript={message.transcript?.text}
+                      overlay={
+                        videoOverlay ? (
+                          <>
+                            {formatMessageTime(message.createdAt)}
+                            {isMe && !isGroup && <MessageTicks message={message} />}
+                            {isMe && isGroup && <GroupMessageTicks message={message} members={data.members} senderId={authUser._id} />}
+                          </>
+                        ) : null
+                      }
+                    />
+                  )}
                   {message.payment ? (
                     <PaymentCard message={message} isMe={isMe} />
                   ) : message.contact ? (
@@ -855,6 +874,7 @@ const ChatContainer = () => {
                       </>
                     )
                   )}
+                  {!videoOverlay && (
                   <span
                     className={`${
                       hasText || (message.viewOnce && !message.image) ? "absolute bottom-1 right-2 lg:bottom-1.5 lg:right-3" : "self-end mt-0.5"
@@ -867,6 +887,7 @@ const ChatContainer = () => {
                       <GroupMessageTicks message={message} members={data.members} senderId={authUser._id} />
                     )}
                   </span>
+                  )}
                 </div>
               )}
 
