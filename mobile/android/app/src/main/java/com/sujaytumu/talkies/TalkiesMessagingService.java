@@ -87,6 +87,10 @@ public class TalkiesMessagingService extends FirebaseMessagingService {
         // ringtone volume (and keeps going, unbroken, when the app is opened).
         if (MainActivity.visible && !isCall) return;
 
+        // Already talking on a Talkies call: nothing may ring or pop up over the conversation (a late push of the
+        // same call, or a second caller — the page tells that caller "busy" over its live connection).
+        if (isCall && MainActivity.callActive) return;
+
         String title = nz(d.get("title"));
         String body = nz(d.get("body"));
         String chatId = nz(d.get("chatId"));

@@ -513,6 +513,15 @@ final class NotificationHelper {
         // then came back): stay silent, exactly like a real call that was hung up.
         if (wasCancelled(callId)) return;
         appCtx = ctx.getApplicationContext();
+        pruneStaleRinging();
+        // The same call announced twice (FCM redelivery, the page's own card after the push, a server retry):
+        // one ring only. Re-posting would cancel the card and start the tune over (a double / restarted ring).
+        if (callId != null && !callId.isEmpty()) {
+            synchronized (RINGING) {
+                String cur = RINGING.get(tag == null ? "" : tag);
+                if (callId.equals(cur) && callNotificationShown(ctx, idFor(tag))) return;
+            }
+        }
         synchronized (RINGING) {
             RINGING.put(tag == null ? "" : tag, callId == null ? "" : callId);
             RING_AT.put(tag == null ? "" : tag, System.currentTimeMillis());
@@ -627,6 +636,8 @@ final class NotificationHelper {
         java.util.List<String> tags;
         synchronized (RINGING) {
             tags = new java.util.ArrayList<String>(RINGING.keySet());
+            // answered / declined inside the app: a late or re-delivered push for these calls must stay silent
+            for (String cid : RINGING.values()) markCancelled(cid);
         }
         for (String t : tags) {
             cancel(ctx, t);
