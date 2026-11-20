@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, ArrowLeft, Download, Forward } from "lucide-react";
+import { Play, Pause, ArrowLeft, Download, Forward, Send } from "lucide-react";
+import { useChatStore } from "../store/useChatStore";
 
 const fmt = (s) => {
   const n = Math.max(0, Math.round(Number(s) || 0));
@@ -31,7 +32,22 @@ const whenLabel = (d) => {
 
 // Full-screen viewer in WhatsApp's layout: back arrow with name and time, download/forward on the top bar,
 // a big round play/pause in the middle, and a green seek bar with times and speed at the bottom.
-const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose }) => {
+const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose, message }) => {
+  const [reply, setReply] = useState("");
+  const sendReply = async (e) => {
+    e?.preventDefault();
+    const t = reply.trim();
+    if (!t || !message) return;
+    setReply("");
+    onClose();
+    useChatStore.getState().setReplyingTo(message);
+    try { await useChatStore.getState().sendMessage({ text: t }); } catch { /* toast shown by store */ }
+  };
+  const react = (emoji) => {
+    if (!message?._id) return;
+    useChatStore.getState().reactToMessage(message._id, emoji);
+    onClose();
+  };
   const vref = useRef(null);
   const hideT = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -85,7 +101,7 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose }) => {
           setPlaying(false);
           poke(false);
         }}
-        className="absolute inset-0 size-full object-contain"
+        className="absolute inset-x-0 top-0 bottom-[72px] size-full object-contain" style={{ height: "calc(100% - 72px)" }}
       />
 
       <div className={`absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent pt-[env(safe-area-inset-top)] transition-opacity duration-200 ${chrome ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={(e) => e.stopPropagation()}>
@@ -102,7 +118,7 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose }) => {
         </div>
       </div>
 
-      <div className={`absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-200 ${chrome || !playing ? "opacity-100" : "opacity-0"}`}>
+      <div className={`absolute inset-x-0 top-0 bottom-[72px] flex items-center justify-center pointer-events-none transition-opacity duration-200 ${chrome || !playing ? "opacity-100" : "opacity-0"}`}>
         <button
           type="button"
           aria-label={playing ? "Pause" : "Play"}
@@ -113,7 +129,7 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose }) => {
         </button>
       </div>
 
-      <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent pb-[max(14px,env(safe-area-inset-bottom))] pt-10 transition-opacity duration-200 ${chrome || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`absolute inset-x-0 bottom-[72px] bg-gradient-to-t from-black/70 to-transparent pb-3 pt-10 transition-opacity duration-200 ${chrome || !playing ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 px-4 text-white text-[14px] tabular-nums">
           <span className="w-11">{fmt(cur)}</span>
           <input
@@ -131,13 +147,35 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose }) => {
           <button type="button" onClick={cycleSpeed} aria-label="Playback speed" className="w-10 text-right font-medium">{rate}x</button>
         </div>
       </div>
+
+      {message && (
+        <form onSubmit={sendReply} onClick={(e) => e.stopPropagation()} className="absolute inset-x-0 bottom-0 h-[72px] bg-black px-3 pb-[env(safe-area-inset-bottom)] flex items-center">
+          <div className="flex w-full items-center rounded-full bg-[#202c33] pl-5 pr-2 h-[52px]">
+            <input
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              onFocus={() => vref.current?.pause()}
+              placeholder="Reply"
+              className="min-w-0 flex-1 bg-transparent text-[17px] text-white placeholder:text-white/40 outline-none"
+            />
+            {reply.trim() ? (
+              <button type="submit" aria-label="Send reply" className="size-10 rounded-full bg-[#25D366] flex items-center justify-center text-white"><Send size={19} /></button>
+            ) : (
+              <>
+                <button type="button" onClick={() => react("❤️")} aria-label="React with heart" className="size-10 text-[26px] leading-none active:scale-90 transition-transform">❤️</button>
+                <button type="button" onClick={() => react("🙏")} aria-label="React with folded hands" className="size-10 text-[26px] leading-none active:scale-90 transition-transform">🙏</button>
+              </>
+            )}
+          </div>
+        </form>
+      )}
     </div>
   );
 };
 
 // A video in the chat, like WhatsApp: a picture of the video with a play button, the length and HD badge at the
 // bottom left, and the time and ticks laid over the bottom right. Tap to watch it full screen.
-const ChatVideo = ({ file, onError, onLoadedMetadata, overlay, title, sentAt, onForward }) => {
+const ChatVideo = ({ file, onError, onLoadedMetadata, overlay, title, sentAt, onForward, message }) => {
   const [open, setOpen] = useState(false);
   const [meta, setMeta] = useState({ w: 0, h: 0, d: Number(file.duration) || 0 });
   const poster = posterFor(file.url);
@@ -190,7 +228,7 @@ const ChatVideo = ({ file, onError, onLoadedMetadata, overlay, title, sentAt, on
         {overlay && <div className="absolute right-2 bottom-1.5 flex items-center gap-1 text-white text-[11px] leading-none pointer-events-none">{overlay}</div>}
       </div>
 
-      {open && <VideoViewer file={file} poster={poster} title={title} sentAt={sentAt} onForward={onForward} onClose={() => setOpen(false)} />}
+      {open && <VideoViewer file={file} poster={poster} title={title} sentAt={sentAt} onForward={onForward} message={message} onClose={() => setOpen(false)} />}
     </>
   );
 };

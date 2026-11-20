@@ -800,6 +800,7 @@ const ChatContainer = () => {
                       transcript={message.transcript?.text}
                       title={isMe ? "You" : sender?.fullName || data?.fullName}
                       sentAt={message.createdAt}
+                      message={message}
                       onForward={() => setForwardingMessage(message)}
                       overlay={
                         videoOverlay ? (
