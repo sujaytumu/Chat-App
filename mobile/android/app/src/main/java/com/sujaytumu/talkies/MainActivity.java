@@ -173,6 +173,7 @@ public class MainActivity extends BridgeActivity {
         showOverLockScreenIfCall(intent);
         TalkiesPushPlugin.handleIntent(intent);
         handlePayReturn(intent);
+        ShareHelper.handle(this, intent);
     }
 
     @Override
@@ -207,6 +208,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         TalkiesPushPlugin.handleIntent(getIntent());
         handlePayReturn(getIntent());
+        ShareHelper.handle(this, getIntent());
 
         // Make the page render exactly as it does in Chrome: ignore the system
         // font-size scaling, no forced dark mode, no overscroll glow/scrollbars.

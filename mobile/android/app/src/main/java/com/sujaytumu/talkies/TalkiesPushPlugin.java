@@ -40,6 +40,38 @@ public class TalkiesPushPlugin extends Plugin {
     }
 
     /** Called by MainActivity for every launch / new intent. */
+    /** The page is told a share arrived (it picks the chat); a page that isn't loaded yet asks with getShared(). */
+    static void notifyShared(JSObject data) {
+        try {
+            if (instance != null) instance.notifyListeners("sharedContent", data, true);
+        } catch (Exception ignored) {
+        }
+    }
+
+    @PluginMethod
+    public void getShared(PluginCall call) {
+        JSObject cur = ShareHelper.get();
+        call.resolve(cur != null ? cur : new JSObject());
+    }
+
+    @PluginMethod
+    public void readShared(PluginCall call) {
+        try {
+            String id = call.getString("id", "");
+            long offset = call.getLong("offset", 0L);
+            int length = call.getInt("length", 786432);
+            call.resolve(ShareHelper.readChunk(getContext(), id, offset, length));
+        } catch (Exception e) {
+            call.reject("Couldn't read the shared file");
+        }
+    }
+
+    @PluginMethod
+    public void clearShared(PluginCall call) {
+        ShareHelper.clear(getContext());
+        call.resolve();
+    }
+
     static void handleIntent(Intent intent) {
         if (intent == null || !intent.hasExtra("tk_action")) return;
         JSObject o = new JSObject();
