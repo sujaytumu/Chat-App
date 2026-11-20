@@ -160,11 +160,16 @@ const ChatVideo = ({ file, onError, onLoadedMetadata, overlay, title, sentAt, on
         <video
           src={`${file.url}#t=0.1`}
           poster={poster}
-          preload="metadata"
+          preload="auto"
           muted
           playsInline
           tabIndex={-1}
           onError={onError}
+          onLoadedData={(e) => {
+            // some Android WebViews leave the video black until it is nudged to a real frame
+            const v = e.currentTarget;
+            if (v.paused && v.currentTime < 0.05) { try { v.currentTime = 0.1; } catch { /* ignore */ } }
+          }}
           onLoadedMetadata={(e) => {
             const v = e.currentTarget;
             setMeta((m) => ({ w: v.videoWidth || m.w, h: v.videoHeight || m.h, d: Number.isFinite(v.duration) ? v.duration : m.d }));
@@ -172,9 +177,9 @@ const ChatVideo = ({ file, onError, onLoadedMetadata, overlay, title, sentAt, on
           }}
           className="absolute inset-0 size-full object-cover pointer-events-none"
         />
-        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/55 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="size-[40px] rounded-full bg-black/45 backdrop-blur-[2px] flex items-center justify-center">
+          <span className="size-[40px] rounded-full bg-black/35 flex items-center justify-center">
             <Play size={20} className="text-white ml-0.5" fill="currentColor" />
           </span>
         </div>
