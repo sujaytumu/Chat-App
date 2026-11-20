@@ -18,6 +18,7 @@ import {
   BarChart3,
   UserRound,
   Smile,
+  Keyboard,
   Camera,
   CalendarDays,
   Receipt,
@@ -390,7 +391,15 @@ const MessageInput = () => {
 
   const handleEmojiSelect = (emoji) => {
     setText((prev) => prev + emoji);
-    textareaRef.current?.focus();
+  };
+
+  const handleEmojiBackspace = () => {
+    setText((prev) => {
+      const parts = typeof Intl !== "undefined" && Intl.Segmenter
+        ? Array.from(new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(prev), (x) => x.segment)
+        : Array.from(prev);
+      return parts.slice(0, -1).join("");
+    });
   };
 
   const handleStickerSelect = async (sticker) => {
@@ -1243,21 +1252,20 @@ const MessageInput = () => {
             <div className="relative order-1 lg:order-1">
               <button
                 type="button"
-                onClick={() => setShowEmojiPicker((s) => !s)}
+                onClick={() => {
+                  if (showEmojiPicker) {
+                    setShowEmojiPicker(false);
+                    setTimeout(() => textareaRef.current?.focus(), 0);
+                  } else {
+                    textareaRef.current?.blur();
+                    setShowEmojiPicker(true);
+                  }
+                }}
                 className="size-10 rounded-full flex items-center justify-center text-wa-muted hover:bg-white/10 active:bg-white/15 transition-colors shrink-0"
-                aria-label="Emoji and stickers"
+                aria-label={showEmojiPicker ? "Show keyboard" : "Emoji and stickers"}
               >
-                <Smile size={24} />
+                {showEmojiPicker ? <Keyboard size={24} /> : <Smile size={24} />}
               </button>
-              {showEmojiPicker && (
-                <Suspense fallback={null}>
-                  <EmojiStickerPicker
-                    onEmojiSelect={handleEmojiSelect}
-                    onStickerSelect={handleStickerSelect}
-                    onClose={() => setShowEmojiPicker(false)}
-                  />
-                </Suspense>
-              )}
             </div>
 
             {hasSel && (
@@ -1362,6 +1370,18 @@ const MessageInput = () => {
           </button>
         )}
       </form>
+      {showEmojiPicker && (
+        <div className="-mx-2 sm:-mx-3 lg:-mx-4 mt-1.5 -mb-[max(0.5rem,env(safe-area-inset-bottom))] lg:-mb-2.5">
+          <Suspense fallback={null}>
+            <EmojiStickerPicker
+              onEmojiSelect={handleEmojiSelect}
+              onStickerSelect={handleStickerSelect}
+              onBackspace={handleEmojiBackspace}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          </Suspense>
+        </div>
+      )}
     </div>
   );
 };
