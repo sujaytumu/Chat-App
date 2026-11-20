@@ -49,6 +49,7 @@ import Avatar from "./Avatar";
 import ChatSearchBar from "./ChatSearchBar";
 import { optimizeImage } from "../lib/cdn";
 import ChatPhoto from "./ChatPhoto";
+import { SafeBlock } from "./ErrorBoundary";
 const ReminderSheet = lazyDialog(() => import("./ReminderSheet"));
 const ForwardMessageModal = lazyDialog(() => import("./ForwardMessageModal"));
 
@@ -306,7 +307,7 @@ const ChatContainer = () => {
   };
 
   const membersById = isGroup
-    ? Object.fromEntries(data.members.map((m) => [m._id, m]))
+    ? Object.fromEntries((data.members || []).filter(Boolean).map((m) => [m._id, m]))
     : {};
   // Names for bill cards: the group's members, or the two people in a 1:1 chat.
   const billPeople = isGroup ? membersById : { [authUser._id]: authUser, [data._id]: data };
@@ -569,7 +570,12 @@ const ChatContainer = () => {
           };
 
           return (
-            <div key={message._id} className={isFreshMsg(message._id) ? "msg-in" : undefined}>
+            <SafeBlock
+              key={message._id}
+              resetKey={`${message._id}:${message.updatedAt || ""}:${message.deletedForEveryone ? 1 : 0}:${message.reactions?.length || 0}:${message.editedAt || ""}`}
+              fallback={<div className="px-3 py-1 text-center text-[11px] text-wa-muted">This message couldn't be shown</div>}
+            >
+            <div className={isFreshMsg(message._id) ? "msg-in" : undefined}>
             {unreadDividerId === message._id && unreadMark.count > 0 && (
               <div className="flex justify-center my-3">
                 <span className="px-3 py-1 rounded-lg bg-wa-surface/90 text-wa-muted text-[11.5px] uppercase tracking-wide">
@@ -897,6 +903,7 @@ const ChatContainer = () => {
               </div>
             )}
             </div>
+            </SafeBlock>
           );
         })}
 
