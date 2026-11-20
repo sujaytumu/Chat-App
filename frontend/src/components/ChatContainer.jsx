@@ -798,6 +798,9 @@ const ChatContainer = () => {
                       onMediaLoaded={handleMediaLoaded}
                       messageId={message._id}
                       transcript={message.transcript?.text}
+                      title={isMe ? "You" : sender?.fullName || data?.fullName}
+                      sentAt={message.createdAt}
+                      onForward={() => setForwardingMessage(message)}
                       overlay={
                         videoOverlay ? (
                           <>
