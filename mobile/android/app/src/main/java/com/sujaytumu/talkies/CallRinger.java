@@ -149,7 +149,7 @@ final class CallRinger {
     /** Stops only if it is ringing for this tag (or for any, when tag is empty). */
     static void stopFor(String tag) {
         synchronized (LOCK) {
-            if (tag != null && !tag.isEmpty() && activeTag != null && !tag.equals(activeTag)) return;
+            if (tag != null && !tag.isEmpty() && activeTag != null && !tag.equals(activeTag) && !"inapp-call".equals(activeTag)) return;
         }
         stop();
         try {
