@@ -101,6 +101,8 @@ export const getUsersForSidebar = async (req, res) => {
             deletedFor: { $ne: loggedInUserId },
             createdAt: { $gte: new Date(Date.now() - 45 * 864e5) }, // recent window keeps this fast however long the history is; quiet chats are filled in below
             $or: [{ senderId: loggedInUserId }, { receiverId: loggedInUserId }],
+            // a disappearing message that has already expired is gone from the chat, so it must not be the preview either
+            $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }],
           },
         },
         { $sort: { createdAt: -1 } },
@@ -117,6 +119,7 @@ export const getUsersForSidebar = async (req, res) => {
             senderId: { $first: "$senderId" },
             delivered: { $first: "$delivered" },
             seen: { $first: "$seen" },
+            expiresAt: { $first: "$expiresAt" },
           },
         },
       ]),
@@ -137,9 +140,10 @@ export const getUsersForSidebar = async (req, res) => {
             system: null,
             deletedFor: { $ne: loggedInUserId },
             $or: [{ senderId: loggedInUserId, receiverId: u._id }, { senderId: u._id, receiverId: loggedInUserId }],
+            $and: [{ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }],
           })
             .sort({ createdAt: -1 })
-            .select("text image viewOnce file createdAt senderId delivered seen")
+            .select("text image viewOnce file createdAt senderId delivered seen expiresAt")
             .lean()
         )
       );
@@ -182,6 +186,7 @@ export const getUsersForSidebar = async (req, res) => {
               file: lm.file,
               createdAt: lm.createdAt,
               senderId: lm.senderId,
+              expiresAt: lm.expiresAt || null,
               delivered: lm.delivered,
               seen: hideSeen && String(lm.senderId) === String(loggedInUserId) ? false : lm.seen,
             }

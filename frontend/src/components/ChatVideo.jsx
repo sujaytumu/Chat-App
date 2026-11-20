@@ -35,7 +35,7 @@ const ChatVideo = ({ file, onError, onLoadedMetadata, overlay }) => {
         aria-label="Play video"
         onClick={() => setOpen(true)}
         onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
-        className="relative w-[260px] max-w-full overflow-hidden rounded-[15px] bg-black cursor-pointer select-none"
+        className="relative w-[182px] max-w-full overflow-hidden rounded-[15px] bg-black cursor-pointer select-none"
         style={{ aspectRatio: String(ratio) }}
       >
         <video
@@ -55,11 +55,11 @@ const ChatVideo = ({ file, onError, onLoadedMetadata, overlay }) => {
         />
         <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/55 to-transparent pointer-events-none" />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="size-[52px] rounded-full bg-black/45 backdrop-blur-[2px] flex items-center justify-center">
-            <Play size={26} className="text-white ml-0.5" fill="currentColor" />
+          <span className="size-[40px] rounded-full bg-black/45 backdrop-blur-[2px] flex items-center justify-center">
+            <Play size={20} className="text-white ml-0.5" fill="currentColor" />
           </span>
         </div>
-        <div className="absolute left-2 bottom-1.5 flex items-center gap-1.5 text-white text-[12.5px] font-semibold leading-none pointer-events-none">
+        <div className="absolute left-2 bottom-1.5 flex items-center gap-1.5 text-white text-[11.5px] font-semibold leading-none pointer-events-none">
           {hd && <span className="rounded-[3px] bg-white px-1 py-[2px] text-[10px] font-extrabold tracking-wide text-black">HD</span>}
           {meta.d > 0 && <span className="tabular-nums drop-shadow">{fmt(meta.d)}</span>}
         </div>

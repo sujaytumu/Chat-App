@@ -231,6 +231,18 @@ const Sidebar = () => {
   const pinnedSet = useMemo(() => new Set(pinnedKeys || []), [pinnedKeys]);
   const lockedSet = useMemo(() => new Set(authUser?.lockedChats || []), [authUser?.lockedChats]);
   const mutedKeys = authUser?.mutedChats;
+  // A disappearing message that was the chat's last one expires: reload the list so the preview shows the real last message
+  // (the chat screen already hides it, so the two used to disagree).
+  useEffect(() => {
+    const times = users.map((u) => (u.lastMessage?.expiresAt ? new Date(u.lastMessage.expiresAt).getTime() : 0)).filter((t) => t > 0);
+    if (!times.length) return;
+    const next = Math.min(...times);
+    // already past (or the phone clock is off): look again in 20 s, never in a tight loop
+    const wait = next > Date.now() ? next - Date.now() + 1500 : 20000;
+    const timer = setTimeout(() => getUsers(), Math.min(wait, 2 ** 31 - 1));
+    return () => clearTimeout(timer);
+  }, [users, getUsers]);
+
   const unreadMarkedSet = useMemo(() => new Set(authUser?.markedUnread || []), [authUser?.markedUnread]);
   const mutedSet = useMemo(() => new Set(mutedKeys || []), [mutedKeys]);
 
