@@ -433,8 +433,8 @@ const duo = (start, dur) => [
   { freq: 440, dur, gain: 0.2, type: "sine", start },
   { freq: 480, dur, gain: 0.2, type: "sine", start },
 ];
-const CALLING_STEPS = [...duo(0, 1.1)]; // ONE soft "tuuu" while connecting
-const RINGING_STEPS = [...duo(0, 0.45), ...duo(0.65, 0.45)]; // "tu-tu" once their phone rings
+const CALLING_STEPS = [...duo(0, 0.18)]; // ONE short tap while connecting
+const RINGING_STEPS = [...duo(0, 0.2), ...duo(0.4, 0.2)]; // TWO quick taps once their phone rings
 const BUSY_STEPS = [
   { freq: 480, dur: 0.9, gain: 0.12, type: "sine", start: 0 },
   { freq: 620, dur: 0.9, gain: 0.08, type: "sine", start: 0 },
