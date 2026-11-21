@@ -71,6 +71,18 @@ export const refreshOnline = () => io.emit("getOnlineUsers", onlineIds());
 const onlineIds = () => [...userSockets.keys()].filter((id) => isPresent(id) && privacyCache.get(id)?.online !== false);
 const canSignal = (from, to) => !privacyCache.get(to)?.blocked.has(from) && !privacyCache.get(from)?.blocked.has(to);
 const roomFor = (id) => (isOnline(id) ? id : undefined);
+// Call signalling (connection candidates, renegotiation, mic/camera state) is only relayed between the two people
+// of a call that really exists, so nobody can push signals into a stranger's call.
+// A caller's first connection candidates can arrive while "callUser" is still being checked (before the call is
+// recorded), so a call being placed counts for a few seconds too.
+const callIntent = new Map(); // pairKey -> time the caller started placing the call
+const inCallWith = (a, b) => {
+  if (typeof b !== "string" && typeof b !== "number") return false;
+  const key = pairKey(a, String(b));
+  if (activeCalls.has(key)) return true;
+  const t = callIntent.get(key);
+  return !!t && Date.now() - t < 10000;
+};
 const DISCONNECT_CALL_GRACE_MS = 8000;
 
 // Incoming-call push: Answer / Decline buttons on the notification, delivered
@@ -384,6 +396,11 @@ io.on("connection", (socket) => {
   // ---- WebRTC call signaling (1:1 audio/video) — pure relay, no persistence ----
   socket.on("callUser", async (payload, ack) => {
     try {
+      if (payload && (typeof payload.toUserId === "string" || typeof payload.toUserId === "number")) {
+        const k = pairKey(userId, String(payload.toUserId));
+        callIntent.set(k, Date.now());
+        setTimeout(() => callIntent.delete(k), 12000);
+      }
       await handleCallUser(payload || {}, ack);
     } catch (err) {
       console.log("Error in callUser:", err?.message);
@@ -399,6 +416,7 @@ io.on("connection", (socket) => {
       blocked = !!target?.blockedUsers?.some((b) => String(b) === userId);
     }
     if (blocked) {
+      callIntent.delete(pairKey(userId, String(toUserId)));
       if (typeof ack === "function") ack({ delivered: false, reason: "blocked" });
       return;
     }
@@ -575,7 +593,8 @@ io.on("connection", (socket) => {
     socket.emit("incomingCall", { fromUser: pending.fromUser, offer: pending.offer, callType: pending.callType, callId: pending.callId });
   });
 
-  socket.on("iceCandidate", ({ toUserId, candidate }) => {
+  socket.on("iceCandidate", ({ toUserId, candidate } = {}) => {
+    if (!inCallWith(userId, toUserId) || !candidate || typeof candidate !== "object") return;
     // Candidates the caller sends while the call is still ringing may be lost (callee asleep / app
     // just starting): keep them so they can be replayed the moment the call is answered.
     const held = pendingCalls.get(String(toUserId));
@@ -589,14 +608,16 @@ io.on("connection", (socket) => {
   // Mid-call renegotiation — used to upgrade a voice call to video (adding
   // a video track requires a fresh offer/answer exchange on the same
   // already-connected peer connection).
-  socket.on("webrtcRenegotiate", ({ toUserId, offer }) => {
+  socket.on("webrtcRenegotiate", ({ toUserId, offer } = {}) => {
+    if (!inCallWith(userId, toUserId) || !offer || typeof offer !== "object") return;
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("webrtcRenegotiateOffer", { offer });
     }
   });
 
-  socket.on("webrtcRenegotiateAnswer", ({ toUserId, answer }) => {
+  socket.on("webrtcRenegotiateAnswer", ({ toUserId, answer } = {}) => {
+    if (!inCallWith(userId, toUserId) || !answer || typeof answer !== "object") return;
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("webrtcRenegotiateAnswer", { answer });
@@ -606,7 +627,8 @@ io.on("connection", (socket) => {
   // Lets each side tell the other about its mic/camera state (muted, camera
   // off) so the call screen can show an indicator — a muted track otherwise
   // looks identical to silence. Pure relay, nothing is stored.
-  socket.on("callMediaState", ({ toUserId, state }) => {
+  socket.on("callMediaState", ({ toUserId, state } = {}) => {
+    if (!inCallWith(userId, toUserId)) return;
     const receiverSocketId = roomFor(toUserId);
     if (receiverSocketId && state && typeof state === "object") {
       io.to(receiverSocketId).emit("remoteMediaState", {
@@ -1014,7 +1036,13 @@ io.on("connection", (socket) => {
           io.to(otherRoom).emit("callEnded");
         }
         if (logId) {
-          CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt: new Date() }).catch(() => {});
+          const endedAt = new Date();
+          if (live?.answered) {
+            // The connection dropped in the middle of a conversation: it was a real call, not a missed one.
+            CallLog.findByIdAndUpdate(logId, { status: "answered", endedAt, durationSeconds: Math.max(0, Math.round((endedAt - (live.answeredAt || live.startedAt)) / 1000)) }).catch(() => {});
+          } else {
+            CallLog.findByIdAndUpdate(logId, { status: "missed", endedAt }).catch(() => {});
+          }
         }
         activeCallLogs.delete(key);
         activeCalls.delete(key);
