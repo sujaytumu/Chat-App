@@ -70,6 +70,7 @@ const GroupInfoModal = ({ group, onClose }) => {
   const { authUser } = useAuthStore();
 
   const [tab, setTab] = useState("Members");
+  const [membersFull, setMembersFull] = useState(false); // the full-screen Members page
   const [lastMin, setLastMin] = useState(0); // keeps the last section tall enough to reach the top
   const [scrolled, setScrolled] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -296,9 +297,174 @@ const GroupInfoModal = ({ group, onClose }) => {
 
   const iconBtn = "size-10 rounded-full flex items-center justify-center text-wa-text hover:bg-white/10 active:bg-white/15 shrink-0";
 
+  const membersBody = (
+    <>
+              <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
+                {memberSearch == null ? (
+                  <>
+                    <span className="text-[15px] text-wa-muted">
+                      {group.members.length} member{group.members.length === 1 ? "" : "s"}
+                    </span>
+                    <button onClick={() => setMemberSearch("")} className="text-wa-muted p-1" aria-label="Search members">
+                      <Search size={19} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2 w-full bg-wa-field rounded-full px-4 h-10">
+                    <Search size={18} className="text-wa-muted shrink-0" />
+                    <input
+                      autoFocus
+                      value={memberSearch}
+                      onChange={(e) => setMemberSearch(e.target.value)}
+                      placeholder="Search members"
+                      className="flex-1 bg-transparent outline-none text-[15px]"
+                    />
+                    <button onClick={() => setMemberSearch(null)} aria-label="Close search">
+                      <X size={18} className="text-wa-muted" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {canAddMembers && memberSearch == null && (
+                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-3.5 px-4 py-[13px] text-left hover:bg-white/5">
+                  <span className="size-[42px] rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
+                    <UserPlus size={19} />
+                  </span>
+                  <span className="text-[17px]">Add members</span>
+                </button>
+              )}
+
+              {showAddMembers && (
+                <div className="mx-5 mb-2 p-3 rounded-2xl bg-wa-panel space-y-2">
+                  <div className="max-h-44 overflow-y-auto space-y-1">
+                    {nonMembers.map((u) => (
+                      <label key={u._id} className="flex items-center gap-3 py-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="checkbox checkbox-sm"
+                          checked={toAdd.includes(u._id)}
+                          onChange={() => setToAdd((prev) => (prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]))}
+                        />
+                        <Avatar src={u.profilePic} name={u.fullName} size="size-8" textSize="text-sm" />
+                        <span className="text-[15px]">{u.fullName}</span>
+                      </label>
+                    ))}
+                    {nonMembers.length === 0 && <p className="text-xs text-wa-muted">Everyone is already in this group</p>}
+                  </div>
+                  <button className="btn btn-sm btn-primary w-full" onClick={handleAdd} disabled={toAdd.length === 0}>
+                    Add selected
+                  </button>
+                </div>
+              )}
+
+              {shownMembers.map((member) => {
+                const isYou = member._id === authUser._id;
+                const memberIsAdmin = group.admins.some((a) => (a._id || a) === member._id);
+                return (
+                  <div key={member._id} className="flex items-center gap-3.5 px-4 py-[13px]">
+                    <Avatar src={member.profilePic} name={member.fullName} size="size-[42px]" textSize="text-base" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[17px] truncate">{isYou ? "You" : member.fullName}</p>
+                      {member.about && <p className="text-[14.5px] text-wa-muted truncate">{member.about}</p>}
+                    </div>
+                    {memberIsAdmin && (
+                      <span className="text-[13.5px] px-3 py-1 rounded-md bg-[#21C063]/20 text-[#21C063] shrink-0">Group Admin</span>
+                    )}
+                                        {!isYou && (
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={(e) => {
+                            // Place the menu where it fits: below the button if there is room, else above,
+                            // else pinned inside the screen (scrolls if the screen is very short).
+                            const r = e.currentTarget.getBoundingClientRect();
+                            const vh = window.innerHeight;
+                            const items = isAdmin ? 6 : 4;
+                            const h = items * 40 + 16;
+                            const below = vh - r.bottom - 8;
+                            const above = r.top - 8;
+                            const right = Math.max(8, window.innerWidth - r.right);
+                            let pos;
+                            if (h <= below) pos = { top: r.bottom + 4, right };
+                            else if (h <= above) pos = { top: r.top - h - 4, right };
+                            else pos = { top: Math.max(8, Math.min(r.bottom + 4, vh - h - 8)), right };
+                            setMemberMenuPos({ ...pos, maxHeight: vh - 16 });
+                            setMemberMenu((m) => (m === member._id ? null : member._id));
+                          }}
+                          className="p-1.5 text-wa-muted"
+                          title="Member options"
+                          aria-label={`Options for ${member.fullName}`}
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                        {memberMenu === member._id && (
+                          <>
+                            <div className="fixed inset-0 z-30" onClick={() => setMemberMenu(null)} />
+                            <div style={memberMenuPos} className="fixed z-40 w-52 overflow-y-auto bg-wa-pop rounded-2xl shadow-2xl border border-white/10 py-2">
+                              <button className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate" onClick={() => messageMember(member)}>
+                                Message {member.fullName}
+                              </button>
+                              <button className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "audio")}>
+                                Voice call {member.fullName}
+                              </button>
+                              <button className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate" onClick={() => callMember(member, "video")}>
+                                Video call {member.fullName}
+                              </button>
+                              <button
+                                className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5 truncate"
+                                onClick={() => {
+                                  setMemberMenu(null);
+                                  setViewMember(memberUser(member));
+                                }}
+                              >
+                                View {member.fullName}
+                              </button>
+                              {isAdmin && (
+                                <>
+                              <button
+                                className="w-full text-left px-4 py-2.5 text-[15px] hover:bg-white/5"
+                                onClick={() => {
+                                  setMemberMenu(null);
+                                  setGroupAdmin(group._id, member._id, !memberIsAdmin);
+                                }}
+                              >
+                                {memberIsAdmin ? "Dismiss as admin" : "Make group admin"}
+                              </button>
+                              <button
+                                className="w-full text-left px-4 py-2.5 text-[15px] text-[#F15C6D] hover:bg-white/5 flex items-center gap-2"
+                                onClick={() => {
+                                  setMemberMenu(null);
+                                  confirm(`Remove ${member.fullName} from the group?`) && removeMemberFromGroup(group._id, member._id);
+                                }}
+                              >
+                                <UserMinus size={18} /> Remove from group
+                              </button>
+                                </>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {shownMembers.length === 0 && <p className="text-center text-wa-muted text-sm py-6">No members found</p>}
+    </>
+  );
+
   return (
-    <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center sm:p-4">
-      <div className="bg-wa-bg text-wa-text sm:rounded-2xl w-full sm:max-w-md h-full sm:h-[92vh] flex flex-col shadow-xl overflow-hidden relative">
+    <div className="fixed inset-0 z-[90] bg-wa-bg">
+      <div className="bg-wa-bg text-wa-text w-full h-full flex flex-col overflow-hidden relative">
+        {membersFull && (
+          <div className="absolute inset-0 z-[20] bg-wa-bg flex flex-col">
+            <div className="flex items-center gap-1 px-2 h-14 shrink-0 border-b border-white/10">
+              <button onClick={() => { setMembersFull(false); setMemberSearch(null); }} className={iconBtn} aria-label="Back"><ArrowLeft size={21} /></button>
+              <h3 className="flex-1 text-[17px] pl-2">Members</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto pb-6">{membersBody}</div>
+          </div>
+        )}
         {/* Top bar: back · (compact avatar + name once scrolled) · QR · ⋮ */}
         <div className="flex items-center gap-1 px-2 h-12 shrink-0 bg-wa-bg z-10">
           <button onClick={editMode ? () => setEditMode(false) : onClose} className={iconBtn} aria-label={editMode ? "Cancel editing" : "Back"}>
@@ -508,6 +674,7 @@ const GroupInfoModal = ({ group, onClose }) => {
           <div>
           {/* ---- Members ---- */}
             <div ref={(n) => (sectionRefs.current.Members = n)} className="pb-6">
+              {!membersFull && (<>
               <div className="flex items-center justify-between px-4 pt-3 pb-1.5">
                 {memberSearch == null ? (
                   <>
@@ -659,6 +826,10 @@ const GroupInfoModal = ({ group, onClose }) => {
                 );
               })}
               {shownMembers.length === 0 && <p className="text-center text-wa-muted text-sm py-6">No members found</p>}
+              </>)}
+              {!membersFull && (
+                <button onClick={() => setMembersFull(true)} className="w-full flex items-center justify-between px-5 py-3 text-left text-[#21C063] text-[15px] hover:bg-white/5">View all {group.members.length} members <ChevronRight size={18} /></button>
+              )}
             </div>
 
           {/* ---- Media ---- */}

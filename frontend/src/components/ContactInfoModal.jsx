@@ -47,8 +47,8 @@ const ContactInfoModal = ({ user, status, onClose }) => {
   ];
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/60 flex items-center justify-center sm:p-4">
-      <div className="bg-wa-panel text-wa-text sm:rounded-2xl w-full sm:max-w-md h-full sm:h-auto sm:max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
+    <div className="fixed inset-0 z-[90] bg-wa-panel">
+      <div className="bg-wa-panel text-wa-text w-full h-full flex flex-col overflow-hidden">
         <div className="flex items-center gap-5 px-4 h-14 shrink-0">
           <button onClick={onClose} aria-label="Close">
             <X size={24} />

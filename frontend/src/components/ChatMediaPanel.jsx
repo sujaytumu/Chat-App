@@ -71,7 +71,7 @@ const ChatMediaPanel = ({ data, title, onClose }) => {
   const empty = <p className="text-center text-wa-muted py-16 text-[13px]">Nothing here yet</p>;
 
   return (
-    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col">
       <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
