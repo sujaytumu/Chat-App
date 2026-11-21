@@ -14,7 +14,7 @@ const GroupPermissionsPanel = ({ group, isAdmin, onClose }) => {
   const perms = { editInfo: "admins", addMembers: "admins", sendMessages: "all", ...(group.permissions || {}) };
 
   return (
-    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col sm:max-w-md sm:mx-auto">
+    <div className="fixed inset-0 z-[96] bg-wa-bg text-wa-text flex flex-col">
       <div className="flex items-center gap-5 px-4 h-14 shrink-0 bg-wa-panel">
         <button onClick={onClose} aria-label="Back">
           <ArrowLeft size={24} />
