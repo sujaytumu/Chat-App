@@ -15,6 +15,13 @@ const KINDS = [
   { id: "photos", label: "Photos", icon: ImageIcon },
 ];
 
+// Case-, accent- and spacing-insensitive: "jose" finds "José", "ravi  kumar" finds "Ravi Kumar".
+const norm = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const hasAll = (name, q) => {
+  const n = norm(name);
+  return !!q && q.split(" ").every((w) => n.includes(w));
+};
+
 const Heading = ({ children }) => <p className="px-4 pt-5 pb-2 text-[14px] text-wa-muted">{children}</p>;
 
 const hostOf = (text) => {
@@ -82,19 +89,19 @@ const SearchScreen = ({ onClose }) => {
     return () => clearTimeout(t);
   }, [term, kind, searchMessages]);
 
-  const lc = term.toLowerCase();
+  const lc = norm(term);
   const lockedKeys = authUser?.lockedChats;
   const chats = useMemo(() => {
     if (!lc || kind) return [];
     const mk = (type, c) => ({ type, data: c, name: type === "group" ? c.name : c.fullName, pic: type === "group" ? c.groupPic : c.profilePic, last: c.lastMessage });
-    return [...users.filter((u) => u.lastMessage).map((u) => mk("direct", u)), ...groups.map((g) => mk("group", g))].filter((c) => c.name?.toLowerCase().includes(lc) && !(lockedKeys || []).includes(`${c.type === "group" ? "g" : "d"}:${c.data._id}`));
+    return [...users.filter((u) => u.lastMessage).map((u) => mk("direct", u)), ...groups.map((g) => mk("group", g))].filter((c) => hasAll(c.name, lc) && !(lockedKeys || []).includes(`${c.type === "group" ? "g" : "d"}:${c.data._id}`));
   }, [users, groups, lc, kind, lockedKeys]);
-  const people = useMemo(() => (!lc || kind ? [] : users.filter((u) => !u.lastMessage && u.fullName?.toLowerCase().includes(lc))), [users, lc, kind]);
+  const people = useMemo(() => (!lc || kind ? [] : users.filter((u) => !u.lastMessage && hasAll(u.fullName, lc))), [users, lc, kind]);
 
   // Groups that one of the matching people is also in: "Sowmya is also in this group"
   const common = useMemo(() => {
     if (!lc || kind) return [];
-    const hit = users.filter((u) => u.fullName?.toLowerCase().includes(lc));
+    const hit = users.filter((u) => hasAll(u.fullName, lc));
     if (!hit.length) return [];
     return groups
       .map((g) => ({ g, who: hit.find((u) => (g.members || []).some((m) => String(m._id ?? m) === String(u._id))) }))
@@ -105,8 +112,8 @@ const SearchScreen = ({ onClose }) => {
   // "From ~ name" chips: people matching the query
   const senders = useMemo(() => {
     if (!lc || kind) return [];
-    const list = users.filter((u) => u.fullName?.toLowerCase().includes(lc)).map((u) => ({ id: u._id, name: u.fullName }));
-    if (authUser?.fullName?.toLowerCase().includes(lc)) list.push({ id: authUser._id, name: authUser.fullName });
+    const list = users.filter((u) => hasAll(u.fullName, lc)).map((u) => ({ id: u._id, name: u.fullName }));
+    if (hasAll(authUser?.fullName, lc)) list.push({ id: authUser._id, name: authUser.fullName });
     return list.slice(0, 4);
   }, [users, lc, kind, authUser]);
 
@@ -180,7 +187,7 @@ const SearchScreen = ({ onClose }) => {
           <>
             <Heading>Contacts on Talkies</Heading>
             {[...users]
-              .filter((u) => u._id && (!lc || u.fullName?.toLowerCase().includes(lc)))
+              .filter((u) => u._id && (!lc || hasAll(u.fullName, lc)))
               .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""))
               .map((u) => (
                 <button key={u._id} onClick={() => open({ type: "direct", data: u })} className="w-full flex items-center gap-3 px-4 py-2.5 text-left active:bg-wa-surface">
@@ -191,7 +198,7 @@ const SearchScreen = ({ onClose }) => {
                   </div>
                 </button>
               ))}
-            {users.filter((u) => u._id && (!lc || u.fullName?.toLowerCase().includes(lc))).length === 0 && <p className="text-center text-wa-muted py-10 text-[14px]">No contacts found</p>}
+            {users.filter((u) => u._id && (!lc || hasAll(u.fullName, lc))).length === 0 && <p className="text-center text-wa-muted py-10 text-[14px]">No contacts found</p>}
           </>
         )}
         <div className={contactsOpen ? "hidden" : ""}>
