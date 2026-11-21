@@ -292,21 +292,45 @@ public class TalkiesPushPlugin extends Plugin {
         previewRingtone = null;
     }
 
-    /** The phone's standard ringback / busy tone for the caller ("calling" | "ringback" | "busy"). */
+    /**
+     * The caller's tones, played on the phone's call volume: "calling" = ONE short tap every few seconds (connecting,
+     * their phone has not rung yet), "ringback" = TWO quick taps every few seconds (their phone is ringing),
+     * "busy" = the phone's standard busy tone.
+     */
+    private static Runnable toneLoop;
+
     @PluginMethod
     public void startCallTone(PluginCall call) {
         try {
             stopCallToneNow();
-            String kind = call.getString("kind", "ringback");
-            callTone = new android.media.ToneGenerator(android.media.AudioManager.STREAM_VOICE_CALL, 100);
-            callTone.startTone("busy".equals(kind) ? android.media.ToneGenerator.TONE_SUP_BUSY : android.media.ToneGenerator.TONE_SUP_RINGTONE);
-            // Safety net: a ringback that nobody stopped must never carry on into a conversation (the page stops it
-            // at pick-up; this only matters if that stop was ever missed).
-            final android.media.ToneGenerator mine = callTone;
+            final String kind = call.getString("kind", "ringback");
+            final android.media.ToneGenerator gen = new android.media.ToneGenerator(android.media.AudioManager.STREAM_VOICE_CALL, "busy".equals(kind) ? 100 : 70);
+            callTone = gen;
+            if ("busy".equals(kind)) {
+                gen.startTone(android.media.ToneGenerator.TONE_SUP_BUSY);
+            } else {
+                final boolean ringing = "ringback".equals(kind);
+                final int tone = ringing ? android.media.ToneGenerator.TONE_PROP_BEEP2 : android.media.ToneGenerator.TONE_PROP_BEEP;
+                final long every = ringing ? 3200 : 3000;
+                toneLoop = new Runnable() {
+                    @Override
+                    public void run() {
+                        if (callTone != gen) return; // stopped or replaced
+                        try {
+                            gen.startTone(tone, ringing ? 380 : 140);
+                        } catch (Exception ignored) {
+                        }
+                        SOUND_MAIN.postDelayed(this, every);
+                    }
+                };
+                SOUND_MAIN.post(toneLoop);
+            }
+            // Safety net: a tone that nobody stopped must never carry on into a conversation (the page stops it at
+            // pick-up; this only matters if that stop was ever missed).
             SOUND_MAIN.postDelayed(new Runnable() {
                 @Override
                 public void run() {
-                    if (callTone == mine) stopCallToneNow();
+                    if (callTone == gen) stopCallToneNow();
                 }
             }, 70_000);
         } catch (Exception ignored) {
@@ -321,6 +345,11 @@ public class TalkiesPushPlugin extends Plugin {
     }
 
     private static void stopCallToneNow() {
+        try {
+            if (toneLoop != null) SOUND_MAIN.removeCallbacks(toneLoop);
+        } catch (Exception ignored) {
+        }
+        toneLoop = null;
         try {
             if (callTone != null) {
                 callTone.stopTone();
