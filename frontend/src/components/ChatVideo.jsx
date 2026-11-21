@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Play, Pause, ArrowLeft, Download, Forward, Send } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const fmt = (s) => {
   const n = Math.max(0, Math.round(Number(s) || 0));
@@ -33,6 +35,7 @@ const whenLabel = (d) => {
 // Full-screen viewer in WhatsApp's layout: back arrow with name and time, download/forward on the top bar,
 // a big round play/pause in the middle, and a green seek bar with times and speed at the bottom.
 const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose, message }) => {
+  useBackToClose(true, onClose); // the phone's back button closes the viewer, not the chat
   const [reply, setReply] = useState("");
   const sendReply = async (e) => {
     e?.preventDefault();
@@ -78,7 +81,9 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose, message 
 
   const pct = dur ? Math.min(100, (cur / dur) * 100) : 0;
 
-  return (
+  // Rendered on the page itself (not inside the message bubble): a bubble's own transform / clipping would
+  // otherwise shrink "full screen" down to the size of that bubble's row.
+  return createPortal(
     <div className="fixed inset-0 z-[130] bg-black select-none" onClick={() => (playing ? (chrome ? setChrome(false) : poke()) : toggle())}>
       <video
         ref={vref}
@@ -101,7 +106,7 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose, message 
           setPlaying(false);
           poke(false);
         }}
-        className="absolute inset-x-0 top-0 bottom-[72px] size-full object-contain" style={{ height: "calc(100% - 72px)" }}
+        className="absolute inset-0 size-full object-contain"
       />
 
       <div className={`absolute inset-x-0 top-0 bg-gradient-to-b from-black/70 to-transparent pt-[env(safe-area-inset-top)] transition-opacity duration-200 ${chrome ? "opacity-100" : "opacity-0 pointer-events-none"}`} onClick={(e) => e.stopPropagation()}>
@@ -169,7 +174,8 @@ const VideoViewer = ({ file, poster, title, sentAt, onForward, onClose, message 
           </div>
         </form>
       )}
-    </div>
+    </div>,
+    document.body
   );
 };
 
