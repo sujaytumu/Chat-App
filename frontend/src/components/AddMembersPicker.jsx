@@ -51,17 +51,17 @@ const AddMembersPicker = ({ people, onClose, onAdd, onInvite }) => {
       <button
         type="button"
         onClick={() => toggle(p._id)}
-        className="w-full flex items-center gap-4 px-4 py-2.5 text-left active:bg-white/5"
+        className="w-full flex items-center gap-5 px-5 py-2 text-left active:bg-white/5"
       >
-        <Avatar src={p.profilePic} name={p.fullName} size="size-[52px]" textSize="text-xl" />
-        <span className="flex-1 min-w-0 border-b border-white/10 py-3.5 -my-2.5 flex items-center">
-          <span className="flex-1 min-w-0 truncate text-[17px]">{p.fullName}</span>
+        <Avatar src={p.profilePic} name={p.fullName} size="size-[60px]" textSize="text-2xl" />
+        <span className="flex-1 min-w-0 border-b border-white/10 py-[22px] -my-2 flex items-center">
+          <span className="flex-1 min-w-0 truncate text-[21px]">{p.fullName}</span>
           <span
-            className={`size-[26px] rounded-full flex items-center justify-center shrink-0 border-2 ${
+            className={`size-[36px] rounded-full flex items-center justify-center shrink-0 border-2 ${
               on ? "bg-[#21C063] border-[#21C063] text-[#0B141A]" : "border-wa-muted/70"
             }`}
           >
-            {on && <Check size={16} strokeWidth={3} />}
+            {on && <Check size={21} strokeWidth={3} />}
           </span>
         </span>
       </button>
@@ -71,7 +71,7 @@ const AddMembersPicker = ({ people, onClose, onAdd, onInvite }) => {
   const Section = ({ title, list }) =>
     list.length ? (
       <>
-        <p className="px-4 pt-4 pb-2 text-[15px] text-wa-muted">{title}</p>
+        <p className="px-5 pt-5 pb-3 text-[18px] text-wa-muted">{title}</p>
         {list.map((p) => (
           <Row key={p._id} p={p} />
         ))}
@@ -82,17 +82,17 @@ const AddMembersPicker = ({ people, onClose, onAdd, onInvite }) => {
     <div className="fixed inset-0 z-[100] bg-wa-bg text-wa-text flex flex-col">
       {/* search bar */}
       <div className="px-3 pt-3 pb-2 shrink-0" style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 12px)" }}>
-        <div className="flex items-center gap-2 h-14 rounded-full bg-wa-panel px-3">
+        <div className="flex items-center gap-2 h-[62px] rounded-full bg-wa-panel px-3.5">
           <button type="button" onClick={onClose} aria-label="Back" className="size-10 rounded-full flex items-center justify-center">
-            <ArrowLeft size={22} />
+            <ArrowLeft size={26} />
           </button>
           <input
             ref={inputRef}
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name or @username"
-            className="flex-1 min-w-0 bg-transparent outline-none text-[17px] placeholder:text-wa-muted"
+            placeholder="Name or @username…"
+            className="flex-1 min-w-0 bg-transparent outline-none text-[19px] placeholder:text-wa-muted"
           />
           {query && (
             <button type="button" onClick={() => setQuery("")} aria-label="Clear" className="size-9 rounded-full flex items-center justify-center">
@@ -104,14 +104,14 @@ const AddMembersPicker = ({ people, onClose, onAdd, onInvite }) => {
 
       {/* chosen people */}
       {picked.length > 0 && (
-        <div className="shrink-0 flex gap-4 overflow-x-auto px-4 pb-3 pt-1 no-scrollbar">
+        <div className="shrink-0 flex gap-4 overflow-x-auto px-5 pb-3 pt-1 no-scrollbar">
           {picked.map((id) => {
             const p = byId.get(id);
             if (!p) return null;
             return (
-              <button key={id} type="button" onClick={() => toggle(id)} className="relative flex flex-col items-center w-[60px] shrink-0">
+              <button key={id} type="button" onClick={() => toggle(id)} className="relative flex flex-col items-center w-[68px] shrink-0">
                 <span className="relative">
-                  <Avatar src={p.profilePic} name={p.fullName} size="size-[52px]" textSize="text-xl" />
+                  <Avatar src={p.profilePic} name={p.fullName} size="size-[60px]" textSize="text-2xl" />
                   <span className="absolute -bottom-0.5 -right-0.5 size-5 rounded-full bg-wa-panel border border-wa-bg flex items-center justify-center">
                     <X size={12} />
                   </span>
@@ -123,13 +123,13 @@ const AddMembersPicker = ({ people, onClose, onAdd, onInvite }) => {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto pb-28">
+      <div className="flex-1 overflow-y-auto pb-32">
         {!q && onInvite && (
-          <button type="button" onClick={onInvite} className="w-full flex items-center gap-4 px-4 py-3 text-left active:bg-white/5">
-            <span className="size-[52px] rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
-              <Link2 size={24} />
+          <button type="button" onClick={onInvite} className="w-full flex items-center gap-5 px-5 py-3.5 text-left active:bg-white/5">
+            <span className="size-[60px] rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
+              <Link2 size={28} />
             </span>
-            <span className="text-[17px]">Invite via link or QR code</span>
+            <span className="text-[21px]">Invite via link or QR code</span>
           </button>
         )}
 
@@ -149,10 +149,10 @@ const AddMembersPicker = ({ people, onClose, onAdd, onInvite }) => {
           onClick={confirm}
           disabled={busy}
           aria-label={`Add ${picked.length} to group`}
-          className="absolute right-5 size-16 rounded-2xl bg-[#21C063] text-[#0B141A] shadow-lg flex items-center justify-center"
+          className="absolute right-6 size-[68px] rounded-[22px] bg-[#21C063] text-[#0B141A] shadow-lg flex items-center justify-center"
           style={{ bottom: "max(env(safe-area-inset-bottom, 0px), 20px)" }}
         >
-          {busy ? <Loader2 size={26} className="animate-spin" /> : <ArrowRight size={28} />}
+          {busy ? <Loader2 size={26} className="animate-spin" /> : <ArrowRight size={32} />}
         </button>
       )}
     </div>
