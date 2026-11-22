@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { X, Bell } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
+import { useAuthStore } from "../store/useAuthStore";
 
 const tomorrow9 = () => {
   const d = new Date();
@@ -20,12 +21,15 @@ const ReminderSheet = ({ message, onClose }) => {
   useBackToClose(true, onClose);
   const [custom, setCustom] = useState(localInput(inMinutes(120)));
   const [busy, setBusy] = useState(false);
+  const authUser = useAuthStore((st) => st.authUser);
+  const mine = String(message.senderId?._id || message.senderId) === String(authUser?._id);
+  const [ifNoReply, setIfNoReply] = useState(mine); // my own message: nudge only if nobody has answered
 
   const save = async (when) => {
     setBusy(true);
     try {
-      await axiosInstance.post("/messages/reminders", { messageId: message._id, remindAt: when.toISOString() });
-      toast.success(`Reminder set for ${when.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`);
+      await axiosInstance.post("/messages/reminders", { messageId: message._id, remindAt: when.toISOString(), ifNoReply: mine && ifNoReply });
+      toast.success(`${mine && ifNoReply ? "Follow-up" : "Reminder"} set for ${when.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}`);
       onClose();
     } catch (e) {
       toast.error(e.response?.data?.error || "Couldn't set the reminder");
@@ -46,10 +50,19 @@ const ReminderSheet = ({ message, onClose }) => {
     <div className="wa-dark fixed inset-0 z-[160] bg-black/60 flex items-end lg:items-center justify-center" onClick={onClose}>
       <div className="w-full max-w-md bg-wa-panel text-wa-text rounded-t-3xl lg:rounded-3xl p-5 pb-[calc(20px+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-[17px] font-semibold flex items-center gap-2"><Bell size={19} /> Remind me</h3>
+          <h3 className="text-[17px] font-semibold flex items-center gap-2"><Bell size={19} /> {mine && ifNoReply ? "Follow up" : "Remind me"}</h3>
           <button onClick={onClose} aria-label="Close" className="size-9 flex items-center justify-center text-wa-muted"><X size={22} /></button>
         </div>
         <p className="text-[13px] text-wa-muted line-clamp-2 mb-3">{message.text || (message.image ? "📷 Photo" : message.file ? "📎 Attachment" : "Message")}</p>
+        {mine && (
+          <label className="flex items-center justify-between gap-3 mb-3 px-4 py-3 rounded-2xl bg-wa-field cursor-pointer">
+            <span>
+              <span className="block text-[14px] font-medium">Only if no reply</span>
+              <span className="block text-[12px] text-wa-muted">Skip the reminder if they answer first</span>
+            </span>
+            <input type="checkbox" className="toggle toggle-success" checked={ifNoReply} onChange={(e) => setIfNoReply(e.target.checked)} />
+          </label>
+        )}
         <div className="grid grid-cols-2 gap-2">
           {presets.map(([label, when]) => (
             <button key={label} disabled={busy} onClick={() => save(when())} className="h-11 rounded-full bg-wa-field text-[13.5px] font-medium active:scale-95 transition-transform disabled:opacity-50">

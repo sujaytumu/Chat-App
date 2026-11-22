@@ -23,7 +23,7 @@ const ReminderListener = () => {
           >
             <Bell size={18} className="mt-0.5 shrink-0" />
             <span>
-              <span className="block font-semibold text-[13px]">Reminder</span>
+              <span className="block font-semibold text-[13px]">{r.followUp ? "No reply yet" : "Reminder"}</span>
               <span className="block text-[13px] line-clamp-3">{r.preview || "A message you wanted to revisit"}</span>
             </span>
           </button>
