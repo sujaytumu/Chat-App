@@ -13,6 +13,7 @@ import { useScrollMemory } from "../lib/useScrollMemory";
 
 const ContactInfoModal = lazy(() => import("../components/ContactInfoModal"));
 const CallLinkSheet = lazy(() => import("../components/CallLinkSheet"));
+const CallStatsSheet = lazy(() => import("../components/CallStatsSheet"));
 
 const GREEN = "#25D366";
 const RED = "#F15C6D";
@@ -87,6 +88,7 @@ const CallsPage = () => {
   const [menu, setMenu] = useState(false);
   const [picker, setPicker] = useState(false);
   const [info, setInfo] = useState(null); // grouped row shown in the details sheet
+  const [showStats, setShowStats] = useState(false);
   const [linkSheet, setLinkSheet] = useState(null); // null | "link" | "schedule"
   const [upcoming, setUpcoming] = useState([]);
   useBackToClose(!!linkSheet, () => setLinkSheet(null));
@@ -244,6 +246,9 @@ const CallsPage = () => {
               </button>
               {menu && (
                 <div className="absolute right-0 top-full mt-1 w-52 bg-wa-pop rounded-2xl shadow-2xl py-2 z-30 overflow-hidden">
+                  <button className="w-full px-4 py-3 text-[15px] text-wa-text text-left hover:bg-white/5" onClick={() => { setMenu(false); setShowStats(true); }}>
+                    Call stats
+                  </button>
                   <button className="w-full px-4 py-3 text-[15px] text-wa-text text-left hover:bg-white/5" onClick={clearLog} disabled={!calls.length}>
                     Clear call log
                   </button>
@@ -396,6 +401,11 @@ const CallsPage = () => {
         </span>
       </button>
 
+      {showStats && (
+        <Suspense fallback={null}>
+          <CallStatsSheet onClose={() => setShowStats(false)} />
+        </Suspense>
+      )}
       {linkSheet && (
         <Suspense fallback={null}>
           <CallLinkSheet schedule={linkSheet === "schedule"} onClose={() => setLinkSheet(null)} onCreated={loadUpcoming} />
