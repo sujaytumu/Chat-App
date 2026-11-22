@@ -20,6 +20,7 @@ import WallpaperCropper from "./WallpaperCropper";
 import ReportGroupDialog from "./ReportGroupDialog";
 import DisappearingPanel, { DISAPPEAR_LABELS } from "./DisappearingPanel";
 import GroupPermissionsPanel from "./GroupPermissionsPanel";
+import AddMembersPicker from "./AddMembersPicker";
 import GroupJoinRequestsPanel from "./GroupJoinRequestsPanel";
 import ChatStarredPanel, { useStarredCount } from "./ChatStarredPanel";
 import MuteSheet from "./MuteSheet";
@@ -85,7 +86,6 @@ const GroupInfoModal = ({ group, onClose }) => {
   const [cropFile, setCropFile] = useState(null); // picked group photo waiting to be cropped
   const [memberSearch, setMemberSearch] = useState(null); // null = closed, string = open
   const [showAddMembers, setShowAddMembers] = useState(false);
-  const [toAdd, setToAdd] = useState([]);
   const [showMedia, setShowMedia] = useState(false);
   const [showStarred, setShowStarred] = useState(false);
   const [showPerms, setShowPerms] = useState(false);
@@ -174,10 +174,9 @@ const GroupInfoModal = ({ group, onClose }) => {
     onClose();
     setTimeout(() => useCallStore.getState().startCall(memberUser(member), type), 150);
   };
-  const handleAdd = async () => {
-    if (toAdd.length === 0) return;
-    await addMembersToGroup(group._id, toAdd);
-    setToAdd([]);
+  const handleAdd = async (ids) => {
+    if (!ids?.length) return;
+    await addMembersToGroup(group._id, ids);
     setShowAddMembers(false);
   };
   const pickPhoto = (e) => {
@@ -327,7 +326,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               </div>
 
               {canAddMembers && memberSearch == null && (
-                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-3.5 px-4 py-[13px] text-left hover:bg-white/5">
+                <button onClick={() => setShowAddMembers(true)} className="w-full flex items-center gap-3.5 px-4 py-[13px] text-left hover:bg-white/5">
                   <span className="size-[42px] rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
                     <UserPlus size={19} />
                   </span>
@@ -335,28 +334,6 @@ const GroupInfoModal = ({ group, onClose }) => {
                 </button>
               )}
 
-              {showAddMembers && (
-                <div className="mx-5 mb-2 p-3 rounded-2xl bg-wa-panel space-y-2">
-                  <div className="max-h-44 overflow-y-auto space-y-1">
-                    {nonMembers.map((u) => (
-                      <label key={u._id} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={toAdd.includes(u._id)}
-                          onChange={() => setToAdd((prev) => (prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]))}
-                        />
-                        <Avatar src={u.profilePic} name={u.fullName} size="size-8" textSize="text-sm" />
-                        <span className="text-[15px]">{u.fullName}</span>
-                      </label>
-                    ))}
-                    {nonMembers.length === 0 && <p className="text-xs text-wa-muted">Everyone is already in this group</p>}
-                  </div>
-                  <button className="btn btn-sm btn-primary w-full" onClick={handleAdd} disabled={toAdd.length === 0}>
-                    Add selected
-                  </button>
-                </div>
-              )}
 
               {shownMembers.map((member) => {
                 const isYou = member._id === authUser._id;
@@ -703,7 +680,7 @@ const GroupInfoModal = ({ group, onClose }) => {
               </div>
 
               {canAddMembers && memberSearch == null && (
-                <button onClick={() => setShowAddMembers((s) => !s)} className="w-full flex items-center gap-3.5 px-4 py-[13px] text-left hover:bg-white/5">
+                <button onClick={() => setShowAddMembers(true)} className="w-full flex items-center gap-3.5 px-4 py-[13px] text-left hover:bg-white/5">
                   <span className="size-[42px] rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center shrink-0">
                     <UserPlus size={19} />
                   </span>
@@ -711,28 +688,6 @@ const GroupInfoModal = ({ group, onClose }) => {
                 </button>
               )}
 
-              {showAddMembers && (
-                <div className="mx-5 mb-2 p-3 rounded-2xl bg-wa-panel space-y-2">
-                  <div className="max-h-44 overflow-y-auto space-y-1">
-                    {nonMembers.map((u) => (
-                      <label key={u._id} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          className="checkbox checkbox-sm"
-                          checked={toAdd.includes(u._id)}
-                          onChange={() => setToAdd((prev) => (prev.includes(u._id) ? prev.filter((x) => x !== u._id) : [...prev, u._id]))}
-                        />
-                        <Avatar src={u.profilePic} name={u.fullName} size="size-8" textSize="text-sm" />
-                        <span className="text-[15px]">{u.fullName}</span>
-                      </label>
-                    ))}
-                    {nonMembers.length === 0 && <p className="text-xs text-wa-muted">Everyone is already in this group</p>}
-                  </div>
-                  <button className="btn btn-sm btn-primary w-full" onClick={handleAdd} disabled={toAdd.length === 0}>
-                    Add selected
-                  </button>
-                </div>
-              )}
 
               {shownMembers.map((member) => {
                 const isYou = member._id === authUser._id;
@@ -950,6 +905,14 @@ const GroupInfoModal = ({ group, onClose }) => {
             setShowMute(false);
             useChatStore.getState().setChatMuted(chat, true, { until });
           }}
+        />
+      )}
+      {showAddMembers && (
+        <AddMembersPicker
+          people={nonMembers}
+          onClose={() => setShowAddMembers(false)}
+          onAdd={handleAdd}
+          onInvite={() => setShowInvite(true)}
         />
       )}
       {showInvite && (
