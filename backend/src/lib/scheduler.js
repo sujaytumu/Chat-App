@@ -7,6 +7,7 @@ import CallLink from "../models/callLink.model.js";
 import { sendPushToUsers, sendPushToUser } from "./webPush.js";
 import Reminder from "../models/reminder.model.js";
 import Message from "../models/message.model.js";
+import Group from "../models/group.model.js";
 import { purgeExpiredAccounts } from "../controllers/auth.controller.js";
 import { destroyPrivateAsset, VIEW_ONCE_TTL_MS } from "./privateMedia.js";
 import { birthdayPushes } from "./birthdayPush.js";
@@ -75,9 +76,27 @@ async function messageReminders() {
   for (const r of due) {
     const claimed = await Reminder.findOneAndDelete({ _id: r._id });
     if (!claimed) continue;
-    io.to(String(r.userId)).emit("reminderDue", { _id: r._id, messageId: r.messageId, chatType: r.chatType, chatId: r.chatId, preview: r.preview });
+    let title = "Reminder";
+    if (r.ifNoReply) {
+      // Follow-up nudge: only when nobody has answered since my message (and it still exists).
+      const sent = await Message.findById(r.messageId).select("deletedForEveryone createdAt").lean();
+      if (!sent || sent.deletedForEveryone) continue;
+      const since = r.msgAt || sent.createdAt;
+      const answered = await Message.exists(
+        r.chatType === "group"
+          ? { groupId: r.chatId, senderId: { $ne: r.userId }, createdAt: { $gt: since }, system: { $exists: false }, deletedForEveryone: { $ne: true } }
+          : { senderId: r.chatId, receiverId: r.userId, createdAt: { $gt: since }, system: { $exists: false }, deletedForEveryone: { $ne: true } }
+      );
+      if (answered) continue;
+      const who =
+        r.chatType === "group"
+          ? (await Group.findById(r.chatId).select("name").lean())?.name
+          : (await User.findById(r.chatId).select("fullName").lean())?.fullName;
+      title = who ? `No reply yet from ${who}` : "No reply yet";
+    }
+    io.to(String(r.userId)).emit("reminderDue", { _id: r._id, messageId: r.messageId, chatType: r.chatType, chatId: r.chatId, preview: r.preview, followUp: !!r.ifNoReply });
     sendPushToUser(r.userId, {
-      title: "Reminder",
+      title,
       body: r.preview || "You asked to be reminded about a message",
       icon: "/icon-v2-192.png",
       tag: `reminder-${r._id}`,

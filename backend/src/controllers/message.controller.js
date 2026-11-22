@@ -1720,14 +1720,17 @@ const previewOf = (m) =>
 export const createReminder = async (req, res) => {
   try {
     const { messageId } = req.body || {};
-    const remindAt = new Date(req.body?.remindAt);
+    const ifNoReply = req.body?.ifNoReply === true;
+    // either an exact time, or "in N minutes" (handy for "nudge me if no reply in 30 min")
+    const mins = Number(req.body?.afterMinutes);
+    const remindAt = Number.isFinite(mins) && mins > 0 && req.body?.remindAt == null ? new Date(Date.now() + mins * 60_000) : new Date(req.body?.remindAt);
     if (!mongoose.isValidObjectId(messageId)) return res.status(400).json({ error: "Invalid message" });
     const t = remindAt.getTime();
     if (!Number.isFinite(t) || t < Date.now() + 30_000 || t > Date.now() + 366 * 24 * 3600_000) {
       return res.status(400).json({ error: "Pick a time between now and a year from now" });
     }
     const me = req.user._id;
-    const m = await Message.findById(messageId).select("senderId receiverId groupId text image file poll event deletedFor deletedForEveryone").lean();
+    const m = await Message.findById(messageId).select("senderId receiverId groupId text image file poll event deletedFor deletedForEveryone createdAt").lean();
     if (!m || m.deletedForEveryone || (m.deletedFor || []).some((id) => String(id) === String(me))) {
       return res.status(404).json({ error: "Message not found" });
     }
@@ -1743,10 +1746,13 @@ export const createReminder = async (req, res) => {
       if (!mine) return res.status(403).json({ error: "Not allowed" });
       chatId = String(m.senderId) === String(me) ? m.receiverId : m.senderId;
     }
+    if (ifNoReply && String(m.senderId) !== String(me)) {
+      return res.status(400).json({ error: "Follow-ups only work on messages you sent" });
+    }
     if ((await Reminder.countDocuments({ userId: me })) >= 50) return res.status(400).json({ error: "You have too many reminders (max 50)" });
     const reminder = await Reminder.findOneAndUpdate(
       { userId: me, messageId },
-      { userId: me, messageId, chatType, chatId, preview: previewOf(m), remindAt },
+      { userId: me, messageId, chatType, chatId, preview: previewOf(m), remindAt, ifNoReply, msgAt: m.createdAt },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
     res.status(201).json(reminder);
