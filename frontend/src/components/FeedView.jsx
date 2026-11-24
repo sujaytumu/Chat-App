@@ -120,7 +120,31 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   );
 };
 
-// Edit your own post: caption, lines, song (add later / change / remove) and who can see it
+// Shrinks a picked photo to a normal post size (max 1440 px, JPEG) before it is uploaded
+const shrinkPhoto = (file) =>
+  new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      try {
+        const k = Math.min(1, 1440 / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.naturalWidth * k));
+        c.height = Math.max(1, Math.round(img.naturalHeight * k));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const out = c.toDataURL("image/jpeg", 0.82);
+        c.width = c.height = 0;
+        URL.revokeObjectURL(url);
+        out.startsWith("data:image/jpeg") ? res(out) : rej(new Error("unreadable"));
+      } catch (e) {
+        rej(e);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("unreadable")); };
+    img.src = url;
+  });
+
+// Edit a post: photos (add / remove), caption, lines, song (add later / change / remove) and who can see it
 const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
   const [caption, setCaption] = useState(post.caption || "");
   const [lines, setLines] = useState(post.lines || "");
@@ -132,15 +156,45 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
   const [showAud, setShowAud] = useState(false);
   const [busy, setBusy] = useState(false);
   const songInput = useRef(null);
-  const imgs = post.images?.length ? post.images : [post.image];
-  const [ptexts, setPtexts] = useState(() => imgs.map((_, k) => ({ text: "", color: "#ffffff", pos: "bot", size: 1, ...(post.photoText?.[k] || {}) })));
+  const startImgs = post.images?.length ? post.images : [post.image];
+  // the post's photos: the ones already in it ({ src, idx }) and any added now ({ src, data })
+  const [photos, setPhotos] = useState(() => startImgs.map((src, idx) => ({ src, idx })));
+  const [photosChanged, setPhotosChanged] = useState(false);
+  const photoInput = useRef(null);
+  const imgs = photos.map((x) => x.src);
+  const [ptexts, setPtexts] = useState(() => startImgs.map((_, k) => ({ text: "", color: "#ffffff", pos: "bot", size: 1, ...(post.photoText?.[k] || {}) })));
   const [ptChanged, setPtChanged] = useState(false);
+  const removePhoto = (k) => {
+    if (photos.length <= 1) return toast.error("A post needs at least one photo");
+    setPhotos((l) => l.filter((_, j) => j !== k));
+    setPtexts((l) => l.filter((_, j) => j !== k));
+    setPhotosChanged(true);
+  };
+  const addPhotos = async (files) => {
+    const room = 10 - photos.length;
+    if (room <= 0) return toast.error("Up to 10 photos per post");
+    const picked = [...files].filter((f) => f.type.startsWith("image/")).slice(0, room);
+    if (files.length > picked.length) toast("Only " + room + " more photo" + (room === 1 ? "" : "s") + " fit");
+    const added = [];
+    for (const f of picked) {
+      try { const data = await shrinkPhoto(f); added.push({ src: data, data }); } catch { toast.error("Couldn't read one of the photos"); }
+    }
+    if (!added.length) return;
+    setPhotos((l) => [...l, ...added]);
+    setPtexts((l) => [...l, ...added.map(() => ({ text: "", color: "#ffffff", pos: "bot", size: 1 }))]);
+    setPhotosChanged(true);
+  };
   const setPt = (k, patch) => { setPtexts((l) => l.map((x, j) => (j === k ? { ...x, ...patch } : x))); setPtChanged(true); };
 
   const save = async () => {
     setBusy(true);
     try {
-      const body = { caption, lines, ...(ptChanged ? { photoText: ptexts } : {}) };
+      const body = { caption, lines, ...(ptChanged || photosChanged ? { photoText: ptexts } : {}) };
+      if (photosChanged) {
+        const keep = new Set(photos.filter((x) => x.idx !== undefined).map((x) => x.idx));
+        body.removeImages = startImgs.map((_, i) => i).filter((i) => !keep.has(i));
+        body.addImages = photos.filter((x) => x.data).map((x) => x.data);
+      }
       if (songChanged) {
         if (!song) body.removeSong = true;
         else if (song.data) body.song = { data: song.data, name: song.name };
@@ -175,6 +229,19 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
           ) : (
             <button onClick={() => setShowMusic(true)} className="mt-1 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-2.5 px-4 text-[15px] active:opacity-80"><Music size={18} className="text-[#25D366]" /> Add a song</button>
           )}
+
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Photos ({photos.length}/10)</label>
+          <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
+            {photos.map((x, k) => (
+              <div key={(x.idx ?? "n") + "-" + k} className="relative shrink-0">
+                <img loading="lazy" decoding="async" src={x.data ? x.src : optimizeImage(x.src, 200)} alt="" className="size-20 rounded-xl object-cover" />
+                <button type="button" onClick={() => removePhoto(k)} aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 size-6 rounded-full bg-black/80 text-white flex items-center justify-center"><X size={14} /></button>
+              </div>
+            ))}
+            {photos.length < 10 && (
+              <button type="button" onClick={() => photoInput.current?.click()} aria-label="Add photos" className="size-20 shrink-0 rounded-xl bg-wa-field flex flex-col items-center justify-center gap-0.5 text-[#25D366] active:opacity-80"><ImageIcon size={22} /><span className="text-[11px]">Add</span></button>
+            )}
+          </div>
 
           <label className="block mt-3 text-[12.5px] text-wa-muted">Line on each photo</label>
           <div className="mt-1 space-y-2.5">
@@ -222,6 +289,7 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
         </div>
       </div>
 
+      <input ref={photoInput} type="file" accept="image/*" multiple className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) addPhotos(f); }} />
       <input
         ref={songInput}
         type="file"
@@ -589,8 +657,8 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
                   {p.song?.url && <span className="flex items-center gap-1 text-[12px] text-white/70 truncate"><Music size={11} className="text-[#25D366] shrink-0" /><span className="truncate">{p.song.name}</span></span>}
                 </span>
                 </button>
-                {p.mine && <button onClick={() => setEditing({ post: p })} className="h-8 pl-2.5 pr-3 rounded-full bg-white/12 active:bg-white/20 text-[13px] font-medium flex items-center gap-1.5" style={{ background: "rgba(255,255,255,.12)" }} aria-label="Edit post"><Pencil size={14} /> Edit</button>}
-                {p.mine && <button onClick={() => remove(p)} className="size-8 flex items-center justify-center text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
+                {(p.mine || p.canManage) && <button onClick={() => setEditing({ post: p })} className="h-8 pl-2.5 pr-3 rounded-full bg-white/12 active:bg-white/20 text-[13px] font-medium flex items-center gap-1.5" style={{ background: "rgba(255,255,255,.12)" }} aria-label="Edit post"><Pencil size={14} /> Edit</button>}
+                {(p.mine || p.canManage) && <button onClick={() => remove(p)} className="size-8 flex items-center justify-center text-white/60" aria-label="Delete post"><Trash2 size={18} /></button>}
               </div>
               <div className="relative">
                 <PostImages images={p.images?.length ? p.images : [p.image]} texts={p.photoText || []} onDouble={() => doubleTap(p)} onOpen={(k) => { const list = p.images?.length ? p.images : [p.image]; setViewer({ images: list, index: k, texts: p.photoText || [], caption: p.caption || "" }); }} />

@@ -5,6 +5,7 @@ import { STATUS_FONTS } from "../lib/statusFonts";
 import { X, Eye, Loader2, ChevronUp, ChevronRight, Heart, MessageCircle, Music, MapPin, Headphones, FileText, Download, Send } from "lucide-react";
 import { SongBars, SongSheet } from "./StatusSong";
 import StatusComments from "./StatusComments";
+import StatusEditSheet from "./StatusEditSheet";
 import { MoreVertical } from "./icons/WaGlyphs";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -62,6 +63,9 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
   const [paused, setPaused] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingStatus, setEditingStatus] = useState(false);
+  const appOwner = useAuthStore((st) => !!st.authUser?.isOwner);
+  const canManage = isOwn || (appOwner && !highlight); // the app owner can edit / remove anyone's status
   const [menuOpen, setMenuOpen] = useState(false); // the ⋮ menu
   const [deleting, setDeleting] = useState(false);
   const current = list[index];
@@ -373,7 +377,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             Copy link
           </button>
         )}
-        {isOwn && (
+        {canManage && (
           <div className="relative">
             <button onClick={() => setMenuOpen((o) => !o)} className="size-10 flex items-center justify-center text-white" aria-label="More options">
               <MoreVertical size={22} />
@@ -383,7 +387,12 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
                 <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
                 {/* WhatsApp-style dropdown: plain text rows, destructive one last */}
                 <div className="absolute right-0 top-11 z-30 min-w-[220px] rounded-xl bg-wa-pop text-wa-text shadow-2xl py-2 text-[15px]" onPointerDown={(e) => e.stopPropagation()}>
-                  {!highlight && onAddToHighlight && (
+                  {!highlight && (
+                    <button onClick={() => { setMenuOpen(false); setPaused(true); setEditingStatus(true); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
+                      Edit status
+                    </button>
+                  )}
+                  {isOwn && !highlight && onAddToHighlight && (
                     <button onClick={() => { setMenuOpen(false); onAddToHighlight(current); }} className="w-full text-left px-5 py-3 hover:bg-white/5 active:bg-white/10">
                       Add to highlights
                     </button>
@@ -725,6 +734,14 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
             </div>
           </div>
         </div>
+      )}
+
+      {editingStatus && current && (
+        <StatusEditSheet
+          status={current}
+          onClose={() => { setEditingStatus(false); setPaused(false); }}
+          onSaved={(d) => { setList((l) => l.map((x) => (x._id === current._id ? { ...x, ...d } : x))); setEditingStatus(false); setPaused(false); toast.success("Saved"); }}
+        />
       )}
 
       {/* Delete confirmation */}

@@ -631,7 +631,7 @@ export const viewReel = async (req, res) => {
 export const updateReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    const r = await Reel.findOne({ _id: req.params.id, userId: req.user._id });
+    const r = await Reel.findOne(isOwner(req.user) ? { _id: req.params.id } : { _id: req.params.id, userId: req.user._id }); // the app owner can change anyone's reel
     if (!r) return res.status(404).json({ error: "Not found" });
     const { caption, audience } = req.body || {};
     if (typeof caption === "string") {
@@ -640,7 +640,7 @@ export const updateReel = async (req, res) => {
     }
     if (audience !== undefined) {
       if (audience?.mode === "only" && !(Array.isArray(audience.users) && audience.users.length)) return res.status(400).json({ error: "Pick at least one person" });
-      const a = cleanReelAudience(audience, req.user._id);
+      const a = cleanReelAudience(audience, r.userId);
       if (!a) return res.status(400).json({ error: "Bad audience" });
       r.audience = a;
     }
@@ -655,7 +655,7 @@ export const updateReel = async (req, res) => {
 export const deleteReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    const r = await Reel.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+    const r = await Reel.findOneAndDelete(isOwner(req.user) ? { _id: req.params.id } : { _id: req.params.id, userId: req.user._id });
     if (!r) return res.status(404).json({ error: "Not found" });
     removeReelFiles(r);
     res.status(200).json({ ok: true });

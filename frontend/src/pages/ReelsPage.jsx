@@ -1408,6 +1408,7 @@ const ReelsPage = () => {
                 { icon: Link2, label: "Copy link", run: async () => { const r = await asReel(menuFor); if (r) copyLink(r); } },
                 { icon: Bookmark, label: "Saved reels", run: () => setTab("saved") },
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Pencil, label: "Edit reel", run: () => setEditFor(menuFor) }, { icon: BarChart3, label: "Insights", run: () => setInsightsFor(menuFor) }] : []),
+                ...(isOwner && !menuFor.mine && menuFor.source === "reel" ? [{ icon: Pencil, label: "Edit reel (owner)", run: () => setEditFor(menuFor) }] : []),
                 ...(!menuFor.mine ? [{ icon: EyeOff, label: "Not interested", run: () => hide(menuFor) }, { icon: Flag, label: "Report", run: () => setReportFor(menuFor), danger: true }] : []),
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Trash2, label: "Delete reel", run: () => remove(menuFor), danger: true }] : []),
                 ...(isOwner ? [{ icon: Flag, label: "Review reported reels", run: () => setReviewing(true) }] : []),

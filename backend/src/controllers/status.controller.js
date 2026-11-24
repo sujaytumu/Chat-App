@@ -1,4 +1,4 @@
-import { visibleUserIds } from "../lib/visibility.js";
+import { visibleUserIds, isOwner } from "../lib/visibility.js";
 import { defaultAudienceFor } from "../lib/audience.js";
 import mongoose from "mongoose";
 import Status from "../models/status.model.js";
@@ -281,7 +281,7 @@ export const deleteStatus = async (req, res) => {
 
     const status = await Status.findById(id);
     if (!status) return res.status(404).json({ error: "Status not found" });
-    if (!status.userId.equals(myId)) {
+    if (!status.userId.equals(myId) && !isOwner(req.user)) {
       return res.status(403).json({ error: "You can only delete your own status" });
     }
 
@@ -290,6 +290,43 @@ export const deleteStatus = async (req, res) => {
   } catch (error) {
     console.log("Error in deleteStatus controller:", error.message);
     res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+// Change a status after posting: the words under a picture / video, the text and look of a text status, the place
+// tag and who can see it. The poster can; so can the app owner (on anyone's status). The 24 hours do not restart.
+export const updateStatus = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Status not found" });
+    const status = await Status.findById(req.params.id);
+    if (!status) return res.status(404).json({ error: "Status not found" });
+    if (!status.userId.equals(req.user._id) && !isOwner(req.user)) return res.status(403).json({ error: "You can only edit your own status" });
+    const { caption, content, backgroundColor, font, location, removeLocation, audience } = req.body || {};
+    if (typeof caption === "string" && status.type !== "text") status.caption = caption.trim().slice(0, 700);
+    if (typeof content === "string" && status.type === "text") {
+      if (!content.trim()) return res.status(400).json({ error: "A text status can't be empty" });
+      status.content = content.slice(0, 700);
+    }
+    if (typeof backgroundColor === "string" && /^#[0-9a-f]{6}$/i.test(backgroundColor)) status.backgroundColor = backgroundColor;
+    if (Number.isInteger(font) && font >= 0 && font <= 4) status.font = font;
+    if (location && typeof location.name === "string" && location.name.trim()) {
+      const lat = Number(location.lat);
+      const lng = Number(location.lng);
+      status.location = { name: location.name.trim().slice(0, 100), ...(Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : {}) };
+    } else if (removeLocation === true) {
+      status.location = undefined;
+    }
+    if (audience && typeof audience === "object" && ["all", "except", "only"].includes(audience.mode)) {
+      const ids = [...new Set((Array.isArray(audience.users) ? audience.users : []).map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(status.userId)).slice(0, 1000);
+      if (audience.mode === "only" && !ids.length) return res.status(400).json({ error: "Pick at least one person to share with" });
+      status.audience = { mode: audience.mode, users: audience.mode === "all" ? [] : ids };
+      status.closeFriends = audience.mode === "only" && audience.close === true;
+    }
+    await status.save();
+    res.status(200).json(status);
+  } catch (error) {
+    console.log("Error in updateStatus controller:", error.message);
+    res.status(500).json({ error: "Couldn't save" });
   }
 };
 

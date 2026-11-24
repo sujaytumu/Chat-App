@@ -1,3 +1,4 @@
+import { isOwner } from "../lib/visibility.js";
 import { canSee, dropUserPairs } from "../lib/visibility.js";
 import jwt from "jsonwebtoken";
 import { generateToken, deviceLabel, renewToken } from "../lib/utils.js";
@@ -267,7 +268,8 @@ export const changePassword = async (req, res) => {
 export const checkAuth = (req, res) => {
   try {
     renewToken(req, res); // opening the app keeps the login alive (sliding 60 days)
-    res.status(200).json(req.user);
+    const plain = typeof req.user?.toObject === "function" ? req.user.toObject() : req.user;
+    res.status(200).json({ ...plain, isOwner: isOwner(req.user) }); // the app owner gets edit / remove on everyone's content
   } catch (error) {
     console.log("Error in checkAuth controller", error.message);
     res.status(500).json({ message: "Internal Server Error" });

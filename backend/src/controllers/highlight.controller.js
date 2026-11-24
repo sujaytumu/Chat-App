@@ -1,3 +1,4 @@
+import { isOwner } from "../lib/visibility.js";
 import { visibleUserIds, canSee as canSeePerson } from "../lib/visibility.js";
 import { defaultAudienceFor } from "../lib/audience.js";
 import mongoose from "mongoose";
@@ -227,7 +228,7 @@ export const updateHighlight = async (req, res) => {
 export const deleteHighlight = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Highlight not found" });
-    const r = await Highlight.deleteOne({ _id: req.params.id, userId: req.user._id });
+    const r = await Highlight.deleteOne(isOwner(req.user) ? { _id: req.params.id } : { _id: req.params.id, userId: req.user._id }); // the app owner can remove any highlight
     if (!r.deletedCount) return res.status(404).json({ error: "Highlight not found" });
     res.status(200).json({ message: "Highlight deleted" });
   } catch (error) {

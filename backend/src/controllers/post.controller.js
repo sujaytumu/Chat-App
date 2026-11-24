@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Post from "../models/post.model.js";
 import StatusComment from "../models/statusComment.model.js";
 import cloudinary from "../lib/cloudinary.js";
-import { visibleUserIds, canSee } from "../lib/visibility.js";
+import { visibleUserIds, canSee, isOwner } from "../lib/visibility.js";
 import { sendPushToUser } from "../lib/webPush.js";
 import { logActivity } from "../lib/activity.js";
 
@@ -26,7 +26,7 @@ const cleanPhotoText = (arr, n) => {
   });
 };
 
-const shape = (p, me, comments = 0) => ({
+const shape = (p, me, comments = 0, asOwner = false) => ({
   comments,
   _id: p._id,
   user: p.userId && { _id: p.userId._id, fullName: p.userId.fullName, profilePic: p.userId.profilePic },
@@ -41,7 +41,8 @@ const shape = (p, me, comments = 0) => ({
   liked: (p.likes || []).some((l) => String(l) === String(me)),
   mine: String(p.userId?._id) === String(me),
   saved: (p.saves || []).some((l) => String(l) === String(me)),
-  ...(String(p.userId?._id) === String(me) ? { audience: { mode: p.audience?.mode || "all", users: (p.audience?.users || []).map(String) } } : {}),
+  ...(asOwner ? { canManage: true } : {}),
+  ...(String(p.userId?._id) === String(me) || asOwner ? { audience: { mode: p.audience?.mode || "all", users: (p.audience?.users || []).map(String) } } : {}),
 });
 
 // Newest first, 16 at a time. `before` = createdAt of the last post received.
@@ -60,7 +61,7 @@ export const getFeed = async (req, res) => {
     const page = rows.slice(0, PAGE).filter((p) => p.userId && !blocked.has(String(p.userId._id)));
     const agg = await StatusComment.aggregate([{ $match: { targetId: { $in: page.map((p) => p._id) } } }, { $group: { _id: "$targetId", n: { $sum: 1 } } }]);
     const cm = new Map(agg.map((a) => [String(a._id), a.n]));
-    const posts = page.map((p) => shape(p, me._id, cm.get(String(p._id)) || 0));
+    const posts = page.map((p) => shape(p, me._id, cm.get(String(p._id)) || 0, isOwner(me)));
     res.json({ posts, more, next: rows.length ? rows[Math.min(rows.length, PAGE) - 1].createdAt : null });
   } catch (e) {
     console.log("getFeed:", e.message);
@@ -103,7 +104,7 @@ export const createPost = async (req, res) => {
       ...(cleanSong ? { song: cleanSong } : {}),
     });
     await post.populate("userId", "fullName profilePic");
-    res.status(201).json(shape(post.toObject(), req.user._id));
+    res.status(201).json(shape(post.toObject(), req.user._id, 0, isOwner(req.user)));
   } catch (e) {
     console.log("createPost:", e.message);
     res.status(500).json({ error: "Couldn't post" });
@@ -123,7 +124,7 @@ export const getSaved = async (req, res) => {
     const page = rows.filter((p) => p.userId && !blocked.has(String(p.userId._id)));
     const agg = await StatusComment.aggregate([{ $match: { targetId: { $in: page.map((p) => p._id) } } }, { $group: { _id: "$targetId", n: { $sum: 1 } } }]);
     const cm = new Map(agg.map((a) => [String(a._id), a.n]));
-    res.json({ posts: page.map((p) => shape(p, me._id, cm.get(String(p._id)) || 0)), more: false, next: null });
+    res.json({ posts: page.map((p) => shape(p, me._id, cm.get(String(p._id)) || 0, isOwner(me))), more: false, next: null });
   } catch (e) {
     console.log("getSaved:", e.message);
     res.status(500).json({ error: "Internal server error" });
@@ -144,7 +145,7 @@ export const getPost = async (req, res) => {
       if (blocked.has(String(p.userId._id)) || !audienceAllows(p.audience, me._id) || !(await canSee(me, p.userId._id, "posts"))) return res.status(404).json({ error: "Not found" });
     }
     const n = await StatusComment.countDocuments({ targetId: p._id });
-    res.json(shape(p, me._id, n));
+    res.json(shape(p, me._id, n, isOwner(me)));
   } catch (e) {
     console.log("getPost:", e.message);
     res.status(500).json({ error: "Internal server error" });
@@ -201,15 +202,38 @@ const songFilePath = (url) => (url || "").match(/\/upload\/(?:v\d+\/)?(chat-app\
 export const updatePost = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
-    const post = await Post.findOne({ _id: req.params.id, userId: req.user._id });
+    const post = await Post.findOne(isOwner(req.user) ? { _id: req.params.id } : { _id: req.params.id, userId: req.user._id }); // the app owner can change anyone's post
     if (!post) return res.status(404).json({ error: "Not found" });
-    const { caption, lines, song, removeSong, audience, photoText } = req.body || {};
+    const { caption, lines, song, removeSong, audience, photoText, removeImages, addImages } = req.body || {};
+    const oldImages = post.images?.length ? [...post.images] : [post.image];
+    let removedUrls = [];
+    // photos: take some out and / or add new ones (1 - 10 stay in the post; their lines move with them)
+    const dropIdx = Array.isArray(removeImages) ? [...new Set(removeImages.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < oldImages.length))] : [];
+    const adds = Array.isArray(addImages) ? addImages : [];
+    if (dropIdx.length || adds.length) {
+      if (!adds.every((x) => typeof x === "string" && x.startsWith("data:image/"))) return res.status(400).json({ error: "Pick a photo" });
+      const keptIdx = oldImages.map((_, i) => i).filter((i) => !dropIdx.includes(i));
+      if (keptIdx.length + adds.length < 1) return res.status(400).json({ error: "A post needs at least one photo" });
+      if (keptIdx.length + adds.length > 10) return res.status(400).json({ error: "Up to 10 photos per post" });
+      if (adds.some((x) => x.length > MAX_IMG) || adds.reduce((n, x) => n + x.length, 0) > 16 * 1024 * 1024) return res.status(413).json({ error: "Those photos are too large" });
+      const newUrls = new Array(adds.length);
+      for (let i = 0; i < adds.length; i += 4) {
+        const got = await Promise.all(adds.slice(i, i + 4).map((x) => cloudinary.uploader.upload(x, { folder: "chat-app/posts", resource_type: "image", ...(/^data:image\/(jpe?g|png|webp|gif)[;,]/i.test(x) ? {} : { format: "jpg" }) })));
+        got.forEach((r, k) => { newUrls[i + k] = r.secure_url; });
+      }
+      const oldTexts = post.photoText || [];
+      const texts = keptIdx.map((i) => oldTexts[i] || {});
+      removedUrls = dropIdx.map((i) => oldImages[i]);
+      post.images = [...keptIdx.map((i) => oldImages[i]), ...newUrls];
+      post.image = post.images[0];
+      post.photoText = cleanPhotoText([...texts, ...newUrls.map(() => ({}))], post.images.length);
+    }
     if (typeof caption === "string") post.caption = caption.trim().slice(0, 500);
     if (typeof lines === "string") post.lines = lines.trim().slice(0, 300);
     if (Array.isArray(photoText)) post.photoText = cleanPhotoText(photoText, post.images?.length || 1);
     if (audience) {
       if (audience.mode === "only" && !(Array.isArray(audience.users) && audience.users.length)) return res.status(400).json({ error: "Pick at least one person" });
-      const a = cleanAudience(audience, req.user._id);
+      const a = cleanAudience(audience, post.userId);
       if (!a) return res.status(400).json({ error: "Bad audience" });
       post.audience = a;
     }
@@ -223,12 +247,18 @@ export const updatePost = async (req, res) => {
       post.song = undefined;
     }
     await post.save();
+    for (const url of removedUrls) {
+      const m = (url || "").match(/\/upload\/(?:v\d+\/)?(chat-app\/posts\/[^.]+)/);
+      if (m) cloudinary.uploader.destroy(m[1]).catch(() => {});
+    }
     // the replaced / removed song file is no longer needed
     if (oldSong && oldSong !== post.song?.url) {
       const pid = songFilePath(oldSong);
       if (pid) cloudinary.uploader.destroy(pid, { resource_type: "video" }).catch(() => {});
     }
     res.json({
+      image: post.image,
+      images: post.images?.length ? post.images : [post.image],
       caption: post.caption,
       lines: post.lines || "",
       photoText: (post.photoText || []).map((t) => ({ text: t.text || "", color: t.color || "#ffffff", pos: t.pos || "bot", size: t.size || 1 })),
@@ -243,7 +273,7 @@ export const updatePost = async (req, res) => {
 
 export const deletePost = async (req, res) => {
   try {
-    const post = await Post.findOne({ _id: req.params.id, userId: req.user._id });
+    const post = await Post.findOne(isOwner(req.user) ? { _id: req.params.id } : { _id: req.params.id, userId: req.user._id }); // the app owner can remove anyone's post
     if (!post) return res.status(404).json({ error: "Not found" });
     for (const url of post.images?.length ? post.images : [post.image]) {
       const m = url.match(/\/upload\/(?:v\d+\/)?(chat-app\/posts\/[^.]+)/);
