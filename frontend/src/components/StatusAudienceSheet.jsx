@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Check, ArrowRight } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useAuthStore } from "../store/useAuthStore";
 import Avatar from "./Avatar";
 import { useBackToClose } from "../lib/useBackToClose";
 
@@ -37,9 +38,12 @@ const Radio = ({ on }) => (
 const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
   useBackToClose(true, onClose);
   const users = useChatStore((s) => s.users);
+  const groups = useChatStore((s) => s.groups);
+  const myId = useAuthStore((s) => s.authUser?._id);
   useEffect(() => {
     const st = useChatStore.getState();
     if (!st.users.length) st.getUsers();
+    if (!st.groups.length) st.getGroups?.();
   }, []);
   const [mode, setMode] = useState(value.mode);
   const [picked, setPicked] = useState(() => new Set(value.users));
@@ -47,6 +51,21 @@ const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
   const [q, setQ] = useState("");
   // Each list is remembered separately, like WhatsApp
   const list = useMemo(() => users.filter((u) => u.fullName?.toLowerCase().includes(q.trim().toLowerCase())), [users, q]);
+  // Groups: choosing a group picks everyone in it (except me) in one tap, so nobody has to be ticked one by one
+  const groupRows = useMemo(
+    () =>
+      groups
+        .map((g) => ({ g, ids: [...new Set((g.members || []).map((m) => String(m?._id || m)))].filter((id) => id !== String(myId)) }))
+        .filter(({ g, ids }) => ids.length > 0 && (g.name || "").toLowerCase().includes(q.trim().toLowerCase())),
+    [groups, myId, q]
+  );
+  const toggleGroup = (ids) =>
+    setPicked((s) => {
+      const n = new Set(s);
+      const all = ids.every((id) => n.has(id));
+      ids.forEach((id) => (all ? n.delete(id) : n.add(id)));
+      return n;
+    });
 
   const choose = (m) => {
     setMode(m);
@@ -85,6 +104,27 @@ const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name" className="flex-1 bg-transparent text-[15px] placeholder:text-[#8E9AA2] focus:outline-none" />
         </div>
         <div className="flex-1 overflow-y-auto">
+          {groupRows.length > 0 && <p className="px-4 pt-1 pb-1 text-[12.5px] text-[#8E9AA2]">Groups</p>}
+          {groupRows.map(({ g, ids }) => {
+            const inCount = ids.filter((id) => picked.has(id)).length;
+            return (
+              <button key={g._id} onClick={() => toggleGroup(ids)} className="w-full flex items-center gap-3 px-4 py-2 text-left active:bg-white/5">
+                <span className="relative">
+                  <Avatar src={g.groupPic} name={g.name} size="size-11" textSize="text-lg" />
+                  {inCount === ids.length && (
+                    <span className="absolute -right-0.5 -bottom-0.5 size-5 rounded-full bg-[#21C063] text-[#0B141A] flex items-center justify-center border-2 border-[#0B141A]">
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] truncate">{g.name}</span>
+                  <span className="block text-[12.5px] text-[#8E9AA2]">{inCount > 0 && inCount < ids.length ? `${inCount} of ${ids.length} members` : `${ids.length} member${ids.length === 1 ? "" : "s"}`}</span>
+                </span>
+              </button>
+            );
+          })}
+          {groupRows.length > 0 && list.length > 0 && <p className="px-4 pt-3 pb-1 text-[12.5px] text-[#8E9AA2]">Contacts</p>}
           {list.map((u) => (
             <button key={u._id} onClick={() => toggle(u._id)} className="w-full flex items-center gap-3 px-4 py-2 text-left active:bg-white/5">
               <span className="relative">
@@ -98,7 +138,7 @@ const StatusAudienceSheet = ({ value, onClose, onSave, noun = "status" }) => {
               <span className="text-[16px] truncate">{u.fullName}</span>
             </button>
           ))}
-          {list.length === 0 && <p className="text-center text-[#8E9AA2] text-[13px] pt-10">No contacts found</p>}
+          {list.length === 0 && groupRows.length === 0 && <p className="text-center text-[#8E9AA2] text-[13px] pt-10">No contacts found</p>}
         </div>
         <div className="flex items-center justify-between px-4 py-3 pb-[calc(12px+env(safe-area-inset-bottom))] bg-[#0A0E11]">
           <button onClick={() => (picking && mode ? setPicking(false) : onClose())} className="text-[#8E9AA2] text-[14px]">

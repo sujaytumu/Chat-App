@@ -8,6 +8,11 @@ import { useCallback, useRef } from "react";
 //   <div ref={useScrollMemory("calls")} className="overflow-y-auto">
 const saved = new Map();
 
+// Forget a list's remembered position, so the next time it appears it starts at the top.
+export const resetScrollMemory = (key) => {
+  saved.delete(key);
+};
+
 export function useScrollMemory(key) {
   const cleanup = useRef(null);
   return useCallback(

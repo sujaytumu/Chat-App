@@ -991,6 +991,22 @@ const readReelsMemo = () => {
   return reelsMemo;
 };
 
+// The reel you were watching in the main feed, and when you left it. Coming back to Reels within REEL_RESUME_MS lands on
+// that same reel; after a longer gap the feed starts from the first reel as usual.
+const REEL_RESUME_MS = 10 * 60 * 1000;
+const LAST_REEL_KEY = "reelsLastWatched";
+let lastWatched = null;
+const readLastWatched = () => {
+  if (lastWatched) return lastWatched;
+  try { lastWatched = JSON.parse(sessionStorage.getItem(LAST_REEL_KEY) || "null"); } catch { /* ignore */ }
+  return lastWatched;
+};
+const writeLastWatched = (id) => {
+  lastWatched = { id, at: Date.now() };
+  try { sessionStorage.setItem(LAST_REEL_KEY, JSON.stringify(lastWatched)); } catch { /* ignore */ }
+};
+const REAL_REEL_ID = /^[a-f\d]{24}$/i;
+
 const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -1047,7 +1063,17 @@ const ReelsPage = () => {
   const box = useRef(null);
   const loadingMore = useRef(false);
   const cursor = useRef({ next: null, ordered: false, px: 1 });
-  const startFrom = useRef(params.get("from") || null); // open the feed on this reel (from the search grid, or a reel just posted)
+  // open the feed on this reel: from the search grid, a reel just posted, or the reel you were on a moment ago (see REEL_RESUME_MS)
+  const startFrom = useRef(undefined);
+  if (startFrom.current === undefined) {
+    let resume = null;
+    if (!params.get("from") && !params.get("r")) {
+      const m = readReelsMemo();
+      const w = readLastWatched();
+      if ((m?.tab || "foryou") === "foryou" && !m?.view && w && REAL_REEL_ID.test(w.id) && Date.now() - w.at < REEL_RESUME_MS) resume = w.id;
+    }
+    startFrom.current = params.get("from") || resume;
+  }
   const lastFrom = useRef(params.get("from") || null);
   const gen = useRef(0);
 
@@ -1081,6 +1107,8 @@ const ReelsPage = () => {
       });
       setMore(!!data.more);
       setFailed(false);
+      // the reel we were asked to open on is gone (deleted / hidden): stop waiting for it
+      if (reset && startFrom.current && !(data.reels || []).some((r) => r._id === startFrom.current)) startFrom.current = null;
       if (reset && tab === "foryou" && !view) writeReelsCache(data.reels || []);
     } catch {
       // the server may be waking up / updating: say so, and let the person retry (never a spinner forever)
@@ -1146,6 +1174,13 @@ const ReelsPage = () => {
       setActiveId(id);
     }
   }, [reels.length, view, tab]);
+
+  // remember the reel on screen (main feed only), so coming back soon lands on it; leaving Reels starts the clock
+  useEffect(() => {
+    if (!activeId || view || tab !== "foryou" || startFrom.current || !REAL_REEL_ID.test(activeId)) return;
+    writeLastWatched(activeId);
+  }, [activeId, view, tab]);
+  useEffect(() => () => { const w = readLastWatched(); if (w) writeLastWatched(w.id); }, []);
 
   // opening a reel from search / a profile list: jump straight to it
   useEffect(() => {

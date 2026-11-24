@@ -28,7 +28,7 @@ import ChatListModal from "./ChatListModal";
 import { CheckCheck, UserPlus, IndianRupee, Lock, Megaphone, QrCode, ChevronDown, Archive, ArchiveRestore, Bell, BellOff, Pin, PinOff, Mail, MailOpen, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import ContextMenu, { isDesktopNow } from "./ContextMenu";
 import { useChatLockStore } from "../store/useChatLockStore";
-import { useScrollMemory } from "../lib/useScrollMemory";
+import { useScrollMemory, resetScrollMemory } from "../lib/useScrollMemory";
 import { useDraftStore } from "../store/useDraftStore";
 import { groupTypingLabel } from "../lib/typingLabel";
 import MuteSheet from "./MuteSheet";
@@ -118,6 +118,8 @@ const Sidebar = () => {
   const [showBroadcast, setShowBroadcast] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const isOwnerUser = String(authUser?.email || "").trim().toLowerCase() === "sujaybabutumu@gmail.com"; // the server enforces this too
+  // Talkies always opens on the most recent chats (top of the list), not where it was scrolled to last time
+  useState(() => resetScrollMemory("chats"));
   const listRef = useScrollMemory("chats");
   useBackToClose(showMenu, () => setShowMenu(false));
   const [showSelMenu, setShowSelMenu] = useState(false);
