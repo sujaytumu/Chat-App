@@ -2,6 +2,7 @@
 // Web Audio API so we don't need to ship/license audio assets; people can also
 // pick their own sound file in Settings (played through an <audio> element).
 import { inQuietHours } from "./quietHours";
+import { takeAudio, releaseAudio } from "./exclusiveAudio";
 import { nativePush, hasPhoneSounds,
   isMessageSoundEnabled,
   isCallRingtoneEnabled,
@@ -43,6 +44,9 @@ function ensureElements() {
 // Phones only allow programmatic <audio> playback once the element has been
 // played from a real tap. Do that with a silent clip on the first gesture so
 // a ring/message that arrives later can actually be heard.
+const playGen = new Map(); // element -> how many times a real sound was started on it
+const bumpGen = (el) => playGen.set(el, (playGen.get(el) || 0) + 1);
+
 function unlockElements() {
   if (elementsUnlocked) return;
   ensureElements();
@@ -51,17 +55,23 @@ function unlockElements() {
   [ringEl, msgEl].forEach((el) => {
     const prev = { src: el.src, loop: el.loop };
     const tok = ringToken;
+    const gen = playGen.get(el) || 0;
+    // a real sound (a tone check, a ring) was started on this element while the silent clip was loading:
+    // that sound must never be paused, muted or have its file swapped back by this background unlock
+    const taken = () => (playGen.get(el) || 0) !== gen;
     el.muted = true;
     el.loop = false;
     el.src = SILENT_WAV;
     el.play()
       .then(() => {
+        if (taken()) return;
         if (tok === ringToken && !(el === ringEl && ringSoundActive)) el.pause();
       })
       .catch(() => {
-        elementsUnlocked = false; // try again on the next gesture
+        if (!taken()) elementsUnlocked = false; // try again on the next gesture
       })
       .finally(() => {
+        if (taken()) return;
         el.muted = false;
         if (tok !== ringToken || (el === ringEl && ringSoundActive)) return; // a call started ringing meanwhile: leave it alone
         el.loop = prev.loop;
@@ -169,7 +179,18 @@ export function stopVibration() {
 //  - pluck: quick exponential decay (bell/pop); otherwise a sustained note with
 //    a short attack and release.
 
-function scheduleSteps(steps) {
+// Built-in tones played as a preview are tracked here, so tapping another tone (or leaving the screen) cuts them off
+// instead of letting several overlap.
+const previewNodes = new Set();
+function stopPreviewNodes() {
+  previewNodes.forEach(({ osc, gain }) => {
+    try { osc.stop(); } catch { /* already finished */ }
+    try { osc.disconnect(); gain.disconnect(); } catch { /* ignore */ }
+  });
+  previewNodes.clear();
+}
+
+function scheduleSteps(steps, track = false) {
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state !== "running") audioCtx.resume().catch(() => {});
   const now = audioCtx.currentTime;
@@ -198,6 +219,11 @@ function scheduleSteps(steps) {
     gain.connect(audioCtx.destination);
     osc.start(t0);
     osc.stop(t1 + 0.05);
+    if (track) {
+      const node = { osc, gain };
+      previewNodes.add(node);
+      osc.onended = () => previewNodes.delete(node);
+    }
   });
 }
 
@@ -259,6 +285,7 @@ let msgStopTimer = null;
 
 function playElement(el, url, { loop }) {
   ensureElements();
+  bumpGen(el);
   el.loop = loop;
   el.muted = false;
   el.volume = 1; // full level: the loudness itself comes from the (normalised) tune file
@@ -303,9 +330,9 @@ function stopElement(el) {
   }
 }
 
-function playPresetOnce(table, id, fallbackId) {
+function playPresetOnce(table, id, fallbackId, track = false) {
   try {
-    scheduleSteps(table[id] || table[fallbackId]);
+    scheduleSteps(table[id] || table[fallbackId], track);
   } catch {
     // Audio isn't critical — fail silently (e.g. autoplay policy blocks it
     // until the user has interacted with the page once).
@@ -508,7 +535,11 @@ export function stopRingtoneSound() {
 // Settings previews — play the given tone once regardless of the on/off
 // switches, so people can hear what they're choosing.
 const PREVIEW_MS = 10000; // call tones preview for 10 seconds
+let previewSeq = 0; // every preview / stop bumps it, so a preview still loading when another one starts gives up
 export function stopTonePreview() {
+  previewSeq++;
+  releaseAudio("tone-preview");
+  stopPreviewNodes();
   try { if (hasPhoneSounds()) nativePush().stopPhonePreview?.().catch(() => {}); } catch { /* not available */ }
   clearTimeout(previewTimer);
   clearInterval(ringSoundInterval);
@@ -520,53 +551,53 @@ export function stopTonePreview() {
 
 export async function previewCallTone(id) {
   primeAudio();
-  stopTonePreview();
+  stopTonePreview(); // the previous tone check
+  takeAudio("tone-preview", stopTonePreview); // and any other sound (status song, playlist...) is stopped too
+  const my = previewSeq;
+  const stale = () => my !== previewSeq; // another tone was tapped (or the screen closed) meanwhile
   if (id === "phone" && hasPhoneSounds()) {
     try { await nativePush().previewPhoneRing(); return true; } catch { return false; }
   }
-  if (id === "custom") {
-    const url = await loadCustomTone("call");
-    if (!url) return false;
+  if (id === "custom" || id === "talkies") {
     try {
+      const url = id === "custom" ? await loadCustomTone("call") : TALKIES_RING_URL;
+      if (stale()) return true;
+      if (!url) return false;
       ensureElements();
       await playElement(ringEl, url, { loop: false }); // one play, not a repeat
+      if (stale()) { stopElement(ringEl); return true; }
       previewTimer = setTimeout(() => stopElement(ringEl), PREVIEW_MS);
       return true;
     } catch {
-      return false;
+      return stale(); // an interrupted play() because another tone was tapped is not an error
     }
   }
-  if (id === "talkies") {
-    try {
-      ensureElements();
-      await playElement(ringEl, TALKIES_RING_URL, { loop: false }); // one play, not a repeat
-      previewTimer = setTimeout(() => stopElement(ringEl), PREVIEW_MS);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  // built-in tones: repeat the ring cycle (every 2 s) for the whole preview
-  playPresetOnce(CALL_PRESETS, id, "classic"); // one ring cycle, once
+  // built-in tones: one ring cycle
+  playPresetOnce(CALL_PRESETS, id, "classic", true);
   return true;
 }
 
 export async function previewMessageTone(id, kind = "message") {
   primeAudio();
   stopTonePreview();
+  takeAudio("tone-preview", stopTonePreview);
+  const my = previewSeq;
+  const stale = () => my !== previewSeq;
   if (id === "custom") {
-    const url = await loadCustomTone(kind);
-    if (!url) return false;
     try {
+      const url = await loadCustomTone(kind);
+      if (stale()) return true;
+      if (!url) return false;
       ensureElements();
-        await playElement(msgEl, url, { loop: false });
+      await playElement(msgEl, url, { loop: false });
+      if (stale()) { stopElement(msgEl); return true; }
       previewTimer = setTimeout(() => stopElement(msgEl), 5000);
       return true;
     } catch {
-      return false;
+      return stale();
     }
   }
-  playPresetOnce(MESSAGE_PRESETS, id, "ding");
+  playPresetOnce(MESSAGE_PRESETS, id, "ding", true);
   return true;
 }
 

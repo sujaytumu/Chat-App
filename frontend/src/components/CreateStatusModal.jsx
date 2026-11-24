@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import { takeAudio, releaseAudio } from "../lib/exclusiveAudio";
 import { useEffect, useRef, useState } from "react";
 import PollSheet from "./PollSheet";
 import { X, Camera, Images, Type, Image as ImageIcon, Headphones, FileText, Music, MapPin, Send, Loader2, Navigation, Palette, Play, Pause, BarChart3 } from "lucide-react";
@@ -167,9 +168,11 @@ const useSongPreview = (song, suspended) => {
     a.onplay = () => setPlaying(true);
     a.onpause = () => setPlaying(false);
     audio.current = a;
+    takeAudio(a, () => a.pause()); // one sound at a time
     a.play().catch(() => {}); // blocked autoplay: the play button still works
     return () => {
       a.pause();
+      releaseAudio(a);
       audio.current = null;
       setPlaying(false);
     };
@@ -180,8 +183,10 @@ const useSongPreview = (song, suspended) => {
   const toggle = () => {
     const a = audio.current;
     if (!a) return;
-    if (a.paused) a.play().catch(() => {});
-    else a.pause();
+    if (a.paused) {
+      takeAudio(a, () => a.pause());
+      a.play().catch(() => {});
+    } else a.pause();
   };
   return { playing, toggle };
 };

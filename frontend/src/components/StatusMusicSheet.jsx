@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { takeAudio, releaseAudio } from "../lib/exclusiveAudio";
 import { Search, Star, ArrowRight, Play, Pause, Loader2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -85,19 +86,28 @@ const StatusMusicSheet = ({ onClose, onPick, onFiles }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, chip, sub, chip === "starred" ? stars : null]);
 
+  const playSeq = useRef(0);
+  const OWNER = "music-sheet";
+  useEffect(() => () => { audio.current?.pause(); releaseAudio(OWNER); }, []); // leaving the sheet silences it
+
   const togglePlay = (s) => {
     if (!audio.current) {
       audio.current = new Audio();
       audio.current.onended = () => setPlaying(null);
     }
     const a = audio.current;
+    const my = ++playSeq.current;
     if (playing === s.id) {
       a.pause();
+      releaseAudio(OWNER);
       setPlaying(null);
       return;
     }
+    takeAudio(OWNER, () => { a.pause(); setPlaying(null); }); // one sound at a time
     a.src = s.preview;
-    a.play().then(() => setPlaying(s.id)).catch(() => toast.error("Couldn't play that preview"));
+    a.play()
+      .then(() => { if (my === playSeq.current) setPlaying(s.id); })
+      .catch((e) => { if (my === playSeq.current && e?.name !== "AbortError") toast.error("Couldn't play that preview"); }); // tapping another song interrupts this one: not an error
   };
 
   const toggleStar = (s) => {

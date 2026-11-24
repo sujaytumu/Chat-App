@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { takeAudio, releaseAudio } from "../lib/exclusiveAudio";
 import { createPortal } from "react-dom";
 import { Trash2, Play, Pause, ChevronDown, Check, Music } from "lucide-react";
 
@@ -71,6 +72,7 @@ const StatusSongEditor = ({ song, onDone, onRemove, onClose }) => {
     return () => {
       dead = true;
       a.pause();
+      releaseAudio(a);
       audio.current = null;
     };
   }, [song.data]);
@@ -102,6 +104,7 @@ const StatusSongEditor = ({ song, onDone, onRemove, onClose }) => {
     setNow(0);
     if (first.current) {
       first.current = false;
+      takeAudio(a, () => a.pause());
       a.play().catch(() => {});
     }
   }, [start, duration]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -152,6 +155,7 @@ const StatusSongEditor = ({ song, onDone, onRemove, onClose }) => {
     if (!a) return;
     if (a.paused) {
       if (a.currentTime < start || a.currentTime >= start + len) a.currentTime = start;
+      takeAudio(a, () => a.pause());
       a.play().catch(() => {});
     } else a.pause();
   };

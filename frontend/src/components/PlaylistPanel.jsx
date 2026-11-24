@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { takeAudio, releaseAudio } from "../lib/exclusiveAudio";
 import { createPortal } from "react-dom";
 import { Search, Plus, X, Play, Pause, Trash2, Loader2, Music2, SkipForward } from "lucide-react";
 import toast from "react-hot-toast";
@@ -53,14 +54,20 @@ const PlaylistPanel = ({ chat, onClose }) => {
     return () => clearTimeout(t);
   }, [query]);
 
+  const playSeq = useRef(0);
+  useEffect(() => () => { audio.current?.pause(); releaseAudio("playlist"); }, []);
+
   const play = (song, all = false) => {
     if (!audio.current) audio.current = new Audio();
     const a = audio.current;
+    const my = ++playSeq.current;
     if (playing === song.id && !all) {
       a.pause();
+      releaseAudio("playlist");
       setPlaying(null);
       return;
     }
+    takeAudio("playlist", () => { a.pause(); setPlaying(null); }); // one sound at a time
     queue.current = { list: songs, all };
     a.onended = () => {
       const { list, all: auto } = queue.current;
@@ -70,7 +77,9 @@ const PlaylistPanel = ({ chat, onClose }) => {
       else setPlaying(null);
     };
     a.src = song.preview;
-    a.play().then(() => setPlaying(song.id)).catch(() => toast.error("Couldn't play that song"));
+    a.play()
+      .then(() => { if (my === playSeq.current) setPlaying(song.id); })
+      .catch((e) => { if (my === playSeq.current && e?.name !== "AbortError") toast.error("Couldn't play that song"); });
   };
 
   const add = async (s) => {
