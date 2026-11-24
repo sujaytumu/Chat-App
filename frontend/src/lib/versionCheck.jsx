@@ -1,4 +1,4 @@
-import { useSyncExternalStore, useState } from "react";
+import { useSyncExternalStore, useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { useCallStore } from "../store/useCallStore";
@@ -205,16 +205,24 @@ export async function checkForUpdateNow() {
 
 export const currentBuildId = () => currentEntry()?.match(/index-([A-Za-z0-9_-]+)\.js/)?.[1] || "dev";
 
-// The update popup: shown once when a newer build is ready (never during a call). "Later" hides it for this
-// build; the Update button/pill stays available.
-let dismissedFor = "";
+// The update popup: shown when a newer build is ready (never during a call). "Later" only snoozes it for a minute -
+// it keeps asking until the app is really on the new build. The Update button/pill stays available too.
+const SNOOZE_MS = 60 * 1000;
+let snoozedUntil = 0;
 export function UpdatePopup() {
   const ready = useSyncExternalStore((cb) => (listeners.add(cb), () => listeners.delete(cb)), () => updateReady);
   const busyCall = useCallStore((s) => s.callStatus !== "idle");
   const [updating, setUpdating] = useState(false);
   const [, bump] = useState(0);
   const pending = readPending();
-  if (!ready || busyCall || !pending || dismissedFor === pending) return null;
+  // when the snooze ends, ask again
+  useEffect(() => {
+    const left = snoozedUntil - Date.now();
+    if (!ready || left <= 0) return undefined;
+    const t = setTimeout(() => bump((n) => n + 1), left + 50);
+    return () => clearTimeout(t);
+  });
+  if (!ready || busyCall || !pending || Date.now() < snoozedUntil) return null;
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-6" role="dialog" aria-modal="true" aria-label="Update available">
       <div className="w-full max-w-sm rounded-2xl bg-wa-panel p-6 text-center shadow-2xl">
@@ -230,7 +238,7 @@ export function UpdatePopup() {
         >
           {updating ? "Updating…" : "Update now"}
         </button>
-        <button disabled={updating} onClick={() => { dismissedFor = pending; bump((n) => n + 1); }} className="mt-2 h-10 w-full rounded-full text-[13.5px] text-wa-muted hover:bg-wa-pop">
+        <button disabled={updating} onClick={() => { snoozedUntil = Date.now() + SNOOZE_MS; bump((n) => n + 1); }} className="mt-2 h-10 w-full rounded-full text-[13.5px] text-wa-muted hover:bg-wa-pop">
           Later
         </button>
       </div>
