@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight, ImagePlus, Camera, Plus, Music, Loader2, SlidersHorizontal, Crop, Palette, Type, Eye } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ImagePlus, Camera, Plus, Music, Loader2, SlidersHorizontal, Crop, Palette, Type, Eye, RotateCw, RotateCcw, Square } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { readFileAsBase64 } from "../lib/fileUtils";
 import StatusMusicSheet from "./StatusMusicSheet";
+import PhotoCropSheet from "./PhotoCropSheet";
+import { rotateImage } from "../lib/photoEdit";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { useAuthStore } from "../store/useAuthStore";
 import { draftPut, draftGet, draftDel, draftGetPrefix, draftDelPrefix } from "../lib/draftStore";
@@ -202,6 +204,8 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
     axiosInstance.get("/privacy").then((r) => setAudience((cur) => cur || r.data.posts)).catch(() => {});
   }, []);
   const [prep, setPrep] = useState(null);
+  const [cropping, setCropping] = useState(false);
+  const [rotating, setRotating] = useState(false);
   const [stage, setStage] = useState(null); // text while sharing
   const gallery = useRef(null);
   const camera = useRef(null);
@@ -257,6 +261,21 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
   const safeCur = Math.min(cur, Math.max(0, items.length - 1));
   const it = items[safeCur];
   const patch = (i, p) => setItems((l) => l.map((x, k) => (k === i ? { ...x, ...p } : x)));
+  // rotate / crop are baked into the picture straight away (canvas only), so preview, grid, draft and upload all agree
+  const rotate = async (dir) => {
+    if (!it || rotating) return;
+    if (it.raw) return toast("This photo can't be rotated on this phone");
+    const id = it.id;
+    setRotating(true);
+    try {
+      const r = await rotateImage(it.src, dir);
+      setItems((l) => l.map((x) => (x.id === id ? { ...x, ...r } : x)));
+    } catch {
+      toast.error("Couldn't rotate this photo");
+    } finally {
+      setRotating(false);
+    }
+  };
 
   const add = async (e) => {
     const chosen = [...(e.target.files || [])].filter((f) => f.type.startsWith("image/") || /\.(heic|heif|heics|jpe?g|jfif|png|webp|avif|gif|bmp|tiff?|dng|raw|arw|cr2|nef|orf)$/i.test(f.name || ""));
@@ -479,6 +498,12 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
               </div>
             </div>
           )}
+          {tool === "rotate" && (
+            <div className="flex justify-center gap-3 px-4 pb-3 shrink-0">
+              <button onClick={() => rotate(-1)} disabled={rotating} className="h-11 px-5 rounded-full bg-wa-field text-[14.5px] flex items-center gap-2 active:scale-95 disabled:opacity-60">{rotating ? <Loader2 size={18} className="animate-spin" /> : <RotateCcw size={18} />} Left</button>
+              <button onClick={() => rotate(1)} disabled={rotating} className="h-11 px-5 rounded-full bg-wa-field text-[14.5px] flex items-center gap-2 active:scale-95 disabled:opacity-60">{rotating ? <Loader2 size={18} className="animate-spin" /> : <RotateCw size={18} />} Right</button>
+            </div>
+          )}
           {tool === "ratio" && (
             <div className="flex justify-center gap-2.5 px-4 pb-3 shrink-0">
               {RATIOS.map((r) => (
@@ -492,7 +517,9 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
               { id: "audio", icon: Music, label: "Audio", run: () => setShowMusic(true) },
               { id: "text", icon: Type, label: "Text" },
               ...(canBake ? [{ id: "filter", icon: Palette, label: "Filter" }, { id: "edit", icon: SlidersHorizontal, label: "Edit" }] : []),
-              { id: "ratio", icon: Crop, label: "Ratio" },
+              { id: "rotate", icon: RotateCw, label: "Rotate" },
+              { id: "crop", icon: Crop, label: "Crop", run: () => (it.raw ? toast("This photo can't be cropped on this phone") : setCropping(true)) },
+              { id: "ratio", icon: Square, label: "Ratio" },
             ].map((t) => (
               <button key={t.id} onClick={t.run || (() => setTool((c) => (c === t.id ? null : t.id)))} className={`shrink-0 w-[84px] h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 text-[13px] active:scale-95 transition-transform ${tool === t.id ? "bg-[#21C063]/25 text-[#21C063]" : "bg-wa-field"}`}>
                 <t.icon size={22} /> {t.label}
@@ -565,6 +592,9 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
           setShowMusic(false);
         }}
       />
+      {cropping && it && (
+        <PhotoCropSheet src={it.src} onClose={() => setCropping(false)} onApply={(r) => { patch(safeCur, { ...r, ratio: "orig" }); setCropping(false); }} />
+      )}
       {showAudience && (
         <div className="fixed inset-0 z-[95]">
           <StatusAudienceSheet noun="post" value={audience || { mode: "all", users: [] }} onClose={() => setShowAudience(false)} onSave={(a) => { setAudience(a); setShowAudience(false); }} />

@@ -204,17 +204,25 @@ export const updatePost = async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });
     const post = await Post.findOne(isOwner(req.user) ? { _id: req.params.id } : { _id: req.params.id, userId: req.user._id }); // the app owner can change anyone's post
     if (!post) return res.status(404).json({ error: "Not found" });
-    const { caption, lines, song, removeSong, audience, photoText, removeImages, addImages } = req.body || {};
+    const { caption, lines, song, removeSong, audience, photoText, removeImages, addImages, photoOrder } = req.body || {};
     const oldImages = post.images?.length ? [...post.images] : [post.image];
     let removedUrls = [];
     // photos: take some out and / or add new ones (1 - 10 stay in the post; their lines move with them)
     const dropIdx = Array.isArray(removeImages) ? [...new Set(removeImages.map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < oldImages.length))] : [];
     const adds = Array.isArray(addImages) ? addImages : [];
-    if (dropIdx.length || adds.length) {
+    // photoOrder = the final photo order: "e3" = the post's existing photo #3, "n0" = the first newly added photo
+    let order = null;
+    if (Array.isArray(photoOrder)) {
+      order = photoOrder.map((t) => { const m = /^([en])(\d{1,3})$/.exec(String(t)); return m ? { k: m[1], i: Number(m[2]) } : null; });
+      const bad = order.some((o) => !o || (o.k === "e" && o.i >= oldImages.length) || (o.k === "n" && o.i >= adds.length)) || new Set(photoOrder.map(String)).size !== order.length;
+      if (bad) return res.status(400).json({ error: "Bad photo order" });
+    }
+    if (order || dropIdx.length || adds.length) {
       if (!adds.every((x) => typeof x === "string" && x.startsWith("data:image/"))) return res.status(400).json({ error: "Pick a photo" });
-      const keptIdx = oldImages.map((_, i) => i).filter((i) => !dropIdx.includes(i));
-      if (keptIdx.length + adds.length < 1) return res.status(400).json({ error: "A post needs at least one photo" });
-      if (keptIdx.length + adds.length > 10) return res.status(400).json({ error: "Up to 10 photos per post" });
+      const keptIdx = order ? order.filter((o) => o.k === "e").map((o) => o.i) : oldImages.map((_, i) => i).filter((i) => !dropIdx.includes(i));
+      const total = order ? order.length : keptIdx.length + adds.length;
+      if (total < 1) return res.status(400).json({ error: "A post needs at least one photo" });
+      if (total > 10) return res.status(400).json({ error: "Up to 10 photos per post" });
       if (adds.some((x) => x.length > MAX_IMG) || adds.reduce((n, x) => n + x.length, 0) > 16 * 1024 * 1024) return res.status(413).json({ error: "Those photos are too large" });
       const newUrls = new Array(adds.length);
       for (let i = 0; i < adds.length; i += 4) {
@@ -222,11 +230,16 @@ export const updatePost = async (req, res) => {
         got.forEach((r, k) => { newUrls[i + k] = r.secure_url; });
       }
       const oldTexts = post.photoText || [];
-      const texts = keptIdx.map((i) => oldTexts[i] || {});
-      removedUrls = dropIdx.map((i) => oldImages[i]);
-      post.images = [...keptIdx.map((i) => oldImages[i]), ...newUrls];
+      const gone = order ? oldImages.map((_, i) => i).filter((i) => !keptIdx.includes(i)) : dropIdx;
+      removedUrls = gone.map((i) => oldImages[i]);
+      if (order) {
+        post.images = order.map((o) => (o.k === "e" ? oldImages[o.i] : newUrls[o.i]));
+        post.photoText = cleanPhotoText(order.map((o) => (o.k === "e" ? oldTexts[o.i] || {} : {})), post.images.length);
+      } else {
+        post.images = [...keptIdx.map((i) => oldImages[i]), ...newUrls];
+        post.photoText = cleanPhotoText([...keptIdx.map((i) => oldTexts[i] || {}), ...newUrls.map(() => ({}))], post.images.length);
+      }
       post.image = post.images[0];
-      post.photoText = cleanPhotoText([...texts, ...newUrls.map(() => ({}))], post.images.length);
     }
     if (typeof caption === "string") post.caption = caption.trim().slice(0, 500);
     if (typeof lines === "string") post.lines = lines.trim().slice(0, 300);

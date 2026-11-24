@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Eye, ChevronRight, Image as ImageIcon, Music, Volume2, VolumeX } from "lucide-react";
+import { Heart, MessageCircle, Send, Loader2, Trash2, Pencil, X, Bookmark, Eye, ChevronRight, ChevronLeft, Image as ImageIcon, Music, Volume2, VolumeX, RotateCw, RotateCcw, Crop } from "lucide-react";
+import PhotoCropSheet from "./PhotoCropSheet";
+import { rotateImage } from "../lib/photoEdit";
 import StatusComments from "./StatusComments";
 import PhotoViewer from "./PhotoViewer";
 import StatusMusicSheet from "./StatusMusicSheet";
@@ -145,6 +147,19 @@ const shrinkPhoto = (file) =>
   });
 
 // Edit a post: photos (add / remove), caption, lines, song (add later / change / remove) and who can see it
+const fileToData = (file) =>
+  new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => {
+      let out = String(r.result);
+      if (!out.startsWith("data:image/")) out = out.replace(/^data:[^;,]*/, `data:image/${(file.name?.split(".").pop() || "heic").toLowerCase()}`);
+      res(out);
+    };
+    r.onerror = () => rej(new Error("unreadable"));
+    r.readAsDataURL(file);
+  });
+const IMG_FILE = /\.(heic|heif|heics|jpe?g|jfif|png|webp|avif|gif|bmp|tiff?)$/i;
+
 const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
   const [caption, setCaption] = useState(post.caption || "");
   const [lines, setLines] = useState(post.lines || "");
@@ -164,29 +179,78 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
   const imgs = photos.map((x) => x.src);
   const [ptexts, setPtexts] = useState(() => startImgs.map((_, k) => ({ text: "", color: "#ffffff", pos: "bot", size: 1, ...(post.photoText?.[k] || {}) })));
   const [ptChanged, setPtChanged] = useState(false);
+  const [sel, setSel] = useState(null); // the photo whose position / rotate / crop buttons are open
+  const [adding, setAdding] = useState(false);
+  const [working, setWorking] = useState(false);
+  const [cropping, setCropping] = useState(false);
   const removePhoto = (k) => {
     if (photos.length <= 1) return toast.error("A post needs at least one photo");
     setPhotos((l) => l.filter((_, j) => j !== k));
     setPtexts((l) => l.filter((_, j) => j !== k));
+    setSel(null);
     setPhotosChanged(true);
   };
+  // photos and their lines always move together
+  const movePhoto = (k, to) => {
+    if (to < 0 || to >= photos.length) return;
+    const swap = (l) => { const c = [...l]; [c[k], c[to]] = [c[to], c[k]]; return c; };
+    setPhotos(swap);
+    setPtexts(swap);
+    setSel(to);
+    setPhotosChanged(true);
+  };
+  // an edited photo becomes a new upload in the same place; the old file is removed when you Save
+  const replacePhoto = (k, r) => {
+    setPhotos((l) => l.map((x, j) => (j === k ? { src: r.src, data: r.src } : x)));
+    setPhotosChanged(true);
+  };
+  const rotatePhoto = async (k, dir) => {
+    if (working) return;
+    setWorking(true);
+    try {
+      if (photos[k].raw) throw new Error("raw");
+      replacePhoto(k, await rotateImage(photos[k].src, dir));
+    } catch {
+      toast.error("Couldn't rotate this photo here");
+    } finally {
+      setWorking(false);
+    }
+  };
   const addPhotos = async (files) => {
+    // (files is already a plain array: the file box is cleared right after the pick, which also empties its live list)
     const room = 10 - photos.length;
     if (room <= 0) return toast.error("Up to 10 photos per post");
-    const picked = [...files].filter((f) => f.type.startsWith("image/")).slice(0, room);
-    if (files.length > picked.length) toast("Only " + room + " more photo" + (room === 1 ? "" : "s") + " fit");
+    const chosen = files.filter((f) => f.type.startsWith("image/") || IMG_FILE.test(f.name || ""));
+    if (!chosen.length) return toast.error("Pick a photo");
+    const picked = chosen.slice(0, room);
+    if (chosen.length > picked.length) toast("Only " + room + " more photo" + (room === 1 ? "" : "s") + " fit");
+    setAdding(true);
     const added = [];
+    let failed = 0;
     for (const f of picked) {
-      try { const data = await shrinkPhoto(f); added.push({ src: data, data }); } catch { toast.error("Couldn't read one of the photos"); }
+      try {
+        let data;
+        let raw = false;
+        try { data = await shrinkPhoto(f); } catch {
+          if (f.size > 9 * 1024 * 1024) throw new Error("too big"); // this phone can't open it and the server takes ~9 MB per photo
+          data = await fileToData(f); // the server converts it to JPEG
+          raw = true;
+        }
+        added.push({ src: data, data, raw });
+      } catch { failed++; }
     }
+    setAdding(false);
+    if (failed) toast.error(`Couldn't add ${failed} photo${failed === 1 ? "" : "s"}`);
     if (!added.length) return;
     setPhotos((l) => [...l, ...added]);
     setPtexts((l) => [...l, ...added.map(() => ({ text: "", color: "#ffffff", pos: "bot", size: 1 }))]);
+    setSel(photos.length + added.length - 1);
     setPhotosChanged(true);
   };
   const setPt = (k, patch) => { setPtexts((l) => l.map((x, j) => (j === k ? { ...x, ...patch } : x))); setPtChanged(true); };
 
   const save = async () => {
+    if (adding || working) return;
     setBusy(true);
     try {
       const body = { caption, lines, ...(ptChanged || photosChanged ? { photoText: ptexts } : {}) };
@@ -194,6 +258,8 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
         const keep = new Set(photos.filter((x) => x.idx !== undefined).map((x) => x.idx));
         body.removeImages = startImgs.map((_, i) => i).filter((i) => !keep.has(i));
         body.addImages = photos.filter((x) => x.data).map((x) => x.data);
+        let n = 0;
+        body.photoOrder = photos.map((x) => (x.idx !== undefined ? `e${x.idx}` : `n${n++}`)); // exact positions, new photos included
       }
       if (songChanged) {
         if (!song) body.removeSong = true;
@@ -230,18 +296,28 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
             <button onClick={() => setShowMusic(true)} className="mt-1 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-2.5 px-4 text-[15px] active:opacity-80"><Music size={18} className="text-[#25D366]" /> Add a song</button>
           )}
 
-          <label className="block mt-3 text-[12.5px] text-wa-muted">Photos ({photos.length}/10)</label>
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Photos ({photos.length}/10) - tap one to move, rotate or crop it</label>
           <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
             {photos.map((x, k) => (
-              <div key={(x.idx ?? "n") + "-" + k} className="relative shrink-0">
-                <img loading="lazy" decoding="async" src={x.data ? x.src : optimizeImage(x.src, 200)} alt="" className="size-20 rounded-xl object-cover" />
-                <button type="button" onClick={() => removePhoto(k)} aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 size-6 rounded-full bg-black/80 text-white flex items-center justify-center"><X size={14} /></button>
+              <div key={(x.idx ?? "n") + "-" + k} className="relative shrink-0" onClick={() => setSel((c) => (c === k ? null : k))}>
+                {x.raw ? <div className={`size-20 rounded-xl bg-[#2a3942] flex items-center justify-center text-wa-muted ${sel === k ? "ring-2 ring-[#21C063]" : ""}`}><ImageIcon size={24} /></div> : <img loading="lazy" decoding="async" src={x.data ? x.src : optimizeImage(x.src, 200)} alt="" className={`size-20 rounded-xl object-cover ${sel === k ? "ring-2 ring-[#21C063]" : ""}`} />}
+                <span className="absolute bottom-1 left-1 min-w-5 h-5 px-1 rounded-full bg-black/70 text-white text-[11px] font-semibold flex items-center justify-center">{k + 1}</span>
+                <button type="button" onClick={(e) => { e.stopPropagation(); removePhoto(k); }} aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 size-6 rounded-full bg-black/80 text-white flex items-center justify-center"><X size={14} /></button>
               </div>
             ))}
             {photos.length < 10 && (
-              <button type="button" onClick={() => photoInput.current?.click()} aria-label="Add photos" className="size-20 shrink-0 rounded-xl bg-wa-field flex flex-col items-center justify-center gap-0.5 text-[#25D366] active:opacity-80"><ImageIcon size={22} /><span className="text-[11px]">Add</span></button>
+              <button type="button" disabled={adding} onClick={() => photoInput.current?.click()} aria-label="Add photos" className="size-20 shrink-0 rounded-xl bg-wa-field flex flex-col items-center justify-center gap-0.5 text-[#25D366] active:opacity-80 disabled:opacity-60">{adding ? <Loader2 size={22} className="animate-spin" /> : <ImageIcon size={22} />}<span className="text-[11px]">{adding ? "Adding…" : "Add"}</span></button>
             )}
           </div>
+          {sel !== null && photos[sel] && (
+            <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+              <button type="button" onClick={() => movePhoto(sel, sel - 1)} disabled={sel === 0} className="h-9 px-3 rounded-full bg-wa-field text-[13px] flex items-center gap-1 disabled:opacity-40 active:opacity-80"><ChevronLeft size={16} /> Earlier</button>
+              <button type="button" onClick={() => movePhoto(sel, sel + 1)} disabled={sel === photos.length - 1} className="h-9 px-3 rounded-full bg-wa-field text-[13px] flex items-center gap-1 disabled:opacity-40 active:opacity-80">Later <ChevronRight size={16} /></button>
+              <button type="button" onClick={() => rotatePhoto(sel, -1)} disabled={working} aria-label="Rotate left" className="size-9 rounded-full bg-wa-field flex items-center justify-center disabled:opacity-40 active:opacity-80">{working ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}</button>
+              <button type="button" onClick={() => rotatePhoto(sel, 1)} disabled={working} aria-label="Rotate right" className="size-9 rounded-full bg-wa-field flex items-center justify-center disabled:opacity-40 active:opacity-80"><RotateCw size={16} /></button>
+              <button type="button" onClick={() => (photos[sel].raw ? toast.error("This photo can't be cropped on this phone") : setCropping(true))} disabled={working} className="h-9 px-3 rounded-full bg-wa-field text-[13px] flex items-center gap-1.5 disabled:opacity-40 active:opacity-80"><Crop size={15} /> Crop</button>
+            </div>
+          )}
 
           <label className="block mt-3 text-[12.5px] text-wa-muted">Line on each photo</label>
           <div className="mt-1 space-y-2.5">
@@ -285,11 +361,11 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
           </button>
         </div>
         <div className="px-5 pt-2 pb-[calc(16px+env(safe-area-inset-bottom))] shrink-0">
-          <button onClick={save} disabled={busy} className="w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98] flex items-center justify-center gap-2">{busy ? <><Loader2 size={18} className="animate-spin" /> Saving…</> : "Save"}</button>
+          <button onClick={save} disabled={busy || adding || working} className="w-full h-12 rounded-full bg-[#21C063] text-black font-semibold text-[16px] disabled:opacity-60 active:scale-[.98] flex items-center justify-center gap-2">{busy ? <><Loader2 size={18} className="animate-spin" /> Saving…</> : "Save"}</button>
         </div>
       </div>
 
-      <input ref={photoInput} type="file" accept="image/*" multiple className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => { const f = e.target.files; e.target.value = ""; if (f?.length) addPhotos(f); }} />
+      <input ref={photoInput} type="file" accept="image/*" multiple className="hidden" onClick={(e) => e.stopPropagation()} onChange={(e) => { const f = [...(e.target.files || [])]; e.target.value = ""; if (f.length) addPhotos(f); }} />
       <input
         ref={songInput}
         type="file"
@@ -306,6 +382,11 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
           setShowMusic(false);
         }}
       />
+      {cropping && sel !== null && photos[sel] && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PhotoCropSheet src={photos[sel].src} onClose={() => setCropping(false)} onApply={(r) => { replacePhoto(sel, r); setCropping(false); }} />
+        </div>
+      )}
       {showMusic && (
         <div onClick={(e) => e.stopPropagation()}>
           <StatusMusicSheet
