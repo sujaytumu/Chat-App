@@ -983,6 +983,38 @@ const ReportsReview = ({ onClose, onRemoved }) => {
   );
 };
 
+// "When a reel ends": slide on to the next reel by itself, or play the same reel again. The choice is kept on this phone
+// (the same setting as the small repeat button on a reel) and every reel follows it.
+const readRepeatChoice = () => { try { return localStorage.getItem("reelRepeat") === "1"; } catch { return false; } };
+const EndChoiceSheet = ({ onClose }) => {
+  const [repeat, setRepeat] = useState(readRepeatChoice);
+  const choose = (want) => {
+    try { localStorage.setItem("reelRepeat", want ? "1" : "0"); } catch { /* ignore */ }
+    window.dispatchEvent(new Event("reelrepeat")); // the repeat button on the reel follows it
+    setRepeat(want);
+    toast(want ? "Each reel will play again and again" : "Reels will scroll to the next one by themselves", { icon: want ? "🔁" : "⬇️" });
+    onClose();
+  };
+  const rows = [
+    [false, "Auto scroll to the next reel", "When a reel finishes, the next one slides in"],
+    [true, "Play the same reel again", "A reel repeats until you swipe to another"],
+  ];
+  return (
+    <div className="absolute inset-0 z-[60] bg-black/60 flex items-end" onClick={onClose}>
+      <div className="w-full bg-neutral-900 rounded-t-3xl pb-5 text-white wa-pop-in" onClick={(e) => e.stopPropagation()}>
+        <div className="mx-auto mt-2 mb-2 h-1 w-10 rounded-full bg-white/25" />
+        <p className="px-6 pb-2 text-[17px] font-semibold">When a reel ends</p>
+        {rows.map(([want, title, sub]) => (
+          <button key={title} onClick={() => choose(want)} className="w-full flex items-center gap-4 px-6 py-3.5 text-left active:bg-white/10">
+            <span className={`size-5 rounded-full border-2 flex items-center justify-center shrink-0 ${repeat === want ? "border-[#21C063]" : "border-white/50"}`}>{repeat === want && <span className="size-2.5 rounded-full bg-[#21C063]" />}</span>
+            <span className="flex-1"><span className="block text-[16px]">{title}</span><span className="block text-[12.5px] text-white/55">{sub}</span></span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Where you were inside Reels (tab / a tag, person or search list): kept while you visit other screens and come back
 let reelsMemo = null;
 const readReelsMemo = () => {
@@ -1060,6 +1092,7 @@ const ReelsPage = () => {
   const [isOwner, setIsOwner] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [reportFor, setReportFor] = useState(null);
+  const [endChoice, setEndChoice] = useState(false);
   const box = useRef(null);
   const loadingMore = useRef(false);
   const cursor = useRef({ next: null, ordered: false, px: 1 });
@@ -1483,6 +1516,7 @@ const ReelsPage = () => {
               <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-white/25" />
               {[
                 { icon: muted ? VolumeX : Volume2, label: muted ? "Turn sound on" : "Mute sound", run: () => setMuted(!muted) },
+                { icon: readRepeatChoice() ? Repeat1 : ChevronDown, label: `When a reel ends: ${readRepeatChoice() ? "play again" : "auto scroll"}`, run: () => setEndChoice(true) },
                 { icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) },
                 { icon: Link2, label: "Copy link", run: async () => { const r = await asReel(menuFor); if (r) copyLink(r); } },
                 ...(menuFor.source === "reel" && !menuFor.external ? [{ icon: Pin, label: menuFor.pinned ? "Unpin reel" : "Pin to top", run: () => pin(menuFor) }] : []),
@@ -1505,6 +1539,7 @@ const ReelsPage = () => {
 
       <MainNav bottomOnly />
 
+      {endChoice && <EndChoiceSheet onClose={() => setEndChoice(false)} />}
       {reviewing && <ReportsReview onClose={() => setReviewing(false)} onRemoved={(id) => setReels((l) => l.filter((r) => r._id !== id))} />}
       {searching && (
         <SearchReels
