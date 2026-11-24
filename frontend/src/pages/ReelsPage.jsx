@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye, Pencil, ChevronRight } from "lucide-react";
+import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye, Pencil, ChevronRight, Pin } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
@@ -218,9 +218,11 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const finished = () => {
     const v = video.current;
     if (!v || !active || endHandled.current) return;
-    if (!readRepeat() && onNext && onNext(reel._id)) {
+    if (!readRepeat()) {
       endHandled.current = true;
-      v.pause(); // the last frame stays on screen for the short pause before the next reel slides in
+      v.pause(); // the last frame stays on screen (for the short pause before the next reel slides in)
+      if (onNext && onNext(reel._id)) return;
+      songEl.current?.pause(); // the very last reel just stops there - nothing is repeated
       return;
     }
     v.currentTime = reel.trim?.start || 0;
@@ -297,6 +299,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       const v = video.current;
       if (!v) return;
       if (v.paused) {
+        endHandled.current = false; // playing it again from the end counts as a fresh play
         v.play().catch(() => {});
         songEl.current?.play().catch(() => {});
         setPaused(false);
@@ -338,6 +341,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
           <span className="px-3 py-1 rounded-full bg-black/55 text-white text-[13px] font-semibold">2× speed</span>
         </div>
       )}
+      {reel.pinned && <span className="absolute z-20 left-3 top-[calc(66px+env(safe-area-inset-top))] flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/50 backdrop-blur-sm ring-1 ring-white/15 text-white text-[12px] font-semibold pointer-events-none"><Pin size={12} className="text-[#25D366]" fill="currentColor" /> Pinned</span>}
       <div className="absolute z-20 right-3 top-[calc(64px+env(safe-area-inset-top))] flex flex-col items-end gap-1.5">
         <button onClick={() => setRateOpen((o) => !o)} className="min-w-[44px] h-8 px-2.5 rounded-full bg-black/45 backdrop-blur-sm ring-1 ring-white/15 text-white text-[13px] font-bold tabular-nums active:scale-95 transition-transform" aria-label="Playback speed">{rate}×</button>
         <button onClick={toggleRepeat} className={`size-8 rounded-full backdrop-blur-sm ring-1 flex items-center justify-center active:scale-95 transition-transform ${repeatOn ? "bg-[#25D366] ring-[#25D366] text-black" : "bg-black/45 ring-white/15 text-white"}`} aria-label={repeatOn ? "Play same reel: on" : "Play same reel: off"} title="Play same reel"><Repeat1 size={16} /></button>
@@ -1042,7 +1046,9 @@ const ReelsPage = () => {
   const [reportFor, setReportFor] = useState(null);
   const box = useRef(null);
   const loadingMore = useRef(false);
-  const cursor = useRef({ before: null, px: 1 });
+  const cursor = useRef({ next: null, ordered: false, px: 1 });
+  const startFrom = useRef(params.get("from") || null); // open the feed on this reel (from the search grid, or a reel just posted)
+  const lastFrom = useRef(params.get("from") || null);
   const gen = useRef(0);
 
   const load = useCallback(async (reset) => {
@@ -1052,8 +1058,10 @@ const ReelsPage = () => {
     try {
       const params = { tab };
       if (!reset) {
-        if (cursor.current.before) params.before = cursor.current.before;
+        if (cursor.current.next) params[cursor.current.ordered ? "after" : "before"] = cursor.current.next;
         params.px = cursor.current.px;
+      } else if (startFrom.current && tab === "foryou" && !view) {
+        params.from = startFrom.current; // the server sends everything up to that reel, in order
       }
       let url = "/reels";
       let cfg = { params, timeout: 20000 };
@@ -1064,7 +1072,7 @@ const ReelsPage = () => {
       const { data } = await axiosInstance.get(url, cfg);
       if (my !== gen.current) return;
       if (typeof data.owner === "boolean") setIsOwner(data.owner);
-      if (data.next) cursor.current.before = data.next;
+      if (data.next) { cursor.current.next = data.next; cursor.current.ordered = !!data.ordered; }
       if (data.px) cursor.current.px = data.px;
       setReels((cur) => {
         const base = reset ? cur.filter((r) => r._pinned) : cur;
@@ -1085,8 +1093,10 @@ const ReelsPage = () => {
 
   // (re)load whenever the tab changes; a shared reel link is shown first
   useEffect(() => {
-    cursor.current = { before: null, px: 1 };
-    const cached = tab === "foryou" && !view && !params.get("r") ? readReelsCache() : null;
+    const f = params.get("from");
+    if (f && f !== lastFrom.current) { lastFrom.current = f; startFrom.current = f; } // a new "open on this reel" link
+    cursor.current = { next: null, ordered: false, px: 1 };
+    const cached = tab === "foryou" && !view && !params.get("r") && !startFrom.current ? readReelsCache() : null;
     setLoading(!cached);
     setReels(cached || []);
     setActiveId(null);
@@ -1124,6 +1134,18 @@ const ReelsPage = () => {
     const i = reels.findIndex((r) => r._id === activeId);
     if (i >= reels.length - 3 && reels.length) load(false);
   }, [activeId, reels, more, load, tab, view]);
+
+  // opened from the search grid / just posted: land on that reel (the list is in posting order)
+  useEffect(() => {
+    const id = startFrom.current;
+    if (!id || view || tab !== "foryou" || !reels.length) return;
+    const el = box.current?.querySelector(`[data-reel="${id}"]`);
+    if (el) {
+      startFrom.current = null;
+      el.scrollIntoView({ block: "start" });
+      setActiveId(id);
+    }
+  }, [reels.length, view, tab]);
 
   // opening a reel from search / a profile list: jump straight to it
   useEffect(() => {
@@ -1271,6 +1293,28 @@ const ReelsPage = () => {
     }
   };
 
+  // Pin: pinned reels open first, in the order they were pinned (they move to the top the next time Reels opens)
+  const pin = async (reel) => {
+    const want = !reel.pinned;
+    patch(reel._id, () => ({ pinned: want }));
+    try {
+      await axiosInstance.put("/reels/pin", { reelId: reel._id, pinned: want });
+      toast(want ? "Pinned - it opens first next time" : "Unpinned", { icon: "📌" });
+    } catch (err) {
+      patch(reel._id, () => ({ pinned: !want }));
+      toast.error(err.response?.data?.error || "Couldn't pin");
+    }
+  };
+
+  // a newly posted reel belongs at the end (posting order): reload the list and land on it
+  const showPosted = (r) => {
+    startFrom.current = r._id;
+    if (view) return setView(null); // the view/tab effect reloads
+    if (tab !== "foryou") return setTab("foryou");
+    cursor.current = { next: null, ordered: false, px: 1 };
+    load(true);
+  };
+
   const [editFor, setEditFor] = useState(null);
 
   const remove = async (reel) => {
@@ -1406,6 +1450,7 @@ const ReelsPage = () => {
                 { icon: muted ? VolumeX : Volume2, label: muted ? "Turn sound on" : "Mute sound", run: () => setMuted(!muted) },
                 { icon: Bookmark, label: menuFor.saved ? "Remove from saved" : "Save reel", run: () => save(menuFor) },
                 { icon: Link2, label: "Copy link", run: async () => { const r = await asReel(menuFor); if (r) copyLink(r); } },
+                ...(menuFor.source === "reel" && !menuFor.external ? [{ icon: Pin, label: menuFor.pinned ? "Unpin reel" : "Pin to top", run: () => pin(menuFor) }] : []),
                 { icon: Bookmark, label: "Saved reels", run: () => setTab("saved") },
                 ...(menuFor.mine && menuFor.source === "reel" ? [{ icon: Pencil, label: "Edit reel", run: () => setEditFor(menuFor) }, { icon: BarChart3, label: "Insights", run: () => setInsightsFor(menuFor) }] : []),
                 ...(isOwner && !menuFor.mine && menuFor.source === "reel" ? [{ icon: Pencil, label: "Edit reel (owner)", run: () => setEditFor(menuFor) }] : []),
@@ -1436,14 +1481,8 @@ const ReelsPage = () => {
       {creating && (
         <NewReel
           onClose={() => setCreating(false)}
-          onAdded={(r) => { setTab("foryou"); setReels((l) => [{ ...r, source: "reel" }, ...l]); }}
-          onPosted={(r) => {
-            setCreating(false);
-            setTab("foryou");
-            setReels((l) => [{ ...r, source: "reel" }, ...l]);
-            setActiveId(r._id);
-            box.current?.scrollTo({ top: 0 });
-          }}
+          onAdded={(r) => showPosted(r)}
+          onPosted={(r) => { setCreating(false); showPosted(r); }}
         />
       )}
     </div>

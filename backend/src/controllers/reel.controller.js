@@ -8,6 +8,7 @@ import Follow from "../models/follow.model.js";
 import SavedReel from "../models/savedReel.model.js";
 import Repost from "../models/repost.model.js";
 import ReelHide from "../models/reelHide.model.js";
+import ReelPin from "../models/reelPin.model.js";
 import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee, isOwner, ownerId as getOwnerId } from "../lib/visibility.js";
@@ -21,6 +22,7 @@ const MAX_SONG_BASE64 = 6 * 1024 * 1024;
 const MAX_SECONDS = 180;
 const MAX_REEL_BASE64 = 70 * 1000 * 1000; // ≈ 50 MB video once base64-encoded
 const PAGE = 8;
+const DIR = process.env.REELS_ORDER === "newest" ? -1 : 1; // 1 = the order they were posted (first posted first)
 
 const shape = (r, meId, commentCounts) => ({
   _id: r._id,
@@ -64,6 +66,7 @@ const publicIdOf = (url) => {
   return m ? m[1] : null;
 };
 async function removeReelFiles(r) {
+  ReelPin.deleteMany({ reelId: r._id }).catch(() => {}); // nobody keeps a pin to a deleted reel
   for (const url of [r.videoUrl, r.song?.url]) {
     const id = publicIdOf(url);
     if (id) await cloudinary.uploader.destroy(id, { resource_type: "video" }).catch(() => {});
@@ -86,26 +89,28 @@ async function decorate(items, me) {
   // only look up the rows for THIS page (not every follow / save / repost the person ever made)
   const owners = [...new Set(items.map((r) => String(r.user?._id || r.userId?._id || "")).filter(Boolean))];
   const reelIds = items.map((r) => r._id);
-  const [follows, saved, reposted] = await Promise.all([
+  const [follows, saved, reposted, pins] = await Promise.all([
     owners.length ? Follow.find({ follower: me._id, following: { $in: owners } }).select("following").lean() : [],
     reelIds.length ? SavedReel.find({ userId: me._id, key: { $in: reelIds.map((i) => `reel:${i}`) } }).select("key").lean() : [],
     reelIds.length ? Repost.find({ userId: me._id, reelId: { $in: reelIds } }).select("reelId").lean() : [],
+    reelIds.length ? ReelPin.find({ userId: me._id, reelId: { $in: reelIds } }).select("reelId").lean() : [],
   ]);
+  const pn = new Set(pins.map((x) => String(x.reelId)));
   const f = new Set(follows.map((x) => String(x.following)));
   const sv = new Set(saved.map((x) => x.key));
   const rp = new Set(reposted.map((x) => String(x.reelId)));
-  return items.map((r) => ({ ...r, source: "reel", following: f.has(String(r.user?._id)), saved: sv.has(`reel:${r._id}`), reposted: rp.has(String(r._id)), mine: String(r.user?._id) === myId, ...(String(r.user?._id) === myId ? {} : { audience: undefined }) }));
+  return items.map((r) => ({ ...r, source: "reel", following: f.has(String(r.user?._id)), saved: sv.has(`reel:${r._id}`), reposted: rp.has(String(r._id)), pinned: pn.has(String(r._id)), mine: String(r.user?._id) === myId, ...(String(r.user?._id) === myId ? {} : { audience: undefined }) }));
 }
 
 // Reels from people this person may see (and not hidden / blocked), for lists that are not the main feed.
-async function visibleReels(me, extraQuery, limit = 40) {
+async function visibleReels(me, extraQuery, limit = 300) {
   const ids = await visibleUserIds(me, "reels");
   const q = { ...extraQuery };
   if (ids !== null) q.userId = { $in: [me._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
   const hidden = (await ReelHide.find({ userId: me._id }).select("reelId").lean()).map((h) => h.reelId);
   if (hidden.length) q._id = { $nin: hidden };
   const blocked = new Set((me.blockedUsers || []).map(String));
-  const rows = await Reel.find(q).sort({ createdAt: -1 }).limit(limit).populate("userId", "fullName profilePic").lean();
+  const rows = await Reel.find(q).sort({ createdAt: DIR, _id: DIR }).limit(limit).populate("userId", "fullName profilePic").lean();
   return (await decorate(await withCounts(rows.filter((r) => !blocked.has(String(r.userId?._id))), me._id), me));
 }
 
@@ -263,7 +268,104 @@ const audienceAllows = (a, viewerId) => {
 const OWNER_ONLY = process.env.REELS_OWNER_ONLY !== "false";
 const rawTagForOwner = (req) => !!String(req.query.tag || "").replace(/\W/g, "");
 
+// ── Posting order ──────────────────────────────────────────────────────────────────────────────────────────────
+// Reels are shown in the order they were posted (first posted = first). Set REELS_ORDER=newest on the server to flip it,
+// or REELS_ORDERED=false to bring the old mixed feed back. Pinned reels (personal) come first, in the order pinned.
+const ORDERED = process.env.REELS_ORDERED !== "false";
+const ORDER_PAGE = 10;
+const MAX_PINS = 20;
+const cursorOf = (r) => `${new Date(r.createdAt).getTime()}_${r._id}`;
+const parseCursor = (c) => {
+  const m = /^(\d{9,14})_([a-f0-9]{24})$/i.exec(String(c || ""));
+  return m ? { t: new Date(Number(m[1])), id: new mongoose.Types.ObjectId(m[2]) } : null;
+};
+const pastCond = (cur) => { const op = DIR === 1 ? "$gt" : "$lt"; return { $or: [{ createdAt: { [op]: cur.t } }, { createdAt: cur.t, _id: { [op]: cur.id } }] }; }; // strictly after `cur` in feed order
+const upToCond = (cur) => { const op = DIR === 1 ? "$lt" : "$gt"; const eq = DIR === 1 ? "$lte" : "$gte"; return { $or: [{ createdAt: { [op]: cur.t } }, { createdAt: cur.t, _id: { [eq]: cur.id } }] }; }; // up to and including `cur`
+
+async function orderedFeed(req, res) {
+  try {
+    const me = req.user;
+    const myId = String(me._id);
+    const friendsTab = req.query.tab === "friends";
+    const toOid = (i) => new mongoose.Types.ObjectId(String(i));
+    const ids = await visibleUserIds(me, "reels");
+    const [follows, hidden, pinDocs, saved, reposts] = await Promise.all([
+      Follow.find({ follower: me._id }).select("following").lean(),
+      ReelHide.find({ userId: me._id }).select("reelId").lean(),
+      friendsTab ? [] : ReelPin.find({ userId: me._id }).sort({ createdAt: 1, _id: 1 }).lean(),
+      SavedReel.find({ userId: me._id }).select("key").lean(),
+      Repost.find({ userId: me._id }).select("reelId").lean(),
+    ]);
+    const followSet = new Set(follows.map((f) => String(f.following)));
+    let allowed = ids === null ? null : new Set([myId, ...[...ids].map(String)]);
+    if (friendsTab) allowed = new Set([...followSet].filter((i) => !allowed || allowed.has(i)));
+    const ownerOid = friendsTab ? null : await getOwnerId();
+    const and = [audienceFilter(me._id), { userId: { $ne: null } }];
+    if (allowed !== null) and.push({ userId: { $in: [...allowed].map(toOid) } });
+    if (OWNER_ONLY && ownerOid) and.push({ userId: toOid(ownerOid) });
+    const blocked = (me.blockedUsers || []).map(String);
+    if (blocked.length) and.push({ userId: { $nin: blocked.map(toOid) } });
+    const hiddenIds = hidden.map((h) => String(h.reelId));
+    const pinIds = pinDocs.map((p) => String(p.reelId));
+    const skip = [...hiddenIds, ...pinIds];
+    const restAnd = [...and, ...(skip.length ? [{ _id: { $nin: skip.map(toOid) } }] : [])];
+
+    const after = parseCursor(req.query.after);
+    let limit = ORDER_PAGE;
+    // opened from the search grid: send everything up to the tapped reel (plus a page), so it can be scrolled to
+    const from = !after && mongoose.isValidObjectId(String(req.query.from || "")) ? String(req.query.from) : null;
+    if (from) {
+      const x = await Reel.findOne({ _id: from, $and: and }).select("createdAt").lean();
+      if (x) limit = Math.min(400, (await Reel.countDocuments({ $and: [...restAnd, upToCond({ t: x.createdAt, id: x._id })] })) + ORDER_PAGE);
+    }
+    const rows = await Reel.find({ $and: after ? [...restAnd, pastCond(after)] : restAnd }).sort({ createdAt: DIR, _id: DIR }).limit(limit + 1).populate("userId", "fullName profilePic").lean();
+    const more = rows.length > limit;
+    const pageRows = rows.slice(0, limit);
+
+    let pinnedRows = [];
+    if (!after && pinIds.length) {
+      const found = await Reel.find({ _id: { $in: pinIds.map(toOid) }, $and: and }).populate("userId", "fullName profilePic").lean();
+      const byId = new Map(found.map((r) => [String(r._id), r]));
+      const hid = new Set(hiddenIds);
+      pinnedRows = pinIds.map((i) => byId.get(i)).filter((r) => r && !hid.has(String(r._id)));
+    }
+    const savedKeys = new Set(saved.map((x) => x.key));
+    const mineReposted = new Set(reposts.map((x) => String(x.reelId)));
+    const dress = async (list, pinned) => (await withCounts(list, me._id)).map((r) => ({ ...r, source: "reel", following: followSet.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`), reposted: mineReposted.has(String(r._id)), pinned }));
+    const out = [...(await dress(pinnedRows, true)), ...(await dress(pageRows, false))];
+    res.set("Cache-Control", "no-store");
+    res.status(200).json({ owner: isOwner(me), reels: out, more, px: 1, localMore: more, ordered: true, next: pageRows.length ? cursorOf(pageRows[pageRows.length - 1]) : null });
+  } catch (error) {
+    console.log("Error in orderedFeed:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+// Pin / unpin a reel for me (up to 20). Pinned reels open first, in the order they were pinned.
+export const pinReel = async (req, res) => {
+  try {
+    const { reelId, pinned } = req.body || {};
+    if (!mongoose.isValidObjectId(reelId)) return res.status(400).json({ error: "Invalid" });
+    if (pinned === false) {
+      await ReelPin.deleteOne({ userId: req.user._id, reelId });
+      return res.status(200).json({ pinned: false });
+    }
+    const r = await Reel.findById(reelId).select("userId audience").lean();
+    if (!r || !r.userId) return res.status(404).json({ error: "Not found" });
+    const mine = String(r.userId) === String(req.user._id);
+    if (!mine && (!(await canSee(req.user, r.userId, "reels")) || !reelAudienceAllows(r.audience, req.user._id))) return res.status(404).json({ error: "Not found" });
+    const already = await ReelPin.exists({ userId: req.user._id, reelId });
+    if (!already && (await ReelPin.countDocuments({ userId: req.user._id })) >= MAX_PINS) return res.status(400).json({ error: `You can pin up to ${MAX_PINS} reels - unpin one first` });
+    await ReelPin.updateOne({ userId: req.user._id, reelId }, { $setOnInsert: { userId: req.user._id, reelId } }, { upsert: true });
+    res.status(200).json({ pinned: true });
+  } catch (error) {
+    console.log("Error in pinReel:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export const getReelFeed = async (req, res) => {
+  if (ORDERED) return orderedFeed(req, res);
   try {
     const me = req.user;
     const myId = String(me._id);
@@ -780,13 +882,14 @@ const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // The Explore grid: up to 16 reels (same visibility rules as the feed).
 export const exploreReels = async (req, res) => {
   try {
-    let list = await visibleReels(req.user, {}, 60);
+    let list = await visibleReels(req.user, {}, 600);
     if (OWNER_ONLY) {
       const oid = await getOwnerId();
       list = list.filter((r) => String(r.user?._id) === String(oid));
     }
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ reels: list.slice(0, 16) });
+    // every reel, in the order posted (only what the grid needs, so a long list stays light)
+    res.status(200).json({ reels: list.map((r) => ({ _id: r._id, poster: r.poster, ...(r.poster ? {} : { videoUrl: r.videoUrl }), views: r.views, likeCount: r.likeCount, createdAt: r.createdAt, pinned: !!r.pinned })) });
   } catch (error) {
     console.log("Error in exploreReels:", error.message);
     res.status(500).json({ error: "Internal server error" });

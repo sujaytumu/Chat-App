@@ -2,7 +2,7 @@ import { axiosInstance } from "./axios";
 
 // Keeps the first few "For you" reels on the phone so Reels opens instantly,
 // then the page refreshes them from the server in the background.
-const KEY = "reelsFirstPageV1";
+const KEY = "reelsFirstPageV2"; // V2: reels are now in posting order (an old saved copy would show the old order)
 const MAX_AGE = 6 * 60 * 60 * 1000;
 
 export const readReelsCache = () => {
