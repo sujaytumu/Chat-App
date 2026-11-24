@@ -147,11 +147,21 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
   const endHandled = useRef(false); // the end can be reported twice (timeupdate + ended): move on only once
+  // Always says whether THIS reel is the one on screen right now. Callbacks that fire late (a play() that finishes after
+  // you swiped on, the tap timer) check it, so a reel you already left can never start playing again.
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  // Only the reel on screen may make sound: if any other reel's video or song starts, stop it at once.
+  const mustBeSilent = (e) => { if (!activeRef.current) e.currentTarget.pause(); };
 
   useEffect(() => {
     const v = video.current;
-    if (!v) return;
+    if (!v) return undefined;
     if (active) {
+      // whatever else is still playing (a reel that was left while it was starting) is stopped first: one reel at a time
+      document.querySelectorAll("section[data-reel] video, section[data-reel] audio").forEach((m) => {
+        if (m !== v && m !== songEl.current && !m.paused) m.pause();
+      });
       setPaused(false);
       endHandled.current = false;
       // (no needless seek: a seek while the page is still sliding in causes a visible hitch)
@@ -163,8 +173,11 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
         songEl.current.currentTime = reel.song?.start || 0;
         songEl.current.play().catch(() => {});
       }
-      v.play().catch(() => {
-        // sound blocked until a tap: start muted so it still plays
+      v.play().catch((err) => {
+        // Swiping on cancels a play that is still starting (AbortError), and a reel that is no longer on screen must stay
+        // stopped - neither is "sound blocked". Only a real autoplay block starts the reel muted so it still plays.
+        if (!activeRef.current || err?.name === "AbortError") return;
+        if (err?.name !== "NotAllowedError") return;
         v.muted = true;
         setMuted(true, true);
         v.play().catch(() => {});
@@ -172,11 +185,20 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       if (reel.source === "reel" || !reel.source) axiosInstance.put(`/reels/${reel._id}/view`).catch(() => {});
       else if (reel.source === "status") axiosInstance.put(`/status/${reel._id}/view`).catch(() => {});
     } else {
+      clearTimeout(tapTimer.current); // a tap just before swiping on must not start this reel later
       v.pause();
       songEl.current?.pause();
     }
+    return undefined;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, reel._id]);
+  }, [active, reel._id, mount]); // mount: a freshly created video element for the reel on screen has to start too
+
+  // leaving (reel removed / page closed): make sure nothing is left playing
+  useEffect(() => () => {
+    clearTimeout(tapTimer.current);
+    video.current?.pause();
+    songEl.current?.pause();
+  }, []);
 
   useEffect(() => {
     if (video.current) video.current.muted = muted;
@@ -297,7 +319,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
     if (soundBlocked) { setMuted(false); return; } // first tap turns the sound on, like Instagram
     tapTimer.current = setTimeout(() => {
       const v = video.current;
-      if (!v) return;
+      if (!v || !activeRef.current) return;
       if (v.paused) {
         endHandled.current = false; // playing it again from the end counts as a fresh play
         v.play().catch(() => {});
@@ -326,6 +348,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
           disablePictureInPicture
           preload={active || near ? "auto" : "metadata"}
           onTimeUpdate={onTime}
+          onPlay={mustBeSilent}
           onEnded={finished}
           onLoadedMetadata={(e) => { if (reel.trim?.start) e.currentTarget.currentTime = reel.trim.start; }}
           style={{ filter: reel.filter && reel.filter !== "none" ? filterCss(reel.filter) : undefined, transform: "translateZ(0)" }}
@@ -334,7 +357,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       ) : (
         reel.poster && <img src={reel.poster} alt="" decoding="async" className="absolute inset-0 w-full h-full object-contain" />
       )}
-      {reel.song?.url && <audio ref={songEl} src={reel.song.url} loop preload={active ? "auto" : "none"} />}
+      {reel.song?.url && <audio ref={songEl} src={reel.song.url} loop onPlay={mustBeSilent} preload={active ? "auto" : "none"} />}
       <div className="absolute inset-0 touch-pan-y select-none" onClick={tap} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()} />
       {fast && (
         <div className="absolute top-16 inset-x-0 flex justify-center pointer-events-none z-10">
