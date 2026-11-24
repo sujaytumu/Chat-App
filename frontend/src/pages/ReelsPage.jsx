@@ -111,7 +111,7 @@ const InstaReel = ({ reel, active, near }) => {
   );
 };
 
-const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, onTag, onUser }) => {
+const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, far = false, onTag, onUser }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -338,7 +338,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       {/* Only the reel on screen and its neighbours get a real video player; the rest are just a still picture.
           That keeps phone memory and the video decoder free, which is what stops the lag. */}
       {/* Whatever the video's shape, it is shown whole (never cropped); the empty space is filled with a soft blurred copy of its first frame */}
-      {reel.poster && <img src={reel.poster} alt="" aria-hidden="true" decoding="async" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
+      {reel.poster && !far && <img src={reel.poster} alt="" aria-hidden="true" decoding="async" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
       {mount ? (
         <video
           ref={video}
@@ -355,7 +355,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
           className="absolute inset-0 w-full h-full object-contain"
         />
       ) : (
-        reel.poster && <img src={reel.poster} alt="" decoding="async" className="absolute inset-0 w-full h-full object-contain" />
+        reel.poster && !far && <img src={reel.poster} alt="" decoding="async" className="absolute inset-0 w-full h-full object-contain" />
       )}
       {reel.song?.url && <audio ref={songEl} src={reel.song.url} loop onPlay={mustBeSilent} preload={active ? "auto" : "none"} />}
       <div className="absolute inset-0 touch-pan-y select-none" onClick={tap} onPointerDown={holdStart} onPointerUp={holdEnd} onPointerLeave={holdEnd} onPointerCancel={holdEnd} onContextMenu={(e) => e.preventDefault()} />
@@ -1501,7 +1501,7 @@ const ReelsPage = () => {
               r.source === "instagram" ? (
                 <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx === activeIdx + 1} mount={Math.abs(idx - activeIdx) <= 1} />
               ) : (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} soundBlocked={soundBlocked} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx >= activeIdx - 1 && idx !== activeIdx && idx <= activeIdx + 2} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
+              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} soundBlocked={soundBlocked} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx >= activeIdx - 1 && idx !== activeIdx && idx <= activeIdx + 2} mount={idx >= activeIdx - 1 && idx <= activeIdx + 2} far={Math.abs(idx - activeIdx) > 4} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
               )
             ))}
           </div>

@@ -27,6 +27,8 @@ const reelSchema = new mongoose.Schema(
 reelSchema.index({ createdAt: -1 });
 reelSchema.index({ userId: 1, createdAt: -1 });
 reelSchema.index({ hashtags: 1, createdAt: -1 });
+reelSchema.index({ userId: 1, createdAt: 1, _id: 1 }); // the feed: posting order, ties broken by id
+reelSchema.index({ createdAt: 1, _id: 1 });
 
 const Reel = mongoose.model("Reel", reelSchema);
 export default Reel;

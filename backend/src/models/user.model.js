@@ -169,6 +169,8 @@ userSchema.post("save", function (doc) {
   userWritten(String(doc._id));
 });
 
+userSchema.index({ "mutedUntil.until": 1 }); // the 15-second scheduler looks for expired mutes
+
 const User = mongoose.model("User", userSchema);
 
 export default User;

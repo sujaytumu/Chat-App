@@ -23,3 +23,28 @@ axiosInstance.interceptors.response.use(
     throw error;
   }
 );
+
+// A sleeping / slow server must never leave a screen hanging. A GET with no answer after 25 s gives up
+// (instead of waiting forever) and is quietly tried again (the host is usually awake by then). Only reads
+// are retried, so nothing is ever sent twice; downloads and calls that set their own timeout are left alone.
+const RETRY_STATUS = new Set([502, 503, 504]);
+const isGet = (cfg) => String(cfg?.method || "get").toLowerCase() === "get";
+axiosInstance.interceptors.request.use((cfg) => {
+  if (isGet(cfg) && !cfg.timeout && !cfg.responseType) cfg.timeout = 25000;
+  return cfg;
+});
+axiosInstance.interceptors.response.use(
+  (r) => r,
+  async (error) => {
+    const cfg = error?.config;
+    if (!cfg || !isGet(cfg) || axios.isCancel(error) || cfg.signal?.aborted || cfg.noRetry) throw error;
+    const status = error.response?.status;
+    const noAnswer = !error.response && ["ECONNABORTED", "ERR_NETWORK", "ETIMEDOUT"].includes(error.code);
+    if (!(noAnswer || RETRY_STATUS.has(status))) throw error;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) throw error; // really offline: say so now
+    cfg._tries = (cfg._tries || 0) + 1;
+    if (cfg._tries > 2) throw error;
+    await new Promise((r) => setTimeout(r, 1000 * cfg._tries));
+    return axiosInstance(cfg);
+  }
+);

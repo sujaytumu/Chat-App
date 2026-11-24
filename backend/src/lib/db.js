@@ -6,12 +6,26 @@ export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI);
     console.log(`MongoDB connected: ${conn.connection.host}`);
-    await cleanupCallLogMessages();
-    await keepExpiredStatuses();
+    // Start-up housekeeping runs in the background a little later, so the first requests after a (cold) start
+    // don't queue behind it. The call-log sweep scans every message, so it runs ONCE (a marker row remembers).
+    setTimeout(() => {
+      runOnce("cleanup-call-log-messages", cleanupCallLogMessages).catch(() => {});
+      keepExpiredStatuses().catch(() => {});
+    }, 45000);
   } catch (error) {
     console.log("MongoDB connection error:", error);
   }
 };
+
+async function runOnce(id, fn) {
+  const col = mongoose.connection.db.collection("maintenance");
+  try {
+    await col.insertOne({ _id: id, at: new Date() }); // fails if it already ran
+  } catch {
+    return;
+  }
+  await fn();
+}
 
 // Permanently removing the inline "Voice call · No answer" chat-bubble
 // feature (it kept resurfacing clutter even after reliability fixes to the

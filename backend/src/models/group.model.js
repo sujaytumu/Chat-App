@@ -53,6 +53,9 @@ const groupSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// "which groups am I in" runs at every sign-in, socket connect and chat-list load: without this it read every group
+groupSchema.index({ members: 1 });
+
 const Group = mongoose.model("Group", groupSchema);
 
 export default Group;
