@@ -5,6 +5,7 @@ import { rotateImage } from "../lib/photoEdit";
 import StatusComments from "./StatusComments";
 import PhotoViewer from "./PhotoViewer";
 import StatusMusicSheet from "./StatusMusicSheet";
+import { useLongPressReorder, moveItem } from "../lib/useLongPressReorder";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { readFileAsBase64 } from "../lib/fileUtils";
 import toast from "react-hot-toast";
@@ -199,6 +200,13 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
     setSel(to);
     setPhotosChanged(true);
   };
+  // hold a photo and drag it to another place: the photo and its line move together
+  const photoStrip = useLongPressReorder((from, to) => {
+    setPhotos((l) => moveItem(l, from, to));
+    setPtexts((l) => moveItem(l, from, to));
+    setSel(to);
+    setPhotosChanged(true);
+  });
   // an edited photo becomes a new upload in the same place; the old file is removed when you Save
   const replacePhoto = (k, r) => {
     setPhotos((l) => l.map((x, j) => (j === k ? { src: r.src, data: r.src } : x)));
@@ -296,13 +304,13 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
             <button onClick={() => setShowMusic(true)} className="mt-1 w-full h-12 rounded-2xl bg-wa-field flex items-center gap-2.5 px-4 text-[15px] active:opacity-80"><Music size={18} className="text-[#25D366]" /> Add a song</button>
           )}
 
-          <label className="block mt-3 text-[12.5px] text-wa-muted">Photos ({photos.length}/10) - tap one to move, rotate or crop it</label>
-          <div className="mt-1 flex gap-2 overflow-x-auto pb-1">
+          <label className="block mt-3 text-[12.5px] text-wa-muted">Photos ({photos.length}/10) - tap one to move, rotate or crop it - or hold and drag it to a new place</label>
+          <div ref={photoStrip} className="mt-1 flex gap-2 overflow-x-auto pb-1">
             {photos.map((x, k) => (
-              <div key={(x.idx ?? "n") + "-" + k} className="relative shrink-0" onClick={() => setSel((c) => (c === k ? null : k))}>
+              <div key={(x.idx ?? "n") + "-" + k} data-sort-idx={k} className="relative shrink-0" onClick={() => setSel((c) => (c === k ? null : k))}>
                 {x.raw ? <div className={`size-20 rounded-xl bg-[#2a3942] flex items-center justify-center text-wa-muted ${sel === k ? "ring-2 ring-[#21C063]" : ""}`}><ImageIcon size={24} /></div> : <img loading="lazy" decoding="async" src={x.data ? x.src : optimizeImage(x.src, 200)} alt="" className={`size-20 rounded-xl object-cover ${sel === k ? "ring-2 ring-[#21C063]" : ""}`} />}
                 <span className="absolute bottom-1 left-1 min-w-5 h-5 px-1 rounded-full bg-black/70 text-white text-[11px] font-semibold flex items-center justify-center">{k + 1}</span>
-                <button type="button" onClick={(e) => { e.stopPropagation(); removePhoto(k); }} aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 size-6 rounded-full bg-black/80 text-white flex items-center justify-center"><X size={14} /></button>
+                <button type="button" data-no-sort onClick={(e) => { e.stopPropagation(); removePhoto(k); }} aria-label="Remove photo" className="absolute -top-1.5 -right-1.5 size-6 rounded-full bg-black/80 text-white flex items-center justify-center"><X size={14} /></button>
               </div>
             ))}
             {photos.length < 10 && (

@@ -142,6 +142,16 @@ const LocationSheet = ({ onPick, onClose }) => {
   );
 };
 
+// The length picked last time (15 / 20 / 30 s) is highlighted next time
+const lastStay = () => {
+  try {
+    const n = Number(localStorage.getItem("status-stay"));
+    return [15, 20, 30].includes(n) ? n : 15;
+  } catch {
+    return 15;
+  }
+};
+
 // Plays the chosen song while composing, so you hear it before posting (loops, like it will on the status).
 const useSongPreview = (song, suspended) => {
   const audio = useRef(null);
@@ -256,8 +266,16 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
 
   const canPost = kind === "text" ? !!text.trim() : !!media;
 
-  const post = async () => {
+  // Text and photo statuses ask how long they stay on screen (15 / 20 / 30 s) before posting
+  const [askTime, setAskTime] = useState(false);
+  const post = () => {
     if (!canPost) return toast.error(kind === "text" ? "Write something first" : "Add a file first");
+    if (kind === "text" || kind === "image") return setAskTime(true);
+    return doPost(0);
+  };
+  const doPost = async (stay) => {
+    if (!canPost) return toast.error(kind === "text" ? "Write something first" : "Add a file first");
+    setAskTime(false);
     setIsPosting(true);
     try {
       let content = kind === "text" ? text.trim() : media.data;
@@ -280,6 +298,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         ...(place ? { location: place } : {}),
         ...(poll ? { poll } : {}),
         ...(audience ? { audience } : {}),
+        ...(stay ? { duration: stay } : {}),
       };
       await axiosInstance.post("/status", body, { timeout: 180000 });
       toast.success("Status posted");
@@ -615,6 +634,30 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
           }}
           onFiles={() => songRef.current?.click()}
         />
+      )}
+
+      {askTime && (
+        <div className="absolute inset-0 z-[90] flex flex-col justify-end bg-black/60" onClick={() => setAskTime(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="rounded-t-[22px] bg-[#1D1F1F] text-white pb-[calc(16px+env(safe-area-inset-bottom))]">
+            <p className="px-5 pt-5 pb-1 text-[18px]">How long should it stay?</p>
+            <p className="px-5 pb-3 text-[12.5px] text-[#8E9AA2]">Each person sees it for this long before it moves on</p>
+            <div className="flex gap-3 px-5">
+              {[15, 20, 30].map((sec) => (
+                <button
+                  key={sec}
+                  onClick={() => {
+                    try { localStorage.setItem("status-stay", String(sec)); } catch { /* private mode */ }
+                    doPost(sec);
+                  }}
+                  className={`flex-1 h-14 rounded-2xl text-[17px] font-medium active:scale-95 ${lastStay() === sec ? "bg-[#21C063] text-[#0B141A]" : "bg-white/10"}`}
+                >
+                  {sec} sec
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setAskTime(false)} className="mt-3 w-full text-center text-[#8E9AA2] text-[14px] py-2">Cancel</button>
+          </div>
+        </div>
       )}
 
       {showPlaces && (

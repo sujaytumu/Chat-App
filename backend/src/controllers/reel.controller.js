@@ -9,6 +9,7 @@ import SavedReel from "../models/savedReel.model.js";
 import Repost from "../models/repost.model.js";
 import ReelHide from "../models/reelHide.model.js";
 import ReelPin from "../models/reelPin.model.js";
+import ReelOrder from "../models/reelOrder.model.js";
 import { deliveryUrl } from "../lib/privateMedia.js";
 import cloudinary from "../lib/cloudinary.js";
 import { visibleUserIds, canSee, isOwner, ownerId as getOwnerId } from "../lib/visibility.js";
@@ -282,6 +283,15 @@ const parseCursor = (c) => {
 const pastCond = (cur) => { const op = DIR === 1 ? "$gt" : "$lt"; return { $or: [{ createdAt: { [op]: cur.t } }, { createdAt: cur.t, _id: { [op]: cur.id } }] }; }; // strictly after `cur` in feed order
 const upToCond = (cur) => { const op = DIR === 1 ? "$lt" : "$gt"; const eq = DIR === 1 ? "$lte" : "$gte"; return { $or: [{ createdAt: { [op]: cur.t } }, { createdAt: cur.t, _id: { [eq]: cur.id } }] }; }; // up to and including `cur`
 
+// The order the owner arranged the reels in (Explore grid drag and drop). Listed reels come first in that order; the rest follow in posting order.
+const getReelOrder = async () => ((await ReelOrder.findOne({ key: "global" }).select("ids").lean())?.ids || []).map(String);
+const applyReelOrder = (list, getId, ids) => {
+  if (!ids.length) return list;
+  const pos = new Map(ids.map((id, i) => [id, i]));
+  const listed = list.filter((x) => pos.has(String(getId(x)))).sort((a, b) => pos.get(String(getId(a))) - pos.get(String(getId(b))));
+  return [...listed, ...list.filter((x) => !pos.has(String(getId(x))))];
+};
+
 async function orderedFeed(req, res) {
   try {
     const me = req.user;
@@ -311,19 +321,42 @@ async function orderedFeed(req, res) {
     const restAnd = [...and, ...(skip.length ? [{ _id: { $nin: skip.map(toOid) } }] : [])];
 
     const after = parseCursor(req.query.after);
+    const idxAfter = /^i(\d{1,6})$/.exec(String(req.query.after || "")); // paging through the owner's custom order
+    const customIds = await getReelOrder();
     let limit = ORDER_PAGE;
     // opened from the search grid: send everything up to the tapped reel (plus a page), so it can be scrolled to
-    const from = !after && mongoose.isValidObjectId(String(req.query.from || "")) ? String(req.query.from) : null;
-    if (from) {
-      const x = await Reel.findOne({ _id: from, $and: and }).select("createdAt").lean();
-      if (x) limit = Math.min(400, (await Reel.countDocuments({ $and: [...restAnd, upToCond({ t: x.createdAt, id: x._id })] })) + ORDER_PAGE);
+    const from = !after && !idxAfter && mongoose.isValidObjectId(String(req.query.from || "")) ? String(req.query.from) : null;
+    let more;
+    let pageRows;
+    let nextCursor;
+    if (customIds.length || idxAfter) {
+      // the owner arranged the reels by hand: that order first, then anything newer in posting order
+      const all = await Reel.find({ $and: restAnd }).select("_id createdAt").sort({ createdAt: DIR, _id: DIR }).limit(3000).lean();
+      const seq = applyReelOrder(all, (r) => r._id, customIds);
+      const start = idxAfter ? Number(idxAfter[1]) : 0;
+      if (from) {
+        const k = seq.findIndex((r) => String(r._id) === from);
+        if (k >= 0) limit = Math.min(400, k + 1 + ORDER_PAGE);
+      }
+      const pageIds = seq.slice(start, start + limit).map((r) => r._id);
+      const found = pageIds.length ? await Reel.find({ _id: { $in: pageIds } }).populate("userId", "fullName profilePic").lean() : [];
+      const byId = new Map(found.map((r) => [String(r._id), r]));
+      pageRows = pageIds.map((i) => byId.get(String(i))).filter(Boolean);
+      more = start + pageIds.length < seq.length;
+      nextCursor = pageRows.length ? `i${start + pageIds.length}` : null;
+    } else {
+      if (from) {
+        const x = await Reel.findOne({ _id: from, $and: and }).select("createdAt").lean();
+        if (x) limit = Math.min(400, (await Reel.countDocuments({ $and: [...restAnd, upToCond({ t: x.createdAt, id: x._id })] })) + ORDER_PAGE);
+      }
+      const rows = await Reel.find({ $and: after ? [...restAnd, pastCond(after)] : restAnd }).sort({ createdAt: DIR, _id: DIR }).limit(limit + 1).populate("userId", "fullName profilePic").lean();
+      more = rows.length > limit;
+      pageRows = rows.slice(0, limit);
+      nextCursor = pageRows.length ? cursorOf(pageRows[pageRows.length - 1]) : null;
     }
-    const rows = await Reel.find({ $and: after ? [...restAnd, pastCond(after)] : restAnd }).sort({ createdAt: DIR, _id: DIR }).limit(limit + 1).populate("userId", "fullName profilePic").lean();
-    const more = rows.length > limit;
-    const pageRows = rows.slice(0, limit);
 
     let pinnedRows = [];
-    if (!after && pinIds.length) {
+    if (!after && !idxAfter && pinIds.length) {
       const found = await Reel.find({ _id: { $in: pinIds.map(toOid) }, $and: and }).populate("userId", "fullName profilePic").lean();
       const byId = new Map(found.map((r) => [String(r._id), r]));
       const hid = new Set(hiddenIds);
@@ -334,12 +367,28 @@ async function orderedFeed(req, res) {
     const dress = async (list, pinned) => (await withCounts(list, me._id)).map((r) => ({ ...r, source: "reel", following: followSet.has(String(r.user?._id)), saved: savedKeys.has(`reel:${r._id}`), reposted: mineReposted.has(String(r._id)), pinned }));
     const out = [...(await dress(pinnedRows, true)), ...(await dress(pageRows, false))];
     res.set("Cache-Control", "no-store");
-    res.status(200).json({ owner: isOwner(me), reels: out, more, px: 1, localMore: more, ordered: true, next: pageRows.length ? cursorOf(pageRows[pageRows.length - 1]) : null });
+    res.status(200).json({ owner: isOwner(me), reels: out, more, px: 1, localMore: more, ordered: true, next: nextCursor });
   } catch (error) {
     console.log("Error in orderedFeed:", error.message);
     res.status(500).json({ error: "Internal server error" });
   }
 }
+
+// The owner drags reels into a new order in the Explore grid: that becomes the order everyone's Reels feed uses.
+export const setReelOrder = async (req, res) => {
+  try {
+    if (!isOwner(req.user)) return res.status(403).json({ error: "Only the owner can change the order" });
+    const raw = Array.isArray(req.body?.ids) ? req.body.ids : null;
+    if (!raw || !raw.length) return res.status(400).json({ error: "Invalid" });
+    const ids = [...new Set(raw.map(String))].filter((i) => mongoose.isValidObjectId(i)).slice(0, 3000);
+    if (!ids.length) return res.status(400).json({ error: "Invalid" });
+    await ReelOrder.updateOne({ key: "global" }, { $set: { ids: ids.map((i) => new mongoose.Types.ObjectId(i)) } }, { upsert: true });
+    res.status(200).json({ ok: true, count: ids.length });
+  } catch (error) {
+    console.log("Error in setReelOrder:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
 // Pin / unpin a reel for me (up to 20). Pinned reels open first, in the order they were pinned.
 export const pinReel = async (req, res) => {
@@ -887,9 +936,10 @@ export const exploreReels = async (req, res) => {
       const oid = await getOwnerId();
       list = list.filter((r) => String(r.user?._id) === String(oid));
     }
+    list = applyReelOrder(list, (r) => r._id, await getReelOrder()); // the order the owner arranged (new reels follow in posting order)
     res.set("Cache-Control", "no-store");
     // every reel, in the order posted (only what the grid needs, so a long list stays light)
-    res.status(200).json({ reels: list.map((r) => ({ _id: r._id, poster: r.poster, ...(r.poster ? {} : { videoUrl: r.videoUrl }), views: r.views, likeCount: r.likeCount, createdAt: r.createdAt, pinned: !!r.pinned })) });
+    res.status(200).json({ owner: isOwner(req.user), reels: list.map((r) => ({ _id: r._id, poster: r.poster, ...(r.poster ? {} : { videoUrl: r.videoUrl }), views: r.views, likeCount: r.likeCount, createdAt: r.createdAt, pinned: !!r.pinned })) });
   } catch (error) {
     console.log("Error in exploreReels:", error.message);
     res.status(500).json({ error: "Internal server error" });

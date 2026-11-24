@@ -201,7 +201,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
           return Math.min(1, Math.max(0, (el.currentTime - st) / len));
         }
         const isMedia = current.type === "video" || current.type === "audio";
-        const total = isMedia ? Math.max(mediaMs, 1000) : current.song?.length ? current.song.length * 1000 : DURATION_MS; // a song's chosen length (15 – 30 s) sets how long a picture / text stays
+        const total = isMedia ? Math.max(mediaMs, 1000) : current.duration ? current.duration * 1000 : current.song?.length ? current.song.length * 1000 : DURATION_MS; // a song's chosen length (15 – 30 s) sets how long a picture / text stays
         const np = p + dt / total;
         if (np >= 1) {
           queueMicrotask(next);

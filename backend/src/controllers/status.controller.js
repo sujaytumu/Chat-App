@@ -103,6 +103,10 @@ export const createStatus = async (req, res) => {
       }
     }
 
+    // how long a picture / text status stays up: 15, 20 or 30 seconds (videos and audio play for their own length)
+    const stay = Number(req.body.duration);
+    if ([15, 20, 30].includes(stay) && (type === "text" || type === "image")) doc.duration = stay;
+
     if (song?.data) {
       if (song.data.length > MAX_SONG_BASE64) return res.status(413).json({ error: "That song is too large" });
       const songMime = typeof song.mime === "string" && song.mime.startsWith("audio/") ? song.mime : "audio/mpeg";

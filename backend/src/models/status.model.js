@@ -37,6 +37,8 @@ const statusSchema = new mongoose.Schema(
       options: [{ type: String }],
       votes: [{ _id: false, user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, option: { type: Number } }],
     },
+    // How long a picture / text status stays on screen (seconds): 15, 20 or 30. 0 = the default (a song's length, else 15).
+    duration: { type: Number, default: 0 },
     closeFriends: { type: Boolean, default: false }, // shared with the owner's Close friends list (green star)
     // Who may see it: everyone (my contacts), everyone except some people, or only some people
     audience: {

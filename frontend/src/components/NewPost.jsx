@@ -6,6 +6,7 @@ import { readFileAsBase64 } from "../lib/fileUtils";
 import StatusMusicSheet from "./StatusMusicSheet";
 import PhotoCropSheet from "./PhotoCropSheet";
 import { rotateImage } from "../lib/photoEdit";
+import { useLongPressReorder, moveItem } from "../lib/useLongPressReorder";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { useAuthStore } from "../store/useAuthStore";
 import { draftPut, draftGet, draftDel, draftGetPrefix, draftDelPrefix } from "../lib/draftStore";
@@ -319,6 +320,16 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
     setCur((c) => (c > i ? c - 1 : c));
   };
 
+  // hold a photo and drag it to another place to change the order it shows in the post
+  const dragPhoto = (from, to) => {
+    setItems((l) => moveItem(l, from, to));
+    const nc = cur === from ? to : from < cur && cur <= to ? cur - 1 : to <= cur && cur < from ? cur + 1 : cur;
+    setCur(nc);
+    setTimeout(() => { const el = slides.current; if (el) el.scrollTo({ left: nc * el.clientWidth }); }, 0); // keep the big preview on the same photo
+  };
+  const pickGridRef = useLongPressReorder(dragPhoto);
+  const stripRef = useLongPressReorder(dragPhoto);
+
   const goSlide = (i) => {
     setCur(i);
     const el = slides.current;
@@ -432,18 +443,18 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
             <button onClick={() => gallery.current?.click()} disabled={items.length >= MAX || !!prep} className="h-9 px-4 rounded-full bg-wa-field text-[14.5px] font-medium disabled:opacity-40 flex items-center gap-1.5 active:scale-95"><Plus size={16} /> Add photos</button>
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
-            <div className="grid grid-cols-4 gap-0.5">
+            <div ref={pickGridRef} className="grid grid-cols-4 gap-0.5">
               <button onClick={() => camera.current?.click()} disabled={items.length >= MAX || !!prep} className="aspect-square bg-wa-field flex items-center justify-center text-wa-muted disabled:opacity-40 active:bg-wa-surface" aria-label="Take a photo"><Camera size={30} /></button>
               <button onClick={() => gallery.current?.click()} disabled={items.length >= MAX || !!prep} className="aspect-square bg-wa-field flex items-center justify-center text-wa-muted disabled:opacity-40 active:bg-wa-surface" aria-label="Choose from gallery"><ImagePlus size={30} /></button>
               {items.map((x, i) => (
-                <div key={x.id} className="relative aspect-square bg-black" onClick={() => setCur(i)}>
+                <div key={x.id} data-sort-idx={i} className="relative aspect-square bg-black" onClick={() => setCur(i)}>
                   <img src={x.thumb} alt="" loading="lazy" decoding="async" className={`w-full h-full object-cover ${i === safeCur ? "" : "opacity-60"}`} />
                   <span className={`absolute top-1.5 right-1.5 size-6 rounded-full flex items-center justify-center text-[13px] font-semibold text-white ${i === safeCur ? "bg-[#21C063] ring-2 ring-white" : "bg-[#3b5bdb]"}`}>{i + 1}</span>
-                  <button onClick={(e) => { e.stopPropagation(); remove(i); }} aria-label="Remove photo" className="absolute top-1 left-1 size-7 rounded-full bg-black/60 flex items-center justify-center text-white"><X size={15} /></button>
+                  <button data-no-sort onClick={(e) => { e.stopPropagation(); remove(i); }} aria-label="Remove photo" className="absolute top-1 left-1 size-7 rounded-full bg-black/60 flex items-center justify-center text-white"><X size={15} /></button>
                 </div>
               ))}
             </div>
-            {!items.length && <p className="px-6 pt-8 text-center text-[14px] text-wa-muted">Tap the gallery or camera tile to add photos. The order you pick them in is the order they show in the post.</p>}
+            {!items.length && <p className="px-6 pt-8 text-center text-[14px] text-wa-muted">Tap the gallery or camera tile to add photos. The order you pick them in is the order they show in the post - hold a photo and drag it to change that.</p>}
           </div>
         </>
       )}
@@ -527,9 +538,9 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
             ))}
           </div>
           <div className="flex items-center gap-2 px-3 pb-[calc(10px+env(safe-area-inset-bottom))] shrink-0">
-            <div className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
+            <div ref={stripRef} className="flex-1 flex gap-2 overflow-x-auto no-scrollbar">
               {items.map((x, i) => (
-                <button key={x.id} onClick={() => goSlide(i)} className={`relative shrink-0 size-14 rounded-xl overflow-hidden ${i === safeCur ? "ring-2 ring-white" : "opacity-70"}`}>
+                <button key={x.id} data-sort-idx={i} onClick={() => goSlide(i)} className={`relative shrink-0 size-14 rounded-xl overflow-hidden ${i === safeCur ? "ring-2 ring-white" : "opacity-70"}`}>
                   <img src={x.thumb} alt="" style={{ filter: cssFilter(x) }} className="w-full h-full object-cover" />
                 </button>
               ))}

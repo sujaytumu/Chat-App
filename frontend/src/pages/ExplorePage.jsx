@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { Search, Eye, X, Film, Pin } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
@@ -6,6 +7,7 @@ import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
 import { useTabSwipe } from "../lib/useTabSwipe";
 import { useAuthStore } from "../store/useAuthStore";
+import { useLongPressReorder, moveItem } from "../lib/useLongPressReorder";
 
 const count = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n || 0));
 
@@ -18,7 +20,23 @@ const ExplorePage = () => {
   const [q, setQ] = useState("");
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [owner, setOwner] = useState(false);
   const seq = useRef(0);
+  const searching = q.trim().length >= 2;
+
+  // The owner holds a reel and drags it to another place: that is the order the Reels feed uses for everyone
+  const gridRef = useLongPressReorder(
+    (from, to) => {
+      const before = list;
+      const next = moveItem(before, from, to);
+      setList(next);
+      axiosInstance.put("/reels/order", { ids: next.map((r) => r._id) }).catch(() => {
+        setList(before);
+        toast.error("Couldn't change the order");
+      });
+    },
+    { enabled: owner && !searching }
+  );
 
   useEffect(() => {
     const my = ++seq.current;
@@ -30,7 +48,10 @@ const ExplorePage = () => {
           const { data } = term.length >= 2
             ? await axiosInstance.get("/reels/search", { params: { q: term }, timeout: 15000 })
             : await axiosInstance.get("/reels/explore", { timeout: 15000 });
-          if (my === seq.current) setList(data.reels || []);
+          if (my === seq.current) {
+            setList(data.reels || []);
+            if (term.length < 2) setOwner(!!data.owner);
+          }
         } catch {
           if (my === seq.current) setList([]);
         } finally {
@@ -74,9 +95,11 @@ const ExplorePage = () => {
         ) : !list.length ? (
           <p className="text-center text-white/55 py-16 text-[15px]">{q.trim().length >= 2 ? "No reels found" : "No reels yet"}</p>
         ) : (
-          <div className="grid grid-cols-3 gap-1 px-1">
+          <>
+          {owner && !searching && <p className="px-4 pb-2 text-[12.5px] text-white/50">Hold a reel and drag it to a new place to change the order it plays in</p>}
+          <div ref={gridRef} className="grid grid-cols-3 gap-1 px-1">
             {list.map((r, i) => (
-              <button key={r._id} onClick={() => navigate(q.trim().length >= 2 ? `/reels?r=${r._id}` : `/reels?from=${r._id}`)} className="relative aspect-[9/14] bg-neutral-900 overflow-hidden rounded-md active:scale-[0.97] transition-transform">
+              <button key={r._id} data-sort-idx={i} onClick={() => navigate(q.trim().length >= 2 ? `/reels?r=${r._id}` : `/reels?from=${r._id}`)} className="relative aspect-[9/14] bg-neutral-900 overflow-hidden rounded-md active:scale-[0.97] transition-transform">
                 {r.poster ? (
                   <img src={r.poster} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                 ) : (
@@ -91,6 +114,7 @@ const ExplorePage = () => {
               </button>
             ))}
           </div>
+          </>
         )}
       </div>
 
