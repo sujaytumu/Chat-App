@@ -55,11 +55,11 @@ export async function markImpliedRead(replier, other, upTo = new Date()) {
     sendFcmClearChat(replier, other); // their phone drops the notification for messages they've now replied to
     const room = getReceiverSocketId(other);
     if (!room) return;
-    io.to(room).emit("messagesDelivered", { by: String(replier) });
+    io.to(room).emit("messagesDelivered", { by: String(replier), upTo: new Date(upTo).getTime() });
     const me = await User.findById(replier).select("privacy").lean();
     const them = await User.findById(other).select("privacy").lean();
     if (me?.privacy?.readReceipts !== false && them?.privacy?.readReceipts !== false) {
-      io.to(room).emit("messagesSeen", { by: String(replier), count: result.modifiedCount });
+      io.to(room).emit("messagesSeen", { by: String(replier), count: result.modifiedCount, upTo: new Date(upTo).getTime() });
     }
   } catch (e) {
     console.log("Error in markImpliedRead:", e.message);
@@ -578,7 +578,7 @@ export const markMessagesAsSeen = async (req, res) => {
     if (result.modifiedCount > 0 && !receiptsOff) {
       const senderSocketId = getReceiverSocketId(senderId);
       if (senderSocketId) {
-        io.to(senderSocketId).emit("messagesSeen", { by: myId, count: result.modifiedCount });
+        io.to(senderSocketId).emit("messagesSeen", { by: myId, count: result.modifiedCount, upTo: Date.now() });
       }
     }
 

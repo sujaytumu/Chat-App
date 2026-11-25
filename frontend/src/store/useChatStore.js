@@ -42,11 +42,17 @@ function notifyIncoming(senderName, message, isGroup = false) {
 const PAGE_SIZE = 25; // messages fetched per page (newest first, older on demand) — small = opens fast
 // ---- speed helpers ----
 // "I read it": over the live connection when there is one (arrives at once), HTTP only as a fallback.
+// Never while the app is hidden / the screen is off: nobody is looking at the chat, so it must not turn blue.
+// (When the app comes back to the front with the chat open, it is reported then - see the end of this file.)
 const emitSeen = (senderId) => {
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
   const socket = useAuthStore.getState().socket;
   if (socket?.connected) socket.emit("markSeen", { from: senderId });
   else axiosInstance.put(`/messages/seen/${senderId}`).catch(() => {});
 };
+// A "delivered" / "read" receipt covers only messages that really existed when it was given: not ones still sending,
+// not ones that failed, and not ones written after `upTo` (server time, ms) - those must keep their own ticks.
+const receiptCovers = (m, upTo) => !m.pending && !m.failed && (!upTo || !m.createdAt || new Date(m.createdAt).getTime() <= upTo);
 // Messages that couldn't reach the server (offline). Resent automatically when the connection returns.
 const outbox = new Map(); // tmpId -> { to, body }
 let usersRetried = false;
@@ -1110,7 +1116,7 @@ export const useChatStore = create((set, get) => ({
       // They replied, so they have read everything I sent them before it (blue ticks).
       const replied = message.senderId !== me && !message.groupId;
       const messages = replied
-        ? current.map((m) => (m.senderId === me && m.receiverId === message.senderId && !m.groupId && (!m.seen || !m.delivered) ? { ...m, seen: true, delivered: true } : m))
+        ? current.map((m) => (m.senderId === me && m.receiverId === message.senderId && !m.groupId && (!m.seen || !m.delivered) && receiptCovers(m, new Date(message.createdAt).getTime() || 0) ? { ...m, seen: true, delivered: true } : m))
         : current;
       if (replied) {
         set((st) => ({
@@ -1200,29 +1206,29 @@ export const useChatStore = create((set, get) => ({
       });
     });
 
-    socket.on("messagesSeen", ({ by }) => {
+    socket.on("messagesSeen", ({ by, upTo }) => {
       const { selectedChat, messages } = get();
       if (selectedChat?.type === "direct" && selectedChat.data._id === by) {
-        set({ messages: messages.map((m) => (m.receiverId === by ? { ...m, seen: true, delivered: true } : m)) });
+        set({ messages: messages.map((m) => (m.receiverId === by && !m.groupId && receiptCovers(m, upTo) ? { ...m, seen: true, delivered: true } : m)) });
       }
       // Keep the ticks in the chat list in sync too.
       set((state) => ({
         users: state.users.map((u) =>
-          u._id === by && u.lastMessage ? { ...u, lastMessage: { ...u.lastMessage, seen: true, delivered: true } } : u
+          u._id === by && u.lastMessage && receiptCovers(u.lastMessage, upTo) ? { ...u, lastMessage: { ...u.lastMessage, seen: true, delivered: true } } : u
         ),
       }));
     });
 
-    socket.on("messagesDelivered", ({ by }) => {
+    socket.on("messagesDelivered", ({ by, upTo }) => {
       const { selectedChat, messages } = get();
       if (selectedChat?.type === "direct" && selectedChat.data._id === by) {
         set({
-          messages: messages.map((m) => (m.receiverId === by ? { ...m, delivered: true } : m)),
+          messages: messages.map((m) => (m.receiverId === by && !m.groupId && receiptCovers(m, upTo) ? { ...m, delivered: true } : m)),
         });
       }
       set((state) => ({
         users: state.users.map((u) =>
-          u._id === by && u.lastMessage ? { ...u, lastMessage: { ...u.lastMessage, delivered: true } } : u
+          u._id === by && u.lastMessage && receiptCovers(u.lastMessage, upTo) ? { ...u, lastMessage: { ...u.lastMessage, delivered: true } } : u
         ),
       }));
     });
@@ -1479,3 +1485,13 @@ setTimeout(() => {
     /* never block start-up */
   }
 }, 0);
+
+// Back in front of the app with a chat open: what arrived while the screen was off / the app was hidden is read now
+// (until now it stayed unread for the sender, because nothing is reported while hidden).
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    const chat = useChatStore.getState().selectedChat;
+    if (chat?.type === "direct" && !chat.data?.isSelf) emitSeen(chat.data._id);
+  });
+}

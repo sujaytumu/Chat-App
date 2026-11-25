@@ -21,6 +21,11 @@ const ExplorePage = () => {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [owner, setOwner] = useState(false);
+  // only hashtags that really exist in reels you can see (nothing hard-coded)
+  const [tags, setTags] = useState([]);
+  useEffect(() => {
+    axiosInstance.get("/reels/trending").then((r) => setTags(r.data.tags || [])).catch(() => {});
+  }, []);
   const seq = useRef(0);
   const searching = q.trim().length >= 2;
 
@@ -78,10 +83,10 @@ const ExplorePage = () => {
             <button onClick={() => setQ("")} aria-label="Clear" className="text-white/70"><X size={18} /></button>
           )}
         </div>
-        {!q && (
+        {!q && tags.length > 0 && (
           <div className="flex gap-2 mt-3 overflow-x-auto no-scrollbar">
-            {["#motivation", "#gym", "#study", "#focus", "#fitness"].map((t) => (
-              <button key={t} onClick={() => setQ(t)} className="shrink-0 px-3.5 py-1.5 rounded-full bg-white/10 text-[14.5px] font-medium active:bg-white/20">{t}</button>
+            {tags.map((t) => (
+              <button key={t.tag} onClick={() => setQ(`#${t.tag}`)} className="shrink-0 px-3.5 py-1.5 rounded-full bg-white/10 text-[14.5px] font-medium active:bg-white/20">#{t.tag}</button>
             ))}
           </div>
         )}

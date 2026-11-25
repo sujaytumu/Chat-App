@@ -182,7 +182,7 @@ async function pixabayClips(q, page) {
         source: "discover",
         videoUrl: f.url,
         poster: f.thumbnail || "",
-        caption: QUOTES[Number(v.id) % QUOTES.length] + " #motivation",
+        caption: QUOTES[Number(v.id) % QUOTES.length],
         duration: v.duration || 0,
         filter: "none",
         trim: null,
@@ -230,7 +230,7 @@ async function discoverPage(page) {
           source: "discover",
           videoUrl: f.link,
           poster: v.image || "",
-          caption: QUOTES[Number(v.id) % QUOTES.length] + " #motivation",
+          caption: QUOTES[Number(v.id) % QUOTES.length],
           duration: v.duration || 0,
           filter: "none",
           trim: null,
@@ -298,18 +298,20 @@ async function orderedFeed(req, res) {
     const myId = String(me._id);
     const friendsTab = req.query.tab === "friends";
     const toOid = (i) => new mongoose.Types.ObjectId(String(i));
-    const ids = await visibleUserIds(me, "reels");
-    const [follows, hidden, pinDocs, saved, reposts] = await Promise.all([
+    // all the lookups the feed needs start together (they used to run one after another, which is what made the first reel slow)
+    const [ids, follows, hidden, pinDocs, saved, reposts, ownerOid, customIds] = await Promise.all([
+      visibleUserIds(me, "reels"),
       Follow.find({ follower: me._id }).select("following").lean(),
       ReelHide.find({ userId: me._id }).select("reelId").lean(),
       friendsTab ? [] : ReelPin.find({ userId: me._id }).sort({ createdAt: 1, _id: 1 }).lean(),
       SavedReel.find({ userId: me._id }).select("key").lean(),
       Repost.find({ userId: me._id }).select("reelId").lean(),
+      friendsTab ? null : getOwnerId(),
+      getReelOrder(),
     ]);
     const followSet = new Set(follows.map((f) => String(f.following)));
     let allowed = ids === null ? null : new Set([myId, ...[...ids].map(String)]);
     if (friendsTab) allowed = new Set([...followSet].filter((i) => !allowed || allowed.has(i)));
-    const ownerOid = friendsTab ? null : await getOwnerId();
     const and = [audienceFilter(me._id), { userId: { $ne: null } }];
     if (allowed !== null) and.push({ userId: { $in: [...allowed].map(toOid) } });
     if (OWNER_ONLY && ownerOid) and.push({ userId: toOid(ownerOid) });
@@ -322,7 +324,6 @@ async function orderedFeed(req, res) {
 
     const after = parseCursor(req.query.after);
     const idxAfter = /^i(\d{1,6})$/.exec(String(req.query.after || "")); // paging through the owner's custom order
-    const customIds = await getReelOrder();
     let limit = ORDER_PAGE;
     // opened from the search grid: send everything up to the tapped reel (plus a page), so it can be scrolled to
     const from = !after && !idxAfter && mongoose.isValidObjectId(String(req.query.from || "")) ? String(req.query.from) : null;
@@ -963,14 +964,15 @@ export const searchReels = async (req, res) => {
   }
 };
 
-// Popular hashtags among reels this person may see (last 14 days).
+// Hashtags that really exist in reels this person may see (the most used first). Nothing is made up or hard-coded:
+// a tag is listed only while at least one reel they can see carries it in its caption.
 export const trendingTags = async (req, res) => {
   try {
     const ids = await visibleUserIds(req.user, "reels");
-    const match = { createdAt: { $gt: new Date(Date.now() - 14 * 86400 * 1000) }, hashtags: { $exists: true, $ne: [] } };
+    const match = { hashtags: { $exists: true, $ne: [] } };
     if (ids !== null) match.userId = { $in: [req.user._id, ...[...ids].map((i) => new mongoose.Types.ObjectId(i))] };
     match.$and = [audienceFilter(req.user._id)];
-    const agg = await Reel.aggregate([{ $match: match }, { $unwind: "$hashtags" }, { $group: { _id: "$hashtags", n: { $sum: 1 } } }, { $sort: { n: -1 } }, { $limit: 12 }]);
+    const agg = await Reel.aggregate([{ $match: match }, { $unwind: "$hashtags" }, { $group: { _id: "$hashtags", n: { $sum: 1 }, last: { $max: "$createdAt" } } }, { $sort: { n: -1, last: -1 } }, { $limit: 15 }]);
     res.status(200).json({ tags: agg.map((a) => ({ tag: a._id, count: a.n })) });
   } catch (error) {
     console.log("Error in trendingTags:", error.message);

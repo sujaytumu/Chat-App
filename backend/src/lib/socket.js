@@ -361,7 +361,7 @@ io.on("connection", (socket) => {
         // We know this message: tell the sender straight away (their double tick), save in the background.
         const m = recallMessage(messageId);
         const room = roomFor(m.senderId);
-        if (room) io.to(room).emit("messagesDelivered", { by: userId });
+        if (room) io.to(room).emit("messagesDelivered", { by: userId, upTo: new Date(m.createdAt).getTime() }); // upTo: only messages up to this one
         markDirectDeliveredFor(() => {}, userId, { senderId: m.senderId, createdAt: { $lte: m.createdAt } }, { silent: true });
       } else {
         await ackDirectMessage((uid, ev, payload) => {
@@ -383,7 +383,7 @@ io.on("connection", (socket) => {
       const receiptsOff = privacyCache.get(userId)?.readReceipts === false || privacyCache.get(sender)?.readReceipts === false;
       if (!receiptsOff) {
         const room = roomFor(sender);
-        if (room) io.to(room).emit("messagesSeen", { by: userId });
+        if (room) io.to(room).emit("messagesSeen", { by: userId, upTo: Date.now() }); // upTo: messages sent after this moment are not read yet
       }
       const r = await Message.updateMany({ senderId: sender, receiverId: userId, seen: false }, { $set: { seen: true, seenAt: new Date(), delivered: true } });
       if (r.modifiedCount > 0) sendFcmClearChat(userId, sender);
@@ -1102,7 +1102,7 @@ io.on("connection", (socket) => {
           senderIds.forEach((senderId) => {
             const senderSocketId = roomFor(senderId);
             if (senderSocketId) {
-              io.to(senderSocketId).emit("messagesDelivered", { by: userId });
+              io.to(senderSocketId).emit("messagesDelivered", { by: userId, upTo: Date.now() });
             }
           });
         }
