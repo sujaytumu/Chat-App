@@ -85,7 +85,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   };
   const many = images.length > 1;
   return (
-    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "80vh" }}>
+    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: many ? 0.8 : ar, maxHeight: "80vh" }}>
       <div
         ref={rail}
         className="absolute inset-0 flex overflow-x-auto snap-x snap-mandatory no-scrollbar overscroll-x-contain"
@@ -103,7 +103,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
               draggable={false}
               onLoad={k === 0 ? first : undefined}
               onClick={() => onTap(k)}
-              className="relative w-full h-full object-contain"
+              className={`relative w-full h-full ${many ? "object-cover" : "object-contain"}`} // several photos: each fills the same frame (no jumping)
             />
             <PhotoLine t={texts[k]} />
           </div>
