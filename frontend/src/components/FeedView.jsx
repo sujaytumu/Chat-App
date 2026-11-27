@@ -6,6 +6,7 @@ import StatusComments from "./StatusComments";
 import PhotoViewer from "./PhotoViewer";
 import StatusMusicSheet from "./StatusMusicSheet";
 import { useLongPressReorder, moveItem } from "../lib/useLongPressReorder";
+import SendReelModal from "./SendReelModal";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { readFileAsBase64 } from "../lib/fileUtils";
 import toast from "react-hot-toast";
@@ -696,19 +697,9 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
       setPosts((l) => l.map((x) => (x._id === p._id ? { ...x, liked: !liked, likeCount: x.likeCount + (liked ? -1 : 1) } : x)));
     }
   };
-  const share = async (p) => {
-    const url = `${window.location.origin}/post?p=${p._id}`; // opens this post
-    const text = `${p.user?.fullName || "Talkies"}${p.caption ? ": " + p.caption : ""}`;
-    try {
-      if (navigator.share) await navigator.share({ title: "Talkies", text, url });
-      else {
-        await navigator.clipboard.writeText(url);
-        toast.success("Link copied");
-      }
-    } catch {
-      /* cancelled */
-    }
-  };
+  // Share opens the same sheet reels have: send the post to chats / groups in the app, WhatsApp, copy the link, or the phone's share menu
+  const [sharePost, setSharePost] = useState(null);
+  const share = (p) => setSharePost(p);
   // Tap a name or picture: your own profile, or a chat with that person
   const openProfile = (p) => {
     if (!p.user?._id) return;
@@ -822,6 +813,11 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
           onClose={() => setCommentsFor(null)}
           onTotal={(n) => setPosts((l) => l.map((x) => (x._id === commentsFor._id ? { ...x, comments: n } : x)))}
         />
+      )}
+      {sharePost && (
+        <div className="fixed inset-0 z-[80]">
+          <SendReelModal post={sharePost} onClose={() => setSharePost(null)} />
+        </div>
       )}
     </div>
   );

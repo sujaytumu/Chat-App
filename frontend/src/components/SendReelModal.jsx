@@ -1,16 +1,25 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Send, Check, Link2, Search, Share2, MessageCircle, Users } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
-import { reelMessageText } from "../lib/messageFormat";
+import { reelMessageText, postMessageText } from "../lib/messageFormat";
 
-// Pick one or more chats and send the reel into them (it shows as a tappable reel card).
-const SendReelModal = ({ reel, onClose }) => {
+// Pick one or more chats and send the reel - or the post - into them (it shows as a tappable card).
+const SendReelModal = ({ reel, post, onClose }) => {
+  const isPost = !!post;
+  const item = post || reel;
+  const noun = isPost ? "Post" : "Reel";
   const users = useChatStore((s) => s.users);
   const groups = useChatStore((s) => s.groups);
+  // the chat list may not have been opened yet (e.g. straight from the feed): load it so there is someone to send to
+  useEffect(() => {
+    const st = useChatStore.getState();
+    if (!st.users.length) st.getUsers?.();
+    if (!st.groups.length) st.getGroups?.();
+  }, []);
   const locked = useAuthStore((s) => s.authUser?.lockedChats) || [];
   const [picked, setPicked] = useState(() => new Set());
   const [q, setQ] = useState("");
@@ -33,19 +42,19 @@ const SendReelModal = ({ reel, onClose }) => {
   const send = async () => {
     if (!picked.size || sending) return;
     setSending(true);
-    const text = reelMessageText(reel);
+    const text = isPost ? postMessageText(post) : reelMessageText(reel);
     const targets = items.filter((i) => picked.has(i.key));
     const results = await Promise.allSettled(
       targets.map((t) => axiosInstance.post(t.type === "direct" ? `/messages/send/${t.id}` : `/groups/${t.id}/messages`, { text }))
     );
     const ok = results.filter((r) => r.status === "fulfilled").length;
-    if (ok) toast.success(ok === 1 ? "Reel sent" : `Reel sent to ${ok} chats`);
+    if (ok) toast.success(ok === 1 ? `${noun} sent` : `${noun} sent to ${ok} chats`);
     if (ok < targets.length) toast.error("Some chats didn't get it");
     setSending(false);
     if (ok) onClose();
   };
 
-  const reelUrl = `${window.location.origin}/reels?r=${reel._id}`;
+  const reelUrl = isPost ? `${window.location.origin}/post?p=${item._id}` : `${window.location.origin}/reels?r=${item._id}`;
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(reelUrl);
@@ -54,11 +63,11 @@ const SendReelModal = ({ reel, onClose }) => {
       toast.error("Couldn't copy");
     }
   };
-  const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(`Watch this reel on Talkies ${reelUrl}`)}`, "_blank", "noopener");
+  const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(isPost ? `See this post on Talkies ${reelUrl}` : `Watch this reel on Talkies ${reelUrl}`)}`, "_blank", "noopener");
   const link = async () => {
-    const url = `${window.location.origin}/reels?r=${reel._id}`;
+    const url = reelUrl;
     try {
-      if (navigator.share) await navigator.share({ url, title: "Talkies reel" });
+      if (navigator.share) await navigator.share({ url, title: isPost ? "Talkies post" : "Talkies reel" });
       else {
         await navigator.clipboard.writeText(url);
         toast.success("Link copied");

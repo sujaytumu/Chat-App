@@ -51,3 +51,14 @@ export function parseReelMessage(text) {
 }
 
 export const reelMessageText = (reel) => `🎬 Reel\n${window.location.origin}/reels?r=${reel._id}`;
+
+// A post sent into a chat: "📷 Post" then its link on the next line (shows as a tappable post card).
+const POST_REGEX = /^📷 Post\n\S*\/post\?p=([a-f0-9]{24})$/;
+
+export function parsePostMessage(text) {
+  if (!text) return null;
+  const m = text.match(POST_REGEX);
+  return m ? { id: m[1] } : null;
+}
+
+export const postMessageText = (post) => `📷 Post\n${window.location.origin}/post?p=${post._id}`;

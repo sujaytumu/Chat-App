@@ -1,4 +1,5 @@
 import BirthdayStrip from "./BirthdayStrip";
+import { parsePostMessage, parseReelMessage } from "../lib/messageFormat";
 import { useEffect, useState, useMemo, useRef, lazy, Suspense } from "react";
 import { lazyDialog } from "../lib/lazyDialog";
 import { UpdateButton } from "../lib/versionCheck";
@@ -62,6 +63,9 @@ const lastMessagePreview = (lastMessage) => {
   if (!lastMessage) return "No messages yet";
   if ((lastMessage.image || lastMessage.viewOnce) && !lastMessage.text) return "📷 Photo";
   if (lastMessage.file && !lastMessage.text) return `📎 ${lastMessage.file.name || "File"}`;
+  // a shared post / reel is "text + link": show just its label, not the link
+  if (parsePostMessage(lastMessage.text)) return "📷 Post";
+  if (parseReelMessage(lastMessage.text)) return "🎬 Reel";
   return lastMessage.text || "";
 };
 
