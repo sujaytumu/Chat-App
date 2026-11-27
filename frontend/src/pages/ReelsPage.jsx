@@ -8,6 +8,7 @@ import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
 import { useTabSwipe } from "../lib/useTabSwipe";
+import { fastVideoUrl, warmVideo } from "../lib/reelVideo";
 import { useAuthStore } from "../store/useAuthStore";
 import { draftPut, draftGet, draftDel } from "../lib/draftStore";
 import StatusComments from "../components/StatusComments";
@@ -115,6 +116,17 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
+  // Smaller phone-friendly copy first; the original file if that copy fails or is slow to start.
+  const [useOriginal, setUseOriginal] = useState(false);
+  const reelSrc = useOriginal ? reel.videoUrl : fastVideoUrl(reel.videoUrl);
+  useEffect(() => {
+    if (useOriginal || reelSrc === reel.videoUrl || !mount || !(active || near)) return undefined;
+    const t = setTimeout(() => {
+      const v = video.current;
+      if (v && v.readyState < 2) setUseOriginal(true);
+    }, 7000);
+    return () => clearTimeout(t);
+  }, [useOriginal, reelSrc, reel.videoUrl, mount, active, near]);
   const [burst, setBurst] = useState(0);
   const fillEl = useRef(null);
   const dotEl = useRef(null);
@@ -342,11 +354,12 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       {mount ? (
         <video
           ref={video}
-          src={reel.videoUrl}
+          src={reelSrc}
           poster={reel.poster}
           playsInline
           disablePictureInPicture
           preload={active || near ? "auto" : "metadata"}
+          onError={() => setUseOriginal(true)}
           onTimeUpdate={onTime}
           onPlay={mustBeSilent}
           onEnded={finished}
@@ -1272,6 +1285,13 @@ const ReelsPage = () => {
   useEffect(() => () => clearTimeout(nextTimer.current), []);
 
   const activeIdx = Math.max(0, reels.findIndex((r) => r._id === (activeId || reels[0]?._id)));
+  // Start fetching the reels just beyond the preloaded ones, so a quick scroller never waits.
+  useEffect(() => {
+    for (let k = 3; k <= 5; k += 1) {
+      const r = reels[activeIdx + k];
+      if (r && !r.igCode && r.videoUrl) warmVideo(r.videoUrl);
+    }
+  }, [activeIdx, reels]);
 
   const patch = (id, fn) => setReels((l) => l.map((r) => (r._id === id ? { ...r, ...fn(r) } : r)));
 
