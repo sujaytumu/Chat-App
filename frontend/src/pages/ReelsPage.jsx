@@ -173,6 +173,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const bar = useRef(null);
   const lastTap = useRef(0);
   const tapTimer = useRef(null);
+  const flippedAt = useRef(0); // when a single tap last paused/played the reel (a quick second tap is a double-tap like and undoes it)
   const endHandled = useRef(false); // the end can be reported twice (timeupdate + ended): move on only once
   // Always says whether THIS reel is the one on screen right now. Callbacks that fire late (a play() that finishes after
   // you swiped on, the tap timer) check it, so a reel you already left can never start playing again.
@@ -338,6 +339,13 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
     if (now - lastTap.current < 280) {
       clearTimeout(tapTimer.current);
       lastTap.current = 0;
+      if (Date.now() - flippedAt.current < 450) { // the first tap already paused/played at once: put it back
+        const v = video.current;
+        if (v && activeRef.current) {
+          if (v.paused) { v.play().catch(() => {}); songEl.current?.play().catch(() => {}); setPaused(false); }
+          else { v.pause(); songEl.current?.pause(); setPaused(true); }
+        }
+      }
       if (!reel.liked) onLike(reel, true);
       setBurst((b) => b + 1);
       return;
@@ -347,6 +355,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
     tapTimer.current = setTimeout(() => {
       const v = video.current;
       if (!v || !activeRef.current) return;
+      flippedAt.current = Date.now();
       if (v.paused) {
         endHandled.current = false; // playing it again from the end counts as a fresh play
         v.play().catch(() => {});
@@ -357,7 +366,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
         songEl.current?.pause();
         setPaused(true);
       }
-    }, 280);
+    }, 0); // at once, like Instagram: no wait to see whether a second tap follows
   };
 
   return (
