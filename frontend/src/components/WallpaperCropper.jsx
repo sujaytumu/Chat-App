@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, Check, RotateCcw } from "lucide-react";
+import { X, Check, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { useBackToClose } from "../lib/useBackToClose";
 
 // Full-screen wallpaper cropper. Shows the WHOLE picture; a frame (shaped like
@@ -32,6 +32,13 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const [resetN, setResetN] = useState(0); // bumps to re-frame after a rotate
   const [ratioName, setRatioName] = useState("Free");
   const ar = useRef(aspectRatio || screenAspect());
+  // Zoom in/out and move the picture under the frame (drag the empty area, pinch, or the slider) to crop deeper
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const pts = useRef(new Map());
+  const pinch = useRef(null);
+  const panFrom = useRef(null);
+  const MAXZ = 5;
 
   // Load the picture
   useEffect(() => {
@@ -58,15 +65,15 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   const fit = img && stage.w
     ? (() => {
         const pad = wa ? PAD : 0;
-        const s = Math.min((stage.w - pad * 2) / img.naturalWidth, (stage.h - pad * 2) / img.naturalHeight);
+        const s = Math.min((stage.w - pad * 2) / img.naturalWidth, (stage.h - pad * 2) / img.naturalHeight) * zoom;
         const w = img.naturalWidth * s;
         const h = img.naturalHeight * s;
-        return { s, w, h, x: (stage.w - w) / 2, y: (stage.h - h) / 2 };
+        return { s, w, h, x: (stage.w - w) / 2 + pan.x, y: (stage.h - h) / 2 + pan.y };
       })()
     : null;
 
   // First frame: the biggest screen-shaped frame that fits, centred
-  const fitKey = fit ? `${Math.round(fit.w)}x${Math.round(fit.h)}` : "";
+  const fitKey = fit ? `${Math.round(fit.w / zoom)}x${Math.round(fit.h / zoom)}` : ""; // the unzoomed size: zooming must not re-frame the box
   useEffect(() => {
     if (!fit) return;
     if (wa && !locked) {
@@ -96,6 +103,67 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
       const y = Math.min(Math.max(box.y, fit.y), fit.y + fit.h - h);
       setBox({ x, y, w, h });
     }
+  };
+
+  // keep the frame on the picture whenever the picture is zoomed or moved
+  useEffect(() => {
+    if (!fit) return;
+    setBox((b) => {
+      if (!b) return b;
+      let w = Math.min(b.w, fit.w);
+      let h = Math.min(b.h, fit.h);
+      if (locked) {
+        w = Math.min(w, h * ar.current);
+        h = w / ar.current;
+      }
+      const x = Math.min(Math.max(b.x, fit.x), fit.x + fit.w - w);
+      const y = Math.min(Math.max(b.y, fit.y), fit.y + fit.h - h);
+      return Math.abs(x - b.x) + Math.abs(y - b.y) + Math.abs(w - b.w) + Math.abs(h - b.h) < 0.5 ? b : { x, y, w, h };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, pan.x, pan.y]);
+
+  const limitPan = (p, z) => {
+    if (!img || !stage.w) return p;
+    const base = (fit ? fit.w / zoom : stage.w) * z;
+    const baseH = (fit ? fit.h / zoom : stage.h) * z;
+    const mx = Math.max(0, (base - stage.w) / 2) + 40;
+    const my = Math.max(0, (baseH - stage.h) / 2) + 40;
+    return { x: Math.min(Math.max(p.x, -mx), mx), y: Math.min(Math.max(p.y, -my), my) };
+  };
+  const setZ = (z) => {
+    const nz = Math.min(Math.max(z, 1), MAXZ);
+    setZoom(nz);
+    setPan((p) => (nz === 1 ? { x: 0, y: 0 } : limitPan(p, nz)));
+  };
+  const stageDown = (e) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.current.size === 2) {
+      const [a, b] = [...pts.current.values()];
+      pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: zoom };
+      panFrom.current = null;
+    } else {
+      panFrom.current = { x: e.clientX, y: e.clientY, p: { ...pan } };
+    }
+  };
+  const stageMove = (e) => {
+    onMove(e);
+    if (!pts.current.has(e.pointerId)) return;
+    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.current.size === 2 && pinch.current) {
+      const [a, b] = [...pts.current.values()];
+      setZ(pinch.current.z * ((Math.hypot(a.x - b.x, a.y - b.y) || 1) / pinch.current.d));
+    } else if (panFrom.current && zoom > 1 && !drag.current) {
+      const f = panFrom.current;
+      setPan(limitPan({ x: f.p.x + e.clientX - f.x, y: f.p.y + e.clientY - f.y }, zoom));
+    }
+  };
+  const stageUp = (e) => {
+    endDrag();
+    pts.current.delete(e.pointerId);
+    pinch.current = null;
+    panFrom.current = null;
   };
 
   const pt = (e) => {
@@ -195,6 +263,8 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
     im.onload = () => {
       setUrl(u);
       setImg(im);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
       if (locked && !aspectRatio) ar.current = 1 / ar.current; // a turned picture wants the turned frame
       setResetN((n) => n + 1);
     };
@@ -202,6 +272,8 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
   };
 
   const pickRatio = ([name, r]) => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
     setRatioName(name);
     if (r == null) setLocked(false);
     else {
@@ -244,9 +316,11 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
       <div
         ref={stageRef}
         className="flex-1 min-h-0 relative touch-none overflow-hidden"
-        onPointerMove={onMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerDown={stageDown}
+        onPointerMove={stageMove}
+        onPointerUp={stageUp}
+        onPointerCancel={stageUp}
+        onWheel={(e) => setZ(zoom - e.deltaY * 0.002)}
       >
         {url && fit && (
           <img
@@ -306,6 +380,11 @@ const WallpaperCropper = ({ file, onCancel, onDone, title = "Crop wallpaper", as
 
       {wa ? (
         <div className="shrink-0 pb-[env(safe-area-inset-bottom)] box-content">
+        <div className="flex items-center gap-3 px-6 pb-2">
+          <button onClick={() => setZ(zoom - 0.5)} aria-label="Zoom out" className="size-9 flex items-center justify-center text-white/85"><ZoomOut size={20} /></button>
+          <input type="range" min={1} max={MAXZ} step="0.05" value={zoom} onChange={(e) => setZ(Number(e.target.value))} aria-label="Zoom" className="flex-1 accent-[#21C063]" />
+          <button onClick={() => setZ(zoom + 0.5)} aria-label="Zoom in" className="size-9 flex items-center justify-center text-white/85"><ZoomIn size={20} /></button>
+        </div>
         {!aspectRatio && (
           <div className="flex gap-2 px-4 pb-1 overflow-x-auto no-scrollbar justify-start sm:justify-center">
             {RATIOS.map((r) => (
