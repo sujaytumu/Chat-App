@@ -1,9 +1,10 @@
 import mongoose from "mongoose";
 import ScheduledMessage from "../models/scheduledMessage.model.js";
 import Group from "../models/group.model.js";
+import { cleanRepeat, cleanTz, MAX_SCHEDULE_MS } from "../lib/recurrence.js";
 
 const MIN_AHEAD_MS = 30 * 1000;
-const MAX_AHEAD_MS = 366 * 24 * 3600 * 1000;
+const MAX_AHEAD_MS = MAX_SCHEDULE_MS;
 const MAX_PENDING = 50;
 
 const chatFilter = (chatType, chatId) =>
@@ -29,11 +30,16 @@ export const scheduleMessage = async (req, res) => {
     if ((await ScheduledMessage.countDocuments({ senderId: myId })) >= MAX_PENDING) {
       return res.status(400).json({ error: "You have too many scheduled messages" });
     }
+    const repeat = cleanRepeat(req.body.repeat);
     const doc = await ScheduledMessage.create({
       senderId: myId,
       ...(chatType === "group" ? { groupId: chatId } : { receiverId: chatId }),
       text,
       sendAt,
+      repeat,
+      firstAt: sendAt,
+      tz: cleanTz(req.body.tz),
+      repeatUntil: repeat === "none" ? null : new Date(Date.now() + MAX_AHEAD_MS), // repeats for at most one year
     });
     res.status(201).json(doc);
   } catch (error) {

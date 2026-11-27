@@ -315,6 +315,7 @@ const CallsPage = () => {
                       <span className="block text-[16.5px] text-wa-text truncate">{l.title || (l.callType === "video" ? "Video call" : "Voice call")}</span>
                       <span className="block text-[13.5px] text-wa-muted truncate">
                         {l.live ? `${l.participants} in the call now` : l.scheduledFor ? new Date(l.scheduledFor).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "Call link"}
+                        {l.repeat && l.repeat !== "none" ? ` · repeats ${l.repeat === "daily" ? "daily" : l.repeat === "weekly" ? "weekly" : l.repeat === "monthly" ? "monthly" : "yearly"}` : ""}
                         {!mine && l.creatorName ? ` · ${l.creatorName}` : ""}
                       </span>
                     </span>

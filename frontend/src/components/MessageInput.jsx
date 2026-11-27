@@ -39,7 +39,7 @@ import { getEnterSends } from "../lib/uiSettings";
 import { readFileAsBase64, formatFileSize, MAX_FILE_SIZE_MB } from "../lib/fileUtils";
 
 import { useDraftStore, draftKey } from "../store/useDraftStore";
-import ScheduleSheet, { fmtWhen } from "./ScheduleSheet";
+import ScheduleSheet, { fmtWhen, localTz, repeatLabel } from "./ScheduleSheet";
 import { axiosInstance } from "../lib/axios";
 const ContactPicker = lazyDialog(() => import("./ContactPicker"));
 const EventModal = lazyDialog(() => import("./EventModal"));
@@ -279,7 +279,7 @@ const MessageInput = () => {
     }, 550);
   };
   const sendPressEnd = () => clearTimeout(schedTimer.current);
-  const doSchedule = async (date) => {
+  const doSchedule = async (date, repeat = "none") => {
     if (!selectedChat) return;
     setScheduling(true);
     try {
@@ -288,8 +288,10 @@ const MessageInput = () => {
         chatId: selectedChat.data._id,
         text: text.trim(),
         sendAt: date.toISOString(),
+        repeat,
+        tz: localTz(),
       });
-      toast.success(`Scheduled for ${fmtWhen(date)}`);
+      toast.success(`Scheduled for ${fmtWhen(date)}${repeat !== "none" ? `, ${repeatLabel(repeat)}` : ""}`);
       setText("");
       setMentionIds([]);
       setMentionQuery(null);

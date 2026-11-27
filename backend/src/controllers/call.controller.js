@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { cleanRepeat, cleanTz, MAX_SCHEDULE_MS } from "../lib/recurrence.js";
 import mongoose from "mongoose";
 import CallLink from "../models/callLink.model.js";
 import { linkCallLive, linkCallCount } from "../lib/socket.js";
@@ -207,6 +208,8 @@ const publicLink = (l, extra = {}) => ({
   callType: l.callType,
   title: l.title,
   scheduledFor: l.scheduledFor,
+  repeat: l.repeat || "none",
+  repeatUntil: l.repeatUntil || null,
   creatorId: String(l.creatorId?._id || l.creatorId),
   creatorName: l.creatorId?.fullName,
   invitees: (l.invitees || []).map(String),
@@ -222,10 +225,12 @@ export const createCallLink = async (req, res) => {
     let when = null;
     if (scheduledFor) {
       when = new Date(scheduledFor);
-      if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() - 60_000 || when.getTime() > Date.now() + 90 * DAY) {
-        return res.status(400).json({ error: "Pick a time in the next 90 days" });
+      if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() - 60_000 || when.getTime() > Date.now() + MAX_SCHEDULE_MS) {
+        return res.status(400).json({ error: "Pick a time within the next year" });
       }
     }
+    const repeat = when ? cleanRepeat(req.body?.repeat) : "none";
+    const repeatUntil = repeat === "none" ? null : new Date(Date.now() + MAX_SCHEDULE_MS); // repeats for at most one year
     const ids = Array.isArray(invitees)
       ? [...new Set(invitees.map(String))].filter((id) => mongoose.isValidObjectId(id) && id !== String(req.user._id)).slice(0, 9)
       : [];
@@ -235,8 +240,13 @@ export const createCallLink = async (req, res) => {
       callType: callType === "video" ? "video" : "audio",
       title: typeof title === "string" ? title.trim().slice(0, 60) : "",
       scheduledFor: when,
+      repeat,
+      repeatUntil,
+      firstAt: when,
+      tz: cleanTz(req.body?.tz),
       invitees: ids,
-      expiresAt: new Date((when ? when.getTime() + 12 * 3600 * 1000 : Date.now() + 30 * DAY)),
+      // a repeating call keeps its link alive until its last date
+      expiresAt: new Date(repeatUntil ? repeatUntil.getTime() + 12 * 3600 * 1000 : when ? when.getTime() + 12 * 3600 * 1000 : Date.now() + 30 * DAY),
     });
     if (when && ids.length) {
       sendPushToUsers(ids, {

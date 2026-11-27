@@ -3,7 +3,7 @@ import { ArrowLeft, Trash2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { useBackToClose } from "../lib/useBackToClose";
-import { fmtWhen } from "./ScheduleSheet";
+import { fmtWhen, repeatLabel } from "./ScheduleSheet";
 
 // The messages you scheduled in this chat (cancel any of them).
 const ScheduledPanel = ({ chat, onClose }) => {
@@ -41,13 +41,18 @@ const ScheduledPanel = ({ chat, onClose }) => {
           <p className="text-center text-wa-muted py-16 px-8 text-[13.5px]">
             Nothing scheduled in this chat.
             <br />
-            Type a message, then press and hold the send button to pick a time.
+            Type a message, then press and hold the send button to pick a time (and repeat it daily, weekly, monthly or yearly).
           </p>
         ) : (
           list.map((m) => (
             <div key={m._id} className="flex items-start gap-3 px-5 py-3 border-b border-white/10">
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] text-[#00A884] font-medium">{fmtWhen(m.sendAt)}</p>
+                <p className="text-[12px] text-[#00A884] font-medium">
+                  {fmtWhen(m.sendAt)}
+                  {m.repeat && m.repeat !== "none" && (
+                    <span className="text-wa-muted font-normal"> · {repeatLabel(m.repeat)}{m.repeatUntil ? `, until ${new Date(m.repeatUntil).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })}` : ""}</span>
+                  )}
+                </p>
                 <p className="text-[13.5px] break-words whitespace-pre-wrap mt-0.5">{m.text}</p>
               </div>
               <button onClick={() => cancel(m._id)} className="size-10 rounded-full flex items-center justify-center text-[#F15C6D] hover:bg-white/5" aria-label="Cancel scheduled message">

@@ -11,6 +11,7 @@ import Group from "../models/group.model.js";
 import { purgeExpiredAccounts } from "../controllers/auth.controller.js";
 import { destroyPrivateAsset, VIEW_ONCE_TTL_MS } from "./privateMedia.js";
 import { birthdayPushes } from "./birthdayPush.js";
+import { nextAfterNow } from "./recurrence.js";
 
 // Every few seconds: send whatever has come due, through the normal send code
 // (so ticks, push notifications, blocking and disappearing timers all behave).
@@ -67,6 +68,18 @@ async function callReminders() {
       tag: `call-link-${l.code}`,
       data: { url: `/call/${l.code}`, callCode: l.code },
     });
+
+  }
+}
+
+// A repeating call keeps its date while people can still join it (30 minutes after it starts), then moves on to its
+// next date - same link - until its one year is over.
+async function rollRepeatingCalls() {
+  const done = await CallLink.find({ repeat: { $ne: "none" }, remindedStart: true, scheduledFor: { $lte: new Date(Date.now() - 30 * 60000) } }).limit(20).lean();
+  for (const l of done) {
+    const nx = nextAfterNow(+new Date(l.firstAt || l.scheduledFor), l.occurrence || 0, l.repeat, l.tz || "UTC", l.repeatUntil);
+    if (!nx) continue; // its year is over: it simply ends (the link expires with it)
+    await CallLink.updateOne({ _id: l._id, scheduledFor: l.scheduledFor }, { $set: { scheduledFor: nx.next, occurrence: nx.n, remindedSoon: false, remindedStart: false } });
   }
 }
 
@@ -124,13 +137,18 @@ async function tick() {
   await purgeExpiredViewOnce().catch((e) => console.log("View-once purge error:", e.message));
   await messageReminders().catch((e) => console.log("Message reminder error:", e.message));
   await callReminders().catch((e) => console.log("Call reminder error:", e.message));
+  await rollRepeatingCalls().catch((e) => console.log("Repeating call error:", e.message));
   await purgeExpiredAccounts().catch((e) => console.log("Account purge error:", e.message));
   await endExpiredMutes().catch((e) => console.log("Mute expiry error:", e.message));
   await birthdayPushes().catch((e) => console.log("Birthday push error:", e.message));
   const due = await ScheduledMessage.find({ sendAt: { $lte: new Date() } }).sort({ sendAt: 1 }).limit(30).lean();
   for (const item of due) {
-    // claim it first so it can never be sent twice
-    const claimed = await ScheduledMessage.findOneAndDelete({ _id: item._id });
+    // A repeating one moves on to its next date (until its one year is over); a one-time one is removed.
+    // Either way it is claimed first, so one date can never be sent twice.
+    const nx = item.repeat && item.repeat !== "none" ? nextAfterNow(+new Date(item.firstAt || item.sendAt), item.occurrence || 0, item.repeat, item.tz || "UTC", item.repeatUntil) : null;
+    const claimed = nx
+      ? await ScheduledMessage.findOneAndUpdate({ _id: item._id, sendAt: item.sendAt }, { $set: { sendAt: nx.next, occurrence: nx.n } })
+      : await ScheduledMessage.findOneAndDelete({ _id: item._id });
     if (!claimed) continue;
     try {
       const user = await User.findById(item.senderId).select("-password");

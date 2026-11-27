@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { RepeatPicker, localTz, oneYearFromNow, repeatLabel } from "./ScheduleSheet";
 import { X, Phone, Video, Link2, Copy, Share2, Check } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
@@ -19,6 +20,7 @@ const CallLinkSheet = ({ schedule = false, onClose, onCreated }) => {
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState(() => toLocalInput(new Date(Date.now() + 60 * 60 * 1000)));
   const [picked, setPicked] = useState(() => new Set());
+  const [repeat, setRepeat] = useState("none");
   const [busy, setBusy] = useState(false);
   const [made, setMade] = useState(null);
 
@@ -35,7 +37,7 @@ const CallLinkSheet = ({ schedule = false, onClose, onCreated }) => {
       const { data } = await axiosInstance.post("/calls/links", {
         callType: type,
         title,
-        ...(schedule ? { scheduledFor: new Date(when).toISOString(), invitees: [...picked] } : {}),
+        ...(schedule ? { scheduledFor: new Date(when).toISOString(), invitees: [...picked], repeat, tz: localTz() } : {}),
       });
       setMade(data);
       onCreated?.();
@@ -97,7 +99,7 @@ const CallLinkSheet = ({ schedule = false, onClose, onCreated }) => {
             </div>
             {made.scheduledFor && (
               <p className="text-[13px] text-wa-muted mt-2">
-                {new Date(made.scheduledFor).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}. You and anyone you invited get a reminder 10 minutes before.
+                {new Date(made.scheduledFor).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}. {made.repeat && made.repeat !== "none" ? ` Repeats ${repeatLabel(made.repeat)} until ${new Date(made.repeatUntil).toLocaleDateString([], { day: "numeric", month: "short", year: "numeric" })}.` : ""} You and anyone you invited get a reminder 10 minutes before, with the link to join.
               </p>
             )}
             <div className="flex gap-3 mt-4">
@@ -129,9 +131,13 @@ const CallLinkSheet = ({ schedule = false, onClose, onCreated }) => {
                   type="datetime-local"
                   value={when}
                   min={toLocalInput(new Date())}
+                  max={toLocalInput(oneYearFromNow())}
                   onChange={(e) => setWhen(e.target.value)}
                   className="mt-1 w-full h-11 rounded-lg bg-wa-bg border border-wa-field px-3 text-[14.5px] focus:outline-none focus:border-[#25D366]"
                 />
+                <div className="-mx-5">
+                  <RepeatPicker value={repeat} onChange={setRepeat} />
+                </div>
                 <p className="mt-3 text-[12.5px] text-wa-muted">Invite people ({picked.size}/9) — they get a notification now and a reminder before it starts</p>
                 <div className="mt-1 max-h-48 overflow-y-auto -mx-2">
                   {users.map((u) => (

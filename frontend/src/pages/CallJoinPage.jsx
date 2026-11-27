@@ -56,6 +56,7 @@ const CallJoinPage = () => {
           <p className="mt-1 text-[14.5px] text-wa-muted">
             {info.creatorName ? `Hosted by ${info.creatorName}` : "Talkies call"}
             {info.scheduledFor && ` · ${new Date(info.scheduledFor).toLocaleString(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}`}
+            {info.repeat && info.repeat !== "none" && ` · repeats ${info.repeat}`}
           </p>
           {info.live && <p className="mt-2 text-[14px] text-[#21C063]">{info.participants} {info.participants === 1 ? "person is" : "people are"} in the call</p>}
           {early && !info.live && <p className="mt-2 text-[13.5px] text-wa-muted">This call hasn&apos;t started yet. You can still open the room early.</p>}
