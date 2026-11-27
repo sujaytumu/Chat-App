@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Check, Loader2 } from "lucide-react";
+import { X, Check, Loader2, ZoomIn, ZoomOut, RotateCcw, RotateCw } from "lucide-react";
 import toast from "react-hot-toast";
-import { loadImage, cropImage } from "../lib/photoEdit";
+import { loadImage, cropImage, rotateImage } from "../lib/photoEdit";
 
 // Full-screen crop: drag the box to move it, drag a corner to resize. Pointer events + canvas only (APK-safe).
 const ASPECTS = [["free", "Free", 0], ["orig", "Original", -1], ["sq", "1:1", 1], ["port", "4:5", 0.8], ["p34", "3:4", 0.75], ["wide", "16:9", 16 / 9]];
@@ -17,13 +17,21 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
   const [busy, setBusy] = useState(false);
   const area = useRef(null);
   const drag = useRef(null);
+  // zoom in/out, move around while zoomed (drag the empty area or pinch), and rotate - all before cropping
+  const [curSrc, setCurSrc] = useState(src);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const pts = useRef(new Map());
+  const pinch = useRef(null);
+  const panFrom = useRef(null);
+  const MAXZ = 4;
 
   useEffect(() => {
     let live = true;
-    loadImage(src).then((i) => live && setImg(i)).catch(() => { toast.error("Couldn't open this photo to crop"); onClose(); });
+    loadImage(curSrc).then((i) => live && setImg(i)).catch(() => { toast.error("Couldn't open this photo to crop"); onClose(); });
     return () => { live = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src]);
+  }, [curSrc]);
   useEffect(() => {
     const el = area.current;
     if (!el) return undefined;
@@ -73,8 +81,8 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
   const move = (e) => {
     const d = drag.current;
     if (!d || !geo) return;
-    const dx = (e.clientX - d.x0) / geo.dw;
-    const dy = (e.clientY - d.y0) / geo.dh;
+    const dx = (e.clientX - d.x0) / (geo.dw * zoom);
+    const dy = (e.clientY - d.y0) / (geo.dh * zoom);
     const r = d.r;
     if (d.mode === "move") {
       setRect({ ...r, x: clamp(r.x + dx, 0, 1 - r.w), y: clamp(r.y + dy, 0, 1 - r.h) });
@@ -107,6 +115,59 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
   };
   const end = () => { drag.current = null; };
 
+  const limitPan = (p, z) => {
+    if (!geo) return p;
+    const mx = ((z - 1) * geo.dw) / 2 + 40;
+    const my = ((z - 1) * geo.dh) / 2 + 40;
+    return { x: clamp(p.x, -mx, mx), y: clamp(p.y, -my, my) };
+  };
+  const setZ = (z) => {
+    const nz = clamp(z, 1, MAXZ);
+    setZoom(nz);
+    setPan((p) => (nz === 1 ? { x: 0, y: 0 } : limitPan(p, nz)));
+  };
+  const areaDown = (e) => {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.current.size === 2) {
+      const [a, b] = [...pts.current.values()];
+      pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: zoom };
+      panFrom.current = null;
+    } else {
+      panFrom.current = { x: e.clientX, y: e.clientY, p: { ...pan } };
+    }
+  };
+  const areaMove = (e) => {
+    if (!pts.current.has(e.pointerId)) return;
+    pts.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.current.size === 2 && pinch.current) {
+      const [a, b] = [...pts.current.values()];
+      setZ(pinch.current.z * ((Math.hypot(a.x - b.x, a.y - b.y) || 1) / pinch.current.d));
+    } else if (panFrom.current && zoom > 1) {
+      const f = panFrom.current;
+      setPan(limitPan({ x: f.p.x + e.clientX - f.x, y: f.p.y + e.clientY - f.y }, zoom));
+    }
+  };
+  const areaUp = (e) => {
+    pts.current.delete(e.pointerId);
+    pinch.current = null;
+    panFrom.current = null;
+  };
+  const rotate = async (dir) => {
+    if (busy || !img) return;
+    setBusy(true);
+    try {
+      const r = await rotateImage(img.src, dir);
+      setImg(null);
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+      setCurSrc(r.src);
+    } catch {
+      toast.error("Couldn't rotate this photo");
+    }
+    setBusy(false);
+  };
+
   const apply = async () => {
     if (busy || !img) return;
     setBusy(true);
@@ -128,9 +189,9 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
         </button>
       </div>
       <div className="flex-1 min-h-0 relative overflow-hidden p-6">
-        <div ref={area} className="relative w-full h-full">
+        <div ref={area} className="relative w-full h-full touch-none" onPointerDown={areaDown} onPointerMove={areaMove} onPointerUp={areaUp} onPointerCancel={areaUp} onWheel={(e) => setZ(zoom - e.deltaY * 0.002)}>
           {geo && (
-            <div className="absolute touch-none select-none" style={{ left: geo.ox, top: geo.oy, width: geo.dw, height: geo.dh }}>
+            <div className="absolute touch-none select-none" style={{ left: geo.ox, top: geo.oy, width: geo.dw, height: geo.dh, transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: "center" }}>
               <img src={img.src} alt="" draggable={false} className="w-full h-full block pointer-events-none" />
               <div
                 onPointerDown={start("move")}
@@ -138,14 +199,14 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
                 onPointerUp={end}
                 onPointerCancel={end}
                 className="absolute border-2 border-white touch-none"
-                style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%`, boxShadow: "0 0 0 9999px rgba(0,0,0,.62)" }}
+                style={{ left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.w * 100}%`, height: `${rect.h * 100}%`, boxShadow: "0 0 0 9999px rgba(0,0,0,.62)", borderWidth: 2 / zoom }}
               >
                 <span className="absolute inset-y-0 left-1/3 w-px bg-white/35 pointer-events-none" />
                 <span className="absolute inset-y-0 left-2/3 w-px bg-white/35 pointer-events-none" />
                 <span className="absolute inset-x-0 top-1/3 h-px bg-white/35 pointer-events-none" />
                 <span className="absolute inset-x-0 top-2/3 h-px bg-white/35 pointer-events-none" />
                 {CORNERS.map(([id, pos]) => (
-                  <span key={id} onPointerDown={start(id)} className={`absolute ${pos} size-11 flex items-center justify-center touch-none`}>
+                  <span key={id} onPointerDown={start(id)} style={{ transform: `scale(${1 / zoom})` }} className={`absolute ${pos} size-11 flex items-center justify-center touch-none`}>
                     <span className="size-4 rounded-sm bg-white shadow" />
                   </span>
                 ))}
@@ -154,6 +215,13 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
           )}
           {!geo && <div className="absolute inset-0 flex items-center justify-center"><Loader2 size={28} className="animate-spin text-white/70" /></div>}
         </div>
+      </div>
+      <div className="flex items-center gap-3 px-4 pt-1 shrink-0">
+        <button onClick={() => rotate(-1)} disabled={busy || !img} aria-label="Rotate left" className="size-10 rounded-full bg-white/10 flex items-center justify-center active:scale-95 disabled:opacity-50"><RotateCcw size={19} /></button>
+        <button onClick={() => setZ(zoom - 0.5)} aria-label="Zoom out" className="size-10 rounded-full bg-white/10 flex items-center justify-center active:scale-95"><ZoomOut size={19} /></button>
+        <input type="range" min={1} max={MAXZ} step="0.05" value={zoom} onChange={(e) => setZ(Number(e.target.value))} aria-label="Zoom" className="flex-1 accent-[#21C063]" />
+        <button onClick={() => setZ(zoom + 0.5)} aria-label="Zoom in" className="size-10 rounded-full bg-white/10 flex items-center justify-center active:scale-95"><ZoomIn size={19} /></button>
+        <button onClick={() => rotate(1)} disabled={busy || !img} aria-label="Rotate right" className="size-10 rounded-full bg-white/10 flex items-center justify-center active:scale-95 disabled:opacity-50"><RotateCw size={19} /></button>
       </div>
       <div className="flex gap-2.5 overflow-x-auto no-scrollbar px-4 pt-2 pb-[calc(14px+env(safe-area-inset-bottom))] shrink-0">
         {ASPECTS.map(([id, label]) => (
