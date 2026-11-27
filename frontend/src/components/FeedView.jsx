@@ -585,13 +585,20 @@ const Caption = ({ name, text }) => {
 
 export { default as NewPost } from "./NewPost";
 
+// Remembers the feed (posts, how far it was loaded, where you were) while you visit another page, so coming back
+// puts you on the same post instead of reloading from the top.
+const FEED_MEM_MS = 3 * 60 * 60 * 1000;
+let feedMem = null;
+
 // The Feed: photo posts from people you can see, 16 at a time
 const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
   const navigate = useNavigate();
   const focusPost = useRef(null); // a post opened from a shared link: kept at the top of the feed
-  const [posts, setPosts] = useState([]);
-  const [more, setMore] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const resume = useRef(undefined);
+  if (resume.current === undefined) resume.current = feedMem && !focusId && Date.now() - feedMem.at < FEED_MEM_MS ? feedMem : null;
+  const [posts, setPosts] = useState(() => resume.current?.posts || []);
+  const [more, setMore] = useState(() => !!resume.current?.more);
+  const [loading, setLoading] = useState(() => !resume.current);
   const [failed, setFailed] = useState(false);
   const [commentsFor, setCommentsFor] = useState(null);
   const [pop, setPop] = useState(null);
@@ -601,6 +608,22 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
   const [viewer, setViewer] = useState(null); // { images, src } - photo open full screen
   const next = useRef(null);
   const busy = useRef(false);
+  const scroller = useRef(null);
+  const scrollPos = useRef(0);
+  const memRef = useRef({});
+  memRef.current = { posts, more, tab };
+  useEffect(() => {
+    if (resume.current) {
+      next.current = resume.current.next;
+      const top = resume.current.scrollTop || 0;
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (scroller.current) scroller.current.scrollTop = top; }));
+    }
+    return () => {
+      const m = memRef.current;
+      feedMem = m.tab === "all" && m.posts.length ? { posts: m.posts.slice(0, 80), more: m.more, next: next.current, scrollTop: scrollPos.current, at: Date.now() } : null;
+    };
+  }, []);
+  const usedResume = useRef(false);
 
   const load = useCallback(async (reset) => {
     if (busy.current) return;
@@ -642,6 +665,10 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
   }, [focusId]);
 
   useEffect(() => {
+    if (resume.current && !usedResume.current) {
+      usedResume.current = true; // coming back: keep what was already loaded
+      return;
+    }
     next.current = null;
     setPosts([]);
     setLoading(true);
@@ -706,7 +733,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
   };
 
   return (
-    <div className="h-full overflow-y-auto pb-6 bg-black text-white overscroll-contain" style={{ paddingTop: topPad }}>
+    <div ref={scroller} onScroll={(e) => { scrollPos.current = e.currentTarget.scrollTop; }} className="h-full overflow-y-auto pb-6 bg-black text-white overscroll-contain" style={{ paddingTop: topPad }}>
       <div className="flex gap-2 px-3 pb-3">
         {[["all", "All posts"], ["saved", "Saved"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} className={`h-9 px-4 rounded-full text-[14px] ${tab === id ? "bg-white text-black font-semibold" : "bg-white/10 text-white/80"}`}>{label}</button>

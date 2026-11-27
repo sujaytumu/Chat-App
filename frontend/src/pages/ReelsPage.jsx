@@ -1085,7 +1085,7 @@ const readReelsMemo = () => {
 
 // The reel you were watching in the main feed, and when you left it. Coming back to Reels within REEL_RESUME_MS lands on
 // that same reel; after a longer gap the feed starts from the first reel as usual.
-const REEL_RESUME_MS = 10 * 60 * 1000;
+const REEL_RESUME_MS = 3 * 60 * 60 * 1000;
 const LAST_REEL_KEY = "reelsLastWatched";
 let lastWatched = null;
 const readLastWatched = () => {
