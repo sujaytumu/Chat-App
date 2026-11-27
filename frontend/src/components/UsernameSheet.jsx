@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import QRCode from "qrcode";
-import { X, Check, AlertCircle, Loader2, Copy, Share2 } from "lucide-react";
+import { X, Check, AlertCircle, Loader2, Copy, Share2, ScanLine } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { useAuthStore } from "../store/useAuthStore";
 import { useBackToClose } from "../lib/useBackToClose";
+import LinkDeviceSheet from "./LinkDeviceSheet";
 
 export const profileLink = (username) => `${window.location.origin}/?u=${username}`;
 
@@ -18,6 +19,7 @@ const UsernameSheet = ({ onClose }) => {
   const [status, setStatus] = useState({ state: "idle" }); // idle | checking | ok | bad
   const [saving, setSaving] = useState(false);
   const [qr, setQr] = useState("");
+  const [scanning, setScanning] = useState(false);
 
   const clean = value.trim().replace(/^@/, "").toLowerCase();
 
@@ -129,6 +131,7 @@ const UsernameSheet = ({ onClose }) => {
             </div>
             <p className="mt-2 text-[15px] font-medium">@{current}</p>
             <p className="text-[12px] text-wa-muted text-center px-4">Anyone who scans this or opens your link can message you.</p>
+            <p className="text-[11.5px] text-wa-muted text-center px-4 mt-1">This is your profile code. To log in on another device, use “Scan a login QR” below.</p>
             <div className="mt-3 flex gap-2 w-full">
               <button onClick={copy} className="flex-1 h-11 rounded-full bg-wa-field text-[13.5px] font-medium flex items-center justify-center gap-2">
                 <Copy size={16} /> Copy link
@@ -139,7 +142,12 @@ const UsernameSheet = ({ onClose }) => {
             </div>
           </div>
         )}
+
+        <button onClick={() => setScanning(true)} className="mt-4 w-full h-12 rounded-full bg-wa-field text-[14px] font-medium flex items-center justify-center gap-2">
+          <ScanLine size={18} /> Scan a login QR (log in another device)
+        </button>
       </div>
+      {scanning && <LinkDeviceSheet onClose={() => setScanning(false)} onDone={() => { setScanning(false); toast.success("Device linked"); }} />}
     </div>,
     document.body
   );

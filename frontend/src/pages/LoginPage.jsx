@@ -4,10 +4,12 @@ import { getSavedLogin } from "../lib/savedLogin";
 import QrLoginPanel from "../components/QrLoginPanel";
 import AuthImagePattern from "../components/AuthImagePattern";
 import { Link } from "react-router-dom";
-import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, UserPlus, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2, Lock, Mail, MessageSquare, UserPlus, ShieldCheck, QrCode } from "lucide-react";
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  // "Scan QR" (like WhatsApp Web) or "Email & password": a browser opens on the QR, the phone app on the form
+  const [via, setVia] = useState(() => (window.Capacitor?.isNativePlatform?.() ? "password" : "qr"));
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -110,8 +112,23 @@ const LoginPage = () => {
             </form>
           ) : (
           <>
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-base-200 mb-5" role="tablist">
+            {[["qr", "Scan QR code", QrCode], ["password", "Email & password", Mail]].map(([k, label, Icon]) => (
+              <button
+                key={k}
+                type="button"
+                role="tab"
+                aria-selected={via === k}
+                onClick={() => setVia(k)}
+                className={`h-10 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition ${via === k ? "bg-base-100 shadow text-primary" : "text-base-content/60"}`}
+              >
+                <Icon size={16} /> {label}
+              </button>
+            ))}
+          </div>
+
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6" method="post" action="#">
+          <form onSubmit={handleSubmit} className={`space-y-6 ${via === "password" ? "" : "hidden"}`} method="post" action="#">
             <div className="form-control">
               <label className="label" htmlFor="login-email">
                 <span className="label-text font-medium">Email</span>
@@ -196,7 +213,7 @@ const LoginPage = () => {
             </button>
           </form>
 
-          {!window.Capacitor?.isNativePlatform?.() && <QrLoginPanel />}
+          {via === "qr" && <QrLoginPanel />}
 
           {/* Highlighted Create Account Box */}
           <div className="mt-6">

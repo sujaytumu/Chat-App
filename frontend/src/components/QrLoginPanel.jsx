@@ -50,18 +50,20 @@ export default function QrLoginPanel() {
 
   return (
     <div className="text-center space-y-3 pt-2">
-      <div className="divider text-xs text-base-content/50">or</div>
       <p className="text-sm font-medium flex items-center justify-center gap-1.5">
-        <QrCode size={16} /> Log in with QR code
+        <QrCode size={16} /> Log in by scanning this code
       </p>
       <div className="mx-auto size-[240px] rounded-xl bg-white flex items-center justify-center">
         {img ? <img src={img} alt="Login QR code" className="size-full" /> : err ? (
           <button className="btn btn-sm" onClick={() => setRound((n) => n + 1)}>Retry</button>
         ) : <Loader2 className="animate-spin text-black/50" />}
       </div>
-      <p className="text-xs text-base-content/60">
-        On your phone open Talkies → ⋮ → Linked devices → Link a device, then scan this code.
-      </p>
+      <ol className="text-xs text-base-content/70 text-left max-w-[260px] mx-auto list-decimal pl-4 space-y-0.5">
+        <li>Open Talkies on your phone (already logged in)</li>
+        <li>Tap ⋮ → Linked devices → Link a device</li>
+        <li>Point the phone at this code</li>
+      </ol>
+      <button type="button" className="btn btn-ghost btn-xs" onClick={() => setRound((n) => n + 1)}>New code</button>
     </div>
   );
 }

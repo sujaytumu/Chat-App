@@ -80,7 +80,7 @@ export default function LinkDeviceSheet({ onClose, onDone, initialCode }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] bg-black/70 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="w-full max-w-md bg-wa-pop text-wa-text rounded-t-3xl sm:rounded-3xl p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[17px] font-medium">Link a device</h3>
