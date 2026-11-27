@@ -85,15 +85,15 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   };
   const many = images.length > 1;
   return (
-    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: many ? 0.8 : ar, maxHeight: "80vh" }}>
+    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "80vh" }}>
       <div
         ref={rail}
-        className="absolute inset-0 flex overflow-x-auto snap-x snap-mandatory no-scrollbar overscroll-x-contain"
-        style={{ scrollSnapStop: "always", WebkitOverflowScrolling: "touch" }}
+        className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar overscroll-x-contain"
+        style={{ scrollSnapStop: "always", WebkitOverflowScrolling: "touch", touchAction: "pan-x pan-y" }}
         onScroll={many ? (e) => { const n = Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth); setI((cur) => (cur === n ? cur : n)); } : undefined}
       >
         {images.map((src, k) => (
-          <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always" style={{ containerType: "inline-size" }}>
+          <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always overflow-hidden" style={{ containerType: "inline-size" }}>
             <img loading="lazy" decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />
             <img
               src={optimizeImage(src, 1080)}
@@ -103,7 +103,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
               draggable={false}
               onLoad={k === 0 ? first : undefined}
               onClick={() => onTap(k)}
-              className={`relative w-full h-full ${many ? "object-cover" : "object-contain"}`} // several photos: each fills the same frame (no jumping)
+              className="relative w-full h-full object-contain"
             />
             <PhotoLine t={texts[k]} />
           </div>
