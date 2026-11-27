@@ -117,6 +117,21 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
   // Smaller phone-friendly copy first; the original file if that copy fails or is slow to start.
+  // Leaving a reel's player behind (scrolled far away) must free its video memory right away. Phones that hold on
+  // to many video buffers can run out of memory and restart the app, which looks like jumping back to the chats.
+  useEffect(() => {
+    const v = video.current; // taken now: by the time the cleanup runs, React has already emptied the ref
+    return () => {
+      if (!v) return;
+      try {
+        v.pause();
+        v.removeAttribute("src");
+        v.load();
+      } catch {
+        /* already gone */
+      }
+    };
+  }, [mount]);
   const [useOriginal, setUseOriginal] = useState(false);
   const reelSrc = useOriginal ? reel.videoUrl : fastVideoUrl(reel.videoUrl);
   useEffect(() => {
@@ -1229,7 +1244,7 @@ const ReelsPage = () => {
   useEffect(() => {
     if (!activeId || !more || tab === "saved" || view) return;
     const i = reels.findIndex((r) => r._id === activeId);
-    if (i >= reels.length - 3 && reels.length) load(false);
+    if (i >= reels.length - 6 && reels.length) load(false); // ask early so the next ones are ready before you reach them
   }, [activeId, reels, more, load, tab, view]);
 
   // opened from the search grid / just posted: land on that reel (the list is in posting order)

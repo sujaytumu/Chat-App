@@ -543,7 +543,7 @@ const MoreSentinel = ({ onVisible }) => {
   useEffect(() => {
     const node = el.current;
     if (!node || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver((e) => e[0].isIntersecting && onVisible(), { rootMargin: "400px" });
+    const io = new IntersectionObserver((e) => e[0].isIntersecting && onVisible(), { rootMargin: "1800px" });
     io.observe(node);
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
