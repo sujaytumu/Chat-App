@@ -764,7 +764,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
       ) : (
         <>
           {posts.map((p) => (
-            <article key={p._id} className="mb-5 pb-4 border-b border-white/[0.06]" style={{ contentVisibility: "auto", containIntrinsicSize: "520px" }}>
+            <article key={p._id} className="mb-5 pb-4 border-b border-white/[0.06]" style={{ contentVisibility: "auto", containIntrinsicSize: "auto 520px" }}>
               <div className="flex items-center gap-2.5 px-3 py-2">
                 <button type="button" onClick={() => openProfile(p)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-70" aria-label={`Open ${p.user?.fullName || "profile"}`}>
                 <span className="rounded-full p-[2px] bg-gradient-to-tr from-[#25D366] to-[#7CFFB2]"><img loading="lazy" decoding="async" src={optimizeImage(p.user?.profilePic || "/avatar.png", 80)} alt="" className="size-8 rounded-full object-cover border-2 border-black" /></span>
