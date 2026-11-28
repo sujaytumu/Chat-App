@@ -173,7 +173,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
     const fe = frameEl.current;
     const eff = fe && fe.clientHeight ? fe.clientWidth / fe.clientHeight : ar;
     const r = imgInfo.get(src)?.r;
-    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.08 ? "object-contain" : "object-cover"; // any photo that would lose more than ~8% is shown whole
+    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.01 ? "object-contain" : "object-cover"; // the photo that sets the frame fills it exactly (a 1% rounding crop is invisible); every other photo is shown whole, smaller, never zoomed in
   };
   return (
     <div ref={frameEl} className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
