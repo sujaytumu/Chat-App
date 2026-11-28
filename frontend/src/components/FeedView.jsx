@@ -35,7 +35,9 @@ const postFrame = (shapes) => {
 // phone can find faces (FaceDetector), the zoom centres on them and stops before any face reaches the edge; otherwise it is
 // a gentle zoom towards the upper middle (where people usually are). Tapping a photo opens it whole, uncropped.
 const imgInfo = new Map(); // photo address -> { r: width/height, faces: [{x, y, w, h}] as fractions of the picture }
+const POST_PHOTO_ZOOM = false; // photos are no longer drawn bigger than the frame (the code stays here in case it is wanted again)
 const zoomFor = (src, ar) => {
+  if (!POST_PHOTO_ZOOM) return null;
   const info = imgInfo.get(src);
   if (!info) return null;
   const { r, faces } = info;
@@ -145,7 +147,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   };
   const many = images.length > 1;
   return (
-    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "92vh", transition: "aspect-ratio .2s ease" }}>
+    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
       <div
         ref={rail}
         className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar overscroll-x-contain"
@@ -163,7 +165,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
               draggable={false}
               onLoad={seen(src)}
               onClick={() => onTap(k)}
-              className="relative w-full h-full object-contain"
+              className="relative w-full h-full object-cover" /* fills the frame: no gaps at the sides */
               style={(() => { const z = zoomFor(src, ar); return z && z.s > 1.001 ? { transform: `scale(${z.s})`, transformOrigin: `${z.ox * 100}% ${z.oy * 100}%` } : undefined; })()}
             />
             <PhotoLine t={texts[k]} />

@@ -33,6 +33,7 @@ import { useThemeStore } from "./store/useThemeStore";
 import { syncPreferences } from "./lib/prefsSync";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import { useChatStore } from "./store/useChatStore";
+import { notePath } from "./lib/tabNav";
 import { startVersionWatcher, GlobalUpdatePill, UpdatePopup } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
 import { syncQuietHours, refreshQuietHoursZone } from "./lib/quietHours";
@@ -127,6 +128,7 @@ const App = () => {
 
   // Remember the last screen. If Android restarts the app while you are away (for example after the phone's share
   // menu or WhatsApp opens on top of a post), come back to that screen instead of the chat list.
+  useEffect(() => { notePath(location.pathname); }, [location.pathname]); // lets tab swiping know which page came before
   const restoredScreen = useRef(false);
   const startScreen = useRef(undefined); // read before the first save below overwrites it
   if (startScreen.current === undefined) {
