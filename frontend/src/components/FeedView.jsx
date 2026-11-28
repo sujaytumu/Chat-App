@@ -100,10 +100,10 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   // seen) and the wider ones sit inside it zoomed out. The shape of every photo is learned up front from its tiny
   // blurred copy (below), so the frame settles at once and stays the same while you swipe.
   const known = images.map((src) => ratioCache.get(src)).filter(Boolean);
-  // Exact fit, nothing wasted: if any photo is vertical the frame is exactly the most vertical photo's shape (it fits
-  // with no gap at all, the others sit smaller inside it). If every photo is horizontal the frame stays as horizontal
-  // as the widest one, and narrower photos just leave a gap at the sides.
-  const ar = known.length ? (Math.min(...known) < 1 ? Math.min(...known) : Math.max(...known)) : 0.8;
+  // The frame is the shape of the LEAST vertical (widest) photo of the post, so that photo fits exactly. Every taller
+  // photo is shown whole at the same height, a little narrower, so the empty space is only ever at the SIDES - never
+  // at the top or bottom. A very tall frame gets narrower instead of shorter (see the width below).
+  const ar = known.length ? Math.max(...known) : 0.8;
   useEffect(() => {
     let live = true;
     images.forEach((src) => {
