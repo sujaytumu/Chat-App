@@ -22,6 +22,7 @@ const PostPage = () => {
     draftGet(`post:${useAuthStore.getState().authUser?._id || "me"}:meta`).then((m) => m?.order?.length && setComposing(true));
   }, []);
   const [feedKey, setFeedKey] = useState(0);
+  const [bare, setBare] = useState(false); // feed still loading: no heading, just the green spinner
   const [params] = useSearchParams();
   const focusId = params.get("p") || undefined; // opened from a shared post link
 
@@ -41,7 +42,7 @@ const PostPage = () => {
         ) : (
           <>
             <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between px-4 pt-[calc(10px+env(safe-area-inset-top))] pb-2 bg-gradient-to-b from-black via-black/85 to-transparent">
-              <h1 className="text-white text-[24px] font-bold drop-shadow">Posts</h1>
+              <h1 className="text-white text-[24px] font-bold drop-shadow">{bare ? "" : "Posts"}</h1>
               <button
                 onClick={() => setComposing(true)}
                 aria-label="New post"
@@ -51,7 +52,7 @@ const PostPage = () => {
                 <Plus size={26} strokeWidth={2.2} />
               </button>
             </div>
-            <FeedView onCreate={() => setComposing(true)} refreshKey={feedKey} focusId={focusId} topPad="calc(60px + env(safe-area-inset-top))" />
+            <FeedView onBare={setBare} onCreate={() => setComposing(true)} refreshKey={feedKey} focusId={focusId} topPad="calc(60px + env(safe-area-inset-top))" />
           </>
         )}
       </div>

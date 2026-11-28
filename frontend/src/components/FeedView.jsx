@@ -619,7 +619,7 @@ export { default as NewPost } from "./NewPost";
 // puts you on the same post instead of reloading from the top.
 
 // The Feed: photo posts from people you can see, 16 at a time
-const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
+const FeedView = ({ onCreate, refreshKey, focusId, onBare, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
   const navigate = useNavigate();
   const focusPost = useRef(null); // a post opened from a shared link: kept at the top of the feed
   const resume = useRef(undefined);
@@ -653,6 +653,12 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
     };
   }, []);
   const usedResume = useRef(false);
+  // While nothing has loaded yet the page shows only the green spinner (the page asks to hide its heading)
+  const bare = loading && !posts.length;
+  useEffect(() => {
+    onBare?.(bare);
+    return () => onBare?.(false);
+  }, [bare, onBare]);
 
   const load = useCallback(async (reset) => {
     if (busy.current) return;
