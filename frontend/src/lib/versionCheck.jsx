@@ -9,7 +9,9 @@ import { useChatStore } from "../store/useChatStore";
 
 const ENTRY_RE = /assets\/index-[A-Za-z0-9_-]+\.js/;
 const RELOAD_LOG_KEY = "talkies-auto-reloads";
-const CHECK_EVERY_MS = 2 * 60 * 1000;
+const CHECK_EVERY_MS = 45 * 1000; // looks for a new build every 45 seconds while the app is open
+// false: a new build always shows the Update popup. (When true, the app switched to it silently and the popup only appeared sometimes.)
+const AUTO_APPLY = false;
 
 function currentEntry() {
   const el = document.querySelector('script[type="module"][src*="assets/index-"]');
@@ -86,6 +88,7 @@ function typingNow() {
   return !!editable && String(el.value ?? el.textContent ?? "").trim().length > 0;
 }
 function autoApply() {
+  if (!AUTO_APPLY) return false;
   if (!updateReady || inCall() || typingNow()) return false;
   try {
     const last = Number(sessionStorage.getItem(AUTO_KEY) || 0);
@@ -96,6 +99,7 @@ function autoApply() {
   return true;
 }
 
+let retrying = false;
 async function check() {
   const mine = currentEntry();
   if (!mine) return false; // dev server — nothing hashed to compare
@@ -103,9 +107,16 @@ async function check() {
   try {
     latest = await latestEntry();
   } catch {
-    return false; // offline
+    latest = null;
   }
-  if (!latest) return false;
+  if (!latest) {
+    // the server may just be waking up or restarting after a deploy: look once more shortly
+    if (!retrying) {
+      retrying = true;
+      setTimeout(() => { retrying = false; check(); }, 12000);
+    }
+    return false;
+  }
   if (latest === mine) {
     // really on the newest build now
     writePending("");
@@ -132,10 +143,14 @@ export function startVersionWatcher() {
   };
   document.addEventListener("visibilitychange", onVisible);
   window.addEventListener("online", check);
+  window.addEventListener("focus", check);
+  window.addEventListener("pageshow", check);
   const id = setInterval(check, CHECK_EVERY_MS);
   return () => {
     document.removeEventListener("visibilitychange", onVisible);
     window.removeEventListener("online", check);
+    window.removeEventListener("focus", check);
+    window.removeEventListener("pageshow", check);
     clearInterval(id);
   };
 }
