@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 
-export const MAX_STATUS_VIDEO_SECONDS = 90;
+export const MAX_STATUS_VIDEO_SECONDS = 30; // a status video lasts up to 30 seconds
 
 const fmt = (s) => {
   const t = Math.max(0, Math.floor(s || 0));
@@ -10,9 +10,9 @@ const fmt = (s) => {
 
 // WhatsApp-style preview of a video picked for a status: shows the first frame
 // straight away, tap to play / pause, a seek bar, and (only when the clip is
-// longer than 90 s) a slider to choose which 90 s to share. Videos up to 90 s
+// longer than 30 s) a slider to choose which 30 s to share. Videos up to 30 s
 // are shown and sent in full.
-const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children }) => {
+const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children, silent = false }) => {
   const ref = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -69,7 +69,7 @@ const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children }) => 
         src={`${src}#t=0.05`}
         preload="auto"
         playsInline
-        muted={muted}
+        muted={muted || silent}
         className={`w-full h-full object-contain ${shown ? "opacity-100" : "opacity-0"}`}
         onLoadedData={() => setShown(true)}
         onLoadedMetadata={(e) => {
@@ -129,7 +129,7 @@ const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children }) => 
               aria-label="Choose which part to share"
               className="w-full accent-[#21C063]"
             />
-            <p className="text-[11px] text-white/55 mt-0.5">Videos longer than 90 seconds are trimmed. Slide to pick the part.</p>
+            <p className="text-[11px] text-white/55 mt-0.5">Videos longer than 30 seconds are trimmed. Slide to pick the part.</p>
           </div>
         )}
         <div className="flex items-center gap-3 text-white text-[13px]">
@@ -148,8 +148,8 @@ const StatusVideoPreview = ({ src, duration, trim, onTrimChange, children }) => 
             aria-label="Seek"
             className="flex-1 min-w-0 accent-[#21C063]"
           />
-          <button onClick={() => setMuted((m) => !m)} aria-label={muted ? "Unmute" : "Mute"} className="shrink-0">
-            {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          <button onClick={() => setMuted((m) => !m)} disabled={silent} aria-label={muted || silent ? "Unmute" : "Mute"} className="shrink-0 disabled:opacity-40">
+            {muted || silent ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </button>
         </div>
       </div>

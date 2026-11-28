@@ -202,7 +202,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
   const [bgColor, setBgColor] = useState(COLORS[0]);
   const [font, setFont] = useState(0);
   const [media, setMedia] = useState(null); // { data, url(preview), name, size, mime, duration }
-  const [trim, setTrim] = useState(null); // video longer than 90 s: { start, end } seconds
+  const [trim, setTrim] = useState(null); // video longer than 30 s: { start, end } seconds
   const [caption, setCaption] = useState("");
   const [song, setSong] = useState(null); // { data, name, size }
   const [place, setPlace] = useState(null); // { name, lat, lng }
@@ -385,7 +385,7 @@ const CreateStatusModal = ({ onClose, onCreated, startWith }) => {
         />
       )}
       {isMedia && kind === "video" && (
-        <StatusVideoPreview src={media.url} duration={media.duration} trim={trim} onTrimChange={setTrim}>
+        <StatusVideoPreview src={media.url} duration={media.duration} trim={trim} onTrimChange={setTrim} silent={!!song}>
           <div className="absolute top-0 inset-x-0 flex items-center gap-1.5 px-3.5 pt-[calc(14px+env(safe-area-inset-top))] pb-3">
             <button onClick={onClose} aria-label="Close" className="size-10 rounded-full bg-[#101418] text-white flex items-center justify-center text-[18px]">✕</button>
             <div className="flex-1" />

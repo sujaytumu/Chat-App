@@ -11,7 +11,7 @@ const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
 const MAX_MEDIA_BASE64 = 13 * 1024 * 1024;
 const MAX_SONG_BASE64 = 6 * 1024 * 1024;
-const MAX_VIDEO_SECONDS = 90;
+const MAX_VIDEO_SECONDS = 30; // a status video lasts up to 30 seconds
 
 // Can `viewerId` see this status? The owner always can; otherwise the audience the owner picked decides.
 const canSee = (s, viewerId) => {
@@ -99,7 +99,7 @@ export const createStatus = async (req, res) => {
       if (Number.isFinite(start) && Number.isFinite(end) && start >= 0 && end > start && end - start <= MAX_VIDEO_SECONDS + 0.5) {
         doc.trim = { start, end };
       } else {
-        return res.status(400).json({ error: "Status videos can be at most 90 seconds" });
+        return res.status(400).json({ error: "Status videos can be at most 30 seconds" });
       }
     }
 

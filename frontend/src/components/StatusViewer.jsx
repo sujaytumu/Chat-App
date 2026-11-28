@@ -466,6 +466,7 @@ const StatusViewer = ({ user, statuses: initial, isOwn, onClose, highlight = nul
               key={current._id}
               src={current.content}
               autoPlay
+              muted={!!current.song?.url} /* a video with a song plays the song; both together was a double sound */
               playsInline
               preload="auto"
               className={`w-full h-full object-contain bg-black ${videoReady ? "opacity-100" : "opacity-0"}`}

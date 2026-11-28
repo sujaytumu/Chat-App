@@ -562,6 +562,7 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
   const pick = useRef(null);
   const prev = useRef(null);
   const songInput = useRef(null);
+  const [heard, setHeard] = useState(false); // the preview starts silent (phones only autoplay muted); the speaker button turns the sound on
   const trimmed = duration > 0 && (range[0] > 0.05 || (range[1] > 0 && range[1] < duration - 0.05));
   const effEnd = range[1] > 0 ? range[1] : duration;
   const effLen = Math.max(0, effEnd - range[0]);
@@ -790,13 +791,14 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
           {busy ? <Loader2 size={16} className="animate-spin" /> : failed.length ? "Retry" : "Share"}
         </button>
       </div>
-      <div className="flex-1 min-h-0 flex items-center justify-center p-3">
+      <div className="flex-1 min-h-0 flex items-center justify-center p-3 relative">
         {url ? (
+          <>
           <video
             ref={prev}
             src={url}
             playsInline
-            muted
+            muted={!heard}
             loop
             autoPlay
             onClick={(e) => (e.currentTarget.paused ? e.currentTarget.play() : e.currentTarget.pause())}
@@ -808,6 +810,10 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
             style={{ filter: filterCss(filter) }}
             className="max-h-full max-w-full rounded-xl"
           />
+          <button onClick={() => setHeard((h) => !h)} aria-label={heard ? "Mute preview" : "Hear the video"} className="absolute right-5 bottom-5 size-10 rounded-full bg-black/60 text-white flex items-center justify-center active:scale-95">
+            {heard ? <Volume2 size={20} /> : <VolumeX size={20} />}
+          </button>
+          </>
         ) : (
           <button onClick={() => pick.current?.click()} className="flex flex-col items-center gap-3 text-white/80">
             <span className="size-20 rounded-full bg-white/10 flex items-center justify-center"><Film size={34} /></span>
