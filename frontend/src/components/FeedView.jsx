@@ -146,8 +146,17 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
     if (el) el.scrollTo({ left: k * el.clientWidth, behavior: "smooth" });
   };
   const many = images.length > 1;
+  const frameEl = useRef(null);
+  // Wide photos fill the frame exactly. A photo taller than the frame is shown whole (smaller, with the soft blurred
+  // sides) instead of being cut at the top and bottom, so faces are never chopped or over-zoomed.
+  const fitFor = (src) => {
+    const fe = frameEl.current;
+    const eff = fe && fe.clientHeight ? fe.clientWidth / fe.clientHeight : ar;
+    const r = imgInfo.get(src)?.r;
+    return r && 1 - r / eff > 0.08 ? "object-contain" : "object-cover";
+  };
   return (
-    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
+    <div ref={frameEl} className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
       <div
         ref={rail}
         className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar overscroll-x-contain"
@@ -165,7 +174,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
               draggable={false}
               onLoad={seen(src)}
               onClick={() => onTap(k)}
-              className="relative w-full h-full object-cover" /* fills the frame: no gaps at the sides */
+              className={`relative w-full h-full ${fitFor(src)}`}
               style={(() => { const z = zoomFor(src, ar); return z && z.s > 1.001 ? { transform: `scale(${z.s})`, transformOrigin: `${z.ox * 100}% ${z.oy * 100}%` } : undefined; })()}
             />
             <PhotoLine t={texts[k]} />
