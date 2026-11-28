@@ -549,6 +549,17 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
   const [duration, setDuration] = useState(0);
   const [caption, setCaption] = useState("");
   const [pct, setPct] = useState(0);
+  // While a video is going up the screen stays awake, so the phone never sleeps and drops the upload half-way.
+  useEffect(() => {
+    if (!busy || !navigator.wakeLock?.request) return undefined;
+    let lock = null;
+    let gone = false;
+    const hold = () => navigator.wakeLock.request("screen").then((l) => { if (gone) l.release().catch(() => {}); else lock = l; }).catch(() => {});
+    hold();
+    const again = () => { if (document.visibilityState === "visible") hold(); };
+    document.addEventListener("visibilitychange", again);
+    return () => { gone = true; document.removeEventListener("visibilitychange", again); lock?.release().catch(() => {}); };
+  }, [busy]);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState("none");
   const [range, setRange] = useState([0, 0]); // trim start / end in seconds (end 0 = untouched)
@@ -836,6 +847,9 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
         {busy && progress && <p className="text-[13px] text-white/80">{progress}…</p>}
         {busy && (
           <div className="h-1.5 rounded-full bg-white/20 overflow-hidden"><div className="h-full bg-[#25D366] transition-all" style={{ width: `${pct}%` }} /></div>
+        )}
+        {busy && (
+          <p className="text-[12.5px] text-white/70">{pct >= 100 ? "Sent - the server is processing the video, keep the app open…" : `Uploading ${pct}% - keep the app open`}</p>
         )}
         {file && !busy && (
           <>

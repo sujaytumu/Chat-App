@@ -566,6 +566,11 @@ const pickSong = () => {
   if (best) songs.get(best).play();
 };
 if (typeof document !== "undefined") document.addEventListener("visibilitychange", pickSong);
+// OWNER RULE (keep): post photos must NEVER leave gaps at the top or bottom of the frame - gaps only at the sides.
+// Hard guarantee: only the post that is on screen (activeSong) may make sound. Every other post's song is paused.
+const silenceOthers = (keepId) => {
+  for (const [sid, sg] of songs) if (sid !== keepId) { try { sg.pause(); } catch { /* gone */ } }
+};
 const setSongsMuted = (m) => {
   songsMuted = m;
   try { localStorage.setItem("postSongMuted", m ? "1" : "0"); } catch { /* ignore */ }
@@ -591,7 +596,12 @@ const PostSong = ({ song, id }) => {
         a.loop = true;
         a.preload = "auto";
         a.muted = songsMuted;
-        a.onplaying = () => setPlaying(true);
+        a.onplaying = () => {
+          setPlaying(true);
+          // a late start (slow phone/network) of a post that is no longer the one on screen is stopped at once
+          if (activeSong !== id) a.pause();
+          else silenceOthers(id);
+        };
         a.onpause = () => setPlaying(false);
         audio.current = a;
       }
@@ -603,6 +613,7 @@ const PostSong = ({ song, id }) => {
         const a = getAudio();
         if (!a.currentTime && song.start) a.currentTime = song.start;
         a.muted = songsMuted;
+        silenceOthers(id);
         a.play().catch(() => {}); // if the phone refuses to start it by itself, the volume button starts it
       },
       pause: () => audio.current?.pause(),
@@ -636,8 +647,8 @@ const PostSong = ({ song, id }) => {
     const next = !songsMuted;
     setSongsMuted(next);
     if (!next && (!audio.current || audio.current.paused)) {
-      songs.get(id)?.play();
       activeSong = id;
+      songs.get(id)?.play();
     }
   };
   const off = muted || !playing;
