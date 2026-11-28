@@ -1630,7 +1630,7 @@ const ReelsPage = () => {
 
       <div className="absolute inset-x-0 top-0 bottom-[calc(72px+env(safe-area-inset-bottom))]">
         {loading && !reels.length ? (
-          <div className="h-full flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>
+          <div className="h-full flex items-center justify-center text-white"><Loader2 className="size-8 animate-spin text-[#25D366]" /></div>
         ) : !reels.length && failed ? (
           <div className="h-full flex flex-col items-center justify-center gap-4 text-white px-8 text-center">
             <p className="text-lg font-semibold">Couldn&apos;t load reels</p>
