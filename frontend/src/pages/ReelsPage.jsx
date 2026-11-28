@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye, Pencil, ChevronRight, Pin } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
+import axios from "axios";
 import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
@@ -530,6 +531,39 @@ const uploadReelRaw = (file, meta, cfg) =>
       headers: { "Content-Type": file.type || "video/mp4", "X-Reel-Meta": encodeURIComponent(JSON.stringify(meta)) },
     })
   );
+// Fast path: the phone sends the video straight to Cloudinary (not through our server), then tells the server it is
+// there. Any trouble on the way (not set up, blocked, too big, network) quietly falls back to the old route above.
+// Only a clear answer from our own server (repeat video, daily limit, too long) is passed on as it is.
+const DIRECT_MAX_BYTES = 95 * 1024 * 1024;
+const uploadReelSmart = async (file, meta, cfg) => {
+  if (file.size > DIRECT_MAX_BYTES) return uploadReelRaw(file, meta, cfg);
+  let sig;
+  try {
+    sig = (await axiosInstance.post("/reels/sign", { fp: meta.fp, size: file.size, duration: meta.duration })).data;
+  } catch (err) {
+    if ([400, 409, 429].includes(err?.response?.status)) throw err;
+    return uploadReelRaw(file, meta, cfg);
+  }
+  let up;
+  try {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("api_key", sig.apiKey);
+    form.append("timestamp", String(sig.timestamp));
+    form.append("signature", sig.signature);
+    form.append("folder", sig.folder);
+    up = (await axios.post(`https://api.cloudinary.com/v1_1/${sig.cloudName}/video/upload`, form, { timeout: cfg?.timeout, onUploadProgress: cfg?.onUploadProgress })).data;
+  } catch (err) {
+    console.warn("Direct upload failed, using the server route:", err?.response?.status, err?.message);
+    return uploadReelRaw(file, meta, cfg);
+  }
+  try {
+    return await axiosInstance.post("/reels/direct", { ...meta, publicId: up.public_id, size: file.size, duration: up.duration || meta.duration });
+  } catch (err) {
+    if ([400, 409, 429].includes(err?.response?.status)) throw err;
+    return uploadReelRaw(file, meta, cfg);
+  }
+};
 // Plain words for what went wrong with one video.
 const reasonOf = (err) => {
   const st = err?.response?.status;
@@ -730,7 +764,7 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
         const meta = { caption, duration, filter, fp: o.fp || fps[file.name + file.size] || "", ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(audience ? { audience } : {}) };
         const res = song
           ? await uploadReel({ video: await toDataUrl(file), ...meta, size: file.size, song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } }, cfg)
-          : await uploadReelRaw(file, meta, cfg);
+          : await uploadReelSmart(file, meta, cfg);
         posted.push(res.data);
       } catch (err) {
         if (err?.response?.status === 409) {
@@ -753,7 +787,7 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
           if (d > MAX_SECONDS + 0.5) {
             bad.push({ file: f, reason: `longer than ${MAX_SECONDS} seconds (${Math.round(d)}s)` });
           } else {
-            const r2 = await uploadReelRaw(f, { caption: "", duration: d, filter: "none", fp: fps[f.name + f.size] || "", ...(audience ? { audience } : {}) }, cfg);
+            const r2 = await uploadReelSmart(f, { caption: "", duration: d, filter: "none", fp: fps[f.name + f.size] || "", ...(audience ? { audience } : {}) }, cfg);
             posted.push(r2.data);
           }
         } catch (e2) {

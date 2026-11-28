@@ -840,6 +840,45 @@ export const createReelRaw = async (req, res) => {
   }
 };
 
+// Direct upload: the phone sends the video straight to Cloudinary (no waiting on this server, no proxy timeout),
+// then tells us it is there. Step 1 - a short-lived signature (and the repeat check, before any bytes move).
+export const signReelUpload = async (req, res) => {
+  try {
+    if (!process.env.CLOUDINARY_API_SECRET || !process.env.CLOUDINARY_CLOUD_NAME) return res.status(501).json({ error: "Direct upload is not set up" });
+    const today = await Reel.countDocuments({ userId: req.user._id, createdAt: { $gt: new Date(Date.now() - 24 * 3600 * 1000) } });
+    if (today >= 200) return res.status(429).json({ error: "You can post up to 200 reels a day - try again tomorrow" });
+    const secs = Number(req.body?.duration) || 0;
+    if (secs > MAX_SECONDS + 0.5) return res.status(400).json({ error: `Reels can be at most ${MAX_SECONDS} seconds` });
+    if (await findDuplicate(req.user._id, { fp: req.body?.fp, size: Number(req.body?.size) || 0, duration: secs })) return res.status(409).json({ error: "This reel is already there" });
+    const params = { folder: "chat-app/reels", timestamp: Math.round(Date.now() / 1000) };
+    const signature = cloudinary.utils.api_sign_request(params, process.env.CLOUDINARY_API_SECRET);
+    res.status(200).json({ cloudName: process.env.CLOUDINARY_CLOUD_NAME, apiKey: process.env.CLOUDINARY_API_KEY, signature, ...params });
+  } catch (error) {
+    console.log("Error in signReelUpload:", error.message);
+    res.status(500).json({ error: "Couldn't start the upload" });
+  }
+};
+
+// Step 2 - the video is on Cloudinary: check it really is (and really ours), then save the reel like any other.
+export const createReelDirect = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const publicId = String(b.publicId || "");
+    if (!/^chat-app\/reels\/[A-Za-z0-9_-]+$/.test(publicId)) return res.status(400).json({ error: "Bad upload" });
+    const up = await cloudinary.api.resource(publicId, { resource_type: "video" });
+    const secs = Number(up.duration) || Number(b.duration) || 0;
+    if (await findDuplicate(req.user._id, { fp: b.fp, size: Number(b.size) || 0, duration: secs })) {
+      cloudinary.uploader.destroy(publicId, { resource_type: "video" }).catch(() => {});
+      return res.status(409).json({ error: "This reel is already there" });
+    }
+    console.log(`reel direct ok user=${req.user._id} bytes=${up.bytes} secs=${secs}`);
+    return finishReel(req, res, { up, caption: b.caption, secs, filter: b.filter, trim: b.trim, song: null, audience: b.audience, fp: b.fp, fileSize: Number(b.size) || Number(up.bytes) || 0 });
+  } catch (error) {
+    console.log("Error in createReelDirect:", error?.message || error?.error?.message);
+    res.status(502).json({ error: "Couldn't find the uploaded video" });
+  }
+};
+
 export const likeReel = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: "Not found" });

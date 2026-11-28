@@ -1,6 +1,6 @@
 import express from "express";
 import { protectRoute } from "../middleware/auth.middleware.js";
-import { getReelFeed, getReel, createReel, createReelRaw, reelsExist, likeReel, viewReel, deleteReel, toggleFollow, toggleSave, pinReel, setReelOrder, dedupeMyReels, getSaved, importDiscover, importStatus, repostReel, getUserReels, reelsByTag, reelsByUser, searchReels, exploreReels, trendingTags, reelInsights, updateReel, hideReel, reportedReels, adminDeleteReel, dismissReports } from "../controllers/reel.controller.js";
+import { getReelFeed, getReel, createReel, createReelRaw, signReelUpload, createReelDirect, reelsExist, likeReel, viewReel, deleteReel, toggleFollow, toggleSave, pinReel, setReelOrder, dedupeMyReels, getSaved, importDiscover, importStatus, repostReel, getUserReels, reelsByTag, reelsByUser, searchReels, exploreReels, trendingTags, reelInsights, updateReel, hideReel, reportedReels, adminDeleteReel, dismissReports } from "../controllers/reel.controller.js";
 
 const router = express.Router();
 
@@ -28,6 +28,8 @@ router.get("/user/:userId", protectRoute, getUserReels);
 router.get("/:id", protectRoute, getReel);
 router.post("/", protectRoute, createReel);
 router.post("/raw", protectRoute, createReelRaw);
+router.post("/sign", protectRoute, signReelUpload);
+router.post("/direct", protectRoute, createReelDirect);
 router.post("/exists", protectRoute, reelsExist);
 router.put("/:id/like", protectRoute, likeReel);
 router.put("/:id/view", protectRoute, viewReel);
