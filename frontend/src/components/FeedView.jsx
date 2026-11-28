@@ -96,7 +96,9 @@ const PhotoLine = ({ t }) =>
 const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   const [i, setI] = useState(0);
   const [, setShapes] = useState(0); // bumped when a photo reports its shape
-  const ar = postFrame(images.map((src) => ratioCache.get(src)));
+  // The frame is the first photo's own shape and never changes while you swipe (before, it was re-worked as later photos
+  // loaded, so photo 1 came back bigger after visiting photo 4).
+  const ar = postFrame([ratioCache.get(images[0])]);
   const rail = useRef(null);
   const tap = useRef({ t: 0, timer: null });
   useEffect(() => () => clearTimeout(tap.current.timer), []);
@@ -147,13 +149,13 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   };
   const many = images.length > 1;
   const frameEl = useRef(null);
-  // Wide photos fill the frame exactly. A photo taller than the frame is shown whole (smaller, with the soft blurred
-  // sides) instead of being cut at the top and bottom, so faces are never chopped or over-zoomed.
+  // A photo that matches the frame fills it exactly. Any other (e.g. a tall one) is shown whole, smaller, with the soft
+  // blurred copy around it, so everyone in it stays visible and nothing is over-zoomed.
   const fitFor = (src) => {
     const fe = frameEl.current;
     const eff = fe && fe.clientHeight ? fe.clientWidth / fe.clientHeight : ar;
     const r = imgInfo.get(src)?.r;
-    return r && 1 - r / eff > 0.08 ? "object-contain" : "object-cover";
+    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.08 ? "object-contain" : "object-cover"; // any photo that would lose more than ~8% is shown whole
   };
   return (
     <div ref={frameEl} className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
