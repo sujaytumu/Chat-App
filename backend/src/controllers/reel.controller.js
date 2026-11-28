@@ -634,12 +634,83 @@ export const getReel = async (req, res) => {
   }
 };
 
-// Has this person already posted this very video? Same fingerprint, or the same size and length (to a tenth of a second).
-const findDuplicate = (userId, { fp, size, duration }) => {
+// "<file fingerprint>.<thumbnail fingerprint>" (the second part is optional: older reels and old phones only have the first)
+const splitFp = (fp) => {
+  const [base = "", th = ""] = String(fp || "").split(".");
+  return { base: /^[\w-]{8,60}$/.test(base) ? base : "", th: /^[0-9a-f]{16}$/.test(th) ? th : "" };
+};
+const hamming = (a, b) => {
+  let x = BigInt("0x" + a) ^ BigInt("0x" + b);
+  let n = 0;
+  while (x) { n += Number(x & 1n); x >>= 1n; }
+  return n;
+};
+const THUMB_NEAR = 4; // of 64 bits: the same picture, even re-encoded
+// Is this reel a repeat of another one (same person)? Same file fingerprint, the same size and length (to a tenth of a
+// second), or the same thumbnail picture with (nearly) the same length.
+const sameReel = (a, b) => {
+  const fa = splitFp(a.fingerprint), fb = splitFp(b.fingerprint);
+  if (fa.base && fa.base === fb.base) return true;
+  const dd = Math.abs((a.duration || 0) - (b.duration || 0));
+  if (a.fileSize > 0 && a.fileSize === b.fileSize && (a.duration || 0) > 0 && dd <= 0.1) return true;
+  if (fa.th && fb.th && (a.duration || 0) > 0 && dd <= 0.5 && hamming(fa.th, fb.th) <= THUMB_NEAR) return true;
+  return false;
+};
+
+// Has this person already posted this very video? (see sameReel)
+const findDuplicate = async (userId, { fp, size, duration }) => {
+  const { base, th } = splitFp(fp);
+  const dur = Number(duration) || 0;
   const or = [];
-  if (typeof fp === "string" && fp.length >= 8) or.push({ fingerprint: fp });
-  if (Number(size) > 0 && Number(duration) > 0) or.push({ fileSize: Number(size), duration: { $gte: Number(duration) - 0.1, $lte: Number(duration) + 0.1 } });
-  return or.length ? Reel.findOne({ userId, $or: or }).select("_id").lean() : null;
+  if (base) or.push({ fingerprint: new RegExp(`^${base}(\\.|$)`) });
+  if (Number(size) > 0 && dur > 0) or.push({ fileSize: Number(size), duration: { $gte: dur - 0.1, $lte: dur + 0.1 } });
+  if (or.length) {
+    const hit = await Reel.findOne({ userId, $or: or }).select("_id").lean();
+    if (hit) return hit;
+  }
+  if (th && dur > 0) {
+    const near = await Reel.find({ userId, fingerprint: /\./, duration: { $gte: dur - 0.5, $lte: dur + 0.5 } }).select("fingerprint").limit(400).lean();
+    return near.find((r) => { const t = splitFp(r.fingerprint).th; return t && hamming(th, t) <= THUMB_NEAR; }) || null;
+  }
+  return null;
+};
+
+// Removes repeated reels that are already posted: the OLDEST copy stays, newer copies go (their file too). Likes and
+// comments on a removed copy move to the one that stays, so nobody's reaction is lost. Only uploaded reels of the same
+// person are compared (never Discover clips or shared statuses).
+export async function dedupeReels(onlyUserId) {
+  const q = { userId: onlyUserId ? new mongoose.Types.ObjectId(String(onlyUserId)) : { $ne: null }, externalId: null, fromStatus: null };
+  const cursor = Reel.find(q).sort({ userId: 1, createdAt: 1, _id: 1 }).select("userId fingerprint fileSize duration videoUrl song likes").lean().cursor();
+  let removed = 0;
+  let curUser = "";
+  let kept = [];
+  for await (const r of cursor) {
+    const u = String(r.userId);
+    if (u !== curUser) { curUser = u; kept = []; }
+    const twin = kept.find((k) => sameReel(k, r));
+    if (!twin) { kept.push(r); continue; }
+    try {
+      if (r.likes?.length) await Reel.updateOne({ _id: twin._id }, { $addToSet: { likes: { $each: r.likes } } });
+      await StatusComment.updateMany({ targetId: r._id }, { $set: { targetId: twin._id } });
+      await Reel.deleteOne({ _id: r._id });
+      await removeReelFiles(r);
+      removed += 1;
+    } catch (e) {
+      console.log("dedupeReels:", e.message);
+    }
+  }
+  if (removed) console.log(`dedupeReels: removed ${removed} repeated reel(s)`);
+  return removed;
+}
+
+// A person cleans up their own repeats
+export const dedupeMyReels = async (req, res) => {
+  try {
+    res.status(200).json({ removed: await dedupeReels(req.user._id) });
+  } catch (error) {
+    console.log("Error in dedupeMyReels:", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 // Before uploading: which of these videos are already posted? Answers with their positions in the list.

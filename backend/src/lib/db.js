@@ -11,6 +11,9 @@ export const connectDB = async () => {
     setTimeout(() => {
       runOnce("cleanup-call-log-messages", cleanupCallLogMessages).catch(() => {});
       keepExpiredStatuses().catch(() => {});
+      // Repeated reels (same file, same size and length, or same thumbnail) that were posted before the check existed:
+      // the oldest copy stays. Runs once.
+      runOnce("dedupe-reels-v1", async () => (await import("../controllers/reel.controller.js")).dedupeReels()).catch(() => {});
     }, 45000);
   } catch (error) {
     console.log("MongoDB connection error:", error);
