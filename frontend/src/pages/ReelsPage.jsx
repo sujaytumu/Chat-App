@@ -558,7 +558,8 @@ const uploadReelSmart = async (file, meta, cfg) => {
     return uploadReelRaw(file, meta, cfg);
   }
   try {
-    return await axiosInstance.post("/reels/direct", { ...meta, publicId: up.public_id, size: file.size, duration: up.duration || meta.duration });
+    // the video is already safe on Cloudinary: ask the server again if it is busy waking up, instead of sending the whole video a second time
+    return await withRetry(() => axiosInstance.post("/reels/direct", { ...meta, publicId: up.public_id, size: file.size, duration: up.duration || meta.duration }));
   } catch (err) {
     if ([400, 409, 429].includes(err?.response?.status)) throw err;
     return uploadReelRaw(file, meta, cfg);
