@@ -460,7 +460,13 @@ const pickSong = () => {
   for (const [id, sg] of songs) if (sg.ratio >= bestRatio) { best = id; bestRatio = sg.ratio; }
   if (document.hidden) best = null;
   if (best === activeSong) return;
-  if (activeSong && songs.get(activeSong)) songs.get(activeSong).pause();
+  // scrolled away from a post: its song goes back to the start, so coming back plays it from the beginning.
+  // (Only the app going to the background keeps the place.)
+  const old = activeSong && songs.get(activeSong);
+  if (old) {
+    if (document.hidden) old.pause();
+    else old.stop();
+  }
   activeSong = best;
   if (best) songs.get(best).play();
 };
@@ -505,6 +511,12 @@ const PostSong = ({ song, id }) => {
         a.play().catch(() => {}); // if the phone refuses to start it by itself, the volume button starts it
       },
       pause: () => audio.current?.pause(),
+      stop: () => {
+        const a = audio.current;
+        if (!a) return;
+        a.pause();
+        try { a.currentTime = song.start || 0; } catch { /* not loaded yet */ }
+      },
     };
     songs.set(id, entry);
     const card = btn.current?.closest("article");
