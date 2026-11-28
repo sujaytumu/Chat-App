@@ -173,7 +173,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
     const fe = frameEl.current;
     const eff = fe && fe.clientHeight ? fe.clientWidth / fe.clientHeight : ar;
     const r = imgInfo.get(src)?.r;
-    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.03 ? "object-contain" : "object-cover"; // any photo that would lose more than ~8% is shown whole
+    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.08 ? "object-contain" : "object-cover"; // any photo that would lose more than ~8% is shown whole
   };
   return (
     <div ref={frameEl} className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
