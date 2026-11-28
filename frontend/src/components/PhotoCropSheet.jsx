@@ -10,7 +10,7 @@ const MIN = 48; // smallest crop side, in screen px
 const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 const CORNERS = [["tl", "-left-[22px] -top-[22px]"], ["tr", "-right-[22px] -top-[22px]"], ["bl", "-left-[22px] -bottom-[22px]"], ["br", "-right-[22px] -bottom-[22px]"]];
 
-const PhotoCropSheet = ({ src, onClose, onApply }) => {
+const PhotoCropSheet = ({ src, onClose, onApply, initialRect }) => {
   useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const [img, setImg] = useState(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -21,6 +21,7 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
   const drag = useRef(null);
   // zoom in/out, move around while zoomed (drag the empty area or pinch), and rotate - all before cropping
   const [curSrc, setCurSrc] = useState(src);
+  const [basePack, setBasePack] = useState(null); // set once this sheet rotated the picture: the rotated whole picture
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const pts = useRef(new Map());
@@ -71,7 +72,8 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
   };
   const pickAspect = (id) => { setAspect(id); setRect(fit(id)); };
   const ready = !!geo;
-  useEffect(() => { if (ready) setRect(fit(aspect)); /* first fit once the picture is measured */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  // a photo cropped before opens on its ORIGINAL picture with the earlier crop box on it: zoom out / widen the box / Reset to get it all back
+  useEffect(() => { if (ready) setRect(initialRect || fit(aspect)); /* first fit once the picture is measured */ // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
   const start = (mode) => (e) => {
@@ -163,6 +165,7 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
       setImg(null);
       setZoom(1);
       setPan({ x: 0, y: 0 });
+      setBasePack(r);
       setCurSrc(r.src);
     } catch {
       toast.error("Couldn't rotate this photo");
@@ -174,7 +177,7 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
     if (busy || !img) return;
     setBusy(true);
     try {
-      onApply(await cropImage(img.src, rect));
+      onApply(await cropImage(img.src, rect), rect, basePack);
     } catch {
       toast.error("Couldn't crop this photo");
       setBusy(false);
@@ -186,6 +189,7 @@ const PhotoCropSheet = ({ src, onClose, onApply }) => {
       <div className="flex items-center gap-2 px-3 pt-[calc(10px+env(safe-area-inset-top))] pb-2 shrink-0">
         <button onClick={onClose} disabled={busy} aria-label="Cancel" className="size-10 flex items-center justify-center rounded-full active:bg-white/10"><X size={24} /></button>
         <h3 className="flex-1 text-[18px] font-semibold">Crop</h3>
+        <button onClick={() => { setAspect("free"); setRect({ x: 0, y: 0, w: 1, h: 1 }); setZoom(1); setPan({ x: 0, y: 0 }); }} disabled={busy || !img} className="h-10 px-4 rounded-full bg-white/10 text-[14px] active:scale-95 disabled:opacity-50">Whole photo</button>
         <button onClick={apply} disabled={busy || !img} aria-label="Apply crop" className="h-10 px-5 rounded-full bg-[#21C063] text-black font-semibold text-[15px] flex items-center gap-1.5 disabled:opacity-60 active:scale-95">
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Done
         </button>

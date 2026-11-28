@@ -272,7 +272,8 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
     setRotating(true);
     try {
       const r = await rotateImage(it.src, dir);
-      setItems((l) => l.map((x) => (x.id === id ? { ...x, ...r } : x)));
+      const ro = it.orig ? await rotateImage(it.orig.src, dir) : null; // the kept original turns with it
+      setItems((l) => l.map((x) => (x.id === id ? { ...x, ...r, ...(ro ? { orig: ro, cropRect: undefined } : {}) } : x)));
     } catch {
       toast.error("Couldn't rotate this photo");
     } finally {
@@ -532,6 +533,7 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
               ...(canBake ? [{ id: "filter", icon: Palette, label: "Filter" }, { id: "edit", icon: SlidersHorizontal, label: "Edit" }] : []),
               { id: "rotate", icon: RotateCw, label: "Rotate" },
               { id: "crop", icon: Crop, label: "Crop", run: () => (it.raw ? toast("This photo can't be cropped on this phone") : setCropping(true)) },
+              ...(it.orig ? [{ id: "restore", icon: RotateCcw, label: "Original", run: () => { patch(safeCur, { ...it.orig, orig: undefined, cropRect: undefined }); toast("Back to the original photo"); } }] : []),
               { id: "ratio", icon: Square, label: "Ratio" },
             ].map((t) => (
               <button key={t.id} onClick={t.run || (() => setTool((c) => (c === t.id ? null : t.id)))} className={`shrink-0 w-[84px] h-[64px] rounded-2xl flex flex-col items-center justify-center gap-1 text-[13px] active:scale-95 transition-transform ${tool === t.id ? "bg-[#21C063]/25 text-[#21C063]" : "bg-wa-field"}`}>
@@ -606,7 +608,16 @@ const NewPost = ({ onClose, onPosted, embedded = false }) => {
         }}
       />
       {cropping && it && (
-        <PhotoCropSheet src={it.src} onClose={() => setCropping(false)} onApply={(r) => { patch(safeCur, { ...r, ratio: "orig" }); setCropping(false); }} />
+        <PhotoCropSheet
+          src={it.orig?.src || it.src}
+          initialRect={it.orig ? it.cropRect : undefined}
+          onClose={() => setCropping(false)}
+          onApply={(r, rect, base) => {
+            // the picture as it was before cropping is kept, so the crop can be redone or undone any time
+            patch(safeCur, { ...r, ratio: "orig", orig: base || it.orig || { src: it.src, thumb: it.thumb, ar0: it.ar0 }, cropRect: rect });
+            setCropping(false);
+          }}
+        />
       )}
       {showAudience && (
         <div className="fixed inset-0 z-[95]">

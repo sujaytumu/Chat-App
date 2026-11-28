@@ -225,8 +225,9 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
     setPhotosChanged(true);
   });
   // an edited photo becomes a new upload in the same place; the old file is removed when you Save
-  const replacePhoto = (k, r) => {
-    setPhotos((l) => l.map((x, j) => (j === k ? { src: r.src, data: r.src } : x)));
+  const replacePhoto = (k, r, rect, base) => {
+    // a crop keeps the picture it was cut from (orig), so it can be cropped again from the whole photo or put back
+    setPhotos((l) => l.map((x, j) => (j === k ? { src: r.src, data: r.src, ...(rect ? { orig: base ? { src: base.src } : x.orig || x, cropRect: rect } : {}) } : x)));
     setPhotosChanged(true);
   };
   const rotatePhoto = async (k, dir) => {
@@ -341,6 +342,7 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
               <button type="button" onClick={() => rotatePhoto(sel, -1)} disabled={working} aria-label="Rotate left" className="size-9 rounded-full bg-wa-field flex items-center justify-center disabled:opacity-40 active:opacity-80">{working ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}</button>
               <button type="button" onClick={() => rotatePhoto(sel, 1)} disabled={working} aria-label="Rotate right" className="size-9 rounded-full bg-wa-field flex items-center justify-center disabled:opacity-40 active:opacity-80"><RotateCw size={16} /></button>
               <button type="button" onClick={() => (photos[sel].raw ? toast.error("This photo can't be cropped on this phone") : setCropping(true))} disabled={working} className="h-9 px-3 rounded-full bg-wa-field text-[13px] flex items-center gap-1.5 disabled:opacity-40 active:opacity-80"><Crop size={15} /> Crop</button>
+              {photos[sel].orig && <button type="button" onClick={() => { setPhotos((l) => l.map((x, j) => (j === sel ? { ...x.orig } : x))); setPhotosChanged(true); toast("Back to the original photo"); }} disabled={working} className="h-9 px-3 rounded-full bg-wa-field text-[13px] flex items-center gap-1.5 disabled:opacity-40 active:opacity-80"><RotateCcw size={15} /> Original</button>}
             </div>
           )}
 
@@ -409,7 +411,7 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
       />
       {cropping && sel !== null && photos[sel] && (
         <div onClick={(e) => e.stopPropagation()}>
-          <PhotoCropSheet src={photos[sel].src} onClose={() => setCropping(false)} onApply={(r) => { replacePhoto(sel, r); setCropping(false); }} />
+          <PhotoCropSheet src={photos[sel].orig?.src || photos[sel].src} initialRect={photos[sel].orig ? photos[sel].cropRect : undefined} onClose={() => setCropping(false)} onApply={(r, rect, base) => { replacePhoto(sel, r, rect, base); setCropping(false); }} />
         </div>
       )}
       {showMusic && (
