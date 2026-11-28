@@ -21,6 +21,23 @@ import { useBackToClose } from "../lib/useBackToClose";
 // Every photo of a post sits in ONE fixed frame whose shape comes from the first photo (kept between
 // 4:5 and 1.91:1, like Instagram) - so swiping to a taller or wider photo never resizes or stretches the others.
 const ratioCache = new Map(); // photo address -> frame shape, so a post doesn't jump when it scrolls back into view
+const loadedImgs = new Set(); // photos already shown once: coming back to the tab, they are drawn at once instead of waiting (black) for lazy loading
+const warmImages = (posts, n = 6) =>
+  posts.slice(0, n).forEach((p) => {
+    const src = (p.images?.length ? p.images : [p.image])[0];
+    if (!src || loadedImgs.has(optimizeImage(src, 1080))) return;
+    const im = new window.Image();
+    im.decoding = "async";
+    im.src = optimizeImage(src, 1080);
+  });
+// One frame for the whole post. A single photo gets exactly its own shape; with several photos the frame takes the middle
+// shape among them, so tall and wide ones both waste as little space as possible (the rest is filled by the blurred photo, never cropped).
+const postFrame = (shapes) => {
+  const k = shapes.filter(Boolean).sort((a, b) => a - b);
+  if (!k.length) return 0.8;
+  const m = k.length >> 1;
+  return k.length % 2 ? k[m] : (k[m - 1] + k[m]) / 2;
+};
 const frameShape = (w, h) => Math.min(1.91, Math.max(0.5625, w / h)); // 9:16 tall up to 1.91:1 wide
 // The like heart: pops with a ring when you like (not when a liked post simply scrolls into view)
 const LikeHeart = ({ liked }) => {
@@ -58,7 +75,8 @@ const PhotoLine = ({ t }) =>
 
 const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   const [i, setI] = useState(0);
-  const [ar, setAr] = useState(() => ratioCache.get(images[0]) || 0.8);
+  const [, setShapes] = useState(0); // bumped when a photo reports its shape
+  const ar = postFrame(images.map((src) => ratioCache.get(src)));
   const rail = useRef(null);
   const tap = useRef({ t: 0, timer: null });
   useEffect(() => () => clearTimeout(tap.current.timer), []);
@@ -74,12 +92,15 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
     clearTimeout(tap.current.timer);
     tap.current.timer = setTimeout(() => onOpen?.(k), 300);
   };
-  const first = (e) => {
+  const seen = (src) => (e) => {
     const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+    loadedImgs.add(e.currentTarget.currentSrc || e.currentTarget.src);
     if (!w || !h) return;
     const shape = frameShape(w, h);
-    ratioCache.set(images[0], shape);
-    setAr(shape);
+    if (ratioCache.get(src) !== shape) {
+      ratioCache.set(src, shape);
+      setShapes((n) => n + 1);
+    }
   };
   const go = (k) => {
     const el = rail.current;
@@ -87,7 +108,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   };
   const many = images.length > 1;
   return (
-    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "80vh" }}>
+    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "80vh", transition: "aspect-ratio .2s ease" }}>
       <div
         ref={rail}
         className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar overscroll-x-contain"
@@ -96,14 +117,14 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
       >
         {images.map((src, k) => (
           <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always overflow-hidden" style={{ containerType: "inline-size" }}>
-            {Math.abs(k - i) <= 2 && <img loading="lazy" decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
+            {Math.abs(k - i) <= 2 && <img loading={k === 0 || loadedImgs.has(optimizeImage(src, 1080)) ? "eager" : "lazy"} decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
             <img
               src={optimizeImage(src, 1080)}
               alt=""
-              loading={k === 0 ? "eager" : "lazy"}
+              loading={k === 0 || loadedImgs.has(optimizeImage(src, 1080)) ? "eager" : "lazy"}
               decoding="async"
               draggable={false}
-              onLoad={k === 0 ? first : undefined}
+              onLoad={seen(src)}
               onClick={() => onTap(k)}
               className="relative w-full h-full object-contain"
             />
@@ -630,6 +651,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
   memRef.current = { posts, more, tab };
   useEffect(() => {
     if (resume.current) {
+      warmImages(resume.current.posts);
       next.current = resume.current.next;
       const top = resume.current.scrollTop || 0;
       requestAnimationFrame(() => requestAnimationFrame(() => { if (scroller.current) scroller.current.scrollTop = top; }));
