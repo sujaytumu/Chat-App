@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useBackToClose } from "../lib/useBackToClose";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Heart, MessageCircle, Send, Plus, Volume2, VolumeX, Trash2, Loader2, X, Film, Play, Music, Bookmark, AlignJustify, ChevronDown, House, CircleDashed, Phone, Link2, Check, Repeat2, Repeat1, Search, Compass, ChevronLeft, BarChart3, EyeOff, Flag, Eye, Pencil, ChevronRight, Pin } from "lucide-react";
@@ -112,7 +112,7 @@ const InstaReel = ({ reel, active, near }) => {
   );
 };
 
-const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, far = false, onTag, onUser }) => {
+const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComments, onShare, onSave, onFollow, onMenu, onRepost, onNext, near, mount = true, far = false, bg = true, onTag, onUser }) => {
   const video = useRef(null);
   const songEl = useRef(null);
   const [paused, setPaused] = useState(false);
@@ -374,7 +374,7 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
       {/* Only the reel on screen and its neighbours get a real video player; the rest are just a still picture.
           That keeps phone memory and the video decoder free, which is what stops the lag. */}
       {/* Whatever the video's shape, it is shown whole (never cropped); the empty space is filled with a soft blurred copy of its first frame */}
-      {reel.poster && !far && <img src={reel.poster} alt="" aria-hidden="true" decoding="async" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
+      {reel.poster && bg && <img src={reel.poster} alt="" aria-hidden="true" decoding="async" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
       {mount ? (
         <video
           ref={video}
@@ -1099,6 +1099,10 @@ const writeLastWatched = (id) => {
 };
 const REAL_REEL_ID = /^[a-f\d]{24}$/i;
 
+// Swiping to the next reel used to redraw EVERY reel in the list. These only redraw when their own data changes.
+const MemoReelItem = memo(ReelItem);
+const MemoInstaReel = memo(InstaReel);
+
 const ReelsPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -1477,6 +1481,22 @@ const ReelsPage = () => {
     </button>
   );
 
+  // Handlers handed to the reels never change identity (so a reel is not redrawn for nothing) yet always run the latest code.
+  const latest = useRef({});
+  latest.current = { like, follow, save, shareReel, repost, goNext, materialize, setMuted };
+  const cb = useMemo(() => ({
+    setMuted: (...a) => latest.current.setMuted(...a),
+    onLike: (...a) => latest.current.like(...a),
+    onComments: async (x) => { const real = await latest.current.materialize(x); if (real) setCommentsFor(real); },
+    onShare: (...a) => latest.current.shareReel(...a),
+    onSave: (...a) => latest.current.save(...a),
+    onFollow: (...a) => latest.current.follow(...a),
+    onRepost: (...a) => latest.current.repost(...a),
+    onNext: (...a) => latest.current.goNext(...a),
+    onTag: (t) => setView({ kind: "tag", arg: t, label: `#${t}` }),
+    onUser: (u) => setView({ kind: "user", arg: u._id, label: u.fullName }),
+  }), []);
+
   return (
     <div ref={swipeRoot} className="fixed inset-0 z-[60] bg-black">
       <style>{"@keyframes reelHeart{0%{transform:scale(.3);opacity:0}25%{transform:scale(1.15);opacity:1}100%{transform:scale(1);opacity:0}}"}</style>
@@ -1543,9 +1563,9 @@ const ReelsPage = () => {
           <div ref={box} className="h-full w-full overflow-y-scroll snap-y snap-mandatory no-scrollbar overscroll-contain">
             {reels.map((r, idx) => (
               r.source === "instagram" ? (
-                <InstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx === activeIdx + 1} mount={Math.abs(idx - activeIdx) <= 1} />
+                <MemoInstaReel key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} near={idx === activeIdx + 1} mount={Math.abs(idx - activeIdx) <= 1} />
               ) : (
-              <ReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} setMuted={setMuted} soundBlocked={soundBlocked} onLike={like} onComments={async (x) => { const real = await materialize(x); if (real) setCommentsFor(real); }} onShare={shareReel} onSave={save} onFollow={follow} onMenu={setMenuFor} onRepost={repost} onNext={goNext} near={idx >= activeIdx - 1 && idx !== activeIdx && idx <= activeIdx + 2} mount={idx >= activeIdx - 1 && idx <= activeIdx + 2} far={Math.abs(idx - activeIdx) > 4} onTag={(t) => setView({ kind: "tag", arg: t, label: `#${t}` })} onUser={(u) => setView({ kind: "user", arg: u._id, label: u.fullName })} />
+              <MemoReelItem key={r._key || r._id} reel={r} active={r._id === (activeId || reels[0]._id)} muted={muted} soundBlocked={soundBlocked} setMuted={cb.setMuted} onLike={cb.onLike} onComments={cb.onComments} onShare={cb.onShare} onSave={cb.onSave} onFollow={cb.onFollow} onMenu={setMenuFor} onRepost={cb.onRepost} onNext={cb.onNext} near={idx >= activeIdx - 1 && idx !== activeIdx && idx <= activeIdx + 2} mount={idx >= activeIdx - 1 && idx <= activeIdx + 2} far={Math.abs(idx - activeIdx) > 4} bg={Math.abs(idx - activeIdx) <= 2} onTag={cb.onTag} onUser={cb.onUser} />
               )
             ))}
           </div>

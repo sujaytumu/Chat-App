@@ -95,7 +95,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
       >
         {images.map((src, k) => (
           <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always overflow-hidden" style={{ containerType: "inline-size" }}>
-            <img loading="lazy" decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />
+            {Math.abs(k - i) <= 2 && <img loading="lazy" decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
             <img
               src={optimizeImage(src, 1080)}
               alt=""
