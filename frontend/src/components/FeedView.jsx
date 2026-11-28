@@ -96,9 +96,27 @@ const PhotoLine = ({ t }) =>
 const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   const [i, setI] = useState(0);
   const [, setShapes] = useState(0); // bumped when a photo reports its shape
-  // The frame is the first photo's own shape and never changes while you swipe (before, it was re-worked as later photos
-  // loaded, so photo 1 came back bigger after visiting photo 4).
-  const ar = postFrame([ratioCache.get(images[0])]);
+  // The frame takes the shape of the MOST VERTICAL photo of the post, so tall photos fit completely (everyone in them is
+  // seen) and the wider ones sit inside it zoomed out. The shape of every photo is learned up front from its tiny
+  // blurred copy (below), so the frame settles at once and stays the same while you swipe.
+  const known = images.map((src) => ratioCache.get(src)).filter(Boolean);
+  const ar = known.length ? Math.min(...known) : 0.8;
+  useEffect(() => {
+    let live = true;
+    images.forEach((src) => {
+      if (ratioCache.has(src)) return;
+      const im = new window.Image();
+      im.onload = () => {
+        if (!live || !im.naturalWidth || !im.naturalHeight) return;
+        ratioCache.set(src, frameShape(im.naturalWidth, im.naturalHeight));
+        if (!imgInfo.has(src)) imgInfo.set(src, { r: im.naturalWidth / im.naturalHeight, faces: [] });
+        setShapes((n) => n + 1);
+      };
+      im.src = optimizeImage(src, 160);
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [images.join("|")]);
   const rail = useRef(null);
   const tap = useRef({ t: 0, timer: null });
   useEffect(() => () => clearTimeout(tap.current.timer), []);
