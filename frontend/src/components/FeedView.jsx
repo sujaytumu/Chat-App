@@ -100,7 +100,10 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   // seen) and the wider ones sit inside it zoomed out. The shape of every photo is learned up front from its tiny
   // blurred copy (below), so the frame settles at once and stays the same while you swipe.
   const known = images.map((src) => ratioCache.get(src)).filter(Boolean);
-  const ar = known.length ? Math.min(...known) : 0.8;
+  // Exact fit, nothing wasted: if any photo is vertical the frame is exactly the most vertical photo's shape (it fits
+  // with no gap at all, the others sit smaller inside it). If every photo is horizontal the frame stays as horizontal
+  // as the widest one, and narrower photos just leave a gap at the sides.
+  const ar = known.length ? (Math.min(...known) < 1 ? Math.min(...known) : Math.max(...known)) : 0.8;
   useEffect(() => {
     let live = true;
     images.forEach((src) => {
@@ -173,10 +176,10 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
     const fe = frameEl.current;
     const eff = fe && fe.clientHeight ? fe.clientWidth / fe.clientHeight : ar;
     const r = imgInfo.get(src)?.r;
-    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.01 ? "object-contain" : "object-cover"; // the photo that sets the frame fills it exactly (a 1% rounding crop is invisible); every other photo is shown whole, smaller, never zoomed in
+    return r && 1 - Math.min(r, eff) / Math.max(r, eff) > 0.005 ? "object-contain" : "object-cover"; // the photo that sets the frame fills it exactly (a 1% rounding crop is invisible); every other photo is shown whole, smaller, never zoomed in
   };
   return (
-    <div ref={frameEl} className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "83vh", transition: "aspect-ratio .2s ease" }}>
+    <div ref={frameEl} className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, width: `min(100%, calc(83vh * ${ar}))`, marginInline: "auto", transition: "aspect-ratio .2s ease" }}>
       <div
         ref={rail}
         className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar overscroll-x-contain"
