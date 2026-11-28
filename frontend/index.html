@@ -75,7 +75,10 @@
         }
         setTimeout(checkBlank, 10000);
         setTimeout(checkBlank, 30000);
-        setTimeout(function () { recover("app did not start in time"); }, 15000);
+        // A slow start (a sleeping free host, a weak connection) is NOT a broken app: wiping the saved files and reloading
+        // after 15 s made every slow open slower still. Only a real script failure (handled above) clears the saved copy;
+        // a very slow start just offers a Reload button after 45 s, and the app still appears if it finishes loading.
+        setTimeout(function () { showFail("still loading: slow connection or the server is waking up"); }, 45000);
       })();
     </script>
     <style>
