@@ -248,12 +248,22 @@ const ReelItem = ({ reel, active, muted, setMuted, soundBlocked, onLike, onComme
   useEffect(() => {
     if (!active) return undefined;
     let raf;
+    // Phones report the video's time in small steps (a few times a second), which made the line creep and jump.
+    // Between two reports the position is worked out from the real clock, so the line glides at the video's own speed.
+    const clock = { t: -1, at: 0 };
     const tick = () => {
       const v = video.current;
       if (v && !scrub) {
         const start = reel.trim?.start || 0;
         const end = reel.trim?.end || v.duration || 0;
-        if (end > start) setProg(Math.min(1, Math.max(0, (v.currentTime - start) / (end - start))));
+        const nowMs = performance.now();
+        if (v.currentTime !== clock.t) {
+          clock.t = v.currentTime;
+          clock.at = nowMs;
+        }
+        const running = !v.paused && !v.seeking && v.readyState >= 3;
+        const shown = running ? Math.min(clock.t + Math.min(0.3, ((nowMs - clock.at) / 1000) * (v.playbackRate || 1)), end || Infinity) : v.currentTime;
+        if (end > start) setProg(Math.min(1, Math.max(0, (shown - start) / (end - start))));
         // a trimmed reel ends exactly at its trim point (checked every frame, not at timeupdate's ~4 times a second)
         if (reel.trim && end > start && !v.paused && !v.seeking && v.currentTime >= end - 0.03) finished();
       }
