@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import { useAuthStore } from "../store/useAuthStore";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // Instagram-style comments under a status update or a highlight item:
 // a bottom sheet with the list, one level of replies, a heart on every comment and a quick-emoji row.
@@ -56,6 +57,7 @@ const Row = ({ c, isReply, meId, ownerId, onReply, onLike, onDelete }) => {
 
 // targetId: the status id, or the highlight item id. onTotal(n) keeps the count on the viewer's icon up to date.
 const StatusComments = ({ targetId, onClose, onTotal }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const me = useAuthStore((s) => s.authUser);
   const [comments, setComments] = useState([]);
   const [total, setTotal] = useState(0);

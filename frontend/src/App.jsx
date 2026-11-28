@@ -31,6 +31,7 @@ import { useAuthStore } from "./store/useAuthStore";
 import { useThemeStore } from "./store/useThemeStore";
 import { syncPreferences } from "./lib/prefsSync";
 import { useEffect, useRef, useState, lazy, Suspense } from "react";
+import { useChatStore } from "./store/useChatStore";
 import { startVersionWatcher, GlobalUpdatePill, UpdatePopup } from "./lib/versionCheck";
 import { syncPrefsToWorker } from "./lib/soundSettings";
 import { syncQuietHours, refreshQuietHoursZone } from "./lib/quietHours";
@@ -122,6 +123,44 @@ const App = () => {
   }, [authUser, joinCode]);
   const pathRef = useRef(location.pathname);
   pathRef.current = location.pathname;
+
+  // Remember the last screen. If Android restarts the app while you are away (for example after the phone's share
+  // menu or WhatsApp opens on top of a post), come back to that screen instead of the chat list.
+  const restoredScreen = useRef(false);
+  const startScreen = useRef(undefined); // read before the first save below overwrites it
+  if (startScreen.current === undefined) {
+    try { startScreen.current = JSON.parse(localStorage.getItem("talkies-last-screen") || "null"); } catch { startScreen.current = null; }
+  }
+  useEffect(() => {
+    if (!authUser) return undefined;
+    const AUTH = ["/login", "/signup", "/forgot-password"];
+    const here = location.pathname + location.search;
+    const save = () => {
+      if (AUTH.includes(location.pathname)) return;
+      try { localStorage.setItem("talkies-last-screen", JSON.stringify({ p: here, at: Date.now() })); } catch { /* ignore */ }
+    };
+    save();
+    const onHide = () => { if (document.visibilityState === "hidden") save(); };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", save);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", save);
+    };
+  }, [authUser, location.pathname, location.search]);
+  useEffect(() => {
+    if (!authUser || restoredScreen.current) return undefined;
+    restoredScreen.current = true;
+    if (location.pathname !== "/" || location.search) return undefined;
+    const saved = startScreen.current;
+    if (!saved?.p || saved.p === "/" || Date.now() - saved.at > 10 * 60 * 1000) return undefined;
+    // a tapped notification opens its chat on the chat list: leave that alone
+    const t = setTimeout(() => {
+      if (!useChatStore.getState().selectedChat && window.location.pathname === "/") navigate(saved.p, { replace: true });
+    }, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser]);
   const isChatScreen = (["/", "/calls", "/status", "/profile", "/starred"].includes(location.pathname) || location.pathname.startsWith("/settings")) && authUser;
 
   useEffect(() => {

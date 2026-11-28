@@ -4,12 +4,14 @@ import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
 import { STATUS_FONTS } from "../lib/statusFonts";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const COLORS = ["#00A884", "#0B141A", "#7f66ff", "#ff8f4d", "#e91e8c", "#22c55e", "#2563eb"];
 
 // Change a status after posting: text + look (text status) or the words under it (photo / video / audio / file),
 // the place tag and who can see it. Used by the poster and by the app owner.
 const StatusEditSheet = ({ status, onClose, onSaved }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const isText = status.type === "text";
   const [text, setText] = useState(isText ? status.content || "" : status.caption || "");
   const [bg, setBg] = useState(status.backgroundColor || COLORS[0]);

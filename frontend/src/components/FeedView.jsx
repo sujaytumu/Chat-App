@@ -14,6 +14,7 @@ import { axiosInstance } from "../lib/axios";
 import { useNavigate } from "react-router-dom";
 import { useChatStore } from "../store/useChatStore";
 import { optimizeImage } from "../lib/cdn";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // One photo, or a swipeable set with a 1/3 counter, dots and (on laptops) arrows.
 // One tap opens the photo full screen (zoom, swipe); a quick double tap likes it.
@@ -163,6 +164,7 @@ const fileToData = (file) =>
 const IMG_FILE = /\.(heic|heif|heics|jpe?g|jfif|png|webp|avif|gif|bmp|tiff?)$/i;
 
 const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const [caption, setCaption] = useState(post.caption || "");
   const [lines, setLines] = useState(post.lines || "");
   const [song, setSong] = useState(post.song || null); // existing { url, name } or a new { data, name }
@@ -416,6 +418,7 @@ const EditPostSheet = ({ post, autoSong = false, onClose, onSaved }) => {
 
 // Who liked your post
 const LikersSheet = ({ post, onClose }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const [users, setUsers] = useState(null);
   useEffect(() => {
     let dead = false;

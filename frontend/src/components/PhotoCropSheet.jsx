@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Check, Loader2, ZoomIn, ZoomOut, RotateCcw, RotateCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { loadImage, cropImage, rotateImage } from "../lib/photoEdit";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // Full-screen crop: drag the box to move it, drag a corner to resize. Pointer events + canvas only (APK-safe).
 const ASPECTS = [["free", "Free", 0], ["orig", "Original", -1], ["sq", "1:1", 1], ["port", "4:5", 0.8], ["p34", "3:4", 0.75], ["wide", "16:9", 16 / 9]];
@@ -10,6 +11,7 @@ const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
 const CORNERS = [["tl", "-left-[22px] -top-[22px]"], ["tr", "-right-[22px] -top-[22px]"], ["bl", "-left-[22px] -bottom-[22px]"], ["br", "-right-[22px] -bottom-[22px]"]];
 
 const PhotoCropSheet = ({ src, onClose, onApply }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const [img, setImg] = useState(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [aspect, setAspect] = useState("free");

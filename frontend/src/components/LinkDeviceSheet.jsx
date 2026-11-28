@@ -3,10 +3,12 @@ import jsQR from "jsqr";
 import { X, Loader2, Monitor } from "lucide-react";
 import toast from "react-hot-toast";
 import { axiosInstance } from "../lib/axios";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // Scanner for "Link a device": reads the QR shown on another device's login
 // page, asks for confirmation, then approves that login.
 export default function LinkDeviceSheet({ onClose, onDone, initialCode }) {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const video = useRef(null);
   const [found, setFound] = useState(null); // {code, device}
   const [error, setError] = useState("");

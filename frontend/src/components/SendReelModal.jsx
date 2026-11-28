@@ -6,9 +6,11 @@ import { optimizeImage } from "../lib/cdn";
 import { useChatStore } from "../store/useChatStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { reelMessageText, postMessageText } from "../lib/messageFormat";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // Pick one or more chats and send the reel - or the post - into them (it shows as a tappable card).
 const SendReelModal = ({ reel, post, onClose }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const isPost = !!post;
   const item = post || reel;
   const noun = isPost ? "Post" : "Reel";

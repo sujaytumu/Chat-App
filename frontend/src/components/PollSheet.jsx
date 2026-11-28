@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { X, Plus, Trash2 } from "lucide-react";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // Create / edit the poll sticker of a status (question + 2–4 options)
 const PollSheet = ({ initial, onClose, onDone }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const [q, setQ] = useState(initial?.question || "");
   const [opts, setOpts] = useState(initial?.options?.length ? initial.options : ["", ""]);
   const clean = opts.map((o) => o.trim()).filter(Boolean);

@@ -10,6 +10,7 @@ import { useLongPressReorder, moveItem } from "../lib/useLongPressReorder";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { useAuthStore } from "../store/useAuthStore";
 import { draftPut, draftGet, draftDel, draftGetPrefix, draftDelPrefix } from "../lib/draftStore";
+import { useBackToClose } from "../lib/useBackToClose";
 
 // New post, in three calm steps (like Instagram):  1 pick photos  ->  2 edit (audio, filter, edit, ratio)  ->  3 details + Share.
 // Performance: every photo is shrunk ONCE from the file (full copy for upload, tiny copy for the grid), the
@@ -191,6 +192,7 @@ const Shot = ({ it, box }) => {
 };
 
 const NewPost = ({ onClose, onPosted, embedded = false }) => {
+  useBackToClose(!embedded, onClose); // phone Back closes this, instead of leaving the page behind it
   const [step, setStep] = useState("pick"); // pick | edit | details
   const [items, setItems] = useState([]); // { id, src, thumb, filter, b, c, ratio }
   const [cur, setCur] = useState(0);

@@ -1047,6 +1047,7 @@ const ReportsReview = ({ onClose, onRemoved }) => {
 // (the same setting as the small repeat button on a reel) and every reel follows it.
 const readRepeatChoice = () => { try { return localStorage.getItem("reelRepeat") === "1"; } catch { return false; } };
 const EndChoiceSheet = ({ onClose }) => {
+  useBackToClose(true, onClose);
   const [repeat, setRepeat] = useState(readRepeatChoice);
   const choose = (want) => {
     try { localStorage.setItem("reelRepeat", want ? "1" : "0"); } catch { /* ignore */ }
@@ -1137,12 +1138,14 @@ const ReelsPage = () => {
   }, []);
   const [commentsFor, setCommentsFor] = useState(null);
   const [creating, setCreating] = useState(false);
+  useBackToClose(creating, () => setCreating(false)); // Back closes the new-reel screen and stays on Reels
   // An unfinished upload (kept on this device) reopens by itself, so nothing picked is ever lost.
   useEffect(() => {
     draftGet(`reels:${useAuthStore.getState().authUser?._id || "me"}`).then((d) => d?.files?.length && setCreating(true));
   }, []);
   const [sendFor, setSendFor] = useState(null);
   const [menuFor, setMenuFor] = useState(null);
+  useBackToClose(!!menuFor, () => setMenuFor(null)); // Back closes the reel menu and stays on Reels
   const [pickTab, setPickTab] = useState(false);
   const [failed, setFailed] = useState(false);
   const [view, setView] = useState(() => (params.get("r") ? null : readReelsMemo()?.view || null)); // { kind: tag | user | search, arg, label, startId } — a list outside the main tabs

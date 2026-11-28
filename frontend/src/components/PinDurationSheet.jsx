@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { Pin } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const OPTIONS = [
   [8, "8 hours"],
@@ -10,6 +11,7 @@ const OPTIONS = [
 
 // WhatsApp's "Choose how long your pin lasts"
 const PinDurationSheet = ({ message, onClose }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const pick = (hours) => {
     onClose();
     useChatStore.getState().togglePinMessage(message._id, hours);

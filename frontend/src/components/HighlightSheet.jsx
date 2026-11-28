@@ -6,6 +6,7 @@ import { axiosInstance } from "../lib/axios";
 import { UpdateThumb } from "./HighlightsRow";
 import StatusAudienceSheet, { audienceLabel } from "./StatusAudienceSheet";
 import { HL_GRADIENT, HL_ACCENT, HL_ACCENT_SOFT, HL_ACCENT_TEXT, HL_SHADOW } from "../lib/highlightTheme";
+import { useBackToClose } from "../lib/useBackToClose";
 
 const monthLabel = (iso) => new Date(iso).toLocaleDateString([], { month: "long", year: "numeric" });
 const dayLabel = (iso) => new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" });
@@ -17,6 +18,7 @@ const dayLabel = (iso) => new Date(iso).toLocaleDateString([], { day: "numeric",
 //  preselect  - a status id to tick at the start (opened from the viewer)
 //  editing    - a highlight being edited (rename / add / delete)
 const HighlightSheet = ({ statuses, highlights, preselect = null, editing = null, onClose, onSaved }) => {
+  useBackToClose(true, onClose); // phone Back closes this, instead of leaving the page behind it
   const [target, setTarget] = useState(editing ? editing._id : "new"); // "new" or a highlight id
   const [title, setTitle] = useState(editing ? editing.title : "");
   const [picked, setPicked] = useState(() => new Set(preselect ? [preselect] : []));
