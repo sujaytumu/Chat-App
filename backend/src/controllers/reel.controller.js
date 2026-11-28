@@ -634,10 +634,31 @@ export const getReel = async (req, res) => {
   }
 };
 
+// Has this person already posted this very video? Same fingerprint, or the same size and length (to a tenth of a second).
+const findDuplicate = (userId, { fp, size, duration }) => {
+  const or = [];
+  if (typeof fp === "string" && fp.length >= 8) or.push({ fingerprint: fp });
+  if (Number(size) > 0 && Number(duration) > 0) or.push({ fileSize: Number(size), duration: { $gte: Number(duration) - 0.1, $lte: Number(duration) + 0.1 } });
+  return or.length ? Reel.findOne({ userId, $or: or }).select("_id").lean() : null;
+};
+
+// Before uploading: which of these videos are already posted? Answers with their positions in the list.
+export const reelsExist = async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items.slice(0, 200) : [];
+    const dupes = [];
+    for (let i = 0; i < items.length; i++) if (await findDuplicate(req.user._id, items[i] || {})) dupes.push(i);
+    res.status(200).json({ dupes });
+  } catch {
+    res.status(200).json({ dupes: [] }); // checking is a bonus: never block posting
+  }
+};
+
 export const createReel = async (req, res) => {
   try {
     const { video, caption, duration, filter, trim, song } = req.body || {};
     const secs = Number(duration) || 0;
+    if (await findDuplicate(req.user._id, { fp: req.body?.fp, size: req.body?.size, duration: secs })) return res.status(409).json({ error: "This reel is already there" });
     const today = await Reel.countDocuments({ userId: req.user._id, createdAt: { $gt: new Date(Date.now() - 24 * 3600 * 1000) } });
     if (today >= 200) return res.status(429).json({ error: "You can post up to 200 reels a day — try again tomorrow" });
     if (typeof video !== "string" || !video.startsWith("data:video/")) return res.status(400).json({ error: "Pick a video" });
@@ -650,7 +671,7 @@ export const createReel = async (req, res) => {
           stream.end(Buffer.from(video.slice(video.indexOf(",") + 1), "base64"));
         })
       : await cloudinary.uploader.upload(video, { folder: "chat-app/reels", resource_type: "video" });
-    return finishReel(req, res, { up, caption, secs, filter, trim, song, audience: req.body?.audience });
+    return finishReel(req, res, { up, caption, secs, filter, trim, song, audience: req.body?.audience, fp: req.body?.fp, fileSize: Number(req.body?.size) || 0 });
   } catch (error) {
     console.log("Error in createReel:", error.message);
     res.status(500).json({ error: "Couldn't post the reel" });
@@ -658,7 +679,7 @@ export const createReel = async (req, res) => {
 };
 
 // Everything after the video is on Cloudinary: checks, the saved reel, the answer and the follower notice.
-async function finishReel(req, res, { up, caption, secs, filter, trim, song, audience }) {
+async function finishReel(req, res, { up, caption, secs, filter, trim, song, audience, fp, fileSize }) {
   try {
     if (up.duration && up.duration > MAX_SECONDS + 1) {
       cloudinary.uploader.destroy(up.public_id, { resource_type: "video" }).catch(() => {});
@@ -682,6 +703,8 @@ async function finishReel(req, res, { up, caption, secs, filter, trim, song, aud
     }
     const reelAud = cleanReelAudience(audience, req.user._id) || (await defaultAudienceFor(req.user._id, "reels"));
     const reel = await Reel.create({
+      fingerprint: typeof fp === "string" ? fp.slice(0, 80) : "",
+      fileSize: Number(fileSize) || 0,
       filter: cleanFilter,
       hashtags: extractTags(caption),
       trim: cleanTrim,
@@ -731,6 +754,7 @@ export const createReelRaw = async (req, res) => {
     try { meta = JSON.parse(decodeURIComponent(String(req.headers["x-reel-meta"] || "{}"))) || {}; } catch { meta = {}; }
     const secs = Number(meta.duration) || 0;
     if (secs > MAX_SECONDS + 0.5) return fail(400, `Reels can be at most ${MAX_SECONDS} seconds`, `secs=${secs}`);
+    if (await findDuplicate(req.user._id, { fp: meta.fp, size: bytes, duration: secs })) return fail(409, "This reel is already there", "duplicate");
     const up = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_chunked_stream({ folder: "chat-app/reels", resource_type: "video", chunk_size: 20 * 1000 * 1000 }, (err, r) => (err ? reject(err) : resolve(r)));
       req.on("error", reject);
@@ -738,7 +762,7 @@ export const createReelRaw = async (req, res) => {
       req.pipe(stream);
     });
     console.log(`reel upload ok user=${who} bytes=${bytes} secs=${up.duration || secs} ms=${Date.now() - t0}`);
-    return finishReel(req, res, { up, caption: meta.caption, secs, filter: meta.filter, trim: meta.trim, song: null, audience: meta.audience });
+    return finishReel(req, res, { up, caption: meta.caption, secs, filter: meta.filter, trim: meta.trim, song: null, audience: meta.audience, fp: meta.fp, fileSize: bytes });
   } catch (error) {
     const why = error?.message || error?.error?.message || String(error);
     fail(502, `Couldn't store the video (${String(why).slice(0, 80)})`, why);

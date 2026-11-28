@@ -9,6 +9,7 @@ import MainNav from "../components/MainNav";
 import { readReelsCache, writeReelsCache } from "../lib/reelsCache";
 import { useTabSwipe } from "../lib/useTabSwipe";
 import { fastVideoUrl, warmVideo } from "../lib/reelVideo";
+import { fingerprintFile } from "../lib/fileFingerprint";
 import { useAuthStore } from "../store/useAuthStore";
 import { draftPut, draftGet, draftDel } from "../lib/draftStore";
 import StatusComments from "../components/StatusComments";
@@ -646,7 +647,62 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
     setUrl(URL.createObjectURL(f));
   };
 
+  // The same video is never posted twice: before uploading, every picked video is compared (fingerprint, size and
+  // length) with what this person already posted and with the others in this batch. Repeats are skipped with a
+  // message and only the remaining ones go up.
   const post = async () => {
+    if (!file || busy) return;
+    setBusy(true);
+    let list = [file, ...extras];
+    try {
+      const info = [];
+      for (const f of list) info.push({ fp: await fingerprintFile(f), size: f.size, duration: f === file ? duration : await probeDuration(f) });
+      const seen = new Set();
+      const keepIdx = [];
+      let inBatch = 0;
+      info.forEach((x, i) => {
+        const key = x.fp || `${x.size}:${Math.round(x.duration * 10)}`;
+        if (seen.has(key)) { inBatch += 1; return; }
+        seen.add(key);
+        keepIdx.push(i);
+      });
+      let posted0 = 0;
+      let dupes = [];
+      try {
+        const r = await axiosInstance.post("/reels/exists", { items: keepIdx.map((i) => info[i]) });
+        dupes = (r.data?.dupes || []).map((k) => keepIdx[k]);
+      } catch { /* the server checks again while uploading */ }
+      const fresh = keepIdx.filter((i) => !dupes.includes(i));
+      posted0 = list.length - fresh.length;
+      if (posted0 > 0) {
+        toast(posted0 === list.length ? (list.length === 1 ? "This reel is already there" : "These reels are already there") : `${posted0} reel${posted0 === 1 ? " is" : "s are"} already there - skipped. Posting the remaining ${fresh.length}`, { icon: "♻️", duration: 5000 });
+      }
+      if (!fresh.length) {
+        draftDel(draftKey);
+        setBusy(false);
+        onClose();
+        return;
+      }
+      const head = list[fresh[0]];
+      const rest = fresh.slice(1).map((i) => list[i]);
+      const headChanged = head !== file;
+      setBusy(false);
+      return postWith(head, rest, headChanged ? { fresh: true, duration: info[fresh[0]].duration, fp: info[fresh[0]].fp } : { fp: info[0].fp }, Object.fromEntries(fresh.map((i) => [list[i].name + list[i].size, info[i].fp])));
+    } catch {
+      setBusy(false);
+      return postWith(file, extras, {}, {}); // checking is a bonus: if it fails, post as before
+    }
+  };
+
+  const durationNow = duration;
+  const trimmedNow = trimmed;
+  const effLenNow = effLen;
+  const filterNow = filter;
+  const postWith = async (file, extras, o = {}, fps = {}) => {
+    const duration = o.duration ?? durationNow; // a different first video (the first one was a repeat) starts without trim or look
+    const trimmed = o.fresh ? false : trimmedNow;
+    const effLen = o.fresh ? duration : effLenNow;
+    const filter = o.fresh ? "none" : filterNow;
     if (!file || busy) return;
     if ((trimmed ? effLen : duration) > MAX_SECONDS + 0.5) return toast.error(`Reels can be at most ${MAX_SECONDS} seconds — trim it shorter`);
     if (song && (file.size + song.size) / 1048576 > MAX_TOTAL_MB) return toast.error("With a song added, the video can be up to about 50 MB - remove the song to post a bigger video");
@@ -659,17 +715,21 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
     try {
       // the first video carries the caption, look, trim and song
       try {
-        const meta = { caption, duration, filter, ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(audience ? { audience } : {}) };
+        const meta = { caption, duration, filter, fp: o.fp || fps[file.name + file.size] || "", ...(trimmed ? { trim: { start: range[0], end: effEnd } } : {}), ...(audience ? { audience } : {}) };
         const res = song
-          ? await uploadReel({ video: await toDataUrl(file), ...meta, song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } }, cfg)
+          ? await uploadReel({ video: await toDataUrl(file), ...meta, size: file.size, song: { data: song.data, name: song.name, mime: song.mime, size: song.size, start: 0 } }, cfg)
           : await uploadReelRaw(file, meta, cfg);
         posted.push(res.data);
       } catch (err) {
+        if (err?.response?.status === 409) {
+          toast("This reel is already there - skipped", { icon: "♻️" }); // the server saw it was a repeat: carry on with the rest
+        } else {
         console.warn("Reel upload failed:", file.name, file.size, err?.code, err?.response?.status, err?.message);
         toast.error(`${file.name || "Video"}: ${reasonOf(err)}`);
         setBusy(false);
         setProgress("");
         return;
+        }
       }
       keep(extras);
       for (let i = 0; i < extras.length; i++) {
@@ -681,10 +741,11 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
           if (d > MAX_SECONDS + 0.5) {
             bad.push({ file: f, reason: `longer than ${MAX_SECONDS} seconds (${Math.round(d)}s)` });
           } else {
-            const r2 = await uploadReelRaw(f, { caption: "", duration: d, filter: "none", ...(audience ? { audience } : {}) }, cfg);
+            const r2 = await uploadReelRaw(f, { caption: "", duration: d, filter: "none", fp: fps[f.name + f.size] || "", ...(audience ? { audience } : {}) }, cfg);
             posted.push(r2.data);
           }
         } catch (e2) {
+          if (e2?.response?.status === 409) continue; // already posted: skipped, not an error to retry
           console.warn("Reel upload failed:", f.name, f.size, e2?.code, e2?.response?.status, e2?.message);
           bad.push({ file: f, reason: reasonOf(e2) });
         }
@@ -704,6 +765,13 @@ const NewReel = ({ onClose, onPosted, onAdded }) => {
         return;
       }
       draftDel(draftKey);
+      if (!posted.length) { // every one turned out to be posted already
+        toast("Nothing new to post - they are already there", { icon: "♻️" });
+        setBusy(false);
+        setProgress("");
+        onClose();
+        return;
+      }
       toast.success(posted.length > 1 ? `${posted.length} reels posted` : "Reel posted");
       posted.forEach((r) => onPosted(r));
     } catch (err) {

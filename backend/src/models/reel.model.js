@@ -10,6 +10,8 @@ const reelSchema = new mongoose.Schema(
     caption: { type: String, default: "", maxlength: 300 },
     hashtags: { type: [String], default: [], index: true },
     duration: { type: Number, default: 0 },
+    fingerprint: { type: String, default: "", index: true }, // fingerprint of the uploaded file: the same video is not posted twice
+    fileSize: { type: Number, default: 0 },
     filter: { type: String, default: "none" },
     trim: { start: { type: Number, default: 0 }, end: { type: Number, default: 0 } }, // end 0 = whole video
     song: { url: String, name: String, start: { type: Number, default: 0 } },
