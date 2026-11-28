@@ -14,6 +14,7 @@ import { axiosInstance } from "../lib/axios";
 import { useNavigate } from "react-router-dom";
 import { useChatStore } from "../store/useChatStore";
 import { optimizeImage } from "../lib/cdn";
+import { POST_W, getFeedCache, setFeedCache, warmImages } from "../lib/feedCache";
 import { useBackToClose } from "../lib/useBackToClose";
 
 // One photo, or a swipeable set with a 1/3 counter, dots and (on laptops) arrows.
@@ -22,14 +23,6 @@ import { useBackToClose } from "../lib/useBackToClose";
 // 4:5 and 1.91:1, like Instagram) - so swiping to a taller or wider photo never resizes or stretches the others.
 const ratioCache = new Map(); // photo address -> frame shape, so a post doesn't jump when it scrolls back into view
 const loadedImgs = new Set(); // photos already shown once: coming back to the tab, they are drawn at once instead of waiting (black) for lazy loading
-const warmImages = (posts, n = 6) =>
-  posts.slice(0, n).forEach((p) => {
-    const src = (p.images?.length ? p.images : [p.image])[0];
-    if (!src || loadedImgs.has(optimizeImage(src, 1080))) return;
-    const im = new window.Image();
-    im.decoding = "async";
-    im.src = optimizeImage(src, 1080);
-  });
 // One frame for the whole post. A single photo gets exactly its own shape; with several photos the frame takes the middle
 // shape among them, so tall and wide ones both waste as little space as possible (the rest is filled by the blurred photo, never cropped).
 const postFrame = (shapes) => {
@@ -117,11 +110,11 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
       >
         {images.map((src, k) => (
           <div key={k} className="relative w-full h-full shrink-0 snap-center snap-always overflow-hidden" style={{ containerType: "inline-size" }}>
-            {Math.abs(k - i) <= 2 && <img loading={k === 0 || loadedImgs.has(optimizeImage(src, 1080)) ? "eager" : "lazy"} decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
+            {Math.abs(k - i) <= 2 && <img loading={k === 0 || loadedImgs.has(optimizeImage(src, POST_W)) ? "eager" : "lazy"} decoding="async" src={optimizeImage(src, 160)} alt="" aria-hidden="true" draggable={false} className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-45 pointer-events-none" />}
             <img
-              src={optimizeImage(src, 1080)}
+              src={optimizeImage(src, POST_W)}
               alt=""
-              loading={k === 0 || loadedImgs.has(optimizeImage(src, 1080)) ? "eager" : "lazy"}
+              loading={k === 0 || loadedImgs.has(optimizeImage(src, POST_W)) ? "eager" : "lazy"}
               decoding="async"
               draggable={false}
               onLoad={seen(src)}
@@ -624,15 +617,13 @@ export { default as NewPost } from "./NewPost";
 
 // Remembers the feed (posts, how far it was loaded, where you were) while you visit another page, so coming back
 // puts you on the same post instead of reloading from the top.
-const FEED_MEM_MS = 3 * 60 * 60 * 1000;
-let feedMem = null;
 
 // The Feed: photo posts from people you can see, 16 at a time
 const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(safe-area-inset-top))" }) => {
   const navigate = useNavigate();
   const focusPost = useRef(null); // a post opened from a shared link: kept at the top of the feed
   const resume = useRef(undefined);
-  if (resume.current === undefined) resume.current = feedMem && !focusId && Date.now() - feedMem.at < FEED_MEM_MS ? feedMem : null;
+  if (resume.current === undefined) resume.current = !focusId ? getFeedCache() : null;
   const [posts, setPosts] = useState(() => resume.current?.posts || []);
   const [more, setMore] = useState(() => !!resume.current?.more);
   const [loading, setLoading] = useState(() => !resume.current);
@@ -658,7 +649,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
     }
     return () => {
       const m = memRef.current;
-      feedMem = m.tab === "all" && m.posts.length ? { posts: m.posts.slice(0, 80), more: m.more, next: next.current, scrollTop: scrollPos.current, at: Date.now() } : null;
+      if (m.tab === "all" && m.posts.length) setFeedCache({ posts: m.posts.slice(0, 80), more: m.more, next: next.current, scrollTop: scrollPos.current });
     };
   }, []);
   const usedResume = useRef(false);
@@ -704,7 +695,24 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
 
   useEffect(() => {
     if (resume.current && !usedResume.current) {
-      usedResume.current = true; // coming back: keep what was already loaded
+      usedResume.current = true; // coming back: keep what was already loaded, and quietly bring in anything new
+      if (tab === "all") {
+        axiosInstance
+          .get("/posts", { timeout: 20000 })
+          .then(({ data }) => {
+            if (!data?.posts) return;
+            setPosts((cur) => {
+              const byId = new Map(data.posts.map((p) => [p._id, p]));
+              const updated = cur.map((p) => byId.get(p._id) || p);
+              const have = new Set(cur.map((p) => p._id));
+              const fresh = data.posts.filter((p) => !have.has(p._id));
+              // new posts go on top only while you are at the top, so the post you are looking at never jumps away
+              return fresh.length && (scroller.current?.scrollTop || 0) < 80 ? [...fresh, ...updated] : updated;
+            });
+            setMore((m) => m || !!data.more);
+          })
+          .catch(() => {});
+      }
       return;
     }
     next.current = null;
@@ -768,15 +776,7 @@ const FeedView = ({ onCreate, refreshKey, focusId, topPad = "calc(60px + env(saf
         ))}
       </div>
       {loading && !posts.length ? (
-        <div className="px-3 space-y-6">
-          {[0, 1].map((i) => (
-            <div key={i} className="animate-pulse">
-              <div className="flex items-center gap-2.5 py-2"><div className="size-8 rounded-full bg-white/10" /><div className="h-3 w-28 rounded bg-white/10" /></div>
-              <div className="aspect-square w-full rounded-xl bg-white/10" />
-              <div className="h-3 w-40 rounded bg-white/10 mt-3" />
-            </div>
-          ))}
-        </div>
+        <div className="py-24 flex justify-center"><Loader2 className="size-8 animate-spin text-[#25D366]" /></div>
       ) : failed && !posts.length ? (
         <div className="py-20 text-center px-8">
           <p className="font-semibold">Couldn&apos;t load the feed</p>

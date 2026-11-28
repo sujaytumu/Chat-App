@@ -1,4 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
+import { warmFeed } from "./lib/feedCache";
 import Navbar from "./components/Navbar";
 import HomePage from "./pages/HomePage";
 import MainLayout from "./components/MainLayout";
@@ -170,7 +171,7 @@ const App = () => {
   // Warm up the first Reels so the tab opens instantly
   useEffect(() => {
     if (!authUser?._id) return;
-    const t = setTimeout(warmReels, 1500);
+    const t = setTimeout(() => { warmReels(); warmFeed(); }, 1500);
     return () => clearTimeout(t);
   }, [authUser?._id]);
 

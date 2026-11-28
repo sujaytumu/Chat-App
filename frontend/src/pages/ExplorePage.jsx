@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
-import { Search, Eye, X, Film, Pin } from "lucide-react";
+import { Search, Eye, X, Film, Pin, Loader2 } from "lucide-react";
 import { axiosInstance } from "../lib/axios";
 import { optimizeImage } from "../lib/cdn";
 import MainNav from "../components/MainNav";
@@ -94,9 +94,7 @@ const ExplorePage = () => {
 
       <div className="flex-1 overflow-y-auto pb-[calc(90px+env(safe-area-inset-bottom))]">
         {loading && !list.length ? (
-          <div className="grid grid-cols-3 gap-1 px-1">
-            {Array.from({ length: 12 }).map((_, i) => <div key={i} className="aspect-[9/14] rounded-md bg-white/10 animate-pulse" />)}
-          </div>
+          <div className="py-24 flex justify-center"><Loader2 className="size-8 animate-spin text-[#25D366]" /></div>
         ) : !list.length ? (
           <p className="text-center text-white/55 py-16 text-[15px]">{q.trim().length >= 2 ? "No reels found" : "No reels yet"}</p>
         ) : (
