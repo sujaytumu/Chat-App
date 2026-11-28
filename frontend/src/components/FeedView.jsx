@@ -31,6 +31,31 @@ const postFrame = (shapes) => {
   const m = k.length >> 1;
   return k.length % 2 ? k[m] : (k[m - 1] + k[m]) / 2;
 };
+// Photos are drawn a little bigger than "fit" (up to 15%) so they fill the frame better. People are protected: where the
+// phone can find faces (FaceDetector), the zoom centres on them and stops before any face reaches the edge; otherwise it is
+// a gentle zoom towards the upper middle (where people usually are). Tapping a photo opens it whole, uncropped.
+const imgInfo = new Map(); // photo address -> { r: width/height, faces: [{x, y, w, h}] as fractions of the picture }
+const zoomFor = (src, ar) => {
+  const info = imgInfo.get(src);
+  if (!info) return null;
+  const { r, faces } = info;
+  const cover = r > ar ? r / ar : ar / r; // the zoom that would leave no empty bars at all
+  const s0 = Math.min(1.15, Math.max(1.1, cover));
+  if (!faces?.length) return { s: s0, ox: 0.5, oy: 0.4 };
+  // where the picture sits inside the frame (fractions of the frame)
+  const pw = r > ar ? 1 : r / ar;
+  const ph = r > ar ? ar / r : 1;
+  const px = (1 - pw) / 2;
+  const py = (1 - ph) / 2;
+  const rects = faces.map((f) => ({ x0: px + (f.x - 0.04) * pw, x1: px + (f.x + f.w + 0.04) * pw, y0: py + (f.y - 0.06) * ph, y1: py + (f.y + f.h + 0.06) * ph }));
+  const u = rects.reduce((a, q) => ({ x0: Math.min(a.x0, q.x0), x1: Math.max(a.x1, q.x1), y0: Math.min(a.y0, q.y0), y1: Math.max(a.y1, q.y1) }), { x0: 1, x1: 0, y0: 1, y1: 0 });
+  const ox = Math.min(0.85, Math.max(0.15, (u.x0 + u.x1) / 2));
+  const oy = Math.min(0.85, Math.max(0.15, (u.y0 + u.y1) / 2));
+  for (let z = s0; z > 1.005; z -= 0.01) {
+    if (u.x0 >= ox - ox / z && u.x1 <= ox + (1 - ox) / z && u.y0 >= oy - oy / z && u.y1 <= oy + (1 - oy) / z) return { s: z, ox, oy };
+  }
+  return { s: 1, ox: 0.5, oy: 0.5 };
+};
 const frameShape = (w, h) => Math.min(1.91, Math.max(0.5625, w / h)); // 9:16 tall up to 1.91:1 wide
 // The like heart: pops with a ring when you like (not when a liked post simply scrolls into view)
 const LikeHeart = ({ liked }) => {
@@ -89,6 +114,25 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
     const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
     loadedImgs.add(e.currentTarget.currentSrc || e.currentTarget.src);
     if (!w || !h) return;
+    if (!imgInfo.has(src)) {
+      imgInfo.set(src, { r: w / h, faces: [] });
+      setShapes((n) => n + 1);
+      try {
+        if ("FaceDetector" in window) {
+          const el = e.currentTarget;
+          new window.FaceDetector({ fastMode: true, maxDetectedFaces: 12 })
+            .detect(el)
+            .then((found) => {
+              const faces = found.map((f) => ({ x: f.boundingBox.x / w, y: f.boundingBox.y / h, w: f.boundingBox.width / w, h: f.boundingBox.height / h }));
+              if (faces.length) {
+                imgInfo.set(src, { r: w / h, faces });
+                setShapes((n) => n + 1);
+              }
+            })
+            .catch(() => {});
+        }
+      } catch { /* no face finder on this phone: the gentle zoom is used */ }
+    }
     const shape = frameShape(w, h);
     if (ratioCache.get(src) !== shape) {
       ratioCache.set(src, shape);
@@ -120,6 +164,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
               onLoad={seen(src)}
               onClick={() => onTap(k)}
               className="relative w-full h-full object-contain"
+              style={(() => { const z = zoomFor(src, ar); return z && z.s > 1.001 ? { transform: `scale(${z.s})`, transformOrigin: `${z.ox * 100}% ${z.oy * 100}%` } : undefined; })()}
             />
             <PhotoLine t={texts[k]} />
           </div>
