@@ -101,7 +101,7 @@ const PostImages = ({ images, texts = [], onOpen, onDouble }) => {
   };
   const many = images.length > 1;
   return (
-    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "80vh", transition: "aspect-ratio .2s ease" }}>
+    <div className="relative w-full bg-black/40 overflow-hidden" style={{ aspectRatio: ar, maxHeight: "92vh", transition: "aspect-ratio .2s ease" }}>
       <div
         ref={rail}
         className="absolute inset-0 flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory no-scrollbar overscroll-x-contain"
